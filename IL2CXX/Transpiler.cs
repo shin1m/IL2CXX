@@ -381,7 +381,6 @@ struct {Escape(type)}
                 typeToDefinition[type] = definition;
                 var identifier = Escape(type);
                 var declaration = $@"// {type.AssemblyQualifiedName}
-// {type.TypeInitializer}
 struct {identifier}";
                 var @base = type == typeof(object) ? $" : t__object" : type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
                 var staticFields = type.IsEnum ? Enumerable.Empty<FieldInfo>() : type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
@@ -1170,14 +1169,14 @@ struct {identifier}";
                         if (m.DeclaringType.IsInterface)
                         {
                             var i = definition.GetIndex(m);
-                            GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>((*reinterpret_cast<std::map<t__type*, void**>*>({target}->v__type + 1))[&t__type_of<{Escape(m.DeclaringType)}>::v__instance][{i}])", stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target), after);
+                            GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>({target}->v__type->v__interface_to_methods[&t__type_of<{Escape(m.DeclaringType)}>::v__instance][{i}])", stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target), after);
                             Escape(m);
                             foreach (var ms in typeToDefinition.Values.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(m.DeclaringType, out var ms) ? ms : null).Where(y => y != null)) queuedMethods.Enqueue(ms[i]);
                         }
                         else if (m.IsVirtual)
                         {
                             var i = definition.GetIndex(m);
-                            GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>(reinterpret_cast<void**>(reinterpret_cast<std::map<t__type*, void**>*>({target}->v__type + 1) + 1)[{i}])", stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target), after);
+                            GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>(reinterpret_cast<void**>({target}->v__type + 1)[{i}])", stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target), after);
                             Escape(m);
                             if (m.IsVirtual) queuedMethods.Enqueue(m);
                             foreach (var p in typeToDefinition.Where(y => !y.Key.IsInterface && y.Key.IsSubclassOf(m.DeclaringType))) queuedMethods.Enqueue(p.Value.Methods[i]);
@@ -1832,7 +1831,7 @@ struct {identifier}";
                     return index;
                 };
             });
-            typeToBuiltinFields.Add(typeof(RuntimeTypeHandle), () => "\tt__type* v__type;\n");
+            typeToBuiltinFields.Add(typeof(RuntimeTypeHandle), () => "\tt__type_base* v__type;\n");
             typeToBuiltinFields.Add(typeof(Exception), () => $@"{'\t'}t_System_2eString* v__5fclassName;
 {'\t'}t_System_2eString* v__5fmessage;
 {'\t'}t_System_2eObject* v__5fdata;
@@ -1902,15 +1901,13 @@ struct {identifier}";
         private void WriteTypeDefinition(Type type, MethodTable definition, TextWriter writer)
         {
             var identifier = Escape(type);
-            writer.WriteLine($@"
+            writer.Write($@"
 template<>
-struct t__type_of<{identifier}> : t__type
-{{
-{'\t'}static t__type_of v__instance;");
+struct t__type_of<{identifier}> : ");
             if (definition is TypeDefinition td)
             {
-                writer.Write($@"
-{'\t'}std::map<t__type*, void**> v_interface_to_methods;
+                writer.Write($@"t__type
+{{
 {string.Join(string.Empty, td.Methods.Select((x, i) =>
     $"\tvoid* v_method{i} = {(methodToIdentifier.TryGetValue(x.MethodHandle, out var name) ? $"reinterpret_cast<void*>(&{name}{(x.DeclaringType.IsValueType ? "__v" : string.Empty)})" : "nullptr")};\n"
 ))}");
@@ -1920,24 +1917,26 @@ struct t__type_of<{identifier}> : t__type
 }{'\t'}}} v_interface__{Escape(p.Key)};");
                 writer.WriteLine("\tt__type_of(t__type* a_base);");
                 memberDefinitions.Write($@"
-t__type_of<{identifier}>::t__type_of(t__type* a_base) : t__type(a_base), v_interface_to_methods{{{
+t__type_of<{identifier}>::t__type_of(t__type* a_base) : t__type(a_base, {{{
     string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}"))}
-}}
+}})
 {{
 }}");
             }
             else
             {
-                writer.WriteLine("\tusing t__type::t__type;");
+                writer.WriteLine($@"t__type_base
+{{");
             }
-            writer.WriteLine("};");
-            memberDefinitions.WriteLine($"\nt__type_of<{identifier}> t__type_of<{identifier}>::v__instance({(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")});");
+            writer.WriteLine($@"{'\t'}static t__type_of v__instance;
+}};");
+            memberDefinitions.WriteLine($"\nt__type_of<{identifier}> t__type_of<{identifier}>::v__instance{(type.IsInterface ? string.Empty : type.BaseType == null ? "(nullptr)" : $"(&t__type_of<{Escape(type.BaseType)}>::v__instance)")};");
         }
         public void Do(MethodInfo method, TextWriter writer)
         {
+            Define(typeof(Type));
             Define(typeof(IntPtr));
             Define(typeof(UIntPtr));
-            queuedMethods.Enqueue(method);
             var fas = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic);
             queuedMethods.Enqueue(fas);
             functionDefinitions.WriteLine($@"
@@ -1947,6 +1946,7 @@ t__type_of<{identifier}>::t__type_of(t__type* a_base) : t__type(a_base), v_inter
 {'\t'}std::copy(a_value.begin(), a_value.end(), reinterpret_cast<char16_t*>(p + 1));
 {'\t'}return p;
 }}");
+            queuedMethods.Enqueue(method);
             do
             {
                 Do();
@@ -1990,11 +1990,17 @@ t__finally<T> f__finally(T&& a_f)
             writer.WriteLine($@"
 using t_managed_pointer = void*;
 
-struct t__type
+struct t__type_base
+{{
+{'\t'}{EscapeForVariable(typeof(Type))} v__type;
+}};
+
+struct t__type : t__type_base
 {{
 {'\t'}t__type* v__base;
+{'\t'}std::map<t__type_base*, void**> v__interface_to_methods;
 
-{'\t'}t__type(t__type* a_base) : v__base(a_base)
+{'\t'}t__type(t__type* a_base, std::map<t__type_base*, void**>&& a_interface_to_methods) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods))
 {'\t'}{{
 {'\t'}}}
 {'\t'}bool f__is(t__type* a_type) const
@@ -2006,11 +2012,10 @@ struct t__type
 {'\t'}{'\t'}}} while (p);
 {'\t'}{'\t'}return false;
 {'\t'}}}
-{'\t'}void** f__implementation(t__type* a_interface) const
+{'\t'}void** f__implementation(t__type_base* a_interface) const
 {'\t'}{{
-{'\t'}{'\t'}auto m = reinterpret_cast<const std::map<t__type*, void**>*>(this + 1);
-{'\t'}{'\t'}auto i = m->find(a_interface);
-{'\t'}{'\t'}return i == m->end() ? nullptr : i->second;
+{'\t'}{'\t'}auto i = v__interface_to_methods.find(a_interface);
+{'\t'}{'\t'}return i == v__interface_to_methods.end() ? nullptr : i->second;
 {'\t'}}}
 }};
 

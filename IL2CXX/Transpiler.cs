@@ -407,9 +407,10 @@ struct {identifier}";
 ";
                 }
                 var arrayMembers = type.IsArray ? $@"{'\t'}size_t v__length;
-{'\t'}static {identifier}* f__new(size_t a_length);
-{'\t'}{EscapeForVariable(GetElementType(type))} f__get(size_t a_index) const;
-{'\t'}void f__set(size_t a_index, {EscapeForParameter(GetElementType(type))} a_value);
+{'\t'}{EscapeForVariable(GetElementType(type))}& f__at(size_t a_index)
+{'\t'}{{
+{'\t'}{'\t'}return reinterpret_cast<{EscapeForVariable(GetElementType(type))}*>(this + 1)[a_index];
+{'\t'}}}
 " : string.Empty;
                 typeDeclarations.WriteLine($"{declaration};");
                 typeDefinitions.WriteLine($@"
@@ -627,7 +628,7 @@ struct {identifier}";
                     tries.Push(clause);
                     if (clause.Flags == ExceptionHandlingClauseOptions.Finally)
                     {
-                        writer.WriteLine("{ auto finally = f__finally([&]\n{");
+                        writer.WriteLine("{auto finally = f__finally([&]\n{");
                         writers.Push(writer);
                         writer = new StringWriter();
                         writer.WriteLine("});");
@@ -1209,7 +1210,7 @@ struct {identifier}";
                             else
                             {
                                 var target = stack.ElementAt(m.GetParameters().Length);
-                                writer.WriteLine($@"{'\t'}{{ auto p = new {Escape(constrained)}(std::move(*{string.Format(MoveFormat(MakePointerType(constrained)), target.Variable)}));
+                                writer.WriteLine($@"{'\t'}{{auto p = new {Escape(constrained)}(std::move(*{string.Format(MoveFormat(MakePointerType(constrained)), target.Variable)}));
 {'\t'}p->v__type = &t__type_of<{Escape(constrained)}>::v__instance;");
                                 generate("p");
                                 writer.WriteLine($"\t}}");
@@ -1267,8 +1268,7 @@ struct {identifier}";
                     }
                     else
                     {
-                        writer.WriteLine($@"{'\t'}{{ auto p = new {Escape(m.DeclaringType)}();
-{'\t'}p->v__type = &t__type_of<{Escape(m.DeclaringType)}>::v__instance;");
+                        writer.WriteLine($@"{'\t'}{{auto p = f__new<{Escape(m.DeclaringType)}>();");
                         arguments.Add("p");
                     }
                     var parameters = m.GetParameters();
@@ -1457,9 +1457,7 @@ struct {identifier}";
                 {
                     var t = ParseType(ref index);
                     var after = indexToStack[index];
-                    writer.WriteLine($@" {t}
-{'\t'}{after.Variable} = new {Escape(t)}(std::move({stack.Variable}));
-{'\t'}{after.Variable}->v__type = &t__type_of<{Escape(t)}>::v__instance;");
+                    writer.WriteLine($" {t}\n\t{after.Variable} = f__new<{Escape(t)}>(std::move({stack.Variable}));");
                     return index;
                 };
             });
@@ -1473,7 +1471,12 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {Escape(t.MakeArrayType())}::f__new({stack.Variable});");
+                    writer.WriteLine($@" {t}
+{'\t'}{{auto p = f__new_sized<{Escape(t.MakeArrayType())}>(sizeof({EscapeForVariable(t)}) * {stack.Variable});
+{'\t'}p->v__length = {stack.Variable};
+{'\t'}std::fill_n(&p->f__at(0), {stack.Variable}, ({EscapeForVariable(t)}){{}});
+{'\t'}{indexToStack[index].Variable} = p;
+{'\t'}}}");
                     return index;
                 };
             });
@@ -1518,7 +1521,7 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var array = stack.Pop;
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__get({stack.Variable});");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__at({stack.Variable});");
                     return index;
                 };
             }));
@@ -1536,7 +1539,7 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__set({stack.Pop.Variable}, static_cast<{set.Type}>({stack.Variable}));");
+                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__at({stack.Pop.Variable}) = static_cast<{set.Type}>({stack.Variable});");
                     return index;
                 };
             }));
@@ -1546,7 +1549,7 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__set({stack.Pop.Variable}, {string.Format(MoveFormat(GetElementType(array.Type)), stack.Variable)});");
+                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__at({stack.Pop.Variable}) = {string.Format(MoveFormat(GetElementType(array.Type)), stack.Variable)};");
                     return index;
                 };
             });
@@ -1859,20 +1862,16 @@ struct {identifier}";
             // TODO: tentative
             methodTreeToBuiltinBody.Add(typeof(object).GetMethod(nameof(object.ToString)).MethodHandle, type => $"\treturn f__string(u\"{type}\");\n");
             methodTreeToBuiltinBody.Add(typeof(Exception).GetMethod(nameof(object.ToString)).MethodHandle, type => $"\treturn f__string(u\"{type}\");\n");
-            methodToBuiltinBody.Add(typeof(string).GetProperty(nameof(string.Length)).GetMethod.MethodHandle, () => "\treturn a_0->v__length;\n");
-            methodToBuiltinBody.Add(typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic).MethodHandle, () =>
-            {
-                var stringType = Escape(typeof(string));
-                return $@"{'\t'}auto p = new(new char[sizeof({stringType}) + sizeof(char16_t) * a_0]) {stringType};
-{'\t'}p->v__type = &t__type_of<{stringType}>::v__instance;
+            methodToBuiltinBody.Add(typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic).MethodHandle, () => $@"{'\t'}auto p = f__new_sized<{Escape(typeof(string))}>(sizeof(char16_t) * a_0);
 {'\t'}p->v__length = a_0;
 {'\t'}return p;
-";
-            });
+");
             methodToBuiltinBody.Add(typeof(string).GetMethod("FillStringChecked", BindingFlags.Static | BindingFlags.NonPublic).MethodHandle, () => $@"{'\t'}if (a_1 < 0 || a_1 + a_2->v__length > a_0->v__length) throw std::runtime_error(""IndexOutOfRangeException"");
 {'\t'}std::copy_n(reinterpret_cast<char16_t*>(a_2 + 1), a_2->v__length, reinterpret_cast<char16_t*>(a_0 + 1) + a_1);
 ");
             methodToBuiltinBody.Add(typeof(string).GetMethod("GetRawStringData", BindingFlags.Instance | BindingFlags.NonPublic).MethodHandle, () => $"\treturn reinterpret_cast<char16_t*>(a_0 + 1);");
+            methodToBuiltinBody.Add(typeof(string).GetProperty(nameof(string.Length)).GetMethod.MethodHandle, () => "\treturn a_0->v__length;\n");
+            methodToBuiltinBody.Add(typeof(string).GetProperty("Chars").GetMethod.MethodHandle, () => "\treturn reinterpret_cast<const char16_t*>(a_0 + 1)[a_1];\n");
             methodToBuiltinBody.Add(typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(StringComparison) }).MethodHandle, () =>
             {
                 var method = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string) });
@@ -2025,7 +2024,23 @@ struct t__object
 }};
 
 template<typename T>
-struct t__type_of;");
+struct t__type_of;
+
+template<typename T, typename... T_an>
+T* f__new(T_an&&... a_n)
+{{
+{'\t'}auto p = new T(std::forward<T_an>(a_n)...);
+{'\t'}p->v__type = &t__type_of<T>::v__instance;
+{'\t'}return p;
+}}
+
+template<typename T, typename... T_an>
+T* f__new_sized(size_t a_extra, T_an&&... a_n)
+{{
+{'\t'}auto p = new(new char[sizeof(T) + a_extra]) T(std::forward<T_an>(a_n)...);
+{'\t'}p->v__type = &t__type_of<T>::v__instance;
+{'\t'}return p;
+}}");
             writer.Write(typeDefinitions);
             writer.Write(functionDeclarations);
             foreach (var p in typeToDefinition) WriteTypeDefinition(p.Key, p.Value, writer);

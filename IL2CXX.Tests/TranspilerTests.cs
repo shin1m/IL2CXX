@@ -78,11 +78,18 @@ namespace IL2CXX.Tests
             Console.WriteLine(f("World"));
             return 0;
         }
+        static int Format()
+        {
+            string f(object x, object y) => $"Hello {x} and {y}!";
+            Console.WriteLine(f("World", 0));
+            return 0;
+        }
         [TestCase(nameof(HelloWorld))]
         [TestCase(nameof(CallVirtual))]
         [TestCase(nameof(ConstrainedCallVirtual))]
         [TestCase(nameof(Box))]
         [TestCase(nameof(Concatination))]
+        [TestCase(nameof(Format))]
         public void DoShouldTranspile(string method)
         {
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method}-build");

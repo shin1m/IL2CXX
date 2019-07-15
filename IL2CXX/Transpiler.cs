@@ -41,22 +41,27 @@ namespace IL2CXX
                 } while (method == null);
             }
         }
-        abstract class MethodTable
+        abstract class MethodTable : IEqualityComparer<Type[]>
         {
+            bool IEqualityComparer<Type[]>.Equals(Type[] x, Type[] y) => x.SequenceEqual(y);
+            int IEqualityComparer<Type[]>.GetHashCode(Type[] x) => x.Select(y => y.GetHashCode()).Aggregate((y, z) => y % z);
+
             public readonly List<MethodInfo> Methods = new List<MethodInfo>();
             public readonly Dictionary<RuntimeMethodHandle, int> MethodToIndex = new Dictionary<RuntimeMethodHandle, int>();
 
+            protected void Add(MethodInfo method, Dictionary<RuntimeMethodHandle, Dictionary<Type[], int>> genericMethodToTypesToIndex)
+            {
+                MethodToIndex.Add(method.MethodHandle, Methods.Count);
+                Methods.Add(method);
+                if (method.IsGenericMethod) genericMethodToTypesToIndex.Add(method.MethodHandle, new Dictionary<Type[], int>(this));
+            }
             public abstract int GetIndex(MethodBase method);
         }
         class InterfaceDefinition : MethodTable
         {
-            public InterfaceDefinition(Type type)
+            public InterfaceDefinition(Type type, Dictionary<RuntimeMethodHandle, Dictionary<Type[], int>> genericMethodToTypesToIndex)
             {
-                foreach (var x in type.GetMethods())
-                {
-                    MethodToIndex.Add(x.MethodHandle, Methods.Count);
-                    Methods.Add(x);
-                }
+                foreach (var x in type.GetMethods()) Add(x, genericMethodToTypesToIndex);
             }
             public override int GetIndex(MethodBase method) => MethodToIndex[method.MethodHandle];
         }
@@ -65,7 +70,7 @@ namespace IL2CXX
             public readonly TypeDefinition Base;
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new Dictionary<Type, MethodInfo[]>();
 
-            public TypeDefinition(Type type, TypeDefinition @base, IEnumerable<(Type Type, InterfaceDefinition Definition)> interfaces)
+            public TypeDefinition(Type type, TypeDefinition @base, Dictionary<RuntimeMethodHandle, Dictionary<Type[], int>> genericMethodToTypesToIndex, IEnumerable<(Type Type, InterfaceDefinition Definition)> interfaces)
             {
                 Base = @base;
                 if (Base != null) Methods.AddRange(Base.Methods);
@@ -73,14 +78,9 @@ namespace IL2CXX
                 {
                     var i = GetIndex(x.GetBaseDefinition());
                     if (i < 0)
-                    {
-                        MethodToIndex.Add(x.MethodHandle, Methods.Count);
-                        Methods.Add(x);
-                    }
+                        Add(x, genericMethodToTypesToIndex);
                     else
-                    {
                         Methods[i] = x;
-                    }
                 }
                 foreach (var (key, definition) in interfaces)
                 {
@@ -240,6 +240,7 @@ namespace IL2CXX
         private readonly Dictionary<string, Func<MethodBase, string>> methodNameToBuiltinBody = new Dictionary<string, Func<MethodBase, string>>();
         private readonly HashSet<(Type, string)> methodIdentifiers = new HashSet<(Type, string)>();
         private readonly Dictionary<RuntimeMethodHandle, string> methodToIdentifier = new Dictionary<RuntimeMethodHandle, string>();
+        private readonly Dictionary<RuntimeMethodHandle, Dictionary<Type[], int>> genericMethodToTypesToIndex = new Dictionary<RuntimeMethodHandle, Dictionary<Type[], int>>();
         private readonly Queue<Type> queuedTypes = new Queue<Type>();
         private readonly HashSet<RuntimeMethodHandle> visitedMethods = new HashSet<RuntimeMethodHandle>();
         private readonly Queue<MethodBase> queuedMethods = new Queue<MethodBase>();
@@ -358,7 +359,7 @@ namespace IL2CXX
             if (typeToDefinition.TryGetValue(type, out var definition)) return definition;
             if (type.IsInterface)
             {
-                definition = new InterfaceDefinition(type);
+                definition = new InterfaceDefinition(type, genericMethodToTypesToIndex);
                 typeToDefinition.Add(type, definition);
                 typeDeclarations.WriteLine($@"// {type.AssemblyQualifiedName}
 struct {Escape(type)}
@@ -371,12 +372,20 @@ struct {Escape(type)}
                 if (type.TypeInitializer != null) queuedMethods.Enqueue(type.TypeInitializer);
                 IEnumerable<Type> interfaces = type.GetInterfaces();
                 if (type.IsArray) interfaces = interfaces.Where(x => !x.IsGenericType);
-                var td = new TypeDefinition(type, type.BaseType == null ? null : (TypeDefinition)Define(type.BaseType), interfaces.Select(x => (x, (InterfaceDefinition)Define(x))));
-                foreach (var m in td.Methods.Where(x => !x.IsAbstract && methodToIdentifier.ContainsKey(x.GetBaseDefinition().MethodHandle))) queuedMethods.Enqueue(m);
+                var td = new TypeDefinition(type, type.BaseType == null ? null : (TypeDefinition)Define(type.BaseType), genericMethodToTypesToIndex, interfaces.Select(x => (x, (InterfaceDefinition)Define(x))));
+                void enqueue(MethodInfo m, MethodInfo concrete)
+                {
+                    if (m.IsGenericMethod)
+                        foreach (var k in genericMethodToTypesToIndex[m.MethodHandle].Keys)
+                            queuedMethods.Enqueue(concrete.MakeGenericMethod(k));
+                    else if (methodToIdentifier.ContainsKey(m.MethodHandle))
+                        queuedMethods.Enqueue(concrete);
+                }
+                foreach (var m in td.Methods.Where(x => !x.IsAbstract)) enqueue(m.GetBaseDefinition(), m);
                 foreach (var p in td.InterfaceToMethods)
                 {
                     var id = typeToDefinition[p.Key];
-                    foreach (var m in id.Methods.Where(x => methodToIdentifier.ContainsKey(x.MethodHandle))) queuedMethods.Enqueue(p.Value[id.GetIndex(m)]);
+                    foreach (var m in id.Methods) enqueue(m, p.Value[id.GetIndex(m)]);
                 }
                 definition = td;
                 typeToDefinition[type] = definition;
@@ -502,7 +511,7 @@ struct {identifier}";
         private void Do()
         {
             method = queuedMethods.Dequeue();
-            if (!visitedMethods.Add(method.MethodHandle)) return;
+            if (!visitedMethods.Add(method.MethodHandle) || method.IsAbstract) return;
             var gotBuiltinBody = methodToBuiltinBody.TryGetValue(method.MethodHandle, out var builtin);
             var returns = method is MethodInfo m ? m.ReturnType == typeof(void) ? "void" : EscapeForVariable(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForVariable(method.DeclaringType);
             var identifier = Escape(method);
@@ -513,7 +522,7 @@ struct {identifier}";
             var prototype = $@"
 // {method.DeclaringType}
 // {method}
-// {(method.IsPublic ? "public " : string.Empty)}{(method.IsPrivate ? "private " : string.Empty)}{(method.IsStatic ? "static " : string.Empty)}{(method.IsFinal ? "final " : string.Empty)}{(method.IsAbstract ? "abstract " : method.IsVirtual ? "virtual " : string.Empty)}{method.MethodImplementationFlags}
+// {(method.IsPublic ? "public " : string.Empty)}{(method.IsPrivate ? "private " : string.Empty)}{(method.IsStatic ? "static " : string.Empty)}{(method.IsFinal ? "final " : string.Empty)}{(method.IsVirtual ? "virtual " : string.Empty)}{method.MethodImplementationFlags}
 {returns}
 {identifier}({string.Join(",", arguments)}{(arguments.Any() ? "\n" : string.Empty)})";
             functionDeclarations.Write(prototype);
@@ -538,7 +547,7 @@ struct {identifier}";
             else
             {
                 if (method is MethodInfo mi)
-                    foreach (var x in UpToOrigin(mi))
+                    foreach (var x in UpToOrigin(mi.IsGenericMethod ? mi.GetGenericMethodDefinition() : mi))
                         if (methodTreeToBuiltinBody.TryGetValue(x.MethodHandle, out var builtin0))
                         {
                             if (builtin0 == null) break;
@@ -560,7 +569,7 @@ struct {identifier}";
             bytes = body?.GetILAsByteArray();
             if (bytes == null)
             {
-                if (!method.IsAbstract) functionDeclarations.WriteLine("// TO BE SUPPLIED");
+                functionDeclarations.WriteLine("// TO BE SUPPLIED");
                 return;
             }
             writer.Write(prototype);
@@ -1175,26 +1184,38 @@ struct {identifier}";
                     var definition = typeToDefinition[m.DeclaringType];
                     void generate(string target)
                     {
+                        void forVirtual(string table, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
+                        {
+                            var variables = stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target);
+                            if (m.IsGenericMethod)
+                            {
+                                var gm = ((MethodInfo)m).GetGenericMethodDefinition();
+                                var i = definition.GetIndex(gm);
+                                var t2i = genericMethodToTypesToIndex[gm.MethodHandle];
+                                var ga = m.GetGenericArguments();
+                                if (!t2i.TryGetValue(ga, out var j))
+                                {
+                                    j = t2i.Count;
+                                    t2i.Add(ga, j);
+                                }
+                                GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>(reinterpret_cast<void**>({table}[{i}])[{j}])", variables, after);
+                                foreach (var ms in concretes) queuedMethods.Enqueue(ms[i].MakeGenericMethod(ga));
+                            }
+                            else
+                            {
+                                var i = definition.GetIndex(m);
+                                GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>({table}[{i}])", variables, after);
+                                Escape(m);
+                                foreach (var ms in concretes) queuedMethods.Enqueue(ms[i]);
+                            }
+                        }
+                        queuedMethods.Enqueue(m);
                         if (m.DeclaringType.IsInterface)
-                        {
-                            var i = definition.GetIndex(m);
-                            GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>({target}->v__type->v__interface_to_methods[&t__type_of<{Escape(m.DeclaringType)}>::v__instance][{i}])", stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target), after);
-                            Escape(m);
-                            foreach (var ms in typeToDefinition.Values.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(m.DeclaringType, out var ms) ? ms : null).Where(y => y != null)) queuedMethods.Enqueue(ms[i]);
-                        }
+                            forVirtual($"{target}->v__type->v__interface_to_methods[&t__type_of<{Escape(m.DeclaringType)}>::v__instance]", typeToDefinition.Values.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(m.DeclaringType, out var ms) ? ms : null).Where(y => y != null));
                         else if (m.IsVirtual)
-                        {
-                            var i = definition.GetIndex(m);
-                            GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>(reinterpret_cast<void**>({target}->v__type + 1)[{i}])", stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target), after);
-                            Escape(m);
-                            if (m.IsVirtual) queuedMethods.Enqueue(m);
-                            foreach (var p in typeToDefinition.Where(y => !y.Key.IsInterface && y.Key.IsSubclassOf(m.DeclaringType))) queuedMethods.Enqueue(p.Value.Methods[i]);
-                        }
+                            forVirtual($"reinterpret_cast<void**>({target}->v__type + 1)", typeToDefinition.Where(y => !y.Key.IsInterface && y.Key.IsSubclassOf(m.DeclaringType)).Select(y => y.Value.Methods));
                         else
-                        {
                             GenerateCall(m, Escape(m), stack, after);
-                            queuedMethods.Enqueue(m);
-                        }
                     }
                     writer.WriteLine($" {m.DeclaringType}::[{m}]");
                     if (constrained == null)
@@ -1203,11 +1224,7 @@ struct {identifier}";
                     }
                     else
                     {
-                        if (!constrained.IsValueType)
-                        {
-                            generate($"*{stack.ElementAt(m.GetParameters().Length).Variable}");
-                        }
-                        else
+                        if (constrained.IsValueType)
                         {
                             var mm = typeToDefinition[constrained].Methods[definition.GetIndex(m)];
                             if (mm.DeclaringType == constrained)
@@ -1223,6 +1240,10 @@ struct {identifier}";
                                 generate("p");
                                 writer.WriteLine($"\t}}");
                             }
+                        }
+                        else
+                        {
+                            generate($"(*static_cast<{Escape(constrained)}**>({stack.ElementAt(m.GetParameters().Length).Variable}))");
                         }
                         constrained = null;
                     }
@@ -1962,15 +1983,30 @@ template<>
 struct t__type_of<{identifier}> : ");
             if (definition is TypeDefinition td)
             {
-                writer.Write($@"t__type
-{{
-{string.Join(string.Empty, td.Methods.Select((x, i) =>
-    $"\tvoid* v_method{i} = {(methodToIdentifier.TryGetValue(x.MethodHandle, out var name) ? $"reinterpret_cast<void*>(&{name}{(x.DeclaringType.IsValueType ? "__v" : string.Empty)})" : "nullptr")};\n"
-))}");
-                foreach (var p in td.InterfaceToMethods) writer.WriteLine($@"{'\t'}struct
-{'\t'}{{
-{string.Join(string.Empty, p.Value.Select((x, i) => $"\t\tvoid* v_method{i} = {(methodToIdentifier.TryGetValue(x.MethodHandle, out var name) ? $"reinterpret_cast<void*>(&{name}{(x.DeclaringType.IsValueType ? "__v" : string.Empty)})" : "nullptr")};\n"))
-}{'\t'}}} v_interface__{Escape(p.Key)};");
+                void writeMethods(IEnumerable<MethodInfo> methods, Func<MethodInfo, MethodInfo> origin, string indent)
+                {
+                    foreach (var (m, i) in methods.Select((x, i) => (x, i))) writer.WriteLine($"{indent}// {m}\n{indent}void* v_method{i} = {(m.IsAbstract ? "nullptr" : m.IsGenericMethod ? $"&v_generic__{Escape(m)}" : methodToIdentifier.TryGetValue(m.MethodHandle, out var name) ? $"reinterpret_cast<void*>(&{name}{(m.DeclaringType.IsValueType ? "__v" : string.Empty)})" : "nullptr")};");
+                    foreach (var m in methods.Where(x => !x.IsAbstract && x.IsGenericMethod)) writer.WriteLine($@"{indent}struct
+{indent}{{
+{
+    string.Join(string.Empty, genericMethodToTypesToIndex[origin(m).MethodHandle].OrderBy(x => x.Value).Select(p =>
+    {
+        var x = m.MakeGenericMethod(p.Key);
+        return $"{indent}\t// {x}\n{indent}\tvoid* v_method{p.Value} = reinterpret_cast<void*>(&{Escape(x)}{(x.DeclaringType.IsValueType ? "__v" : string.Empty)});\n";
+    }))
+}{indent}}} v_generic__{Escape(m)};");
+                }
+                writer.WriteLine(@"t__type
+{");
+                writeMethods(td.Methods, x => x.GetBaseDefinition(), "\t");
+                foreach (var p in td.InterfaceToMethods)
+                {
+                    writer.WriteLine($@"{'\t'}struct
+{'\t'}{{");
+                    var ms = typeToDefinition[p.Key].Methods;
+                    writeMethods(p.Value, x => ms[Array.IndexOf(p.Value, x)], "\t\t");
+                    writer.WriteLine($"\t}} v_interface__{Escape(p.Key)};");
+                }
                 writer.WriteLine("\tt__type_of();");
                 memberDefinitions.Write($@"
 t__type_of<{identifier}>::t__type_of() : t__type({(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{{

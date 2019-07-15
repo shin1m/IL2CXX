@@ -9,7 +9,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    class Tests
+    static class Utilities
     {
         static int Spawn(string command, string arguments, string workingDirectory, IEnumerable<(string, string)> environment, Action<string> output, Action<string> error)
         {
@@ -37,6 +37,23 @@ namespace IL2CXX.Tests
             }
         }
 
+        public static void Test(MethodInfo method)
+        {
+            Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
+            var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
+            if (Directory.Exists(build)) Directory.Delete(build, true);
+            Directory.CreateDirectory(build);
+            using (var writer = File.CreateText(Path.Combine(build, "run.cc")))
+                new Transpiler(_ => { }).Do(method, writer);
+            Assert.AreEqual(0, Spawn("make", "run", build, new[] {
+                ("CXXFLAGS", "-std=c++17 -g")
+            }, Console.Error.WriteLine, Console.Error.WriteLine));
+            Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", "", Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
+        }
+        public static void Test(Func<int> method) => Test(method.Method);
+    }
+    class CallTests
+    {
         class Foo
         {
             public object Value;
@@ -51,56 +68,148 @@ namespace IL2CXX.Tests
             public Bar(string value) => Value = value;
             public override string ToString() => Value.ToString();
         }
-
-        static int HelloWorld()
+        class Bar<T>
         {
-            Console.WriteLine("Hello World!");
-            return 0;
+            public T Value;
+
+            public Bar(T value) => Value = value;
+            public string AsString() => Value.ToString();
         }
+
         static int CallVirtual()
         {
-            Console.WriteLine(new Foo("Hello Foo!").ToString());
+            Console.WriteLine(new Foo("Hello, Foo!").ToString());
             return 0;
         }
+        [Test]
+        public void TestCallVirtual() => Utilities.Test(CallVirtual);
         static int ConstrainedCallVirtual()
         {
-            Console.WriteLine(new Bar("Hello Bar!").ToString());
+            Console.WriteLine(new Bar("Hello, Bar!").ToString());
             return 0;
         }
+        [Test]
+        public void TestConstrainedCallVirtual() => Utilities.Test(ConstrainedCallVirtual);
+        static int ConstrainedCallVirtualReference()
+        {
+            Console.WriteLine(new Bar<string>("Hello, Bar!").AsString());
+            return 0;
+        }
+        [Test]
+        public void TestConstrainedCallVirtualReference() => Utilities.Test(ConstrainedCallVirtualReference);
         static int Box()
         {
-            Console.WriteLine(new Foo(new Bar("Hello Foo Bar!")).ToString());
+            Console.WriteLine(new Foo(new Bar("Hello, Foo Bar!")).ToString());
             return 0;
         }
+        [Test]
+        public void TestBox() => Utilities.Test(Box);
+    }
+    class AbstractMethodTests
+    {
+        abstract class Foo
+        {
+            public abstract string AsString(object x);
+        }
+        class Bar : Foo
+        {
+            public override string AsString(object x) => x.ToString();
+        }
+
+        static int CallVirtual()
+        {
+            Console.WriteLine(new Bar().AsString("Hello, World!"));
+            return 0;
+        }
+        [Test]
+        public void TestCallVirtual() => Utilities.Test(CallVirtual);
+    }
+    class AbstractGenericMethodTests
+    {
+        abstract class Foo
+        {
+            public abstract string AsString<T>(T x);
+        }
+        class Bar : Foo
+        {
+            public override string AsString<T>(T x) => x.ToString();
+        }
+
+        static int CallVirtual()
+        {
+            Console.WriteLine(new Bar().AsString("Hello, World!"));
+            Console.WriteLine(new Bar().AsString(0));
+            return 0;
+        }
+        [Test]
+        public void TestCallVirtual() => Utilities.Test(CallVirtual);
+    }
+    class InterfaceMethodTests
+    {
+        interface IFoo
+        {
+            string AsString(object x);
+        }
+        class Foo : IFoo
+        {
+            public string AsString(object x) => x.ToString();
+        }
+
+        static string Bar(IFoo x, object y) => x.AsString(y);
+
+        static int CallVirtual()
+        {
+            Console.WriteLine(Bar(new Foo(), "Hello, World!"));
+            return 0;
+        }
+        [Test]
+        public void TestCallVirtual() => Utilities.Test(CallVirtual);
+    }
+    class InterfaceGenericMethodTests
+    {
+        interface IFoo
+        {
+            string AsString<T>(T x);
+        }
+        class Foo : IFoo
+        {
+            public string AsString<T>(T x) => x.ToString();
+        }
+
+        static string Bar<T>(IFoo x, T y) => x.AsString(y);
+
+        static int CallVirtual()
+        {
+            Console.WriteLine(Bar(new Foo(), "Hello, World!"));
+            return 0;
+        }
+        [Test]
+        public void TestCallVirtual() => Utilities.Test(CallVirtual);
+    }
+    class StringTests
+    {
+        static int HelloWorld()
+        {
+            Console.WriteLine("Hello, World!");
+            return 0;
+        }
+        [Test]
+        public void TestHelloWorld() => Utilities.Test(HelloWorld);
         static int Concatination()
         {
-            string f(string name) => $"Hello {name}!";
+            string f(string name) => $"Hello, {name}!";
             Console.WriteLine(f("World"));
             return 0;
         }
+        [Test]
+        public void TestConcatination() => Utilities.Test(Concatination);
         static int Format()
         {
-            string f(object x, object y) => $"Hello {x} and {y}!";
+            string f(object x, object y) => $"Hello, {x} and {y}!";
             Console.WriteLine(f("World", 0));
             return 0;
         }
-        [TestCase(nameof(HelloWorld))]
-        [TestCase(nameof(CallVirtual))]
-        [TestCase(nameof(ConstrainedCallVirtual))]
-        [TestCase(nameof(Box))]
-        [TestCase(nameof(Concatination))]
-        [TestCase(nameof(Format))]
-        public void DoShouldTranspile(string method)
-        {
-            var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method}-build");
-            if (Directory.Exists(build)) Directory.Delete(build, true);
-            Directory.CreateDirectory(build);
-            using (var writer = File.CreateText(Path.Combine(build, "run.cc")))
-                new Transpiler(_ => { }).Do(GetType().GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic), writer);
-            Assert.AreEqual(0, Spawn("make", "run", build, new[] {
-                ("CXXFLAGS", "-std=c++17 -g")
-            }, Console.Error.WriteLine, Console.Error.WriteLine));
-            Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", "", Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
-        }
+        [Test]
+        public void TestFormat() => Utilities.Test(Format);
     }
 }

@@ -27,6 +27,7 @@ namespace IL2CXX
     public class Transpiler
     {
         private const BindingFlags declaredAndInstance = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        private const BindingFlags declaredAll = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
         private static IEnumerable<MethodInfo> UpToOrigin(MethodInfo method)
         {
             var origin = method.GetBaseDefinition().MethodHandle;
@@ -236,6 +237,7 @@ namespace IL2CXX
         private readonly HashSet<string> typeIdentifiers = new HashSet<string>();
         private readonly Dictionary<Type, string> typeToIdentifier = new Dictionary<Type, string>();
         private readonly Dictionary<RuntimeMethodHandle, Func<string>> methodToBuiltinBody = new Dictionary<RuntimeMethodHandle, Func<string>>();
+        private readonly Dictionary<RuntimeMethodHandle, Func<Type[], string>> genericMethodToBuiltinBody = new Dictionary<RuntimeMethodHandle, Func<Type[], string>>();
         private readonly Dictionary<RuntimeMethodHandle, Func<Type, string>> methodTreeToBuiltinBody = new Dictionary<RuntimeMethodHandle, Func<Type, string>>();
         private readonly Dictionary<string, Func<MethodBase, string>> methodNameToBuiltinBody = new Dictionary<string, Func<MethodBase, string>>();
         private readonly HashSet<(Type, string)> methodIdentifiers = new HashSet<(Type, string)>();
@@ -487,6 +489,7 @@ struct {identifier}";
         }
         private string MoveFormat(Type type) =>
             type == typeof(bool) ? "{0} != 0" :
+            type == typeof(IntPtr) || type == typeof(UIntPtr) ? "{{{0}}}" :
             type.IsByRef || type.IsPointer ? $"reinterpret_cast<{EscapeForVariable(type)}>({{0}})" :
             type.IsPrimitive || type.IsEnum ? "{0}" :
             type.IsValueType ? "std::move({0})" :
@@ -508,11 +511,33 @@ struct {identifier}";
             if (!method.IsStatic) parameters = parameters.Prepend(GetThisType(method));
             return $"{(method is MethodInfo m && m.ReturnType != typeof(void) ? EscapeForVariable(m.ReturnType) : "void")}(*)({string.Join(", ", parameters.Select(EscapeForParameter))})";
         }
+        private static MethodInfo GetGenericTypeMethod(MethodInfo method)
+        {
+            var t = method.DeclaringType;
+            var h = (method.IsGenericMethod ? method.GetGenericMethodDefinition() : method).MethodHandle;
+            return t.GetGenericTypeDefinition().GetMethods(declaredAll).Zip(t.GetMethods(declaredAll), (x, y) => (x: x, y: y.MethodHandle)).First(x => x.y == h).x;
+        }
+        private static ConstructorInfo GetGenericTypeConstructor(MethodBase method)
+        {
+            var t = method.DeclaringType;
+            return t.GetGenericTypeDefinition().GetConstructors(declaredAll)[Array.IndexOf(t.GetConstructors(declaredAll), method)];
+        }
         private void Do()
         {
             method = queuedMethods.Dequeue();
             if (!visitedMethods.Add(method.MethodHandle) || method.IsAbstract) return;
             var gotBuiltinBody = methodToBuiltinBody.TryGetValue(method.MethodHandle, out var builtin);
+            if (!gotBuiltinBody && method.IsGenericMethod)
+            {
+                gotBuiltinBody = genericMethodToBuiltinBody.TryGetValue(((MethodInfo)method).GetGenericMethodDefinition().MethodHandle, out var gb);
+                if (gotBuiltinBody) builtin = () => gb(method.GetGenericArguments());
+            }
+            if (!gotBuiltinBody && method.DeclaringType.IsGenericType)
+            {
+                var gm = method is MethodInfo mi ? GetGenericTypeMethod(mi).MethodHandle : GetGenericTypeConstructor(method).MethodHandle;
+                gotBuiltinBody = genericMethodToBuiltinBody.TryGetValue(gm, out var gb);
+                if (gotBuiltinBody) builtin = () => gb(method.DeclaringType.GetGenericArguments());
+            }
             var returns = method is MethodInfo m ? m.ReturnType == typeof(void) ? "void" : EscapeForVariable(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForVariable(method.DeclaringType);
             var identifier = Escape(method);
             var parameters = method.GetParameters().Select(x => x.ParameterType);
@@ -1226,11 +1251,11 @@ struct {identifier}";
                     {
                         if (constrained.IsValueType)
                         {
-                            var mm = typeToDefinition[constrained].Methods[definition.GetIndex(m)];
-                            if (mm.DeclaringType == constrained)
+                            var cm = typeToDefinition[constrained].Methods[definition.GetIndex(m)];
+                            if (cm.DeclaringType == constrained)
                             {
-                                GenerateCall(mm, Escape(mm), stack, after);
-                                queuedMethods.Enqueue(mm);
+                                GenerateCall(cm, Escape(cm), stack, after);
+                                queuedMethods.Enqueue(cm);
                             }
                             else
                             {
@@ -1291,7 +1316,7 @@ struct {identifier}";
                     writer.WriteLine($@" {m.DeclaringType}::[{m}]");
                     var parameters = m.GetParameters();
                     var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{string.Format(MoveFormat(p.ParameterType), s.Variable)}");
-                    if (methodToBuiltinBody.TryGetValue(m.MethodHandle, out var builtin))
+                    if (methodToBuiltinBody.ContainsKey(m.MethodHandle) || m.DeclaringType.IsGenericType && genericMethodToBuiltinBody.ContainsKey(GetGenericTypeConstructor(m).MethodHandle))
                     {
                         writer.WriteLine($@"{'\t'}{after.Variable} = {Escape(m)}({string.Join(",", arguments)}
 {'\t'});");
@@ -1755,7 +1780,7 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
-                    writer.WriteLine($" {m.DeclaringType}::[{m}]\n\t{indexToStack[index].Variable} = &{Escape(m)};");
+                    writer.WriteLine($" {m.DeclaringType}::[{m}]\n\t{indexToStack[index].Variable} = reinterpret_cast<void*>(&{Escape(m)});");
                     queuedMethods.Enqueue(m);
                     return index;
                 };
@@ -1898,21 +1923,33 @@ struct {identifier}";
             typeToBuiltinFields.Add(typeof(string), () => "\tsize_t v__length;\n");
             typeToBuiltinInitialize.Add(typeof(string), () => $"\t{Escape(typeof(string).GetField(nameof(string.Empty)))} = f__string(u\"\"sv);\n");
             methodToBuiltinBody.Add(typeof(object).GetMethod(nameof(object.GetType)).MethodHandle, () => "\treturn a_0->v__type;\n");
-            methodToBuiltinBody.Add(typeof(object).GetMethod(nameof(object.ToString)).MethodHandle, () => "\treturn f__string(u\"object\");\n");
-            methodToBuiltinBody.Add(typeof(ValueType).GetMethod(nameof(object.ToString)).MethodHandle, () => "\treturn f__string(u\"struct\");\n");
+            methodToBuiltinBody.Add(typeof(object).GetMethod(nameof(object.ToString)).MethodHandle, () => "\treturn f__string(u\"object\"sv);\n");
+            methodToBuiltinBody.Add(typeof(ValueType).GetMethod(nameof(object.ToString)).MethodHandle, () => "\treturn f__string(u\"struct\"sv);\n");
             methodToBuiltinBody.Add(typeof(Type).TypeInitializer.MethodHandle, () => string.Empty);
             methodToBuiltinBody.Add(typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle)).MethodHandle, () => "\treturn a_0.v__type;\n");
             methodToBuiltinBody.Add(typeof(Type).GetMethod("op_Equality").MethodHandle, () => "\treturn a_0 == a_1;\n");
             methodToBuiltinBody.Add(typeof(Type).GetMethod("op_Inequality").MethodHandle, () => "\treturn a_0 != a_1;\n");
             methodToBuiltinBody.Add(typeof(char).TypeInitializer.MethodHandle, () => string.Empty);
-            methodToBuiltinBody.Add(typeof(Enum).GetMethod(nameof(Enum.ToString), new[] { typeof(string) }).MethodHandle, () => "\treturn f__string(u\"enum\");\n");
+            methodToBuiltinBody.Add(typeof(Enum).GetMethod(nameof(Enum.ToString), new[] { typeof(string) }).MethodHandle, () => "\treturn f__string(u\"enum\"sv);\n");
             methodToBuiltinBody.Add(typeof(Array).GetMethod(nameof(Array.Copy), new[] { typeof(Array), typeof(int), typeof(Array), typeof(int), typeof(int) }).MethodHandle, () => $@"{'\t'}if (a_0->v__type == a_2->v__type) {{
 {'\t'}{'\t'}auto n = a_0->v__type->v__element_size;
 {'\t'}{'\t'}std::copy_n(reinterpret_cast<char*>(a_0 + 1) + a_1 * n, a_4 * n, reinterpret_cast<char*>(a_2 + 1) + a_3 * n);
 {'\t'}}} else {{
 {'\t'}}}
 ");
-            methodToBuiltinBody.Add(typeof(Exception).GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(Exception).GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic) }, null).MethodHandle, () => "\treturn f__string(u\"message from native resources\");\n");
+            methodToBuiltinBody.Add(typeof(Array).GetProperty(nameof(Array.Length)).GetMethod.MethodHandle, () => "\treturn a_0->v__length;\n");
+            genericMethodToBuiltinBody.Add(typeof(Func<,>).GetConstructor(new[] { typeof(object), typeof(IntPtr) }).MethodHandle, types =>
+            {
+                var type = typeof(Func<,>).MakeGenericType(types);
+                return $@"{'\t'}auto p = f__new<{Escape(type)}>();
+{'\t'}std::fill_n(reinterpret_cast<char*>(p) + sizeof(t__type*), sizeof({Escape(type)}) - sizeof(t__type*), '\0');
+{'\t'}p->v__5ftarget = a_0;
+{'\t'}p->v__5fmethodPtr = a_1;
+{'\t'}return p;
+";
+            });
+            genericMethodToBuiltinBody.Add(typeof(Func<,>).GetMethod("Invoke").MethodHandle, types => $"\treturn reinterpret_cast<{EscapeForVariable(types[1])}(*)({EscapeForVariable(typeof(object))}, {EscapeForVariable(types[0])})>(a_0->v__5fmethodPtr.v__5fvalue)(a_0->v__5ftarget, a_1);\n");
+            methodToBuiltinBody.Add(typeof(Exception).GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(Exception).GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic) }, null).MethodHandle, () => "\treturn f__string(u\"message from native resources\"sv);\n");
             methodToBuiltinBody.Add(Type.GetType("System.Runtime.CompilerServices.JitHelpers").GetMethod("GetRawSzArrayData", BindingFlags.Static | BindingFlags.NonPublic).MethodHandle, () => "\treturn reinterpret_cast<uint8_t*>(a_0 + 1);\n");
             methodToBuiltinBody.Add(typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("get_OffsetToStringData").MethodHandle, () => $"\treturn sizeof({Escape(typeof(string))});\n");
             {
@@ -1931,10 +1968,12 @@ struct {identifier}";
                 }
             }
             // TODO: tentative
-            methodTreeToBuiltinBody.Add(typeof(object).GetMethod(nameof(object.ToString)).MethodHandle, type => $"\treturn f__string(u\"{type}\");\n");
+            methodTreeToBuiltinBody.Add(typeof(object).GetMethod(nameof(object.ToString)).MethodHandle, type => $"\treturn f__string(u\"{type}\"sv);\n");
+            methodToBuiltinBody.Add(typeof(int).GetMethod(nameof(object.ToString), Type.EmptyTypes).MethodHandle, () => $"\treturn f__string(f__u16string(std::to_string(*a_0)));\n");
+            methodToBuiltinBody.Add(typeof(int).GetMethod(nameof(object.ToString), new[] { typeof(string), typeof(IFormatProvider) }).MethodHandle, () => $"\treturn f__string(f__u16string(std::to_string(*a_0)));\n");
             methodToBuiltinBody.Add(typeof(string).GetMethod(nameof(object.ToString), Type.EmptyTypes).MethodHandle, null);
             methodToBuiltinBody.Add(typeof(System.Text.StringBuilder).GetMethod(nameof(object.ToString), Type.EmptyTypes).MethodHandle, null);
-            methodTreeToBuiltinBody.Add(typeof(Exception).GetMethod(nameof(object.ToString)).MethodHandle, type => $"\treturn f__string(u\"{type}\");\n");
+            methodTreeToBuiltinBody.Add(typeof(Exception).GetMethod(nameof(object.ToString)).MethodHandle, type => $"\treturn f__string(u\"{type}\"sv);\n");
             methodToBuiltinBody.Add(typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic).MethodHandle, () => $@"{'\t'}auto p = f__new_sized<{Escape(typeof(string))}>(sizeof(char16_t) * a_0);
 {'\t'}p->v__length = a_0;
 {'\t'}return p;
@@ -1953,8 +1992,9 @@ struct {identifier}";
                 queuedMethods.Enqueue(method);
                 return $"\treturn {Escape(method)}(a_0, a_1);\n";
             });
-            methodToBuiltinBody.Add(typeof(string).GetMethod(nameof(string.Join), new[] { typeof(string), typeof(object[]) }).MethodHandle, () => $"\treturn f__string(u\"join\");\n");
+            methodToBuiltinBody.Add(typeof(string).GetMethod(nameof(string.Join), new[] { typeof(string), typeof(object[]) }).MethodHandle, () => $"\treturn f__string(u\"join\"sv);\n");
             methodToBuiltinBody.Add(Type.GetType("System.SR, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e").GetMethod("InternalGetResourceString", BindingFlags.Static | BindingFlags.NonPublic).MethodHandle, () => "\treturn a_0;\n");
+            methodToBuiltinBody.Add(typeof(Environment).GetProperty(nameof(Environment.CurrentManagedThreadId)).GetMethod.MethodHandle, () => "\treturn 0;\n");
             methodToBuiltinBody.Add(typeof(Console).GetMethod(nameof(Console.WriteLine), new[] { typeof(string) }).MethodHandle, () => $@"{'\t'}auto p = static_cast<{Escape(typeof(string))}*>(a_0);
 {'\t'}std::mbstate_t state{{}};
 {'\t'}char cs[MB_LEN_MAX];
@@ -1967,7 +2007,7 @@ struct {identifier}";
 {'\t'}std::cout << std::endl;
 ");
             // TODO: tentative
-            methodNameToBuiltinBody.Add("System.String ToString(System.String, System.IFormatProvider)", method => $"\treturn f__string(u\"{method.ReflectedType}\");\n");
+            methodNameToBuiltinBody.Add("System.String ToString(System.String, System.IFormatProvider)", method => $"\treturn f__string(u\"{method.ReflectedType}\"sv);\n");
             var tryFormat = $@"*a_2 = 0;
 {'\t'}return false;
 ";
@@ -2131,6 +2171,37 @@ t__finally<T> f__finally(T&& a_f)
 using t_managed_pointer = void*;
 
 struct t__type;
+
+std::u16string f__u16string(const std::string& a_x)
+{{
+{'\t'}std::vector<char16_t> cs;
+{'\t'}std::mbstate_t state{{}};
+{'\t'}auto p = a_x.c_str();
+{'\t'}auto q = p + a_x.size() + 1;
+{'\t'}while (p < q) {{
+{'\t'}{'\t'}char16_t c;
+{'\t'}{'\t'}auto n = std::mbrtoc16(&c, p, q - p, &state);
+{'\t'}{'\t'}switch (n) {{
+{'\t'}{'\t'}case size_t(-3):
+{'\t'}{'\t'}{'\t'}cs.push_back(c);
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}case size_t(-2):
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}case size_t(-1):
+{'\t'}{'\t'}{'\t'}++p;
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}case 0:
+{'\t'}{'\t'}{'\t'}cs.push_back('\0');
+{'\t'}{'\t'}{'\t'}++p;
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}default:
+{'\t'}{'\t'}{'\t'}cs.push_back(c);
+{'\t'}{'\t'}{'\t'}p += n;
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}}}
+{'\t'}}}
+{'\t'}return {{cs.data(), cs.size() - 1}};
+}}
 ");
             writer.Write(typeDeclarations);
             writer.Write(typeDefinitions);

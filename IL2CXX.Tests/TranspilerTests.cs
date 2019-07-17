@@ -212,4 +212,15 @@ namespace IL2CXX.Tests
         [Test]
         public void TestFormat() => Utilities.Test(Format);
     }
+    class GenericBuiltinTests
+    {
+        static int Count()
+        {
+            var n = Enumerable.Range(0, 128).Count(x => x >= 'A' && x <= 'Z');
+            Console.WriteLine($"# of alphabets: {n}");
+            return n == 26 ? 0 : 1;
+        }
+        [Test]
+        public void Test() => Utilities.Test(Count);
+    }
 }

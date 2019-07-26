@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -188,29 +189,107 @@ namespace IL2CXX.Tests
     }
     class StringTests
     {
-        static int HelloWorld()
+        static int AssertEquals(string x, string y)
         {
-            Console.WriteLine("Hello, World!");
-            return 0;
+            Console.WriteLine(x);
+            return x == y ? 0 : 1;
         }
+        static int Equality() => AssertEquals("Hello, World!", "Hello, World!");
         [Test]
-        public void TestHelloWorld() => Utilities.Test(HelloWorld);
+        public void TestEquality() => Utilities.Test(Equality);
         static int Concatination()
         {
             string f(string name) => $"Hello, {name}!";
-            Console.WriteLine(f("World"));
-            return 0;
+            return AssertEquals(f("World"), "Hello, World!");
         }
         [Test]
         public void TestConcatination() => Utilities.Test(Concatination);
         static int Format()
         {
             string f(object x, object y) => $"Hello, {x} and {y}!";
-            Console.WriteLine(f("World", 0));
-            return 0;
+            return AssertEquals(f("World", 0), "Hello, World and 0!");
         }
         [Test]
         public void TestFormat() => Utilities.Test(Format);
+        static int Substring() => AssertEquals("Hello, World!".Substring(7, 5), "World");
+        [Test]
+        public void TestSubstring() => Utilities.Test(Substring);
+        static int ToLowerInvariant() => AssertEquals("Hello, World!".ToLowerInvariant(), "hello, world!");
+        [Test]
+        public void TestToLowerInvariant() => Utilities.Test(ToLowerInvariant);
+    }
+    class ArrayTests
+    {
+        static int IsReadOnly()
+        {
+            string[] xs = { "Hello, World!" };
+            return xs.IsReadOnly ? 1 : 0;
+        }
+        [Test]
+        public void TestIsReadOnly() => Utilities.Test(IsReadOnly);
+        static int IListIsReadOnly()
+        {
+            IList xs = new[] { "Hello, World!" };
+            return xs.IsReadOnly ? 1 : 0;
+        }
+        [Test]
+        public void TestIListIsReadOnly() => Utilities.Test(IListIsReadOnly);
+        static int IListTIsReadOnly()
+        {
+            IList<string> xs = new[] { "Hello, World!" };
+            return xs.IsReadOnly ? 0 : 1;
+        }
+        [Test]
+        public void TestIListTIsReadOnly() => Utilities.Test(IListTIsReadOnly);
+        static int IListTCount()
+        {
+            IList<string> xs = new[] { "Hello, World!" };
+            return xs.Count == 1 ? 0 : 1;
+        }
+        [Test]
+        public void TestIListTCount() => Utilities.Test(IListTCount);
+        static int IListTGetItem()
+        {
+            IList<string> xs = new[] { "foo" };
+            return xs[0] == "foo" ? 0 : 1;
+        }
+        [Test]
+        public void TestIListTGetItem() => Utilities.Test(IListTGetItem);
+        static int IListTSetItem()
+        {
+            IList<string> xs = new[] { "foo" };
+            xs[0] = "bar";
+            return xs[0] == "bar" ? 0 : 1;
+        }
+        [Test]
+        public void TestIListTSetItem() => Utilities.Test(IListTSetItem);
+        static int IListTCopyTo()
+        {
+            IList<string> xs = new[] { "World" };
+            string[] ys = { "Hello", null };
+            xs.CopyTo(ys, 1);
+            foreach (var x in ys) Console.WriteLine(x);
+            return ys[1] == "World" ? 0 : 1;
+        }
+        [Test]
+        public void TestIListTCopyTo() => Utilities.Test(IListTCopyTo);
+        static int GetEnumerator()
+        {
+            foreach (var x in (IEnumerable<string>)new[] {
+                "Hello, World!",
+                "Good bye."
+            }) Console.WriteLine(x);
+            return 0;
+        }
+        [Test]
+        public void TestGetEnumerator() => Utilities.Test(GetEnumerator);
+        static int IListTIndexOf()
+        {
+            IList<string> xs = new[] { "foo", "bar" };
+            return xs.IndexOf("bar") == 1 ? 0 : 1;
+        }
+        [Test]
+        public void TestIListTIndexOf() => Utilities.Test(IListTIndexOf);
     }
     class GenericBuiltinTests
     {

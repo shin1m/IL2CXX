@@ -7,6 +7,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace IL2CXX
@@ -35,7 +37,7 @@ namespace IL2CXX
             public MethodKey(MethodBase method)
             {
                 this.method = method.MethodHandle;
-                this.type = method.DeclaringType.TypeHandle;
+                type = method.DeclaringType.TypeHandle;
             }
             public static bool operator ==(MethodKey x, MethodKey y) => x.method == y.method && x.type.Equals(y.type);
             public static bool operator !=(MethodKey x, MethodKey y) => !(x == y);
@@ -448,7 +450,24 @@ struct {identifier}";
                 var @base = type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
                 var staticFields = type.IsEnum ? Enumerable.Empty<FieldInfo>() : type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                 var staticDeclarations = string.Join(string.Empty, staticFields.Select(x => $"\tstatic {EscapeForVariable(x.FieldType)} v_{Escape(x.Name)};\n"));
-                var staticDefinitions = string.Join(string.Empty, staticFields.Select(x => $"{EscapeForVariable(x.FieldType)} {identifier}::v_{Escape(x.Name)};\n"));
+                var staticDefinitions = string.Join(string.Empty, staticFields.Select(x =>
+                {
+                    var content = string.Empty;
+                    if (x.FieldType.Name.StartsWith("__StaticArrayInitTypeSize="))
+                    {
+                        var bytes = new byte[Marshal.SizeOf(x.FieldType)];
+                        RuntimeHelpers.InitializeArray(bytes, x.FieldHandle);
+                        content = $"\tuint8_t v__content[{bytes.Length}] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};\n";
+                    }
+                    var field = $"t__field_{Escape(x.DeclaringType)}__{Escape(x.Name)}";
+                    return $@"{EscapeForVariable(x.FieldType)} {identifier}::v_{Escape(x.Name)};
+struct {field}
+{{
+{content}{'\t'}static {field} v__instance;
+}};
+{field} {field}::v__instance;
+";
+                }));
                 var fields = typeToBuiltinFields.TryGetValue(type, out var builtin) ? builtin() : string.Join(string.Empty, type.GetFields(declaredAndInstance).Select(x => $"\t{EscapeForVariable(x.FieldType)} v_{Escape(x.Name)};\n"));
                 if (primitives.TryGetValue(type, out var name) || type.IsEnum)
                 {
@@ -523,7 +542,7 @@ struct {identifier}";
             type.IsEnum ? primitives[type.GetEnumUnderlyingType()] :
             type.IsValueType ? $"{Escape(type)}::t_value" :
             $"{Escape(type)}*";
-        private string Escape(FieldInfo field) => $"{(field.IsStatic ? $"{Escape(field.DeclaringType)}::" : string.Empty)}v_{Escape(field.Name)}";
+        private string Escape(FieldInfo field) => $"v_{Escape(field.Name)}";
         private string Escape(MethodBase method)
         {
             var key = ToKey(method);
@@ -1042,6 +1061,13 @@ struct {identifier}";
                     return index;
                 };
             });
+            string condition_Un(Stack stack, string integer, string @float)
+            {
+                if (stack.VariableType == "double") return string.Format(@float, stack.Pop.Variable, stack.Variable);
+                if (stack.VariableType == $"{Escape(typeof(object))}*") return $"{stack.Pop.Variable} {integer} {stack.Variable}";
+                string cast(Stack s) => $"static_cast<u{s.VariableType}>({s.Variable})";
+                return $"{cast(stack.Pop)} {integer} {cast(stack)}";
+            }
             new[] {
                 (OpCode: OpCodes.Br_S, Target: (ParseBranchTarget)ParseBranchTargetI1),
                 (OpCode: OpCodes.Br, Target: (ParseBranchTarget)ParseBranchTargetI4)
@@ -1083,12 +1109,7 @@ struct {identifier}";
                     (OpCode: OpCodes.Bge_S, Operator: ">="),
                     (OpCode: OpCodes.Bgt_S, Operator: ">"),
                     (OpCode: OpCodes.Ble_S, Operator: "<="),
-                    (OpCode: OpCodes.Blt_S, Operator: "<"),
-                    (OpCode: OpCodes.Bne_Un_S, Operator: "!="),
-                    (OpCode: OpCodes.Bge_Un_S, Operator: ">="),
-                    (OpCode: OpCodes.Bgt_Un_S, Operator: ">"),
-                    (OpCode: OpCodes.Ble_Un_S, Operator: "<="),
-                    (OpCode: OpCodes.Blt_Un_S, Operator: "<")
+                    (OpCode: OpCodes.Blt_S, Operator: "<")
                 }.ForEach(set => instructions1[set.OpCode.Value - OpCodes.Br_S.Value + baseSet.OpCode.Value].For(x =>
                 {
                     x.Estimate = (index, stack) =>
@@ -1102,6 +1123,26 @@ struct {identifier}";
                         bool isPointer(Stack s) => s.Type.IsByRef || s.Type.IsPointer;
                         var format = isPointer(stack.Pop) || isPointer(stack) ? "reinterpret_cast<char*>({0})" : "{0}";
                         writer.WriteLine($" {target:x04}\n\tif ({string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)}) goto L_{target:x04};");
+                        return index;
+                    };
+                }));
+                new[] {
+                    (OpCode: OpCodes.Bne_Un_S, Integer: "!=", Float: "std::isunordered({0}, {1}) || {0} != {1}"),
+                    (OpCode: OpCodes.Bge_Un_S, Integer: ">=", Float: "std::isgreaterequal({0}, {1})"),
+                    (OpCode: OpCodes.Bgt_Un_S, Integer: ">", Float: "std::isgreater({0}, {1})"),
+                    (OpCode: OpCodes.Ble_Un_S, Integer: "<=", Float: "std::islessequal({0}, {1})"),
+                    (OpCode: OpCodes.Blt_Un_S, Integer: "<", Float: "std::isless({0}, {1})")
+                }.ForEach(set => instructions1[set.OpCode.Value - OpCodes.Br_S.Value + baseSet.OpCode.Value].For(x =>
+                {
+                    x.Estimate = (index, stack) =>
+                    {
+                        Estimate(baseSet.Target(ref index), stack.Pop.Pop);
+                        return (index, stack.Pop.Pop);
+                    };
+                    x.Generate = (index, stack) =>
+                    {
+                        var target = baseSet.Target(ref index);
+                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Integer, set.Float)}) goto L_{target:x04};");
                         return index;
                     };
                 }));
@@ -1502,7 +1543,7 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = {Escape(f)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = {Escape(f.DeclaringType)}::{Escape(f)};");
                     return index;
                 };
             });
@@ -1526,7 +1567,7 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{Escape(f)} = {string.Format(MoveFormat(f.FieldType), stack.Variable)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{Escape(f.DeclaringType)}::{Escape(f)} = {string.Format(MoveFormat(f.FieldType), stack.Variable)};");
                     return index;
                 };
             });
@@ -1566,8 +1607,7 @@ struct {identifier}";
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    var after = indexToStack[index];
-                    writer.WriteLine($" {t}\n\t{after.Variable} = f__new<{Escape(t)}>(std::move({stack.Variable}));");
+                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {string.Format(t.IsValueType ? $"f__new<{Escape(t)}>({{0}})" : "{0}", $"std::move({stack.Variable})")};");
                     return index;
                 };
             });
@@ -1747,7 +1787,7 @@ struct {identifier}";
                     switch (member)
                     {
                         case FieldInfo f:
-                            writer.WriteLine($"{Escape(f)}::v__handle;");
+                            writer.WriteLine($"{Escape(typeof(RuntimeFieldHandle))}::t_value{{&t__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}::v__instance}};");
                             break;
                         case MethodInfo m:
                             writer.WriteLine($"{Escape(m)}::v__handle;");
@@ -1807,15 +1847,25 @@ struct {identifier}";
             new[] {
                 (OpCode: OpCodes.Ceq, Operator: "=="),
                 (OpCode: OpCodes.Cgt, Operator: ">"),
-                (OpCode: OpCodes.Cgt_Un, Operator: ">"),
-                (OpCode: OpCodes.Clt, Operator: "<"),
-                (OpCode: OpCodes.Clt_Un, Operator: "<")
+                (OpCode: OpCodes.Clt, Operator: "<")
             }.ForEach(set => instructions2[set.OpCode.Value & 0xff].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(int)));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = {stack.Pop.Variable} {set.Operator} {stack.Variable} ? 1 : 0;");
+                    return index;
+                };
+            }));
+            new[] {
+                (OpCode: OpCodes.Cgt_Un, Integer: ">", Float: "std::isgreater({0}, {1})"),
+                (OpCode: OpCodes.Clt_Un, Integer: "<", Float: "std::isless({0}, {1})")
+            }.ForEach(set => instructions2[set.OpCode.Value & 0xff].For(x =>
+            {
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(int)));
+                x.Generate = (index, stack) =>
+                {
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {condition_Un(stack, set.Integer, set.Float)} ? 1 : 0;");
                     return index;
                 };
             }));
@@ -1950,6 +2000,7 @@ struct {identifier}";
             });
             typeToBuiltinFields.Add(typeof(object), () => "\tt__type* v__type;\n");
             typeToBuiltinFields.Add(typeof(Type), () => $"\t{Escape(typeof(Type))}();\n");
+            typeToBuiltinFields.Add(typeof(RuntimeFieldHandle), () => "\tvoid* v__field;\n");
             typeToBuiltinFields.Add(typeof(RuntimeTypeHandle), () => $"\t{EscapeForVariable(typeof(Type))} v__type;\n");
             typeToBuiltinFields.Add(typeof(Array), () => $@"{'\t'}struct t__bound
 {'\t'}{{
@@ -1980,17 +2031,40 @@ struct {identifier}";
 {'\t'}t_System_2eUIntPtr::t_value v__5fipForWatsonBuckets;
 ");
             typeToBuiltinFields.Add(typeof(string), () => "\tsize_t v__length;\n");
-            typeToBuiltinInitialize.Add(typeof(string), () => $"\t{Escape(typeof(string).GetField(nameof(string.Empty)))} = f__string(u\"\"sv);\n");
+            typeToBuiltinInitialize.Add(typeof(string), () => $"\t{Escape(typeof(string))}::{Escape(typeof(string).GetField(nameof(string.Empty)))} = f__string(u\"\"sv);\n");
+            methodToBuiltinBody.Add(ToKey(Type.GetType("System.Marvin").GetMethod("GenerateSeed", BindingFlags.Static | BindingFlags.NonPublic)), () => $@"{'\t'}union
+{'\t'}{{
+{'\t'}{'\t'}uint32_t v_32s[2];
+{'\t'}{'\t'}uint64_t v_64;
+{'\t'}}} seed;
+{'\t'}std::seed_seq().generate(seed.v_32s, seed.v_32s + 2);
+{'\t'}return seed.v_64;
+");
             methodToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.GetType))), () => "\treturn a_0->v__type;\n");
             methodToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.ToString))), () => "\treturn f__string(u\"object\"sv);\n");
+            methodToBuiltinBody.Add(ToKey(typeof(ValueType).GetMethod("GetHashCodeOfPtr", BindingFlags.Static | BindingFlags.NonPublic)), () => "\treturn reinterpret_cast<intptr_t>(a_0.v__5fvalue);\n");
             methodToBuiltinBody.Add(ToKey(typeof(ValueType).GetMethod(nameof(object.Equals))), () => "\treturn a_0 == a_1;\n");
+            methodToBuiltinBody.Add(ToKey(typeof(ValueType).GetMethod(nameof(object.GetHashCode), Type.EmptyTypes)), () =>
+            {
+                var marvin = Type.GetType("System.Marvin");
+                var seed = marvin.GetProperty("DefaultSeed").GetMethod;
+                var compute = marvin.GetMethod("ComputeHash32", new[] { typeof(byte).MakeByRefType(), typeof(int), typeof(ulong) });
+                queuedMethods.Enqueue(seed);
+                queuedMethods.Enqueue(compute);
+                return $"\treturn a_0 ? {Escape(compute)}(reinterpret_cast<uint8_t*>(a_0), a_0->v__type->v__size, {Escape(seed)}()) : 0;\n";
+            });
             methodToBuiltinBody.Add(ToKey(typeof(ValueType).GetMethod(nameof(object.ToString))), () => "\treturn f__string(u\"struct\"sv);\n");
             methodToBuiltinBody.Add(ToKey(typeof(Type).TypeInitializer), () => string.Empty);
             methodToBuiltinBody.Add(ToKey(typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))), () => "\treturn a_0.v__type;\n");
             methodToBuiltinBody.Add(ToKey(typeof(Type).GetMethod("op_Equality")), () => "\treturn a_0 == a_1;\n");
             methodToBuiltinBody.Add(ToKey(typeof(Type).GetMethod("op_Inequality")), () => "\treturn a_0 != a_1;\n");
+            methodToBuiltinBody.Add(ToKey(typeof(RuntimeFieldHandle).GetProperty(nameof(RuntimeFieldHandle.Value)).GetMethod), () => "\treturn {a_0->v__field};\n");
+            methodToBuiltinBody.Add(ToKey(typeof(RuntimeTypeHandle).GetMethod(nameof(object.GetHashCode))), () => "\treturn reinterpret_cast<intptr_t>(a_0->v__type);\n");
             methodToBuiltinBody.Add(ToKey(typeof(char).TypeInitializer), () => string.Empty);
+            methodToBuiltinBody.Add(ToKey(typeof(float).GetMethod(nameof(object.GetHashCode))), () => "\treturn reinterpret_cast<intptr_t>(a_0);\n");
+            methodToBuiltinBody.Add(ToKey(typeof(double).GetMethod(nameof(object.GetHashCode))), () => "\treturn reinterpret_cast<intptr_t>(a_0);\n");
             methodToBuiltinBody.Add(ToKey(typeof(Enum).GetMethod(nameof(object.Equals))), () => "\treturn a_0 == a_1;\n");
+            methodToBuiltinBody.Add(ToKey(typeof(Enum).GetMethod(nameof(object.GetHashCode))), () => "\treturn reinterpret_cast<intptr_t>(a_0);\n");
             methodToBuiltinBody.Add(ToKey(typeof(Enum).GetMethod(nameof(Enum.ToString), new[] { typeof(string) })), () => "\treturn f__string(u\"enum\"sv);\n");
             methodToBuiltinBody.Add(ToKey(typeof(TypedReference).GetMethod("InternalToObject", BindingFlags.Static | BindingFlags.NonPublic)), () => $@"{'\t'}auto p = static_cast<{EscapeForVariable(typeof(TypedReference))}*>(a_0);
 {'\t'}auto type = static_cast<t__type*>(p->v_Type.v__5fvalue);
@@ -1998,16 +2072,18 @@ struct {identifier}";
 {'\t'}if (type->f__is(&t__type_of<{Escape(typeof(ValueType))}>::v__instance)) {{
 {'\t'}{'\t'}auto p = new(new char[sizeof({Escape(typeof(object))}) + type->v__size]) {Escape(typeof(object))};
 {'\t'}{'\t'}p->v__type = type;
-{'\t'}{'\t'}std::memcpy(p + 1, value, type->v__size);
+{'\t'}{'\t'}std::copy_n(static_cast<char*>(value), type->v__size, reinterpret_cast<char*>(p + 1));
 {'\t'}{'\t'}return p;
 {'\t'}}} else {{
 {'\t'}{'\t'}return *static_cast<{EscapeForVariable(typeof(object))}*>(value);
 {'\t'}}}
 ");
             methodToBuiltinBody.Add(ToKey(typeof(Array).GetMethod(nameof(Array.Copy), new[] { typeof(Array), typeof(int), typeof(Array), typeof(int), typeof(int) })), () => $@"{'\t'}if (a_0->v__type == a_2->v__type) {{
+{'\t'}{'\t'}auto rank = a_0->v__type->v__rank;
 {'\t'}{'\t'}auto n = a_0->v__type->v__element->v__size;
-{'\t'}{'\t'}std::copy_n(reinterpret_cast<char*>(a_0 + 1) + a_1 * n, a_4 * n, reinterpret_cast<char*>(a_2 + 1) + a_3 * n);
+{'\t'}{'\t'}std::copy_n(reinterpret_cast<char*>(a_0->f__bounds() + rank) + a_1 * n, a_4 * n, reinterpret_cast<char*>(a_2->f__bounds() + rank) + a_3 * n);
 {'\t'}}} else {{
+{'\t'}{'\t'}throw std::runtime_error(""NotImplementedException"");
 {'\t'}}}
 ");
             methodToBuiltinBody.Add(ToKey(typeof(Array).GetMethod(nameof(Array.GetLowerBound))), () => $@"
@@ -2067,7 +2143,9 @@ struct {identifier}";
             genericMethodToBuiltinBody.Add(ToKey(typeof(Func<,>).GetMethod("Invoke")), types => $"\treturn reinterpret_cast<{EscapeForVariable(types[1])}(*)({EscapeForVariable(typeof(object))}, {EscapeForVariable(types[0])})>(a_0->v__5fmethodPtr.v__5fvalue)(a_0->v__5ftarget, a_1);\n");
             methodToBuiltinBody.Add(ToKey(typeof(Exception).GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(Exception).GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic) }, null)), () => "\treturn f__string(u\"message from native resources\"sv);\n");
             methodToBuiltinBody.Add(ToKey(Type.GetType("System.Runtime.CompilerServices.JitHelpers").GetMethod("GetRawSzArrayData", BindingFlags.Static | BindingFlags.NonPublic)), () => "\treturn reinterpret_cast<uint8_t*>(a_0 + 1);\n");
-            methodToBuiltinBody.Add(ToKey(typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("get_OffsetToStringData")), () => $"\treturn sizeof({Escape(typeof(string))});\n");
+            methodToBuiltinBody.Add(ToKey(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.GetHashCode), BindingFlags.Static | BindingFlags.Public)), () => "\treturn reinterpret_cast<intptr_t>(a_0);\n");
+            methodToBuiltinBody.Add(ToKey(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.InitializeArray))), () => "\tstd::copy_n(static_cast<char*>(a_1.v__field), a_0->v__type->v__element->v__size * a_0->v__length, reinterpret_cast<char*>(a_0->f__bounds() + a_0->v__type->v__rank));\n");
+            methodToBuiltinBody.Add(ToKey(typeof(RuntimeHelpers).GetMethod("get_OffsetToStringData")), () => $"\treturn sizeof({Escape(typeof(string))});\n");
             {
                 var method = Type.GetType("System.ByReference`1[System.Char]").GetConstructor(new[] { typeof(char).MakeByRefType() });
                 methodToBuiltinBody.Add(ToKey(method), () => $"\treturn {{{Escape(typeof(IntPtr))}::t_value{{a_0}}}};\n");
@@ -2079,23 +2157,19 @@ struct {identifier}";
                     methodToBuiltinBody.Add(ToKey(method.MakeGenericMethod(typeof(char))), () => "\treturn a_0 + a_1;\n");
                 }
                 {
+                    var method = methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1);
+                    genericMethodToBuiltinBody.Add(ToKey(method), types => $"\treturn reinterpret_cast<{EscapeForVariable(types[0])}*>(reinterpret_cast<char*>(a_0) + reinterpret_cast<intptr_t>(a_1.v__5fvalue));\n");
+                }
+                {
                     var method = methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 2);
                     methodToBuiltinBody.Add(ToKey(method.MakeGenericMethod(typeof(byte), typeof(char))), () => "\treturn reinterpret_cast<char16_t*>(a_0);\n");
                 }
+                {
+                    var byteByRefType = typeof(byte).MakeByRefType();
+                    var method = methods.First(x => x.Name == "ReadUnaligned" && x.GetGenericArguments().Length == 1 && x.GetParameters()[0].ParameterType == byteByRefType);
+                    genericMethodToBuiltinBody.Add(ToKey(method), types => $"\treturn *reinterpret_cast<{EscapeForVariable(types[0])}*>(a_0);\n");
+                }
             }
-            // TODO: tentative
-            methodTreeToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.Equals), new[] { typeof(object) })), type => "\treturn a_0 == a_1;\n");
-            methodTreeToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.ToString))), type => $"\treturn f__string(u\"{type}\"sv);\n");
-            methodTreeToBuiltinBody.Add(ToKey(typeof(ValueType).GetMethod(nameof(object.Equals))), type =>
-            {
-                var identifier = Escape(type);
-                return $"\treturn a_1 && a_1->v__type->f__is(&t__type_of<{identifier}>::v__instance) && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({identifier})) == 0;\n";
-            });
-            methodToBuiltinBody.Add(ToKey(typeof(int).GetMethod(nameof(object.ToString), Type.EmptyTypes)), () => $"\treturn f__string(f__u16string(std::to_string(*a_0)));\n");
-            methodToBuiltinBody.Add(ToKey(typeof(int).GetMethod(nameof(object.ToString), new[] { typeof(string), typeof(IFormatProvider) })), () => $"\treturn f__string(f__u16string(std::to_string(*a_0)));\n");
-            methodToBuiltinBody.Add(ToKey(typeof(string).GetMethod(nameof(object.ToString), Type.EmptyTypes)), null);
-            methodToBuiltinBody.Add(ToKey(typeof(System.Text.StringBuilder).GetMethod(nameof(object.ToString), Type.EmptyTypes)), null);
-            methodTreeToBuiltinBody.Add(ToKey(typeof(Exception).GetMethod(nameof(object.ToString))), type => $"\treturn f__string(u\"{type}\"sv);\n");
             methodToBuiltinBody.Add(ToKey(typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)), () => $@"{'\t'}auto p = f__new_sized<{Escape(typeof(string))}>(sizeof(char16_t) * a_0);
 {'\t'}p->v__length = a_0;
 {'\t'}return p;
@@ -2122,6 +2196,37 @@ struct {identifier}";
                 queuedMethods.Enqueue(method);
                 return $"\treturn a_1 && a_1->v__type->f__is(&t__type_of<{Escape(typeof(string))}>::v__instance) && {Escape(method)}(a_0, static_cast<{EscapeForVariable(typeof(string))}>(a_1));\n";
             });
+            methodToBuiltinBody.Add(ToKey(typeof(string).GetMethod(nameof(object.GetHashCode), Type.EmptyTypes)), () =>
+            {
+                var marvin = Type.GetType("System.Marvin");
+                var seed = marvin.GetProperty("DefaultSeed").GetMethod;
+                var compute = marvin.GetMethod("ComputeHash32", new[] { typeof(byte).MakeByRefType(), typeof(int), typeof(ulong) });
+                queuedMethods.Enqueue(seed);
+                queuedMethods.Enqueue(compute);
+                return $"\treturn {Escape(compute)}(reinterpret_cast<uint8_t*>(a_0 + 1), a_0->v__length * sizeof(char16_t), {Escape(seed)}());\n";
+            });
+            methodToBuiltinBody.Add(ToKey(typeof(string).GetMethod("GetLegacyNonRandomizedHashCode", BindingFlags.Instance | BindingFlags.NonPublic)), () =>
+            {
+                var marvin = Type.GetType("System.Marvin");
+                var compute = marvin.GetMethod("ComputeHash32", new[] { typeof(byte).MakeByRefType(), typeof(int), typeof(ulong) });
+                queuedMethods.Enqueue(compute);
+                return $"\treturn {Escape(compute)}(reinterpret_cast<uint8_t*>(a_0 + 1), a_0->v__length * sizeof(char16_t), 0);\n";
+            });
+            methodToBuiltinBody.Add(ToKey(typeof(Math).GetMethod(nameof(Math.Sqrt))), () => $"\treturn std::sqrt(a_0);\n");
+            // TODO: tentative
+            methodTreeToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.Equals), new[] { typeof(object) })), type => "\treturn a_0 == a_1;\n");
+            //methodTreeToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.GetHashCode))), type => "\treturn reinterpret_cast<int32_t>(a_0);\n");
+            methodTreeToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.ToString))), type => $"\treturn f__string(u\"{type}\"sv);\n");
+            methodTreeToBuiltinBody.Add(ToKey(typeof(ValueType).GetMethod(nameof(object.Equals))), type =>
+            {
+                var identifier = Escape(type);
+                return $"\treturn a_1 && a_1->v__type->f__is(&t__type_of<{identifier}>::v__instance) && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({identifier})) == 0;\n";
+            });
+            methodToBuiltinBody.Add(ToKey(typeof(int).GetMethod(nameof(object.ToString), Type.EmptyTypes)), () => $"\treturn f__string(f__u16string(std::to_string(*a_0)));\n");
+            methodToBuiltinBody.Add(ToKey(typeof(int).GetMethod(nameof(object.ToString), new[] { typeof(string), typeof(IFormatProvider) })), () => $"\treturn f__string(f__u16string(std::to_string(*a_0)));\n");
+            methodToBuiltinBody.Add(ToKey(typeof(string).GetMethod(nameof(object.ToString), Type.EmptyTypes)), null);
+            methodToBuiltinBody.Add(ToKey(typeof(System.Text.StringBuilder).GetMethod(nameof(object.ToString), Type.EmptyTypes)), null);
+            methodTreeToBuiltinBody.Add(ToKey(typeof(Exception).GetMethod(nameof(object.ToString))), type => $"\treturn f__string(u\"{type}\"sv);\n");
             methodToBuiltinBody.Add(ToKey(typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(StringComparison) })), () =>
             {
                 var method = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string) });
@@ -2152,21 +2257,36 @@ struct {identifier}";
 {'\t'}if (n != size_t(-1) && n > 1) std::cout << std::string_view(cs, n - 1);
 {'\t'}std::cout << std::endl;
 ");
-            // TODO: tentative
             methodNameToBuiltinBody.Add("System.String ToString(System.String, System.IFormatProvider)", method => $"\treturn f__string(u\"{method.ReflectedType}\"sv);\n");
             var tryFormat = $@"*a_2 = 0;
 {'\t'}return false;
 ";
             methodNameToBuiltinBody.Add("Boolean TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)", method => tryFormat);
             methodNameToBuiltinBody.Add("Boolean System.ISpanFormattable.TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)", method => tryFormat);
+            genericMethodToBuiltinBody.Add(ToKey(typeof(EqualityComparer<>).TypeInitializer), types =>
+            {
+                var type = typeof(EqualityComparer<>).MakeGenericType(types);
+                var concrete = type.GetProperty(nameof(EqualityComparer<object>.Default)).GetValue(null).GetType();
+                var identifier = Escape(concrete);
+                var constructor = concrete.GetConstructor(Type.EmptyTypes);
+                queuedMethods.Enqueue(constructor);
+                return $@"{'\t'}auto p = f__new<{identifier}>();
+{'\t'}std::fill_n(reinterpret_cast<char*>(p) + sizeof(t__type*), sizeof({identifier}) - sizeof(t__type*), '\0');
+{'\t'}{Escape(constructor)}(p);
+{'\t'}{Escape(type)}::v__3cDefault_3ek_5f_5fBackingField = std::move(p);
+";
+            });
             writer = functionDefinitions;
         }
         private void WriteTypeDefinition(Type type, MethodTable definition, TextWriter writer)
         {
             var identifier = Escape(type);
-            writer.Write($@"
+            writer.WriteLine($@"
 template<>
-struct t__type_of<{identifier}> : ");
+struct t__type_of<{identifier}> : t__type
+{{");
+            memberDefinitions.Write($@"
+t__type_of<{identifier}>::t__type_of() : t__type({(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
             if (definition is TypeDefinition td)
             {
                 void writeMethods(IEnumerable<MethodInfo> methods, Func<MethodInfo, MethodInfo> origin, string indent)
@@ -2182,8 +2302,6 @@ struct t__type_of<{identifier}> : ");
     }))
 }{indent}}} v_generic__{Escape(m)};");
                 }
-                writer.WriteLine(@"t__type
-{");
                 writeMethods(td.Methods, x => x.GetBaseDefinition(), "\t");
                 foreach (var p in td.InterfaceToMethods)
                 {
@@ -2193,23 +2311,16 @@ struct t__type_of<{identifier}> : ");
                     writeMethods(p.Value, x => ms[Array.IndexOf(p.Value, x)], "\t\t");
                     writer.WriteLine($"\t}} v_interface__{Escape(p.Key)};");
                 }
-                writer.WriteLine("\tt__type_of();");
-                memberDefinitions.Write($@"
-t__type_of<{identifier}>::t__type_of() : t__type({(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{{
-    string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}"))
-}
-}}, sizeof({EscapeForVariable(type)}){(type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" : string.Empty)})
-{{
-}}");
+                memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}")));
             }
-            else
-            {
-                writer.WriteLine($@"{Escape(typeof(Type))}
-{{");
-            }
-            writer.WriteLine($@"{'\t'}static t__type_of v__instance;
+            writer.WriteLine($@"
+{'\t'}t__type_of();
+{'\t'}static t__type_of v__instance;
 }};");
-            memberDefinitions.WriteLine($"\nt__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
+            memberDefinitions.WriteLine($@"}}, sizeof({EscapeForVariable(type)}){(type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" : string.Empty)})
+{{
+}}
+t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
         }
         public void Do(MethodInfo method, TextWriter writer)
         {
@@ -2289,6 +2400,7 @@ T* f__new_sized(size_t a_extra, T_an&&... a_n)
 #include <iostream>
 #include <limits>
 #include <map>
+#include <random>
 #include <stdexcept>
 #include <utility>
 #include <climits>

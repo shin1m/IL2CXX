@@ -302,4 +302,38 @@ namespace IL2CXX.Tests
         [Test]
         public void Test() => Utilities.Test(Count);
     }
+    class LinqTests
+    {
+        static IEnumerable<string> EnumerateWords(IEnumerable<string> lines)
+        {
+            var isWords = Enumerable.Range(0, 128).Select(c => c >= 48 && c < 58 || c >= 65 && c < 91 || c == 95 || c >= 97 && c < 123).ToArray();
+            bool isWord(char c) => c < 128 && isWords[c];
+            IEnumerable<string> matches(string line)
+            {
+                for (var i = 0; i < line.Length;)
+                {
+                    while (!isWord(line[i])) if (++i >= line.Length) yield break;
+                    var j = i;
+                    do ++j; while (j < line.Length && isWord(line[j]));
+                    yield return line.Substring(i, j - i).ToLowerInvariant();
+                    i = j;
+                }
+            }
+            return lines.SelectMany(matches);
+        }
+        static int CountWords()
+        {
+            var word2count = EnumerateWords(new[] {
+                "Hello, World!",
+                "Hello, this is shin!",
+                "Good bye, World!",
+                "Bye bye."
+            }).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count());
+            Console.WriteLine($"# of words: {word2count.Count}");
+            foreach (var x in word2count) Console.WriteLine($"\t{x.Key}: {x.Value}");
+            return word2count.Count == 7 ? 0 : 1;
+        }
+        [Test]
+        public void Test() => Utilities.Test(CountWords);
+    }
 }

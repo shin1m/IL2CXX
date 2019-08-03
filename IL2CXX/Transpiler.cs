@@ -1419,14 +1419,13 @@ struct {field}
                         }
                         else
                         {
-                            writer.WriteLine($@"{'\t'}{{auto p = f__new<{Escape(m.DeclaringType)}>();
-{'\t'}std::fill_n(reinterpret_cast<char*>(p) + sizeof(t__type*), sizeof({Escape(m.DeclaringType)}) - sizeof(t__type*), '\0');");
+                            writer.WriteLine($"\t{{auto p = f__new_zerod<{Escape(m.DeclaringType)}>();");
                             arguments = arguments.Prepend("p");
                         }
                         writer.WriteLine($@"{'\t'}{Escape(m)}(
 {'\t'}{'\t'}{string.Join(",", arguments)}
 {'\t'});");
-                        if (!m.DeclaringType.IsValueType) writer.WriteLine($"\t{after.Variable} = std::move(p); }}");
+                        if (!m.DeclaringType.IsValueType) writer.WriteLine($"\t{after.Variable} = std::move(p);}}");
                     }
                     queuedMethods.Enqueue(m);
                     return index;
@@ -1621,13 +1620,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($@" {t}
-{'\t'}{{auto p = f__new_sized<{Escape(t.MakeArrayType())}>(sizeof({EscapeForVariable(t)}) * {stack.Variable});
-{'\t'}p->v__length = {stack.Variable};
-{'\t'}p->v__bounds[0] = {{{stack.Variable}, 0}};
-{'\t'}std::fill_n(p->f__data(), {stack.Variable}, ({EscapeForVariable(t)}){{}});
-{'\t'}{indexToStack[index].Variable} = p;
-{'\t'}}}");
+                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = f__new_array<{Escape(t.MakeArrayType())}, {EscapeForVariable(t)}>({stack.Variable});");
                     return index;
                 };
             });
@@ -1943,7 +1936,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tstd::fill_n(reinterpret_cast<char*>({stack.Variable}), sizeof({EscapeForVariable(t)}), '\\0');");
+                    writer.WriteLine($" {t}\n\t*reinterpret_cast<{EscapeForVariable(t)}*>({stack.Variable}) = {{}};");
                     return index;
                 };
             });
@@ -2004,7 +1997,7 @@ struct {field}
             typeToBuiltinFields.Add(typeof(RuntimeTypeHandle), () => $"\t{EscapeForVariable(typeof(Type))} v__type;\n");
             typeToBuiltinFields.Add(typeof(Array), () => $@"{'\t'}struct t__bound
 {'\t'}{{
-{'\t'}{'\t'}int v_length;
+{'\t'}{'\t'}size_t v_length;
 {'\t'}{'\t'}int v_lower;
 {'\t'}}};
 {'\t'}size_t v__length;
@@ -2133,8 +2126,7 @@ struct {field}
             genericMethodToBuiltinBody.Add(ToKey(typeof(Func<,>).GetConstructor(new[] { typeof(object), typeof(IntPtr) })), types =>
             {
                 var type = Escape(typeof(Func<,>).MakeGenericType(types));
-                return $@"{'\t'}auto p = f__new<{type}>();
-{'\t'}std::fill_n(reinterpret_cast<char*>(p) + sizeof(t__type*), sizeof({type}) - sizeof(t__type*), '\0');
+                return $@"{'\t'}auto p = f__new_zerod<{type}>();
 {'\t'}p->v__5ftarget = a_0;
 {'\t'}p->v__5fmethodPtr = a_1;
 {'\t'}return p;
@@ -2270,8 +2262,7 @@ struct {field}
                 var identifier = Escape(concrete);
                 var constructor = concrete.GetConstructor(Type.EmptyTypes);
                 queuedMethods.Enqueue(constructor);
-                return $@"{'\t'}auto p = f__new<{identifier}>();
-{'\t'}std::fill_n(reinterpret_cast<char*>(p) + sizeof(t__type*), sizeof({identifier}) - sizeof(t__type*), '\0');
+                return $@"{'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{Escape(constructor)}(p);
 {'\t'}{Escape(type)}::v__3cDefault_3ek_5f_5fBackingField = std::move(p);
 ";
@@ -2375,6 +2366,24 @@ T* f__new_sized(size_t a_extra, T_an&&... a_n)
 {{
 {'\t'}auto p = new(new char[sizeof(T) + a_extra]) T(std::forward<T_an>(a_n)...);
 {'\t'}p->v__type = &t__type_of<T>::v__instance;
+{'\t'}return p;
+}}
+
+template<typename T>
+T* f__new_zerod()
+{{
+{'\t'}auto p = f__new<T>();
+{'\t'}std::fill_n(reinterpret_cast<char*>(p) + sizeof(t__type*), sizeof(T) - sizeof(t__type*), '\0');
+{'\t'}return p;
+}}
+
+template<typename T_array, typename T_element>
+T_array* f__new_array(size_t a_length)
+{{
+{'\t'}auto p = f__new_sized<T_array>(sizeof(T_element) * a_length);
+{'\t'}p->v__length = a_length;
+{'\t'}p->v__bounds[0] = {{a_length, 0}};
+{'\t'}std::fill_n(p->f__data(), a_length, T_element{{}});
 {'\t'}return p;
 }}");
             Define(typeof(IntPtr));

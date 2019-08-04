@@ -167,9 +167,7 @@ namespace IL2CXX
                 Pop = pop;
                 Indices = new Dictionary<string, int>(Pop.Indices);
                 Type = type;
-                if (Type.IsByRef)
-                    VariableType = "t_managed_pointer";
-                else if (Type.IsPointer)
+                if (Type.IsByRef || Type.IsPointer)
                     VariableType = "void*";
                 else if (primitives.ContainsKey(Type))
                     if (Type == typeof(long) || Type == typeof(ulong))
@@ -229,25 +227,20 @@ namespace IL2CXX
             [typeof(float)] = "float",
             [typeof(void)] = "void"
         };
-        private static readonly Type managedPointerType = typeof(void).MakeByRefType();
-        private static readonly Type transientPointerType = typeof(void).MakePointerType();
+        private static readonly Type pointerType = typeof(void).MakePointerType();
         private static readonly Type typedReferenceByRefType = typeof(TypedReferenceTag).MakeByRefType();
         private static readonly Type typedReferencePointerType = typeof(TypedReferenceTag).MakePointerType();
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfAdd = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
             [("int32_t", "intptr_t")] = typeof(NativeInt),
-            [("int32_t", "t_managed_pointer")] = managedPointerType,
-            [("int32_t", "void*")] = transientPointerType,
+            [("int32_t", "void*")] = pointerType,
             [("int64_t", "int64_t")] = typeof(long),
             [("intptr_t", "int32_t")] = typeof(NativeInt),
             [("intptr_t", "intptr_t")] = typeof(NativeInt),
-            [("intptr_t", "t_managed_pointer")] = managedPointerType,
-            [("intptr_t", "void*")] = transientPointerType,
+            [("intptr_t", "void*")] = pointerType,
             [("double", "double")] = typeof(double),
-            [("t_managed_pointer", "int32_t")] = managedPointerType,
-            [("t_managed_pointer", "intptr_t")] = managedPointerType,
-            [("void*", "int32_t")] = transientPointerType,
-            [("void*", "intptr_t")] = transientPointerType,
+            [("void*", "int32_t")] = pointerType,
+            [("void*", "intptr_t")] = pointerType,
             [("void*", "void*")] = typeof(NativeInt)
         };
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un = new Dictionary<(string, string), Type> {
@@ -396,8 +389,8 @@ namespace IL2CXX
             {
                 if (indexToStack.TryGetValue(index, out var x))
                 {
-                    var xs = stack.Select(y => y.VariableType).Select(y => y == "t_managed_pointer" ? "void*" : y);
-                    var ys = x.Select(y => y.VariableType).Select(y => y == "t_managed_pointer" ? "void*" : y);
+                    var xs = stack.Select(y => y.VariableType);
+                    var ys = x.Select(y => y.VariableType);
                     if (!xs.SequenceEqual(ys)) throw new Exception($"{index:x04}: {string.Join("|", xs)} {string.Join("|", ys)}");
                     break;
                 }
@@ -2467,8 +2460,6 @@ t__finally<T> f__finally(T&& a_f)
 {{
 {'\t'}return {{{{std::move(a_f)}}}};
 }}
-
-using t_managed_pointer = void*;
 
 struct t__type;
 

@@ -1061,12 +1061,12 @@ struct {field}
                     return index;
                 };
             });
+            string unsigned(Stack stack) => $"static_cast<u{stack.VariableType}>({stack.Variable})";
             string condition_Un(Stack stack, string integer, string @float)
             {
                 if (stack.VariableType == "double") return string.Format(@float, stack.Pop.Variable, stack.Variable);
                 if (stack.VariableType == $"{Escape(typeof(object))}*") return $"{stack.Pop.Variable} {integer} {stack.Variable}";
-                string cast(Stack s) => $"static_cast<u{s.VariableType}>({s.Variable})";
-                return $"{cast(stack.Pop)} {integer} {cast(stack)}";
+                return $"{unsigned(stack.Pop)} {integer} {unsigned(stack)}";
             }
             new[] {
                 (OpCode: OpCodes.Br_S, Target: (ParseBranchTarget)ParseBranchTargetI1),
@@ -1228,15 +1228,12 @@ struct {field}
                 (OpCode: OpCodes.Sub, Operator: "-", Type: typeOfAdd),
                 (OpCode: OpCodes.Mul, Operator: "*", Type: typeOfAdd),
                 (OpCode: OpCodes.Div, Operator: "/", Type: typeOfAdd),
-                (OpCode: OpCodes.Div_Un, Operator: "/", Type: typeOfDiv_Un),
                 (OpCode: OpCodes.Rem, Operator: "%", Type: typeOfAdd),
-                (OpCode: OpCodes.Rem_Un, Operator: "%", Type: typeOfDiv_Un),
                 (OpCode: OpCodes.And, Operator: "&", Type: typeOfDiv_Un),
                 (OpCode: OpCodes.Or, Operator: "|", Type: typeOfDiv_Un),
                 (OpCode: OpCodes.Xor, Operator: "^", Type: typeOfDiv_Un),
                 (OpCode: OpCodes.Shl, Operator: "<<", Type: typeOfShl),
-                (OpCode: OpCodes.Shr, Operator: ">>", Type: typeOfShl),
-                (OpCode: OpCodes.Shr_Un, Operator: ">>", Type: typeOfShl)
+                (OpCode: OpCodes.Shr, Operator: ">>", Type: typeOfShl)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type[(stack.Pop.VariableType, stack.VariableType)]));
@@ -1244,6 +1241,19 @@ struct {field}
                 {
                     string operand(Stack s) => s.Type.IsByRef || s.Type.IsPointer ? $"static_cast<char*>({s.Variable})" : s.Variable;
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = {operand(stack.Pop)} {set.Operator} {operand(stack)};");
+                    return index;
+                };
+            }));
+            new[] {
+                (OpCode: OpCodes.Div_Un, Operator: "/", Type: typeOfDiv_Un),
+                (OpCode: OpCodes.Rem_Un, Operator: "%", Type: typeOfDiv_Un),
+                (OpCode: OpCodes.Shr_Un, Operator: ">>", Type: typeOfShl)
+            }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
+            {
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type[(stack.Pop.VariableType, stack.VariableType)]));
+                x.Generate = (index, stack) =>
+                {
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {unsigned(stack.Pop)} {set.Operator} {unsigned(stack)};");
                     return index;
                 };
             }));
@@ -2054,6 +2064,7 @@ struct {field}
             methodToBuiltinBody.Add(ToKey(typeof(RuntimeFieldHandle).GetProperty(nameof(RuntimeFieldHandle.Value)).GetMethod), () => "\treturn {a_0->v__field};\n");
             methodToBuiltinBody.Add(ToKey(typeof(RuntimeTypeHandle).GetMethod(nameof(object.GetHashCode))), () => "\treturn reinterpret_cast<intptr_t>(a_0->v__type);\n");
             methodToBuiltinBody.Add(ToKey(typeof(char).TypeInitializer), () => string.Empty);
+            methodToBuiltinBody.Add(ToKey(typeof(char).GetMethod(nameof(object.ToString), Type.EmptyTypes)), null);
             methodToBuiltinBody.Add(ToKey(typeof(float).GetMethod(nameof(object.GetHashCode))), () => "\treturn reinterpret_cast<intptr_t>(a_0);\n");
             methodToBuiltinBody.Add(ToKey(typeof(double).GetMethod(nameof(object.GetHashCode))), () => "\treturn reinterpret_cast<intptr_t>(a_0);\n");
             methodToBuiltinBody.Add(ToKey(typeof(Enum).GetMethod(nameof(object.Equals))), () => "\treturn a_0 == a_1;\n");
@@ -2123,6 +2134,16 @@ struct {field}
                 queuedMethods.Enqueue(method);
                 return $"\treturn {Escape(method)}(a_0, a_1);\n";
             });
+            genericMethodToBuiltinBody.Add(ToKey(typeof(Action<>).GetConstructor(new[] { typeof(object), typeof(IntPtr) })), types =>
+            {
+                var type = Escape(typeof(Action<>).MakeGenericType(types));
+                return $@"{'\t'}auto p = f__new_zerod<{type}>();
+{'\t'}p->v__5ftarget = a_0;
+{'\t'}p->v__5fmethodPtr = a_1;
+{'\t'}return p;
+";
+            });
+            genericMethodToBuiltinBody.Add(ToKey(typeof(Action<>).GetMethod("Invoke")), types => $"\treinterpret_cast<void(*)({EscapeForVariable(typeof(object))}, {EscapeForVariable(types[0])})>(a_0->v__5fmethodPtr.v__5fvalue)(a_0->v__5ftarget, a_1);\n");
             genericMethodToBuiltinBody.Add(ToKey(typeof(Func<,>).GetConstructor(new[] { typeof(object), typeof(IntPtr) })), types =>
             {
                 var type = Escape(typeof(Func<,>).MakeGenericType(types));
@@ -2204,7 +2225,15 @@ struct {field}
                 queuedMethods.Enqueue(compute);
                 return $"\treturn {Escape(compute)}(reinterpret_cast<uint8_t*>(a_0 + 1), a_0->v__length * sizeof(char16_t), 0);\n";
             });
+            methodToBuiltinBody.Add(ToKey(typeof(string).GetMethod("CreateFromChar", BindingFlags.Static | BindingFlags.NonPublic)), () => "\treturn f__string({&a_0, 1});\n");
             methodToBuiltinBody.Add(ToKey(typeof(Math).GetMethod(nameof(Math.Sqrt))), () => $"\treturn std::sqrt(a_0);\n");
+            foreach (var name in new[] {
+                "GenerateGlobalSeed",
+                "GenerateSeed"
+            }) methodToBuiltinBody.Add(ToKey(typeof(Random).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic)), () => $@"{'\t'}uint32_t seed;
+{'\t'}std::seed_seq().generate(&seed, &seed + 1);
+{'\t'}return seed;
+");
             // TODO: tentative
             methodTreeToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.Equals), new[] { typeof(object) })), type => "\treturn a_0 == a_1;\n");
             //methodTreeToBuiltinBody.Add(ToKey(typeof(object).GetMethod(nameof(object.GetHashCode))), type => "\treturn reinterpret_cast<int32_t>(a_0);\n");

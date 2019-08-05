@@ -2258,7 +2258,8 @@ struct {field}
 {'\t'}}});
 {'\t'}return p;
 ");
-            methodToBuiltinBody.Add(ToKey(Type.GetType("System.SR, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e").GetMethod("InternalGetResourceString", BindingFlags.Static | BindingFlags.NonPublic)), () => "\treturn a_0;\n");
+            methodToBuiltinBody.Add(ToKey(Type.GetType("System.SR, System.Private.CoreLib").GetMethod("InternalGetResourceString", BindingFlags.Static | BindingFlags.NonPublic)), () => "\treturn a_0;\n");
+            methodToBuiltinBody.Add(ToKey(Type.GetType("System.SR, System.Collections").GetMethod("GetResourceString", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(string), typeof(string) }, null)), () => "\treturn a_0;\n");
             methodToBuiltinBody.Add(ToKey(typeof(Environment).GetProperty(nameof(Environment.CurrentManagedThreadId)).GetMethod), () => "\treturn 0;\n");
             methodToBuiltinBody.Add(ToKey(typeof(Console).GetMethod(nameof(Console.WriteLine), new[] { typeof(string) })), () => $@"{'\t'}auto p = static_cast<{Escape(typeof(string))}*>(a_0);
 {'\t'}std::mbstate_t state{{}};

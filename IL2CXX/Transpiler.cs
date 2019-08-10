@@ -1959,81 +1959,10 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
 {'\t'}v__type = &t__type_of<{Escape(typeof(Type))}>::v__instance;
 }}
 ");
-            typeDefinitions.WriteLine($@"
-struct t__type : {Escape(typeof(Type))}
-{{
-{'\t'}t__type* v__base;
-{'\t'}std::map<{EscapeForVariable(typeof(Type))}, void**> v__interface_to_methods;
-{'\t'}size_t v__size;
-{'\t'}t__type* v__element;
-{'\t'}size_t v__rank;
-
-{'\t'}t__type(t__type* a_base, std::map<{EscapeForVariable(typeof(Type))}, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__size(a_size), v__element(a_element), v__rank(a_rank)
-{'\t'}{{
-{'\t'}}}
-{'\t'}bool f__is(t__type* a_type) const
-{'\t'}{{
-{'\t'}{'\t'}auto p = this;
-{'\t'}{'\t'}do {{
-{'\t'}{'\t'}{'\t'}if (p == a_type) return true;
-{'\t'}{'\t'}{'\t'}p = p->v__base;
-{'\t'}{'\t'}}} while (p);
-{'\t'}{'\t'}return false;
-{'\t'}}}
-{'\t'}void** f__implementation({EscapeForVariable(typeof(Type))} a_interface) const
-{'\t'}{{
-{'\t'}{'\t'}auto i = v__interface_to_methods.find(a_interface);
-{'\t'}{'\t'}return i == v__interface_to_methods.end() ? nullptr : i->second;
-{'\t'}}}
-}};
-
-template<typename T>
-struct t__type_of;
-
-template<typename T, typename... T_an>
-T* f__new(T_an&&... a_n)
-{{
-{'\t'}auto p = new T(std::forward<T_an>(a_n)...);
-{'\t'}p->v__type = &t__type_of<T>::v__instance;
-{'\t'}return p;
-}}
-
-template<typename T, typename... T_an>
-T* f__new_sized(size_t a_extra, T_an&&... a_n)
-{{
-{'\t'}auto p = new(new char[sizeof(T) + a_extra]) T(std::forward<T_an>(a_n)...);
-{'\t'}p->v__type = &t__type_of<T>::v__instance;
-{'\t'}return p;
-}}
-
-template<typename T>
-T* f__new_zerod()
-{{
-{'\t'}auto p = f__new<T>();
-{'\t'}std::fill_n(reinterpret_cast<char*>(p) + sizeof(t__type*), sizeof(T) - sizeof(t__type*), '\0');
-{'\t'}return p;
-}}
-
-template<typename T_array, typename T_element>
-T_array* f__new_array(size_t a_length)
-{{
-{'\t'}auto p = f__new_sized<T_array>(sizeof(T_element) * a_length);
-{'\t'}p->v__length = a_length;
-{'\t'}p->v__bounds[0] = {{a_length, 0}};
-{'\t'}std::fill_n(p->f__data(), a_length, T_element{{}});
-{'\t'}return p;
-}}");
+            typeDefinitions.WriteLine("\n#include <il2cxx/type.h>");
             Define(typeof(IntPtr));
             Define(typeof(UIntPtr));
-            var fas = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic);
-            Enqueue(fas);
-            functionDefinitions.WriteLine($@"
-{EscapeForVariable(typeof(string))} f__string(std::u16string_view a_value)
-{{
-{'\t'}auto p = {Escape(fas)}(a_value.size());
-{'\t'}std::copy(a_value.begin(), a_value.end(), reinterpret_cast<char16_t*>(p + 1));
-{'\t'}return p;
-}}");
+            Define(typeof(string));
             Enqueue(method);
             do
             {
@@ -2041,79 +1970,17 @@ T_array* f__new_array(size_t a_length)
                 while (queuedTypes.Count > 0) Define(queuedTypes.Dequeue());
             }
             while (queuedMethods.Count > 0);
-            writer.WriteLine($@"#include <algorithm>
-#include <exception>
-#include <iostream>
-#include <limits>
-#include <map>
-#include <random>
-#include <stdexcept>
-#include <utility>
-#include <climits>
-#include <cstdint>
-#include <cstring>
-#include <cuchar>
+            writer.WriteLine($@"#include <il2cxx/base.h>
 
 namespace il2cxx
 {{
-
-using namespace std::literals;
-
-template<typename T>
-struct t__finally
-{{
-{'\t'}T v_f;
-
-{'\t'}~t__finally()
-{'\t'}{{
-{'\t'}{'\t'}v_f();
-{'\t'}}}
-}};
-
-template<typename T>
-t__finally<T> f__finally(T&& a_f)
-{{
-{'\t'}return {{{{std::move(a_f)}}}};
-}}
-
-struct t__type;
-
-std::u16string f__u16string(const std::string& a_x)
-{{
-{'\t'}std::vector<char16_t> cs;
-{'\t'}std::mbstate_t state{{}};
-{'\t'}auto p = a_x.c_str();
-{'\t'}auto q = p + a_x.size() + 1;
-{'\t'}while (p < q) {{
-{'\t'}{'\t'}char16_t c;
-{'\t'}{'\t'}auto n = std::mbrtoc16(&c, p, q - p, &state);
-{'\t'}{'\t'}switch (n) {{
-{'\t'}{'\t'}case size_t(-3):
-{'\t'}{'\t'}{'\t'}cs.push_back(c);
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}case size_t(-2):
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}case size_t(-1):
-{'\t'}{'\t'}{'\t'}++p;
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}case 0:
-{'\t'}{'\t'}{'\t'}cs.push_back('\0');
-{'\t'}{'\t'}{'\t'}++p;
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}default:
-{'\t'}{'\t'}{'\t'}cs.push_back(c);
-{'\t'}{'\t'}{'\t'}p += n;
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}}}
-{'\t'}}}
-{'\t'}return {{cs.data(), cs.size() - 1}};
-}}
 ");
             writer.Write(typeDeclarations);
             writer.Write(typeDefinitions);
             writer.Write(functionDeclarations);
             foreach (var p in typeToDefinition) WriteTypeDefinition(p.Key, p.Value, writer);
             writer.Write(memberDefinitions);
+            writer.WriteLine("\n#include <il2cxx/allocate.h>");
             writer.WriteLine(functionDefinitions);
             writer.WriteLine($@"}}
 

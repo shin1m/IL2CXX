@@ -16,4 +16,7 @@
     <ProjectReference Include="..\IL2CXX\IL2CXX.csproj" />
   </ItemGroup>
 
+  <Target Name="WriteCXXIncludePath" AfterTargets="AfterBuild">
+    <WriteLinesToFile File="$(OutputPath)CXXIncludePath" Overwrite="true" Lines="$(MSBuildProjectDirectory)/../IL2CXX/include" />
+  </Target>
 </Project>

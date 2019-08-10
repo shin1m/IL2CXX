@@ -41,12 +41,13 @@ namespace IL2CXX.Tests
         {
             Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
+            var include = File.ReadLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CXXIncludePath")).First();
             if (Directory.Exists(build)) Directory.Delete(build, true);
             Directory.CreateDirectory(build);
             using (var writer = File.CreateText(Path.Combine(build, "run.cc")))
                 new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, writer);
             Assert.AreEqual(0, Spawn("make", "run", build, new[] {
-                ("CXXFLAGS", "-std=c++17 -g")
+                ("CXXFLAGS", $"'-I{include}' -std=c++17 -g")
             }, Console.Error.WriteLine, Console.Error.WriteLine));
             Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", "", Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
         }

@@ -291,10 +291,7 @@ namespace IL2CXX
             code.Initialize = transpiler => $"\t{transpiler.Escape(typeof(string))}::{transpiler.Escape(typeof(string).GetField(nameof(string.Empty)))} = f__string(u\"\"sv);\n";
             code.For(
                 type.GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => $@"{'\t'}auto p = f__new_sized<{transpiler.Escape(typeof(string))}>(sizeof(char16_t) * a_0);
-{'\t'}p->v__length = a_0;
-{'\t'}return p;
-"
+                transpiler => "\treturn f__new_string(a_0);\n"
             );
             code.For(
                 type.GetMethod("FillStringChecked", BindingFlags.Static | BindingFlags.NonPublic),

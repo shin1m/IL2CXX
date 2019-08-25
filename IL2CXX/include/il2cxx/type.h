@@ -5,10 +5,12 @@ struct t__type : t_System_2eType
 	size_t v__size;
 	t__type* v__element;
 	size_t v__rank;
+	bool v_revive = false;
 
-	t__type(t__type* a_base, std::map<t_System_2eType*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__size(a_size), v__element(a_element), v__rank(a_rank)
-	{
-	}
+	t__type(t__type* a_base, std::map<t_System_2eType*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
+	virtual void f_scan(t_object* a_this, t_scan a_scan);
+	virtual void f_finalize(t_object* a_this);
+	virtual void f_copy(const char* a_from, size_t a_n, char* a_to);
 	bool f__is(t__type* a_type) const
 	{
 		auto p = this;
@@ -24,6 +26,3 @@ struct t__type : t_System_2eType
 		return i == v__interface_to_methods.end() ? nullptr : i->second;
 	}
 };
-
-template<typename T>
-struct t__type_of;

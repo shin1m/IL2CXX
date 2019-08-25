@@ -7,6 +7,14 @@ namespace IL2CXX.Tests
 {
     class ArrayTests
     {
+        static int AssertEquals(string[] xs, string[] ys)
+        {
+            foreach (var x in xs) Console.WriteLine(x);
+            var n = xs.Length;
+            if (n != ys.Length) return 1;
+            for (var i = 0; i < n; ++i) if (xs[i] != ys[i]) return 1;
+            return 0;
+        }
         static int IsReadOnly()
         {
             string[] xs = { "Hello, World!" };
@@ -14,6 +22,31 @@ namespace IL2CXX.Tests
         }
         [Test]
         public void TestIsReadOnly() => Utilities.Test(IsReadOnly);
+        static int Copy()
+        {
+            string[] xs = { "Hello", "World", "Good", "Bye" };
+            var ys = new string[6];
+            Array.Copy(xs, 1, ys, 2, 3);
+            return AssertEquals(ys, new[] { null, null, "World", "Good", "Bye", null });
+        }
+        [Test]
+        public void TestCopy() => Utilities.Test(Copy);
+        static int ResizeLarger()
+        {
+            string[] xs = { "Hello", "World", "Good", "Bye" };
+            Array.Resize(ref xs, 6);
+            return AssertEquals(xs, new[] { "Hello", "World", "Good", "Bye", null, null });
+        }
+        [Test]
+        public void TestResizeLarger() => Utilities.Test(ResizeLarger);
+        static int ResizeSmaller()
+        {
+            string[] xs = { "Hello", "World", "Good", "Bye" };
+            Array.Resize(ref xs, 3);
+            return AssertEquals(xs, new[] { "Hello", "World", "Good" });
+        }
+        [Test]
+        public void TestResizeSmaller() => Utilities.Test(ResizeSmaller);
         static int IListIsReadOnly()
         {
             IList xs = new[] { "Hello, World!" };
@@ -55,8 +88,7 @@ namespace IL2CXX.Tests
             IList<string> xs = new[] { "World" };
             string[] ys = { "Hello", null };
             xs.CopyTo(ys, 1);
-            foreach (var x in ys) Console.WriteLine(x);
-            return ys[1] == "World" ? 0 : 1;
+            return AssertEquals(ys, new[] { "Hello", "World" });
         }
         [Test]
         public void TestIListTCopyTo() => Utilities.Test(IListTCopyTo);

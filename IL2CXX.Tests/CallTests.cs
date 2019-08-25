@@ -41,6 +41,14 @@ namespace IL2CXX.Tests
         }
         [Test]
         public void TestConstrainedCallVirtual() => Utilities.Test(ConstrainedCallVirtual);
+        static int ConstrainedCallInterface()
+        {
+            string f<T>(T x, T y) where T : IEquatable<T> => x.Equals(y) ? "yes" : "no";
+            Console.WriteLine(f(0, 1));
+            return 0;
+        }
+        [Test]
+        public void TestConstrainedCallInterface() => Utilities.Test(ConstrainedCallInterface);
         static int ConstrainedCallVirtualReference()
         {
             Console.WriteLine(new Bar<string>("Hello, Bar!").AsString());

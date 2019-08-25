@@ -114,31 +114,64 @@ namespace IL2CXX
                 Pop = pop;
                 Indices = new Dictionary<string, int>(Pop.Indices);
                 Type = type;
+                string prefix;
                 if (Type.IsByRef || Type.IsPointer)
+                {
                     VariableType = "void*";
+                    prefix = "p";
+                }
                 else if (primitives.ContainsKey(Type))
+                {
                     if (Type == typeof(long) || Type == typeof(ulong))
+                    {
                         VariableType = "int64_t";
+                        prefix = "j";
+                    }
                     else if (Type == typeof(float) || Type == typeof(double))
+                    {
                         VariableType = "double";
+                        prefix = "f";
+                    }
                     else if (Type == typeof(NativeInt))
+                    {
                         VariableType = "intptr_t";
+                        prefix = "q";
+                    }
                     else
+                    {
                         VariableType = "int32_t";
+                        prefix = "i";
+                    }
+                }
                 else if (Type.IsEnum)
                 {
                     var underlying = Type.GetEnumUnderlyingType();
-                    VariableType = underlying == typeof(long) || underlying == typeof(ulong) ? "int64_t" : "int32_t";
+                    if (underlying == typeof(long) || underlying == typeof(ulong))
+                    {
+                        VariableType = "int64_t";
+                        prefix = "l";
+                    }
+                    else
+                    {
+                        VariableType = "int32_t";
+                        prefix = "i";
+                    }
                 }
                 else if (Type.IsValueType)
-                    VariableType = transpiler.EscapeForVariable(Type);
+                {
+                    VariableType = transpiler.EscapeForScoped(Type);
+                    prefix = $"v{transpiler.Escape(Type)}__";
+                }
                 else
-                    VariableType = $"{transpiler.Escape(typeof(object))}*";
+                {
+                    VariableType = "t_scoped<t_slot>";
+                    prefix = "o";
+                }
                 Indices.TryGetValue(VariableType, out var index);
-                Variable = $"s{Escape(VariableType)}__{index}";
+                Variable = prefix + index;
                 Indices[VariableType] = ++index;
                 transpiler.definedIndices.TryGetValue(VariableType, out var defined);
-                if (index > defined) transpiler.definedIndices[VariableType] = index;
+                if (index > defined.Index) transpiler.definedIndices[VariableType] = (prefix, index);
             }
             public Stack Push(Type type) => new Stack(this, type);
             public IEnumerator<Stack> GetEnumerator()
@@ -221,6 +254,7 @@ namespace IL2CXX
         private readonly Instruction[] instructions2 = new Instruction[256];
         private readonly StringWriter typeDeclarations = new StringWriter();
         private readonly StringWriter typeDefinitions = new StringWriter();
+        private readonly StringWriter staticDeclarations = new StringWriter();
         private readonly StringWriter memberDefinitions = new StringWriter();
         private readonly StringWriter functionDeclarations = new StringWriter();
         private readonly StringWriter functionDefinitions = new StringWriter();
@@ -235,7 +269,7 @@ namespace IL2CXX
         private readonly Queue<MethodBase> queuedMethods = new Queue<MethodBase>();
         private MethodBase method;
         private byte[] bytes;
-        private Dictionary<string, int> definedIndices;
+        private SortedDictionary<string, (string Prefix, int Index)> definedIndices;
         private Dictionary<int, Stack> indexToStack;
         private StringWriter writer;
         private readonly Stack<ExceptionHandlingClause> tries = new Stack<ExceptionHandlingClause>();
@@ -383,63 +417,109 @@ struct {Escape(type)}
                 var identifier = Escape(type);
                 var declaration = $@"// {type.AssemblyQualifiedName}
 struct {identifier}";
-                var @base = type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
+                var @base = type == typeof(object) ? " : t_object" : type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
                 var staticFields = type.IsEnum ? Enumerable.Empty<FieldInfo>() : type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                var staticDeclarations = string.Join(string.Empty, staticFields.Select(x => $"\tstatic {EscapeForVariable(x.FieldType)} v_{Escape(x.Name)};\n"));
-                var staticDefinitions = string.Join(string.Empty, staticFields.Select(x =>
+                var staticMembers = new StringWriter();
+                var staticDefinitions = new StringWriter();
+                if (staticFields.Any())
                 {
-                    var content = string.Empty;
-                    if (x.FieldType.Name.StartsWith("__StaticArrayInitTypeSize="))
+                    staticMembers.WriteLine("\tstruct\n\t{");
+                    foreach (var x in staticFields)
                     {
-                        var bytes = new byte[Marshal.SizeOf(x.FieldType)];
-                        RuntimeHelpers.InitializeArray(bytes, x.FieldHandle);
-                        content = $"\tuint8_t v__content[{bytes.Length}] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};\n";
-                    }
-                    var field = $"t__field_{Escape(x.DeclaringType)}__{Escape(x.Name)}";
-                    return $@"{EscapeForVariable(x.FieldType)} {identifier}::v_{Escape(x.Name)};
+                        staticMembers.WriteLine($"\t\t{EscapeForScoped(x.FieldType)} {Escape(x)};");
+                        var content = string.Empty;
+                        if (x.FieldType.Name.StartsWith("__StaticArrayInitTypeSize="))
+                        {
+                            var bytes = new byte[Marshal.SizeOf(x.FieldType)];
+                            RuntimeHelpers.InitializeArray(bytes, x.FieldHandle);
+                            content = $"\tuint8_t v__content[{bytes.Length}] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};\n";
+                        }
+                        var field = $"t__field_{Escape(x.DeclaringType)}__{Escape(x.Name)}";
+                        staticDefinitions.WriteLine($@"
 struct {field}
 {{
 {content}{'\t'}static {field} v__instance;
 }};
-{field} {field}::v__instance;
-";
-                }));
-                var fields = builtin.GetFields(this, type) ?? string.Join(string.Empty, type.GetFields(declaredAndInstance).Select(x => $"\t{EscapeForVariable(x.FieldType)} v_{Escape(x.Name)};\n"));
+{field} {field}::v__instance;");
+                    }
+                    staticMembers.WriteLine($"\t}} v_{identifier};");
+                }
+                string members;
                 if (primitives.TryGetValue(type, out var name) || type.IsEnum)
                 {
                     if (name == null) name = primitives[type.GetEnumUnderlyingType()];
-                    fields = $@"{'\t'}{name} v__value;
-{'\t'}{identifier}({name} a_value) : v__value(a_value)
+                    members = $@"{'\t'}{name} v__value;
+{'\t'}void f__construct({name} a_value)
 {'\t'}{{
+{'\t'}{'\t'}v__value = a_value;
 {'\t'}}}
 ";
                 }
-                else if (type.IsValueType)
+                else
                 {
-                    fields = $@"{'\t'}struct t_value
-{'\t'}{{
-{fields}{'\t'}}} v__value;
-{'\t'}{identifier}(t_value&& a_value) : v__value(std::move(a_value))
-{'\t'}{{
-{'\t'}}}
-";
-                }
-                var arrayMembers = type.IsArray ? $@"{'\t'}t__bound v__bounds[{type.GetArrayRank()}];
-{'\t'}{EscapeForVariable(GetElementType(type))}* f__data()
+                    members = builtin.GetFields(this, type);
+                    if (members == null)
+                    {
+                        bool hasSlots(Type x) => !(x.IsByRef || x.IsPointer || primitives.ContainsKey(x) || x.IsEnum);
+                        string scan(Type x, string y) => x.IsValueType ? $"{y}.f__scan(a_scan)" : $"a_scan({y})";
+                        if (type.IsArray)
+                        {
+                            var element = GetElementType(type);
+                            members = $@"{'\t'}t__bound v__bounds[{type.GetArrayRank()}];
+{'\t'}{EscapeForVariable(element)}* f__data()
 {'\t'}{{
 {'\t'}{'\t'}return reinterpret_cast<{EscapeForVariable(GetElementType(type))}*>(this + 1);
 {'\t'}}}
-" : string.Empty;
+";
+                            if (hasSlots(element)) members += $@"{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{{
+{'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
+{'\t'}{'\t'}auto p = f__data();
+{'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) {scan(element, "p[i]")};
+{'\t'}}}
+";
+                        }
+                        else
+                        {
+                            var fields = type.GetFields(declaredAndInstance);
+                            string variables(string indent) => string.Join(string.Empty, fields.Select(x => $"{indent}{EscapeForVariable(x.FieldType)} {Escape(x)};\n"));
+                            string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => hasSlots(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
+                            members = type.IsValueType
+                                ? $@"{variables("\t\t")}
+{'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}{{
+{string.Join(string.Empty, fields.Where(x => hasSlots(x.FieldType)).Select(x => $"\t\t\t{Escape(x)}.f__destruct();\n"))}{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{'\t'}{{
+{scanSlots("\t\t\t")}{'\t'}{'\t'}}}
+"
+                                : $@"{variables("\t")}
+{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{{
+{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
+";
+                        }
+                    }
+                    if (type.IsValueType) members = $@"{'\t'}struct t_value
+{'\t'}{{
+{members}{'\t'}}} v__value;
+{'\t'}void f__construct(t_value&& a_value)
+{'\t'}{{
+{'\t'}{'\t'}new(&v__value) t_value(std::move(a_value));
+{'\t'}}}
+{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{{
+{'\t'}{'\t'}v__value.f__scan(a_scan);
+{'\t'}}}
+";
+                }
                 typeDeclarations.WriteLine($"{declaration};");
                 typeDefinitions.WriteLine($@"
 {declaration}{@base}
 {{
-{fields}{staticDeclarations}{arrayMembers}}};");
-                if (staticDefinitions != string.Empty)
-                {
-                    memberDefinitions.WriteLine();
-                    memberDefinitions.Write(staticDefinitions);
-                }
+{members}}};");
+                staticDeclarations.Write(staticMembers);
+                memberDefinitions.Write(staticDefinitions);
             }
             return definition;
         }
@@ -467,17 +547,18 @@ struct {field}
         }
         public string EscapeForVariable(Type type) =>
             type.IsByRef || type.IsPointer ? $"{EscapeForVariable(GetElementType(type))}*" :
-            type.IsInterface ? $"{Escape(typeof(object))}*" :
-            primitives.TryGetValue(type, out var x) ? x :
-            type.IsEnum ? primitives[type.GetEnumUnderlyingType()] :
-            $"{Escape(type)}{(type.IsValueType ? "::t_value" : "*")}";
-        private string EscapeForParameter(Type type) =>
-            type.IsByRef || type.IsPointer ? $"{EscapeForVariable(GetElementType(type))}*" :
-            type.IsInterface ? $"{Escape(typeof(object))}*" :
+            type.IsInterface ? EscapeForVariable(typeof(object)) :
             primitives.TryGetValue(type, out var x) ? x :
             type.IsEnum ? primitives[type.GetEnumUnderlyingType()] :
             type.IsValueType ? $"{Escape(type)}::t_value" :
-            $"{Escape(type)}*";
+            $"t_slot_of<{Escape(type)}>";
+        public string EscapeForScoped(Type type) =>
+            type.IsByRef || type.IsPointer ? $"{EscapeForVariable(GetElementType(type))}*" :
+            type.IsInterface ? EscapeForScoped(typeof(object)) :
+            primitives.TryGetValue(type, out var x) ? x :
+            type.IsEnum ? primitives[type.GetEnumUnderlyingType()] :
+            type.IsValueType ? $"t_scoped<{Escape(type)}::t_value>" :
+            $"t_scoped<t_slot_of<{Escape(type)}>>";
         public string Escape(FieldInfo field) => $"v_{Escape(field.Name)}";
         public string Escape(MethodBase method)
         {
@@ -500,29 +581,28 @@ struct {field}
                     throw new Exception();
             }
         }
-        private string MoveFormat(Type type) =>
-            type == typeof(bool) ? "{0} != 0" :
-            type == typeof(IntPtr) || type == typeof(UIntPtr) ? "{{{0}}}" :
-            type.IsByRef || type.IsPointer ? $"reinterpret_cast<{EscapeForVariable(type)}>({{0}})" :
-            type.IsPrimitive || type.IsEnum ? "{0}" :
-            type.IsValueType ? "std::move({0})" :
-            $"std::move(static_cast<{EscapeForVariable(type)}>({{0}}))";
+        private string FormatMove(Type type, string variable) =>
+            type == typeof(bool) ? $"{variable} != 0" :
+            type == typeof(IntPtr) || type == typeof(UIntPtr) ? $"{EscapeForVariable(type)}{{{variable}}}" :
+            type.IsByRef || type.IsPointer ? $"reinterpret_cast<{EscapeForVariable(type)}>({variable})" :
+            type.IsPrimitive || type.IsEnum ? variable :
+            $"std::move({variable})";
         private void GenerateCall(MethodBase method, string function, IEnumerable<string> variables, Stack after)
         {
             var arguments = new List<Type>();
             if (!method.IsStatic) arguments.Add(GetThisType(method));
             arguments.AddRange(method.GetParameters().Select(x => x.ParameterType));
             var call = $@"{function}({
-    string.Join(",", arguments.Zip(variables.Reverse(), (a, v) => $"\n\t\t{string.Format(MoveFormat(a), v)}"))
+    string.Join(",", arguments.Zip(variables.Reverse(), (a, v) => $"\n\t\t{FormatMove(a, v)}"))
 }{(arguments.Count > 0 ? "\n\t" : string.Empty)})";
-            writer.WriteLine(method is MethodInfo m && m.ReturnType != typeof(void) ? $"\t{after.Variable} = {(m.ReturnType.IsValueType ? call : $"static_cast<{EscapeForVariable(m.ReturnType)}>({call})")};" : $"\t{call};");
+            writer.WriteLine(method is MethodInfo m && m.ReturnType != typeof(void) ? $"\t{after.Variable} = {call};" : $"\t{call};");
         }
         private void GenerateCall(MethodBase method, string function, Stack stack, Stack after) => GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable), after);
         private string FunctionPointer(MethodBase method)
         {
             var parameters = method.GetParameters().Select(x => x.ParameterType);
             if (!method.IsStatic) parameters = parameters.Prepend(GetThisType(method));
-            return $"{(method is MethodInfo m && m.ReturnType != typeof(void) ? EscapeForVariable(m.ReturnType) : "void")}(*)({string.Join(", ", parameters.Select(EscapeForParameter))})";
+            return $"{(method is MethodInfo m && m.ReturnType != typeof(void) ? EscapeForScoped(m.ReturnType) : "void")}(*)({string.Join(", ", parameters.Select(EscapeForScoped))})";
         }
         private static MethodBase GetGenericTypeMethod(MethodBase method) => MethodBase.GetMethodFromHandle(method.MethodHandle, method.DeclaringType.GetGenericTypeDefinition().TypeHandle);
         private void Do()
@@ -531,11 +611,11 @@ struct {field}
             var key = ToKey(method);
             if (!visitedMethods.Add(key) || method.IsAbstract) return;
             var builtin = this.builtin.GetBody(this, method);
-            var returns = method is MethodInfo m ? m.ReturnType == typeof(void) ? "void" : EscapeForVariable(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForVariable(method.DeclaringType);
+            var returns = method is MethodInfo m ? m.ReturnType == typeof(void) ? "void" : EscapeForScoped(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForScoped(method.DeclaringType);
             var identifier = Escape(method);
             var parameters = method.GetParameters().Select(x => x.ParameterType);
             if (!method.IsStatic && !(method.IsConstructor && builtin != null)) parameters = parameters.Prepend(GetThisType(method));
-            string argument(Type t, int i) => $"\n\t{EscapeForParameter(t)} a_{i}";
+            string argument(Type t, int i) => $"\n\t{EscapeForScoped(t)} a_{i}";
             var arguments = parameters.Select(argument).ToList();
             var prototype = $@"
 // {method.DeclaringType}
@@ -569,7 +649,7 @@ struct {field}
             writer.Write(prototype);
             writer.WriteLine($@"
 {{{string.Join(string.Empty, body.ExceptionHandlingClauses.Select(x => $"\n\t// {x}"))}");
-            definedIndices = new Dictionary<string, int>();
+            definedIndices = new SortedDictionary<string, (string, int)>();
             indexToStack = new Dictionary<int, Stack>();
             log($"{method.DeclaringType}::[{method}]");
             foreach (var x in body.ExceptionHandlingClauses)
@@ -603,12 +683,10 @@ struct {field}
                 }
             log("\n");
             foreach (var x in body.LocalVariables)
-                writer.WriteLine($"\t{EscapeForVariable(x.LocalType)} l{x.LocalIndex}{(body.InitLocals ? "{}" : string.Empty)};");
+                writer.WriteLine($"\t{EscapeForScoped(x.LocalType)} l{x.LocalIndex}{(body.InitLocals ? "{}" : string.Empty)};");
             foreach (var x in definedIndices)
-            {
-                var name = Escape(x.Key);
-                for (var i = 0; i < x.Value; ++i) writer.WriteLine($"\t{x.Key} s{name}__{i};");
-            }
+                for (var i = 0; i < x.Value.Index; ++i)
+                    writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
             var index = 0;
             while (index < bytes.Length)
@@ -657,11 +735,11 @@ struct {field}
                         {
                             case ExceptionHandlingClauseOptions.Clause:
                                 writer.WriteLine($@"// catch {clause.CatchType}
-}} catch ({EscapeForVariable(clause.CatchType)} e) {{");
+}} catch ({EscapeForScoped(clause.CatchType)} e) {{");
                                 break;
                             case ExceptionHandlingClauseOptions.Filter:
                                 writer.WriteLine($@"// filter
-}} catch ({EscapeForVariable(typeof(Exception))} e) {{");
+}} catch ({EscapeForScoped(typeof(Exception))} e) {{");
                                 break;
                             case ExceptionHandlingClauseOptions.Finally:
                                 writers.Push(writer);
@@ -737,7 +815,7 @@ struct {field}
                 x.Estimate = (index, stack) => (index, stack.Pop);
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\tl{i} = {string.Format(MoveFormat(method.GetMethodBody().LocalVariables[i].LocalType), stack.Variable)};");
+                    writer.WriteLine($"\n\tl{i} = {FormatMove(method.GetMethodBody().LocalVariables[i].LocalType, stack.Variable)};");
                     return index;
                 };
             }));
@@ -775,7 +853,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseI1(ref index);
-                    writer.WriteLine($" {i}\n\ta_{i} = {string.Format(MoveFormat(GetArgumentType(i)), stack.Variable)};");
+                    writer.WriteLine($" {i}\n\ta_{i} = {FormatMove(GetArgumentType(i), stack.Variable)};");
                     return index;
                 };
             });
@@ -814,7 +892,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseI1(ref index);
-                    writer.WriteLine($" {i}\n\tl{i} = {string.Format(MoveFormat(method.GetMethodBody().LocalVariables[i].LocalType), stack.Variable)};");
+                    writer.WriteLine($" {i}\n\tl{i} = {FormatMove(method.GetMethodBody().LocalVariables[i].LocalType, stack.Variable)};");
                     return index;
                 };
             });
@@ -956,7 +1034,7 @@ struct {field}
                     writer.Write("\n\treturn");
                     if (method is MethodInfo m && m.ReturnType != typeof(void))
                     {
-                        writer.Write($" {string.Format(MoveFormat(m.ReturnType), stack.Variable)}");
+                        writer.Write($" {FormatMove(m.ReturnType, stack.Variable)}");
                         stack = stack.Pop;
                     }
                     writer.WriteLine(";");
@@ -968,7 +1046,7 @@ struct {field}
             string condition_Un(Stack stack, string integer, string @float)
             {
                 if (stack.VariableType == "double") return string.Format(@float, stack.Pop.Variable, stack.Variable);
-                if (stack.VariableType == $"{Escape(typeof(object))}*") return $"{stack.Pop.Variable} {integer} {stack.Variable}";
+                if (stack.VariableType == "t_scoped<t_slot>") return $"{stack.Pop.Variable} {integer} {stack.Variable}";
                 return $"{unsigned(stack.Pop)} {integer} {unsigned(stack)}";
             }
             new[] {
@@ -1192,7 +1270,14 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var after = indexToStack[index];
-                    writer.WriteLine($"\n\t{after.Variable} = {(stack.Type.IsByRef || stack.Type.IsPointer || !stack.Type.IsValueType ? "reinterpret_cast" : "static_cast")}<{after.VariableType}>({stack.Variable});");
+                    writer.Write($"\n\t{after.Variable} = ");
+                    var type = stack.Type;
+                    if (type.IsByRef || type.IsPointer)
+                        writer.WriteLine($"reinterpret_cast<{after.VariableType}>({stack.Variable});");
+                    else if (type.IsValueType)
+                        writer.WriteLine($"static_cast<{after.VariableType}>({stack.Variable});");
+                    else
+                        writer.WriteLine($"reinterpret_cast<{after.VariableType}>(static_cast<t_object*>({stack.Variable}));");
                     return index;
                 };
             }));
@@ -1238,9 +1323,9 @@ struct {field}
                         }
                         Enqueue(m);
                         if (m.DeclaringType.IsInterface)
-                            forVirtual($"{target}->v__type->v__interface_to_methods[&t__type_of<{Escape(m.DeclaringType)}>::v__instance]", typeToDefinition.Values.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(m.DeclaringType, out var ms) ? ms : null).Where(y => y != null));
+                            forVirtual($"{target}->f_type()->v__interface_to_methods[&t__type_of<{Escape(m.DeclaringType)}>::v__instance]", typeToDefinition.Values.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(m.DeclaringType, out var ms) ? ms : null).Where(y => y != null));
                         else if (m.IsVirtual)
-                            forVirtual($"reinterpret_cast<void**>({target}->v__type + 1)", typeToDefinition.Where(y => !y.Key.IsInterface && y.Key.IsSubclassOf(m.DeclaringType)).Select(y => y.Value.Methods));
+                            forVirtual($"reinterpret_cast<void**>({target}->f_type() + 1)", typeToDefinition.Where(y => !y.Key.IsInterface && y.Key.IsSubclassOf(m.DeclaringType)).Select(y => y.Value.Methods));
                         else
                             GenerateCall(m, Escape(m), stack, after);
                     }
@@ -1253,19 +1338,27 @@ struct {field}
                     {
                         if (constrained.IsValueType)
                         {
-                            var cm = typeToDefinition[constrained].Methods[definition.GetIndex(m)];
-                            if (cm.DeclaringType == constrained)
+                            if (m.IsVirtual)
                             {
-                                GenerateCall(cm, Escape(cm), stack, after);
-                                Enqueue(cm);
+                                var ct = (TypeDefinition)typeToDefinition[constrained];
+                                var cm = (m.DeclaringType.IsInterface ? ct.InterfaceToMethods[m.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods)[definition.GetIndex(m)];
+                                if (cm.DeclaringType == constrained)
+                                {
+                                    Enqueue(cm);
+                                    GenerateCall(cm, Escape(cm), stack, after);
+                                }
+                                else
+                                {
+                                    var target = stack.ElementAt(m.GetParameters().Length);
+                                    writer.WriteLine($"\t{{auto p = f__new_constructed<{Escape(constrained)}>(std::move(*{FormatMove(MakePointerType(constrained), target.Variable)}));");
+                                    generate("p");
+                                    writer.WriteLine($"\t}}");
+                                }
                             }
                             else
                             {
-                                var target = stack.ElementAt(m.GetParameters().Length);
-                                writer.WriteLine($@"{'\t'}{{auto p = new {Escape(constrained)}(std::move(*{string.Format(MoveFormat(MakePointerType(constrained)), target.Variable)}));
-{'\t'}p->v__type = &t__type_of<{Escape(constrained)}>::v__instance;");
-                                generate("p");
-                                writer.WriteLine($"\t}}");
+                                Enqueue(m);
+                                GenerateCall(m, Escape(m), stack, after);
                             }
                         }
                         else
@@ -1317,7 +1410,7 @@ struct {field}
                     var after = indexToStack[index];
                     writer.WriteLine($@" {m.DeclaringType}::[{m}]");
                     var parameters = m.GetParameters();
-                    var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{string.Format(MoveFormat(p.ParameterType), s.Variable)}");
+                    var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{FormatMove(p.ParameterType, s.Variable)}");
                     if (builtin.GetBody(this, m) != null)
                     {
                         writer.WriteLine($@"{'\t'}{after.Variable} = {Escape(m)}({string.Join(",", arguments)}
@@ -1354,7 +1447,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->v__type->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) throw std::runtime_error(\"InvalidCastException\");");
+                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) throw std::runtime_error(\"InvalidCastException\");");
                     return index;
                 };
             });
@@ -1368,7 +1461,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->v__type->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) {indexToStack[index].Variable} = nullptr;");
+                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) {indexToStack[index].Variable} = nullptr;");
                     return index;
                 };
             });
@@ -1441,7 +1534,7 @@ struct {field}
                 {
                     var f = ParseField(ref index);
                     writer.WriteLine($@" {f.DeclaringType}::[{f}]
-{'\t'}static_cast<{(f.DeclaringType.IsValueType ? EscapeForVariable(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)} = {string.Format(MoveFormat(f.FieldType), stack.Variable)};");
+{'\t'}static_cast<{(f.DeclaringType.IsValueType ? EscapeForVariable(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};");
                     return index;
                 };
             });
@@ -1455,7 +1548,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = {Escape(f.DeclaringType)}::{Escape(f)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = t_static::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)};");
                     return index;
                 };
             });
@@ -1469,7 +1562,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = &{Escape(f)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = &t_static::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)};");
                     return index;
                 };
             });
@@ -1479,7 +1572,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{Escape(f.DeclaringType)}::{Escape(f)} = {string.Format(MoveFormat(f.FieldType), stack.Variable)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\tt_static::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};");
                     return index;
                 };
             });
@@ -1519,7 +1612,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {string.Format(t.IsValueType ? $"f__new<{Escape(t)}>({{0}})" : "{0}", $"std::move({stack.Variable})")};");
+                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {string.Format(t.IsValueType ? $"f__new_constructed<{Escape(t)}>({{0}})" : "{0}", $"std::move({stack.Variable})")};");
                     return index;
                 };
             });
@@ -1607,7 +1700,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {string.Format(MoveFormat(GetElementType(array.Type)), stack.Variable)};");
+                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {FormatMove(GetElementType(array.Type), stack.Variable)};");
                     return index;
                 };
             });
@@ -1632,7 +1725,7 @@ struct {field}
                 {
                     var t = ParseType(ref index);
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($" {t}\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {string.Format(MoveFormat(t), stack.Variable)};");
+                    writer.WriteLine($" {t}\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {FormatMove(t, stack.Variable)};");
                     return index;
                 };
             });
@@ -1810,7 +1903,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseI4(ref index);
-                    writer.WriteLine($" {i}\n\tl{i} = {string.Format(MoveFormat(method.GetMethodBody().LocalVariables[i].LocalType), stack.Variable)};");
+                    writer.WriteLine($" {i}\n\tl{i} = {FormatMove(method.GetMethodBody().LocalVariables[i].LocalType, stack.Variable)};");
                     return index;
                 };
             });
@@ -1891,7 +1984,7 @@ struct {field}
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(int)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {stack.Variable}.v__type;");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {stack.Variable}.f_type();");
                     return index;
                 };
             });
@@ -1940,25 +2033,35 @@ t__type_of<{identifier}>::t__type_of() : t__type({(type.BaseType == null ? "null
                     writer.WriteLine($"\t}} v_interface__{Escape(p.Key)};");
                 }
                 memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}")));
+                writer.WriteLine($@"{'\t'}virtual void f_scan(t_object* a_this, t_scan a_scan);
+{'\t'}virtual void f_finalize(t_object* a_this);");
+                if (type.IsValueType) writer.WriteLine($"\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
             }
-            writer.WriteLine($@"
-{'\t'}t__type_of();
+            writer.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
             memberDefinitions.WriteLine($@"}}, sizeof({EscapeForVariable(type)}){(type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" : string.Empty)})
 {{
 }}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
+            if (definition is TypeDefinition)
+            {
+                memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_scan(t_object* a_this, t_scan a_scan)
+{{
+{'\t'}static_cast<{identifier}*>(a_this)->f__scan(a_scan);
+}}
+void t__type_of<{identifier}>::f_finalize(t_object* a_this)
+{{
+}}");
+                if (type.IsValueType) memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to)
+{{
+{'\t'}std::copy_n({(type.IsEnum || primitives.ContainsKey(type) ? $"a_from, a_n * sizeof({EscapeForVariable(type)}), a_to" : $"reinterpret_cast<const {identifier}::t_value*>(a_from), a_n, reinterpret_cast<{identifier}::t_value*>(a_to)")});
+}}");
+            }
         }
         public void Do(MethodInfo method, TextWriter writer)
         {
             Define(typeof(Type));
-            memberDefinitions.WriteLine($@"
-{Escape(typeof(Type))}::{Escape(typeof(Type))}()
-{{
-{'\t'}v__type = &t__type_of<{Escape(typeof(Type))}>::v__instance;
-}}
-");
             typeDefinitions.WriteLine("\n#include <il2cxx/type.h>");
             Define(typeof(IntPtr));
             Define(typeof(UIntPtr));
@@ -1970,23 +2073,55 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
                 while (queuedTypes.Count > 0) Define(queuedTypes.Dequeue());
             }
             while (queuedMethods.Count > 0);
-            writer.WriteLine($@"#include <il2cxx/base.h>
+            writer.WriteLine(@"#include <il2cxx/base.h>
 
 namespace il2cxx
-{{
+{
 ");
             writer.Write(typeDeclarations);
             writer.Write(typeDefinitions);
             writer.Write(functionDeclarations);
             foreach (var p in typeToDefinition) WriteTypeDefinition(p.Key, p.Value, writer);
             writer.Write(memberDefinitions);
-            writer.WriteLine("\n#include <il2cxx/allocate.h>");
+            writer.WriteLine(@"
+}
+
+#include <il2cxx/engine.h>
+
+namespace il2cxx
+{
+
+struct t_static
+{");
+            writer.Write(staticDeclarations);
+            writer.WriteLine($@"
+{'\t'}static t_static* v_instance;
+{'\t'}t_static()
+{'\t'}{{
+{'\t'}{'\t'}v_instance = this;
+{'\t'}}}
+{'\t'}~t_static()
+{'\t'}{{
+{'\t'}{'\t'}v_instance = nullptr;
+{'\t'}}}
+}};
+
+t_static* t_static::v_instance;");
             writer.WriteLine(functionDefinitions);
             writer.WriteLine($@"}}
+
+#include ""slot.cc""
+#include ""object.cc""
+#include ""thread.cc""
+#include ""engine.cc""
 
 int main(int argc, char* argv[])
 {{
 {'\t'}using namespace il2cxx;
+{'\t'}t_engine::t_options options;
+{'\t'}options.v_verbose = true;
+{'\t'}t_engine engine(options, argc, argv);
+{'\t'}t_static s;
 {string.Join(string.Empty, typeToDefinition.Keys.Select(x => builtin.GetInitialize(this, x)).Where(x => x != null))}
 {string.Join(string.Empty, typeToDefinition.Keys.Select(x => x.TypeInitializer).Where(x => x != null).Select(x => $"\t{Escape(x)}();\n"))}
 {'\t'}return {Escape(method)}();

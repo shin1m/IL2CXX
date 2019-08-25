@@ -1,3 +1,4 @@
+#include "object.h"
 #include <algorithm>
 #include <exception>
 #include <iostream>
@@ -32,8 +33,6 @@ t__finally<T> f__finally(T&& a_f)
 {
 	return {{std::move(a_f)}};
 }
-
-struct t__type;
 
 std::u16string f__u16string(const std::string& a_x)
 {

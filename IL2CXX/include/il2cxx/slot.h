@@ -59,16 +59,7 @@ public:
 			v_collector__running = true;
 			v_collector__wake.notify_one();
 		}
-		void f_wait()
-		{
-			std::unique_lock<std::mutex> lock(v_collector__mutex);
-			++v_collector__wait;
-			if (!v_collector__running) {
-				v_collector__running = true;
-				v_collector__wake.notify_one();
-			}
-			v_collector__done.wait(lock);
-		}
+		void f_wait();
 	};
 
 protected:
@@ -77,20 +68,42 @@ protected:
 	{
 		static const size_t V_SIZE = A_SIZE;
 
-		std::atomic<t_object* volatile*> v_head{v_objects};
+		t_object* volatile* v_head{v_objects};
 		t_object* volatile* v_next = v_objects + V_SIZE / 2;
 		t_object* volatile v_objects[V_SIZE];
-		std::atomic<t_object* volatile*> v_tail{v_objects + V_SIZE - 1};
+		t_object* volatile* v_epoch;
+		t_object* volatile* v_tail{v_objects + V_SIZE - 1};
 
-		void f_next(t_object* a_object) noexcept;
+		void f_next() noexcept;
 		IL2CXX__PORTABLE__ALWAYS_INLINE IL2CXX__PORTABLE__FORCE_INLINE void f_push(t_object* a_object)
 		{
-			auto head = v_head.load(std::memory_order_relaxed);
-			if (head == v_next) {
-				f_next(a_object);
-			} else {
-				*head = a_object;
-				v_head.store(++head, std::memory_order_release);
+			*v_head = a_object;
+			if (v_head == v_next)
+				f_next();
+			else
+				++v_head;
+		}
+		template<typename T>
+		void f__flush(t_object* volatile* a_epoch, T a_do)
+		{
+			auto end = v_objects + V_SIZE - 1;
+			if (a_epoch > v_objects)
+				--a_epoch;
+			else
+				a_epoch = end;
+			while (v_tail != a_epoch) {
+				auto next = a_epoch;
+				if (v_tail < end) {
+					if (next < v_tail) next = end;
+					++v_tail;
+				} else {
+					v_tail = v_objects;
+				}
+				while (true) {
+					a_do(*v_tail);
+					if (v_tail == next) break;
+					++v_tail;
+				}
 			}
 		}
 	};
@@ -100,7 +113,13 @@ protected:
 	struct t_increments : t_queue<128>
 #endif
 	{
-		void f_flush();
+		void f_flush()
+		{
+			f__flush(v_epoch, [](auto x)
+			{
+				x->f_increment();
+			});
+		}
 	};
 #ifdef NDEBUG
 	struct t_decrements : t_queue<32768>
@@ -110,7 +129,14 @@ protected:
 	{
 		t_object* volatile* v_last = v_objects;
 
-		void f_flush();
+		void f_flush()
+		{
+			f__flush(v_last, [](auto x)
+			{
+				x->f_decrement();
+			});
+			v_last = v_epoch;
+		}
 	};
 	class t_pass
 	{
@@ -134,46 +160,32 @@ protected:
 	static IL2CXX__PORTABLE__EXPORT t_decrements* f_decrements();
 #endif
 
-	t_object* v_p;
+	std::atomic<t_object*> v_p;
 
-	IL2CXX__PORTABLE__ALWAYS_INLINE void f_copy_construct(const t_slot& a_value)
-	{
-		if (a_value.v_p) f_increments()->f_push(a_value.v_p);
-		v_p = a_value.v_p;
-	}
-	void f_move_construct(t_slot& a_value)
-	{
-		v_p = a_value.v_p;
-		a_value.v_p = nullptr;
-	}
 	t_slot(t_object* a_p, const t_pass&) : v_p(a_p)
 	{
 	}
 	void f_assign(t_object* a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
-		auto p = v_p;
-		v_p = a_p;
-		if (p) f_decrements()->f_push(p);
+		if (auto p = v_p.exchange(a_p)) f_decrements()->f_push(p);
 	}
 	void f_assign(t_object& a_p)
 	{
 		f_increments()->f_push(&a_p);
-		auto p = v_p;
-		v_p = &a_p;
-		if (p) f_decrements()->f_push(p);
+		if (auto p = v_p.exchange(&a_p)) f_decrements()->f_push(p);
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(const t_slot& a_value)
 	{
-		auto p = v_p;
-		f_copy_construct(a_value);
+		auto p = a_value.v_p.load();
+		if (p) f_increments()->f_push(p);
+		p = v_p.exchange(p);
 		if (p) f_decrements()->f_push(p);
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(t_slot&& a_value)
 	{
 		if (&a_value == this) return;
-		auto p = v_p;
-		f_move_construct(a_value);
+		auto p = v_p.exchange(a_value.v_p.exchange(nullptr));
 		if (p) f_decrements()->f_push(p);
 	}
 
@@ -182,13 +194,12 @@ public:
 	{
 		if (v_p) f_increments()->f_push(v_p);
 	}
-	t_slot(const t_slot& a_value)
+	t_slot(const t_slot& a_value) : v_p(a_value.v_p.load())
 	{
-		f_copy_construct(a_value);
+		if (auto p = v_p.load()) f_increments()->f_push(p);
 	}
-	t_slot(t_slot&& a_value)
+	t_slot(t_slot&& a_value) : v_p(a_value.v_p.exchange(nullptr))
 	{
-		f_move_construct(a_value);
 	}
 	t_slot& operator=(const t_slot& a_value)
 	{
@@ -219,7 +230,7 @@ public:
 	template<typename T>
 	explicit operator T*() const
 	{
-		return static_cast<T*>(v_p);
+		return static_cast<T*>(v_p.load());
 	}
 	t_object* operator->() const
 	{
@@ -228,7 +239,9 @@ public:
 	void f_construct(const t_slot& a_value)
 	{
 		assert(!v_p);
-		f_copy_construct(a_value);
+		auto p = a_value.v_p.load();
+		if (p) f_increments()->f_push(p);
+		v_p = p;
 	}
 	void f_construct(t_slot&& a_value)
 	{
@@ -302,11 +315,11 @@ public:
 	}*/
 	operator T*() const
 	{
-		return static_cast<T*>(v_p);
+		return static_cast<T*>(v_p.load());
 	}
 	T* operator->() const
 	{
-		return static_cast<T*>(v_p);
+		return static_cast<T*>(v_p.load());
 	}
 };
 
@@ -339,20 +352,18 @@ struct t_scoped : T
 };
 
 template<size_t A_SIZE>
-void t_slot::t_queue<A_SIZE>::f_next(t_object* a_object) noexcept
+void t_slot::t_queue<A_SIZE>::f_next() noexcept
 {
 	v_collector->f_tick();
-	auto head = v_head.load(std::memory_order_relaxed);
-	while (head == v_tail.load(std::memory_order_acquire)) v_collector->f_wait();
-	*head = a_object;
-	if (head < v_objects + V_SIZE - 1) {
-		v_head.store(++head, std::memory_order_release);
-		auto tail = v_tail.load(std::memory_order_acquire);
-		v_next = std::min(tail < head ? v_objects + V_SIZE - 1 : tail, head + V_SIZE / 2);
+	if (v_head < v_objects + V_SIZE - 1) {
+		++v_head;
+		while (v_tail == v_head) v_collector->f_wait();
+		auto tail = v_tail;
+		v_next = std::min(tail < v_head ? v_objects + V_SIZE - 1 : tail - 1, v_head + V_SIZE / 2);
 	} else {
-		v_head.store(v_objects, std::memory_order_release);
-		auto tail = v_tail.load(std::memory_order_acquire);
-		v_next = std::min(tail, v_objects + V_SIZE / 2);
+		v_head = v_objects;
+		while (v_tail == v_head) v_collector->f_wait();
+		v_next = std::min(v_tail - 1, v_head + V_SIZE / 2);
 	}
 }
 

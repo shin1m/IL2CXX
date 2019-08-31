@@ -55,13 +55,12 @@ class t_object
 	template<void (t_object::*A_push)()>
 	static void f_push(t_slot& a_slot)
 	{
-		auto p = a_slot.v_p;
-		if (p) (p->*A_push)();
+		if (auto p = a_slot.v_p.load()) (p->*A_push)();
 	}
 	template<void (t_object::*A_push)()>
 	static void f_push_and_clear(t_slot& a_slot)
 	{
-		auto p = a_slot.v_p;
+		auto p = a_slot.v_p.load();
 		if (!p) return;
 		(p->*A_push)();
 		a_slot.v_p = nullptr;

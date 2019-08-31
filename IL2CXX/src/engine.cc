@@ -7,10 +7,6 @@ void t__type::f_scan(t_object* a_this, t_scan a_scan)
 {
 }
 
-void t__type::f_finalize(t_object* a_this)
-{
-}
-
 void t__type::f_copy(const char* a_from, size_t a_n, char* a_to)
 {
 	std::copy_n(reinterpret_cast<const t_slot*>(a_from), a_n, reinterpret_cast<t_slot*>(a_to));
@@ -54,16 +50,24 @@ void t_engine::f_collector()
 		}
 		{
 			std::lock_guard<std::mutex> lock(v_thread__mutex);
+			if (v_thread__internals) v_thread__internals->f_epoch_request();
 			for (auto p = &v_thread__internals; *p;) {
 				auto q = *p;
-				auto tail = q->v_increments.v_tail.load(std::memory_order_relaxed) + 1;
+				q->f_epoch_wait();
+				if (q->v_done > 0) ++q->v_done;
+				if (q->v_done < 3)
+					p = &q->v_next;
+				else
+					*p = q->v_next;
+				if (*p) (*p)->f_epoch_request();
+				auto tail = q->v_increments.v_tail + 1;
 				q->v_increments.f_flush();
 				q->v_decrements.f_flush();
 				{
 					std::lock_guard<std::mutex> lock(v_object__reviving__mutex);
 					if (q->v_reviving) {
 						size_t n = t_slot::t_increments::V_SIZE;
-						size_t epoch = (q->v_increments.v_tail.load(std::memory_order_relaxed) + 1 + n - tail) % n;
+						size_t epoch = (q->v_increments.v_tail + 1 + n - tail) % n;
 						size_t reviving = (q->v_reviving + n - tail) % n;
 						if (epoch > reviving)
 							q->v_reviving = nullptr;
@@ -71,13 +75,7 @@ void t_engine::f_collector()
 							v_object__reviving = true;
 					}
 				}
-				if (q->v_done > 0) ++q->v_done;
-				if (q->v_done < 3) {
-					p = &(*p)->v_next;
-				} else {
-					*p = q->v_next;
-					delete q;
-				}
+				if (q->v_done >= 3) delete q;
 			}
 		}
 		t_object::f_collect();
@@ -105,6 +103,7 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 
 t_engine::~t_engine()
 {
+	f_epoch_point();
 	{
 		std::unique_lock<std::mutex> lock(v_thread__mutex);
 		auto internal = v_thread->v_internal;
@@ -160,21 +159,6 @@ t_engine::~t_engine()
 		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
 		if (allocated != freed) std::exit(EXIT_FAILURE);
 	}
-}
-
-void t_engine::f_debug_safe_region_enter()
-{
-	std::lock_guard<std::mutex> lock(v_thread__mutex);
-	++v_debug__safe;
-	v_thread__condition.notify_all();
-}
-
-void t_engine::f_debug_safe_region_leave()
-{
-	std::unique_lock<std::mutex> lock(v_thread__mutex);
-	while (v_debug__stopping) v_thread__condition.wait(lock);
-	assert(v_debug__safe > 0);
-	--v_debug__safe;
 }
 
 }

@@ -9,7 +9,6 @@ struct t__type : t_System_2eType
 
 	t__type(t__type* a_base, std::map<t_System_2eType*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
 	virtual void f_scan(t_object* a_this, t_scan a_scan);
-	virtual void f_finalize(t_object* a_this);
 	virtual void f_copy(const char* a_from, size_t a_n, char* a_to);
 	bool f__is(t__type* a_type) const
 	{

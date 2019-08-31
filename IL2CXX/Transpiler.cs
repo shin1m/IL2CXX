@@ -687,6 +687,7 @@ struct {field}
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
+            writer.WriteLine("\tf_epoch_point();");
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
             var index = 0;
             while (index < bytes.Length)
@@ -1049,6 +1050,10 @@ struct {field}
                 if (stack.VariableType == "t_scoped<t_slot>") return $"{stack.Pop.Variable} {integer} {stack.Variable}";
                 return $"{unsigned(stack.Pop)} {integer} {unsigned(stack)}";
             }
+            string @goto(int index, int target) => target < index ? $@"{{
+{'\t'}{'\t'}f_epoch_point();
+{'\t'}{'\t'}goto L_{target:x04};
+{'\t'}}}" : $"goto L_{target:x04};";
             new[] {
                 (OpCode: OpCodes.Br_S, Target: (ParseBranchTarget)ParseBranchTargetI1),
                 (OpCode: OpCodes.Br, Target: (ParseBranchTarget)ParseBranchTargetI4)
@@ -1064,7 +1069,9 @@ struct {field}
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tgoto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}");
+                        if (target < index) writer.WriteLine("\tf_epoch_point();");
+                        writer.WriteLine($"\tgoto L_{target:x04};");
                         return index;
                     };
                 });
@@ -1081,7 +1088,7 @@ struct {field}
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({set.Operator}{stack.Variable}) goto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\tif ({set.Operator}{stack.Variable}) {@goto(index, target)}");
                         return index;
                     };
                 }));
@@ -1103,7 +1110,7 @@ struct {field}
                         var target = baseSet.Target(ref index);
                         bool isPointer(Stack s) => s.Type.IsByRef || s.Type.IsPointer;
                         var format = isPointer(stack.Pop) || isPointer(stack) ? "reinterpret_cast<char*>({0})" : "{0}";
-                        writer.WriteLine($" {target:x04}\n\tif ({string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)}) goto L_{target:x04};");
+                        writer.Write($" {target:x04}\n\tif ({string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)}) {@goto(index, target)}");
                         return index;
                     };
                 }));
@@ -1123,7 +1130,7 @@ struct {field}
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Integer, set.Float)}) goto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Integer, set.Float)}) {@goto(index, target)}");
                         return index;
                     };
                 }));
@@ -2033,8 +2040,7 @@ t__type_of<{identifier}>::t__type_of() : t__type({(type.BaseType == null ? "null
                     writer.WriteLine($"\t}} v_interface__{Escape(p.Key)};");
                 }
                 memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}")));
-                writer.WriteLine($@"{'\t'}virtual void f_scan(t_object* a_this, t_scan a_scan);
-{'\t'}virtual void f_finalize(t_object* a_this);");
+                writer.WriteLine($"\tvirtual void f_scan(t_object* a_this, t_scan a_scan);");
                 if (type.IsValueType) writer.WriteLine($"\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
             }
             writer.WriteLine($@"{'\t'}t__type_of();
@@ -2049,9 +2055,6 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
                 memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_scan(t_object* a_this, t_scan a_scan)
 {{
 {'\t'}static_cast<{identifier}*>(a_this)->f__scan(a_scan);
-}}
-void t__type_of<{identifier}>::f_finalize(t_object* a_this)
-{{
 }}");
                 if (type.IsValueType) memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to)
 {{

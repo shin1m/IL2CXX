@@ -48,7 +48,7 @@ void t_thread::f_join()
 {
 	if (this == v_current) throw std::runtime_error("current thread can not be joined.");
 	if (this == f_engine()->v_thread) throw std::runtime_error("engine thread can not be joined.");
-	t_safe_region region;
+	t_epoch_region region;
 	std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
 	while (v_internal) f_engine()->v_thread__condition.wait(lock);
 }
@@ -58,9 +58,6 @@ t__type_of<t_thread>::t__type_of() : t__type(&t__type_of<t_System_2eObject>::v__
 {
 }
 void t__type_of<t_thread>::f_scan(t_object* a_this, t_scan a_scan)
-{
-}
-void t__type_of<t_thread>::f_finalize(t_object* a_this)
 {
 }
 t__type_of<t_thread> t__type_of<t_thread>::v__instance;

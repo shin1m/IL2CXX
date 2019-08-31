@@ -79,8 +79,6 @@ private:
 	std::condition_variable v_thread__condition;
 	t_scoped<t_slot_of<t_thread>> v_thread;
 	t_options v_options;
-	bool v_debug__stopping = false;
-	size_t v_debug__safe = 0;
 
 	void f_pools__return();
 	decltype(auto) f_object__pool(std::integral_constant<size_t, 0>)
@@ -147,8 +145,6 @@ private:
 public:
 	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
 	~t_engine();
-	void f_debug_safe_region_enter();
-	void f_debug_safe_region_leave();
 };
 
 template<size_t A_rank>
@@ -166,18 +162,6 @@ inline t_engine* f_engine()
 {
 	return static_cast<t_engine*>(t_slot::v_collector);
 }
-
-struct t_safe_region
-{
-	t_safe_region()
-	{
-		f_engine()->f_debug_safe_region_enter();
-	}
-	~t_safe_region()
-	{
-		f_engine()->f_debug_safe_region_leave();
-	}
-};
 
 template<size_t A_rank>
 inline t_object* t_object::f_pool__allocate()
@@ -211,7 +195,6 @@ inline void t_object::f_step()
 inline void t_object::f_decrement_step()
 {
 	v_type->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
-	v_type->f_finalize(this);
 	v_type->f_decrement_push();
 	v_color = e_color__BLACK;
 	if (v_next) {

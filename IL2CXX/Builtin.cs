@@ -658,7 +658,8 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(Console.WriteLine), new[] { typeof(string) }),
-                transpiler => $@"{'\t'}if (auto p = static_cast<{transpiler.Escape(typeof(string))}*>(a_0)) {{
+                transpiler => $@"{'\t'}f_epoch_point();
+{'\t'}if (auto p = static_cast<{transpiler.Escape(typeof(string))}*>(a_0)) {{
 {'\t'}{'\t'}std::mbstate_t state{{}};
 {'\t'}{'\t'}char cs[MB_LEN_MAX];
 {'\t'}{'\t'}for (auto c : std::u16string_view(p->f__data(), p->v__length)) {{

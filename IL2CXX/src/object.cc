@@ -46,6 +46,7 @@ void t_object::f_collect()
 				}
 			}
 		} else {
+			// TODO: enqueue to-be-finalized objects to the finalizer thread.
 			do p->v_color = e_color__RED; while ((p = p->v_next) != cycle);
 			do p->f_cyclic_decrement(); while ((p = p->v_next) != cycle);
 			do {
@@ -115,7 +116,6 @@ void t_object::f_collect()
 void t_object::f_cyclic_decrement()
 {
 	v_type->f_scan(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
-	v_type->f_finalize(this);
 	v_type->f_cyclic_decrement_push();
 }
 

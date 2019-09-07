@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace IL2CXX
 {
@@ -41,6 +42,23 @@ namespace IL2CXX
         {
             var type = method.DeclaringType;
             var handle = method.MethodHandle;
+            if (type.IsSubclassOf(typeof(Delegate)) && type != typeof(MulticastDelegate))
+            {
+                if (handle == type.GetConstructor(new[] { typeof(object), typeof(IntPtr) }).MethodHandle)
+                {
+                    return $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
+{'\t'}p->v__5ftarget = std::move(a_0);
+{'\t'}p->v__5fmethodPtr = a_1;
+{'\t'}return p;
+";
+                }
+                else if (handle == type.GetMethod("Invoke").MethodHandle)
+                {
+                    var @return = ((MethodInfo)method).ReturnType;
+                    var parameters = method.GetParameters().Select(x => x.ParameterType);
+                    return $"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForScoped(@return))}(*)({string.Join(", ", parameters.Select(x => transpiler.EscapeForScoped(x)).Prepend(transpiler.EscapeForScoped(typeof(object))))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.FormatMove(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n";
+                }
+            }
             if (TypeToCode.TryGetValue(type, out var code))
             {
                 if (code.MethodToBody.TryGetValue(handle, out var body0)) return body0(transpiler);
@@ -114,7 +132,7 @@ namespace IL2CXX
             );
             /*code.ForTree(
                 type.GetMethod(nameof(object.GetHashCode)),
-                (transpiler, actual) => "\treturn reinterpret_cast<int32_t>(a_0);\n"
+                (transpiler, actual) => "\treturn reinterpret_cast<intptr_t>(a_0);\n"
             );*/
             code.ForTree(
                 type.GetMethod(nameof(object.ToString)),
@@ -297,6 +315,47 @@ namespace IL2CXX
             code.ForTree(
                 type.GetMethod(nameof(object.ToString)),
                 (transpiler, actual) => $"\treturn f__string(u\"{actual}\"sv);\n"
+            );
+        })
+        .For(typeof(Thread), (type, code) =>
+        {
+            code.Fields = transpiler => $@"
+{'\t'}static IL2CXX__PORTABLE__THREAD {transpiler.Escape(type)}* v__current;
+
+{'\t'}static {transpiler.Escape(type)}* f__current()
+{'\t'}{{
+{'\t'}{'\t'}return v__current;
+{'\t'}}}
+
+{'\t'}t_slot_of<t_System_2eDelegate> v__start;
+{'\t'}t_thread* v__internal;
+
+{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{{
+{'\t'}{'\t'}t_System_2eObject::f__scan(a_scan);
+{'\t'}{'\t'}a_scan(v__start);
+{'\t'}}}
+{'\t'}void f__start();
+{'\t'}void f__join();
+";
+            code.For(
+                type.GetConstructor(new[] { typeof(ThreadStart) }),
+                transpiler => $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
+{'\t'}p->v__start = std::move(a_0);
+{'\t'}return p;
+"
+            );
+            code.For(
+                type.GetMethod(nameof(object.GetHashCode)),
+                transpiler => "\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n"
+            );
+            code.For(
+                type.GetMethod(nameof(Thread.Start), Type.EmptyTypes),
+                transpiler => "\treturn a_0->f__start();\n"
+            );
+            code.For(
+                type.GetMethod(nameof(Thread.Join), Type.EmptyTypes),
+                transpiler => "\ta_0->f__join();\n"
             );
         })
         .For(typeof(string), (type, code) =>
@@ -533,36 +592,6 @@ namespace IL2CXX
                     transpiler.Enqueue(method);
                     return $"\treturn {transpiler.Escape(method)}(a_0, a_1);\n";
                 }
-            );
-        })
-        .For(typeof(Action<>), (type, code) =>
-        {
-            code.ForGeneric(
-                type.GetConstructor(new[] { typeof(object), typeof(IntPtr) }),
-                (transpiler, types) => $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type.MakeGenericType(types))}>();
-{'\t'}p->v__5ftarget = std::move(a_0);
-{'\t'}p->v__5fmethodPtr = a_1;
-{'\t'}return p;
-"
-            );
-            code.ForGeneric(
-                type.GetMethod("Invoke"),
-                (transpiler, types) => $"\treinterpret_cast<void(*)({transpiler.EscapeForScoped(typeof(object))}, {transpiler.EscapeForScoped(types[0])})>(a_0->v__5fmethodPtr.v__5fvalue)(a_0->v__5ftarget, a_1);\n"
-            );
-        })
-        .For(typeof(Func<,>), (type, code) =>
-        {
-            code.ForGeneric(
-                type.GetConstructor(new[] { typeof(object), typeof(IntPtr) }),
-                (transpiler, types) => $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type.MakeGenericType(types))}>();
-{'\t'}p->v__5ftarget = std::move(a_0);
-{'\t'}p->v__5fmethodPtr = a_1;
-{'\t'}return p;
-"
-            );
-            code.ForGeneric(
-                type.GetMethod("Invoke"),
-                (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForScoped(types[1])}(*)({transpiler.EscapeForScoped(typeof(object))}, {transpiler.EscapeForScoped(types[0])})>(a_0->v__5fmethodPtr.v__5fvalue)(a_0->v__5ftarget, a_1);\n"
             );
         })
         .For(Type.GetType("System.Runtime.CompilerServices.JitHelpers"), (type, code) =>

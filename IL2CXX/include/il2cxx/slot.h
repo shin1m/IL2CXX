@@ -16,14 +16,16 @@ namespace il2cxx
 struct t__type;
 class t_engine;
 class t_object;
-class t_thread;
+struct t_thread;
+struct t_System_2eThreading_2eThread;
 t_engine* f_engine();
 
 class t_slot
 {
 	friend class t_engine;
 	friend class t_object;
-	friend class t_thread;
+	friend struct t_thread;
+	friend struct t_System_2eThreading_2eThread;
 	friend t_engine* f_engine();
 
 public:

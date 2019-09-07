@@ -10,6 +10,7 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace IL2CXX
 {
@@ -255,6 +256,7 @@ namespace IL2CXX
         private readonly StringWriter typeDeclarations = new StringWriter();
         private readonly StringWriter typeDefinitions = new StringWriter();
         private readonly StringWriter staticDeclarations = new StringWriter();
+        private readonly StringWriter threadStaticDeclarations = new StringWriter();
         private readonly StringWriter memberDefinitions = new StringWriter();
         private readonly StringWriter functionDeclarations = new StringWriter();
         private readonly StringWriter functionDefinitions = new StringWriter();
@@ -418,10 +420,14 @@ struct {Escape(type)}
                 var declaration = $@"// {type.AssemblyQualifiedName}
 struct {identifier}";
                 var @base = type == typeof(object) ? " : t_object" : type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
-                var staticFields = type.IsEnum ? Enumerable.Empty<FieldInfo>() : type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                var staticFields = new List<FieldInfo>();
+                var threadStaticFields = new List<FieldInfo>();
+                if (!type.IsEnum)
+                    foreach (var x in type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                        (Attribute.IsDefined(x, typeof(ThreadStaticAttribute)) ? threadStaticFields : staticFields).Add(x);
                 var staticMembers = new StringWriter();
                 var staticDefinitions = new StringWriter();
-                if (staticFields.Any())
+                if (staticFields.Count > 0)
                 {
                     staticMembers.WriteLine("\tstruct\n\t{");
                     foreach (var x in staticFields)
@@ -443,6 +449,13 @@ struct {field}
 {field} {field}::v__instance;");
                     }
                     staticMembers.WriteLine($"\t}} v_{identifier};");
+                }
+                var threadStaticMembers = new StringWriter();
+                if (threadStaticFields.Count > 0)
+                {
+                    threadStaticMembers.WriteLine("\tstruct\n\t{");
+                    foreach (var x in threadStaticFields) threadStaticMembers.WriteLine($"\t\t{EscapeForScoped(x.FieldType)} {Escape(x)};");
+                    threadStaticMembers.WriteLine($"\t}} v_{identifier};");
                 }
                 string members;
                 if (primitives.TryGetValue(type, out var name) || type.IsEnum)
@@ -520,6 +533,7 @@ struct {field}
 {members}}};");
                 staticDeclarations.Write(staticMembers);
                 memberDefinitions.Write(staticDefinitions);
+                threadStaticDeclarations.Write(threadStaticMembers);
             }
             return definition;
         }
@@ -581,7 +595,7 @@ struct {field}
                     throw new Exception();
             }
         }
-        private string FormatMove(Type type, string variable) =>
+        public string FormatMove(Type type, string variable) =>
             type == typeof(bool) ? $"{variable} != 0" :
             type == typeof(IntPtr) || type == typeof(UIntPtr) ? $"{EscapeForVariable(type)}{{{variable}}}" :
             type.IsByRef || type.IsPointer ? $"reinterpret_cast<{EscapeForVariable(type)}>({variable})" :
@@ -1110,7 +1124,7 @@ struct {field}
                         var target = baseSet.Target(ref index);
                         bool isPointer(Stack s) => s.Type.IsByRef || s.Type.IsPointer;
                         var format = isPointer(stack.Pop) || isPointer(stack) ? "reinterpret_cast<char*>({0})" : "{0}";
-                        writer.Write($" {target:x04}\n\tif ({string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)}) {@goto(index, target)}");
+                        writer.WriteLine($" {target:x04}\n\tif ({string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)}) {@goto(index, target)}");
                         return index;
                     };
                 }));
@@ -1545,6 +1559,7 @@ struct {field}
                     return index;
                 };
             });
+            string @static(FieldInfo x) => Attribute.IsDefined(x, typeof(ThreadStaticAttribute)) ? "t_thread_static" : "t_static";
             instructions1[OpCodes.Ldsfld.Value].For(x =>
             {
                 x.Estimate = (index, stack) =>
@@ -1555,7 +1570,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = t_static::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = {@static(f)}::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)};");
                     return index;
                 };
             });
@@ -1569,7 +1584,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = &t_static::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = &{@static(f)}::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)};");
                     return index;
                 };
             });
@@ -1579,7 +1594,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\tt_static::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]\n\t{@static(f)}::v_instance->v_{Escape(f.DeclaringType)}.{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};");
                     return index;
                 };
             });
@@ -2068,6 +2083,9 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
             typeDefinitions.WriteLine("\n#include <il2cxx/type.h>");
             Define(typeof(IntPtr));
             Define(typeof(UIntPtr));
+            Define(typeof(Thread));
+            Enqueue(typeof(ThreadStart).GetMethod("Invoke"));
+            Enqueue(typeof(ParameterizedThreadStart).GetMethod("Invoke"));
             Define(typeof(string));
             Enqueue(method);
             do
@@ -2109,7 +2127,24 @@ struct t_static
 {'\t'}}}
 }};
 
-t_static* t_static::v_instance;");
+t_static* t_static::v_instance;
+
+struct t_thread_static
+{{");
+            writer.Write(threadStaticDeclarations);
+            writer.WriteLine($@"
+{'\t'}static IL2CXX__PORTABLE__THREAD t_thread_static* v_instance;
+{'\t'}t_thread_static()
+{'\t'}{{
+{'\t'}{'\t'}v_instance = this;
+{'\t'}}}
+{'\t'}~t_thread_static()
+{'\t'}{{
+{'\t'}{'\t'}v_instance = nullptr;
+{'\t'}}}
+}};
+
+IL2CXX__PORTABLE__THREAD t_thread_static* t_thread_static::v_instance;");
             writer.WriteLine(functionDefinitions);
             writer.WriteLine($@"}}
 
@@ -2125,6 +2160,7 @@ int main(int argc, char* argv[])
 {'\t'}options.v_verbose = true;
 {'\t'}t_engine engine(options, argc, argv);
 {'\t'}t_static s;
+{'\t'}t_thread_static ts;
 {string.Join(string.Empty, typeToDefinition.Keys.Select(x => builtin.GetInitialize(this, x)).Where(x => x != null))}
 {string.Join(string.Empty, typeToDefinition.Keys.Select(x => x.TypeInitializer).Where(x => x != null).Select(x => $"\t{Escape(x)}();\n"))}
 {'\t'}return {Escape(method)}();

@@ -93,7 +93,9 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 	v_object__pool1.f_grow();
 	v_object__pool2.f_grow();
 	v_object__pool3.f_grow();
-	t_thread::v_current = v_thread = f__new_constructed<t_thread>(v_thread__internals);
+	v_thread = f__new_zerod<t_System_2eThreading_2eThread>();
+	v_thread->v__internal = v_thread__internals;
+	t_System_2eThreading_2eThread::v__current = v_thread;
 	{
 		std::unique_lock<std::mutex> lock(v_collector__mutex);
 		std::thread(&t_engine::f_collector, this).detach();
@@ -103,20 +105,17 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 
 t_engine::~t_engine()
 {
-	f_epoch_point();
 	{
+		t_epoch_region region;
 		std::unique_lock<std::mutex> lock(v_thread__mutex);
-		auto internal = v_thread->v_internal;
+		auto internal = v_thread->v__internal;
 		while (true) {
 			auto p = v_thread__internals;
 			while (p == internal || p && p->v_done > 0) p = p->v_next;
 			if (!p) break;
 			v_thread__condition.wait(lock);
 		}
-	}
-	{
-		std::lock_guard<std::mutex> lock(v_thread__mutex);
-		++v_thread->v_internal->v_done;
+		++v_thread->v__internal->v_done;
 	}
 	v_thread.f__destruct();
 	f_pools__return();

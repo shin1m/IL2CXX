@@ -11,8 +11,7 @@ struct t_safe_region;
 class t_engine : public t_slot::t_collector
 {
 	friend class t_object;
-	friend class t_thread;
-	friend struct t_safe_region;
+	friend struct t_System_2eThreading_2eThread;
 
 	template<typename T, size_t A_size>
 	struct t_pool : t_shared_pool<T, A_size>
@@ -74,10 +73,10 @@ private:
 	std::mutex v_object__reviving__mutex;
 	size_t v_object__release = 0;
 	size_t v_object__collect = 0;
-	t_thread::t_internal* v_thread__internals = new t_thread::t_internal();
+	t_thread* v_thread__internals = new t_thread();
 	std::mutex v_thread__mutex;
 	std::condition_variable v_thread__condition;
-	t_scoped<t_slot_of<t_thread>> v_thread;
+	t_scoped<t_slot_of<t_System_2eThreading_2eThread>> v_thread;
 	t_options v_options;
 
 	void f_pools__return();

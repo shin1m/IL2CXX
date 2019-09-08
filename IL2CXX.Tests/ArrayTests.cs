@@ -109,5 +109,12 @@ namespace IL2CXX.Tests
         }
         [Test]
         public void TestIListTIndexOf() => Utilities.Test(IListTIndexOf);
+        static int Clone()
+        {
+            string[] xs = { "foo", "bar" };
+            return AssertEquals((string[])xs.Clone(), xs);
+        }
+        [Test]
+        public void TestClone() => Utilities.Test(Clone);
     }
 }

@@ -478,10 +478,11 @@ struct {field}
                         if (type.IsArray)
                         {
                             var element = GetElementType(type);
+                            var elementIdentifier = EscapeForVariable(element);
                             members = $@"{'\t'}t__bound v__bounds[{type.GetArrayRank()}];
-{'\t'}{EscapeForVariable(element)}* f__data()
+{'\t'}{elementIdentifier}* f__data()
 {'\t'}{{
-{'\t'}{'\t'}return reinterpret_cast<{EscapeForVariable(GetElementType(type))}*>(this + 1);
+{'\t'}{'\t'}return reinterpret_cast<{elementIdentifier}*>(this + 1);
 {'\t'}}}
 ";
                             if (hasSlots(element)) members += $@"{'\t'}void f__scan(t_scan a_scan)
@@ -489,6 +490,17 @@ struct {field}
 {'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
 {'\t'}{'\t'}auto p = f__data();
 {'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) {scan(element, "p[i]")};
+{'\t'}}}
+";
+                            members += $@"{'\t'}t_scoped<t_slot> f__clone() const
+{'\t'}{{
+{'\t'}{'\t'}auto p = t_object::f_allocate<{identifier}>(sizeof({identifier}) * v__length);
+{'\t'}{'\t'}p->v__length = v__length;
+{'\t'}{'\t'}std::copy_n(v__bounds, {type.GetArrayRank()}, p->v__bounds);
+{'\t'}{'\t'}auto p0 = reinterpret_cast<const {elementIdentifier}*>(this + 1);
+{'\t'}{'\t'}auto p1 = p->f__data();
+{'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) new(p1 + i) {elementIdentifier}(p0[i]);
+{'\t'}{'\t'}return p;
 {'\t'}}}
 ";
                         }
@@ -510,6 +522,15 @@ struct {field}
 {'\t'}void f__scan(t_scan a_scan)
 {'\t'}{{
 {(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
+{'\t'}void f__construct({identifier}* a_p) const
+{'\t'}{{
+{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__construct(a_p);\n")}{string.Join(string.Empty, fields.Select(x => $"{'\t'}{'\t'}new(&a_p->{Escape(x)}) decltype({Escape(x)})({Escape(x)});\n"))}{'\t'}}}
+{'\t'}t_scoped<t_slot> f__clone() const
+{'\t'}{{
+{'\t'}{'\t'}auto p = t_object::f_allocate<{identifier}>();
+{'\t'}{'\t'}f__construct(p);
+{'\t'}{'\t'}return p;
+{'\t'}}}
 ";
                         }
                     }
@@ -2055,8 +2076,9 @@ t__type_of<{identifier}>::t__type_of() : t__type({(type.BaseType == null ? "null
                     writer.WriteLine($"\t}} v_interface__{Escape(p.Key)};");
                 }
                 memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}")));
-                writer.WriteLine($"\tvirtual void f_scan(t_object* a_this, t_scan a_scan);");
-                if (type.IsValueType) writer.WriteLine($"\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
+                writer.WriteLine($@"{'\t'}virtual void f_scan(t_object* a_this, t_scan a_scan);
+{'\t'}virtual t_scoped<t_slot> f_clone(const t_object* a_this);");
+                if (type.IsValueType) writer.WriteLine("\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
             }
             writer.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
@@ -2070,10 +2092,19 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
                 memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_scan(t_object* a_this, t_scan a_scan)
 {{
 {'\t'}static_cast<{identifier}*>(a_this)->f__scan(a_scan);
-}}");
-                if (type.IsValueType) memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to)
+}}
+t_scoped<t_slot> t__type_of<{identifier}>::f_clone(const t_object* a_this)
+{{");
+                memberDefinitions.WriteLine(type.IsValueType
+                    ? $@"{'\t'}auto p = t_object::f_allocate<{identifier}>();
+{'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
+{'\t'}return p;
+}}
+void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to)
 {{
-{'\t'}std::copy_n({(type.IsEnum || primitives.ContainsKey(type) ? $"a_from, a_n * sizeof({EscapeForVariable(type)}), a_to" : $"reinterpret_cast<const {identifier}::t_value*>(a_from), a_n, reinterpret_cast<{identifier}::t_value*>(a_to)")});
+{'\t'}std::copy_n(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));
+}}"
+                    : $@"{'\t'}return static_cast<const {identifier}*>(a_this)->f__clone();
 }}");
             }
         }

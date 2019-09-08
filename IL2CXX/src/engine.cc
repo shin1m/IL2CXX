@@ -7,6 +7,11 @@ void t__type::f_scan(t_object* a_this, t_scan a_scan)
 {
 }
 
+t_scoped<t_slot> t__type::f_clone(const t_object* a_this)
+{
+	throw std::logic_error("not supported.");
+}
+
 void t__type::f_copy(const char* a_from, size_t a_n, char* a_to)
 {
 	std::copy_n(reinterpret_cast<const t_slot*>(a_from), a_n, reinterpret_cast<t_slot*>(a_to));

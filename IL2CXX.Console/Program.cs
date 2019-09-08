@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 
 namespace IL2CXX.Console
 {
@@ -49,7 +50,7 @@ namespace IL2CXX.Console
                 return top.Word;
             };
         }
-        static Dictionary<string, int> LoadWordToCount(IEnumerable<string> lines)
+        static IEnumerable<string> EnumerateWords(IEnumerable<string> lines)
         {
             var isWords = Enumerable.Range(0, 128).Select(c => c >= 48 && c < 58 || c >= 65 && c < 91 || c == 95 || c >= 97 && c < 123).ToArray();
             bool isWord(char c) => c < 128 && isWords[c];
@@ -64,23 +65,35 @@ namespace IL2CXX.Console
                     i = j;
                 }
             }
-            return lines.SelectMany(matches).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count());
+            return lines.SelectMany(matches);
         }
         static int Test()
         {
-            var lines = new[] {
+            string[] lines = {
                 "Hello, World!",
                 "Hello, this is shin!",
                 "Good bye, World!",
                 "Bye bye."
             };
-            var word2count = LoadWordToCount(lines);
-            Console.WriteLine($"words: {word2count.Count}");
-            foreach (var x in word2count) Console.WriteLine($"\t{x.Key}: {x.Value}");
-            var correct = Corrector(word2count);
-            Console.WriteLine($"hell: {correct("hell")}");
-            Console.WriteLine($"work: {correct("work")}");
-            Console.WriteLine($"wide: {correct("wide")}");
+            var correct = Corrector(EnumerateWords(lines).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count()));
+            var log = string.Empty;
+            void test(string word) {
+                var corrected = correct(word);
+                log += $"corrected: {word}: {corrected}\n";
+                Console.WriteLine($"{word}: {corrected}");
+            }
+            var ts = new[] {
+                "hell",
+                "shin1",
+                "work",
+                "wide",
+                "wild"
+            }.Select(x => new Thread(() => {
+                for (var i = 0; i < 10; ++i) test(x);
+            })).ToList();
+            foreach (var x in ts) x.Start();
+            foreach (var x in ts) x.Join();
+            Console.WriteLine(log);
             return 0;
         }
         static void Main(string[] args)

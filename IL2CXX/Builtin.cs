@@ -119,6 +119,10 @@ namespace IL2CXX
         .For(typeof(object), (type, code) =>
         {
             code.For(
+                type.GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => "\treturn a_0->f_type()->f_clone(a_0);\n"
+            );
+            code.For(
                 type.GetMethod(nameof(object.GetType)),
                 transpiler => "\treturn a_0->f_type();\n"
             );

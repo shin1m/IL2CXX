@@ -26,3 +26,31 @@ struct t__type : t_System_2eType
 		return i == v__interface_to_methods.end() ? nullptr : i->second;
 	}
 };
+
+template<typename T_interface, size_t A_i>
+void* f__resolve(void*& a_site, t__type* a_type)
+{
+	auto p = a_type->v__interface_to_methods[&t__type_of<T_interface>::v__instance][A_i];
+	a_site = p;
+	return reinterpret_cast<void*(*)(void*&, t__type*)>(p)(a_site, a_type);
+}
+
+template<typename T_interface, size_t A_i, typename T_type, typename T_method, T_method A_method>
+void* f__method(void*& a_site, t__type* a_type)
+{
+	return a_type == &t__type_of<T_type>::v__instance ? reinterpret_cast<void*>(A_method) : f__resolve<T_interface, A_i>(a_site, a_type);
+}
+
+template<typename T_interface, size_t A_i, size_t A_j>
+void* f__generic_resolve(void*& a_site, t__type* a_type)
+{
+	auto p = reinterpret_cast<void**>(a_type->v__interface_to_methods[&t__type_of<T_interface>::v__instance][A_i])[A_j];
+	a_site = p;
+	return reinterpret_cast<void*(*)(void*&, t__type*)>(p)(a_site, a_type);
+}
+
+template<typename T_interface, size_t A_i, size_t A_j, typename T_type, typename T_method, T_method A_method>
+void* f__generic_method(void*& a_site, t__type* a_type)
+{
+	return a_type == &t__type_of<T_type>::v__instance ? reinterpret_cast<void*>(A_method) : f__generic_resolve<T_interface, A_i, A_j>(a_site, a_type);
+}

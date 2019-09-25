@@ -87,13 +87,10 @@ struct t_epoch_region
 inline void t_slot::t_collector::f_wait()
 {
 	t_epoch_region region;
-	std::unique_lock<std::mutex> lock(v_collector__mutex);
+	std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
 	++v_collector__wait;
-	if (!v_collector__running) {
-		v_collector__running = true;
-		v_collector__wake.notify_one();
-	}
-	v_collector__done.wait(lock);
+	v_collector__conductor.f__wake();
+	v_collector__conductor.v_done.wait(lock);
 }
 
 }

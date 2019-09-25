@@ -2,6 +2,7 @@
 #define IL2CXX__ENGINE_H
 
 #include "thread.h"
+#include <deque>
 
 namespace il2cxx
 {
@@ -77,7 +78,12 @@ private:
 	std::mutex v_thread__mutex;
 	std::condition_variable v_thread__condition;
 	t_scoped<t_slot_of<t_System_2eThreading_2eThread>> v_thread;
-	t_options v_options;
+	t_conductor v_finalizer__conductor;
+	std::deque<t_object*> v_finalizer__queue;
+	const t_options& v_options;
+	size_t v_collector__threshold;
+	size_t v_collector__full = 0;
+	bool v_shuttingdown = false;
 
 	void f_pools__return();
 	decltype(auto) f_object__pool(std::integral_constant<size_t, 0>)
@@ -140,10 +146,18 @@ private:
 		f_free(a_p);
 	}
 	void f_collector();
+	void f_finalizer();
 
 public:
 	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
 	~t_engine();
+	bool f_shuttingdown() const
+	{
+		return v_shuttingdown;
+	}
+	void f_shutdown();
+	void f_collect();
+	void f_finalize();
 };
 
 template<size_t A_rank>
@@ -203,19 +217,31 @@ inline void t_object::f_decrement_step()
 	f_engine()->f_free_as_release(this);
 }
 
-inline t_scoped<t_slot> t_object::f_allocate(t__type* a_type, size_t a_size)
+inline void t_object::f_decrement()
 {
-	auto p = f_local_pool__allocate(a_size);
-	p->v_next = nullptr;
-	t_slot::f_increments()->f_push(a_type);
-	p->v_type = a_type;
-	return {p, t_slot::t_pass()};
+	assert(v_count > 0);
+	if (--v_count > 0) {
+		v_color = e_color__PURPLE;
+		if (!v_next) f_append(this);
+	} else {
+		if (v_finalizee) {
+			auto& conductor = f_engine()->v_finalizer__conductor;
+			std::lock_guard<std::mutex> lock(conductor.v_mutex);
+			if (!conductor.v_quitting) {
+				f_increment();
+				f_engine()->v_finalizer__queue.push_back(this);
+				conductor.f__wake();
+				return;
+			}
+		}
+		f_loop<&t_object::f_decrement_step>();
+	}
 }
 
 template<typename T>
 inline t_scoped<t_slot_of<T>> t_object::f_allocate(size_t a_extra)
 {
-	return f_allocate(&t__type_of<T>::v__instance, sizeof(T) + a_extra);
+	return t__type_of<T>::v__instance.f__allocate(sizeof(T) + a_extra);
 }
 
 template<typename T>

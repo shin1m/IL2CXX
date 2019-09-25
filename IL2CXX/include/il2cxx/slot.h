@@ -14,14 +14,56 @@ namespace il2cxx
 {
 
 struct t__type;
+struct t__type_finalizee;
 class t_engine;
 class t_object;
 struct t_thread;
 struct t_System_2eThreading_2eThread;
 t_engine* f_engine();
 
+struct t_conductor
+{
+	bool v_running = true;
+	bool v_quitting = false;
+	std::mutex v_mutex;
+	std::condition_variable v_wake;
+	std::condition_variable v_done;
+
+	void f__next(std::unique_lock<std::mutex>& a_lock)
+	{
+		v_running = false;
+		v_done.notify_all();
+		do v_wake.wait(a_lock); while (!v_running);
+	}
+	void f_exit()
+	{
+		std::lock_guard<std::mutex> lock(v_mutex);
+		v_running = false;
+		v_done.notify_one();
+	}
+	void f__wake()
+	{
+		if (v_running) return;
+		v_running = true;
+		v_wake.notify_one();
+	}
+	void f__wait(std::unique_lock<std::mutex>& a_lock)
+	{
+		do v_done.wait(a_lock); while (v_running);
+	}
+	void f_quit()
+	{
+		std::unique_lock<std::mutex> lock(v_mutex);
+		v_running = v_quitting = true;
+		v_wake.notify_one();
+		f__wait(lock);
+	}
+};
+
 class t_slot
 {
+	friend class t__type;
+	friend class t__type_finalizee;
 	friend class t_engine;
 	friend class t_object;
 	friend struct t_thread;
@@ -32,11 +74,7 @@ public:
 	class t_collector
 	{
 	protected:
-		bool v_collector__running = true;
-		bool v_collector__quitting = false;
-		std::mutex v_collector__mutex;
-		std::condition_variable v_collector__wake;
-		std::condition_variable v_collector__done;
+		t_conductor v_collector__conductor;
 		size_t v_collector__tick = 0;
 		size_t v_collector__wait = 0;
 		size_t v_collector__epoch = 0;
@@ -54,12 +92,10 @@ public:
 	public:
 		void f_tick()
 		{
-			if (v_collector__running) return;
-			std::lock_guard<std::mutex> lock(v_collector__mutex);
+			if (v_collector__conductor.v_running) return;
+			std::lock_guard<std::mutex> lock(v_collector__conductor.v_mutex);
 			++v_collector__tick;
-			if (v_collector__running) return;
-			v_collector__running = true;
-			v_collector__wake.notify_one();
+			v_collector__conductor.f__wake();
 		}
 		void f_wait();
 	};
@@ -262,6 +298,7 @@ template<typename T>
 class t_slot_of : public t_slot
 {
 	friend struct t__type;
+	friend struct t__type_finalizee;
 	friend class t_object;
 
 	t_slot_of(T* a_p, const t_pass&) : t_slot(a_p, t_pass())

@@ -3,20 +3,6 @@
 namespace il2cxx
 {
 
-void t__type::f_scan(t_object* a_this, t_scan a_scan)
-{
-}
-
-t_scoped<t_slot> t__type::f_clone(const t_object* a_this)
-{
-	throw std::logic_error("not supported.");
-}
-
-void t__type::f_copy(const char* a_from, size_t a_n, char* a_to)
-{
-	std::copy_n(reinterpret_cast<const t_slot*>(a_from), a_n, reinterpret_cast<t_slot*>(a_to));
-}
-
 IL2CXX__PORTABLE__THREAD size_t t_engine::v_local_object__allocated;
 
 void t_engine::f_pools__return()
@@ -36,17 +22,9 @@ void t_engine::f_collector()
 	t_object::v_roots.v_next = t_object::v_roots.v_previous = reinterpret_cast<t_object*>(&t_object::v_roots);
 	while (true) {
 		{
-			std::unique_lock<std::mutex> lock(v_collector__mutex);
-			v_collector__running = false;
-			v_collector__done.notify_all();
-			do v_collector__wake.wait(lock); while (!v_collector__running);
-		}
-		if (v_collector__quitting) {
-			if (v_options.v_verbose) std::fprintf(stderr, "collector quitting...\n");
-			std::lock_guard<std::mutex> lock(v_collector__mutex);
-			v_collector__running = false;
-			v_collector__done.notify_one();
-			break;
+			std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+			v_collector__conductor.f__next(lock);
+			if (v_collector__conductor.v_quitting) break;
 		}
 		++v_collector__epoch;
 		{
@@ -89,9 +67,39 @@ void t_engine::f_collector()
 		if (v_object__pool2.v_freed > 0) v_object__pool2.f_return();
 		if (v_object__pool3.v_freed > 0) v_object__pool3.f_return();
 	}
+	if (v_options.v_verbose) std::fprintf(stderr, "collector quitting...\n");
+	v_collector__conductor.f_exit();
 }
 
-t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_options(a_options)
+void t_engine::f_finalizer()
+{
+	if (v_options.v_verbose) std::fprintf(stderr, "finalizer starting...\n");
+	while (true) {
+		{
+			t_epoch_region region;
+			std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
+			if (v_finalizer__conductor.v_quitting) break;
+			v_finalizer__conductor.f__next(lock);
+		}
+		while (true) {
+			t_object* p;
+			{
+				t_epoch_region region;
+				std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
+				if (v_finalizer__queue.empty()) break;
+				p = v_finalizer__queue.front();
+				v_finalizer__queue.pop_front();
+			}
+			p->f_type()->f_suppress_finalize(p);
+			reinterpret_cast<void(*)(t_scoped<t_slot_of<t_System_2eObject>>)>(reinterpret_cast<void**>(p->f_type() + 1)[2])(t_slot(p, t_slot::t_pass()));
+		}
+	}
+	if (v_options.v_verbose) std::fprintf(stderr, "finalizer quitting...\n");
+	t_epoch_region region;
+	v_finalizer__conductor.f_exit();
+}
+
+t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_options(a_options), v_collector__threshold(v_options.v_collector__threshold)
 {
 	v_thread__internals->f_initialize();
 	v_object__pool0.f_grow();
@@ -102,39 +110,29 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 	v_thread->v__internal = v_thread__internals;
 	t_System_2eThreading_2eThread::v__current = v_thread;
 	{
-		std::unique_lock<std::mutex> lock(v_collector__mutex);
+		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
 		std::thread(&t_engine::f_collector, this).detach();
-		while (v_collector__running) v_collector__done.wait(lock);
+		v_collector__conductor.f__wait(lock);
+	}
+	{
+		auto finalizer = f__new_zerod<t_System_2eThreading_2eThread>();
+		t_epoch_region region;
+		std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
+		finalizer->f__start([this]
+		{
+			f_finalizer();
+		});
+		v_finalizer__conductor.f__wait(lock);
 	}
 }
 
 t_engine::~t_engine()
 {
-	{
-		t_epoch_region region;
-		std::unique_lock<std::mutex> lock(v_thread__mutex);
-		auto internal = v_thread->v__internal;
-		while (true) {
-			auto p = v_thread__internals;
-			while (p == internal || p && p->v_done > 0) p = p->v_next;
-			if (!p) break;
-			v_thread__condition.wait(lock);
-		}
-		++v_thread->v__internal->v_done;
-	}
-	v_thread.f__destruct();
-	f_pools__return();
-	v_options.v_collector__threshold = 0;
 	f_wait();
 	f_wait();
 	f_wait();
 	f_wait();
-	{
-		std::unique_lock<std::mutex> lock(v_collector__mutex);
-		v_collector__running = v_collector__quitting = true;
-		v_collector__wake.notify_one();
-		do v_collector__done.wait(lock); while (v_collector__running);
-	}
+	v_collector__conductor.f_quit();
 	assert(!v_thread__internals);
 	v_object__pool0.f_clear();
 	v_object__pool1.f_clear();
@@ -163,6 +161,68 @@ t_engine::~t_engine()
 		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
 		if (allocated != freed) std::exit(EXIT_FAILURE);
 	}
+}
+
+void t_engine::f_shutdown()
+{
+	{
+		t_epoch_region region;
+		std::unique_lock<std::mutex> lock(v_thread__mutex);
+		auto internal = v_thread->v__internal;
+		while (true) {
+			auto p = v_thread__internals;
+			while (p && (p->v_done > 0 || p == internal || p->v_next == internal)) p = p->v_next;
+			if (!p) break;
+			v_thread__condition.wait(lock);
+		}
+	}
+	v_shuttingdown = true;
+	f_pools__return();
+	{
+		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+		if (v_collector__full++ <= 0) v_collector__threshold = 0;
+	}
+	f_wait();
+	f_wait();
+	f_wait();
+	f_wait();
+	assert(!v_thread__internals->v_next->v_next);
+	{
+		t_epoch_region region;
+		v_finalizer__conductor.f_quit();
+		std::unique_lock<std::mutex> lock(v_thread__mutex);
+		while (v_thread__internals->v_next && v_thread__internals->v_done <= 0) v_thread__condition.wait(lock);
+	}
+	{
+		auto internal = v_thread->v__internal;
+		v_thread.f__destruct();
+		t_epoch_region region;
+		std::lock_guard<std::mutex> lock(v_thread__mutex);
+		++internal->v_done;
+	}
+}
+
+void t_engine::f_collect()
+{
+	{
+		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+		if (v_collector__full++ <= 0) v_collector__threshold = 0;
+	}
+	f_wait();
+	f_wait();
+	f_wait();
+	{
+		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+		if (--v_collector__full <= 0) v_collector__threshold = v_options.v_collector__threshold;
+	}
+}
+
+void t_engine::f_finalize()
+{
+	t_epoch_region region;
+	std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
+	v_finalizer__conductor.f__wake();
+	v_finalizer__conductor.f__wait(lock);
 }
 
 }

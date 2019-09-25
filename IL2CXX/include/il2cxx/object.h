@@ -17,11 +17,10 @@ class t_object
 	template<typename T> friend class t_local_pool;
 	template<size_t A_rank> friend class t_object_and;
 	friend struct t__type;
-	friend struct t__type_of<t_object>;
-	friend struct t__type_of<t__type>;
+	friend struct t__type_finalizee;
 	friend class t_engine;
 
-	enum t_color
+	enum t_color : char
 	{
 		e_color__BLACK,
 		e_color__PURPLE,
@@ -74,6 +73,7 @@ class t_object
 	t_object* v_previous;
 	t_object* v_scan;
 	t_color v_color;
+	bool v_finalizee = false;
 	size_t v_count = 1;
 	size_t v_cyclic;
 	size_t v_rank;
@@ -108,16 +108,7 @@ class t_object
 		}
 	}
 	void f_decrement_step();
-	IL2CXX__PORTABLE__ALWAYS_INLINE IL2CXX__PORTABLE__FORCE_INLINE void f_decrement()
-	{
-		assert(v_count > 0);
-		if (--v_count > 0) {
-			v_color = e_color__PURPLE;
-			if (!v_next) f_append(this);
-		} else {
-			f_loop<&t_object::f_decrement_step>();
-		}
-	}
+	void f_decrement();
 	void f_mark_gray_push()
 	{
 		if (v_color != e_color__GRAY) {
@@ -201,7 +192,6 @@ class t_object
 	void f_cyclic_decrement();
 
 public:
-	static t_scoped<t_slot> f_allocate(t__type* a_type, size_t a_size);
 	template<typename T>
 	static t_scoped<t_slot_of<T>> f_allocate(size_t a_extra = 0);
 
@@ -209,10 +199,6 @@ public:
 	{
 		return v_type;
 	}
-	/*bool f_is(t__type* a_class) const
-	{
-		return v_type->f_derives(a_class);
-	}*/
 };
 
 template<size_t A_rank>
@@ -225,15 +211,6 @@ struct t_object_and : t_object
 		v_rank = A_rank;
 	}
 };
-
-/*
-template<typename T_base>
-inline void t_finalizes<T_base>::f_do_finalize(t_object* a_this)
-{
-	using t = typename T_base::t_what;
-	a_this->f_as<t>().~t();
-}
-*/
 
 }
 

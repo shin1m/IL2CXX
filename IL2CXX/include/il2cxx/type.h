@@ -8,8 +8,19 @@ struct t__type : t_System_2eType
 	bool v_revive = false;
 
 	t__type(t__type* a_base, std::map<t_System_2eType*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
+	t_scoped<t_slot> f__allocate(size_t a_size)
+	{
+		auto p = t_object::f_local_pool__allocate(a_size);
+		p->v_next = nullptr;
+		t_slot::f_increments()->f_push(this);
+		p->v_type = this;
+		return {p, t_slot::t_pass()};
+	}
+	virtual t_scoped<t_slot> f_allocate(size_t a_size);
 	virtual void f_scan(t_object* a_this, t_scan a_scan);
 	virtual t_scoped<t_slot> f_clone(const t_object* a_this);
+	virtual void f_register_finalize(t_object* a_this);
+	virtual void f_suppress_finalize(t_object* a_this);
 	virtual void f_copy(const char* a_from, size_t a_n, char* a_to);
 	bool f__is(t__type* a_type) const
 	{
@@ -25,6 +36,20 @@ struct t__type : t_System_2eType
 		auto i = v__interface_to_methods.find(a_interface);
 		return i == v__interface_to_methods.end() ? nullptr : i->second;
 	}
+};
+
+struct t__type_finalizee : t__type
+{
+	using t__type::t__type;
+	t_scoped<t_slot> f__allocate(size_t a_size)
+	{
+		auto p = t__type::f__allocate(a_size);
+		p->v_finalizee = true;
+		return p;
+	}
+	virtual t_scoped<t_slot> f_allocate(size_t a_size);
+	virtual void f_register_finalize(t_object* a_this);
+	virtual void f_suppress_finalize(t_object* a_this);
 };
 
 template<typename T_interface, size_t A_i>

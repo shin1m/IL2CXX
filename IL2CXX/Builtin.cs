@@ -93,6 +93,7 @@ namespace IL2CXX
 
         public static Builtin Create() => new Builtin {
             MethodNameToBody = {
+                ["Boolean get_HasShutdownStarted()"] = (transpiler, method) => "\treturn f_engine()->f_shuttingdown();\n",
                 ["System.String ToString(System.String, System.IFormatProvider)"] = (transpiler, method) => $"\treturn f__string(u\"{method.ReflectedType}\"sv);\n",
                 ["Boolean TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)"] = (transpiler, method) => $@"*a_2 = 0;
 {'\t'}return false;
@@ -321,6 +322,36 @@ namespace IL2CXX
                 (transpiler, actual) => $"\treturn f__string(u\"{actual}\"sv);\n"
             );
         })
+        .For(typeof(GC), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("_Collect", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => $@"{'\t'}if (!(a_1 & 2)) {{
+{'\t'}{'\t'}f_engine()->f_tick();
+{'\t'}}} else if (a_1 & 4) {{
+{'\t'}{'\t'}f_engine()->f_wait();
+{'\t'}{'\t'}if (uint32_t(a_0) > 1) {{
+{'\t'}{'\t'}{'\t'}f_engine()->f_wait();
+{'\t'}{'\t'}{'\t'}f_engine()->f_wait();
+{'\t'}{'\t'}}}
+{'\t'}}} else {{
+{'\t'}{'\t'}f_engine()->f_collect();
+{'\t'}}}
+"
+            );
+            code.For(
+                type.GetMethod(nameof(GC.SuppressFinalize)),
+                transpiler => "\ta_0->f_type()->f_suppress_finalize(a_0);\n"
+            );
+            code.For(
+                type.GetMethod(nameof(GC.ReRegisterForFinalize)),
+                transpiler => "\ta_0->f_type()->f_register_finalize(a_0);\n"
+            );
+            code.For(
+                type.GetMethod(nameof(GC.WaitForPendingFinalizers)),
+                transpiler => "\tf_engine()->f_finalize();\n"
+            );
+        })
         .For(typeof(Thread), (type, code) =>
         {
             code.Fields = transpiler => $@"
@@ -339,6 +370,8 @@ namespace IL2CXX
 {'\t'}{'\t'}t_System_2eObject::f__scan(a_scan);
 {'\t'}{'\t'}a_scan(v__start);
 {'\t'}}}
+{'\t'}template<typename T>
+{'\t'}void f__start(T a_do);
 {'\t'}void f__start();
 {'\t'}void f__join();
 ";
@@ -360,6 +393,24 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Thread.Join), Type.EmptyTypes),
                 transpiler => "\ta_0->f__join();\n"
+            );
+        })
+        .For(typeof(Monitor), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(object), typeof(bool).MakeByRefType() }, null),
+                transpiler => string.Empty
+            );
+            code.For(
+                type.GetMethod(nameof(Monitor.Exit)),
+                transpiler => string.Empty
+            );
+        })
+        .For(Type.GetType("System.Runtime.CompilerServices.DependentHandle"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("Free"),
+                transpiler => string.Empty
             );
         })
         .For(typeof(string), (type, code) =>
@@ -545,7 +596,7 @@ namespace IL2CXX
 {'\t'}auto type = static_cast<t__type*>(p->v_Type.v__5fvalue);
 {'\t'}auto value = p->v_Value.v__5fvalue;
 {'\t'}if (type->f__is(&t__type_of<{transpiler.Escape(typeof(ValueType))}>::v__instance)) {{
-{'\t'}{'\t'}auto p = t_object::f_allocate(type, sizeof(t_object) + type->v__size);
+{'\t'}{'\t'}auto p = type->f_allocate(sizeof(t_object) + type->v__size);
 {'\t'}{'\t'}type->f_copy(reinterpret_cast<char*>(value), 1, reinterpret_cast<char*>(p + 1));
 {'\t'}{'\t'}return p;
 {'\t'}}} else {{
@@ -685,6 +736,10 @@ namespace IL2CXX
             code.For(
                 type.GetProperty(nameof(Environment.CurrentManagedThreadId)).GetMethod,
                 transpiler => "\treturn 0;\n"
+            );
+            code.For(
+                type.GetProperty(nameof(Environment.HasShutdownStarted)).GetMethod,
+                transpiler => "\treturn f_engine()->f_shuttingdown();\n"
             );
         })
         .For(typeof(Console), (type, code) =>

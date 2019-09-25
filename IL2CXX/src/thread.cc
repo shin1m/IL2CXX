@@ -8,33 +8,33 @@ IL2CXX__PORTABLE__THREAD t_thread* t_thread::v_current;
 
 IL2CXX__PORTABLE__THREAD t_System_2eThreading_2eThread* t_System_2eThreading_2eThread::v__current;
 
-void t_System_2eThreading_2eThread::f__start()
+template<typename T>
+void t_System_2eThreading_2eThread::f__start(T a_main)
 {
 	{
 		t_epoch_region region;
 		std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 		if (v__internal) throw std::runtime_error("already started.");
 		v__internal = new t_thread();
+		v__internal->v_epoch__blocking = true;
 		v__internal->v_next = f_engine()->v_thread__internals;
 		f_engine()->v_thread__internals = v__internal;
 	}
 	t_slot::v_increments->f_push(this);
 	try {
-		std::thread([this]
+		std::thread([this, main = std::move(a_main)]
 		{
 			t_slot::v_collector = v__internal->v_collector;
 			v__internal->f_initialize();
 			v__current = this;
+			auto internal = v__internal;
+			internal->f_epoch_leave();
 			try {
 				t_thread_static ts;
-				if (v__start->f_type()->f__is(&t__type_of<t_System_2eThreading_2eThreadStart>::v__instance))
-					f_t_System_2eThreading_2eThreadStart__Invoke(v__start);
-				else
-					f_t_System_2eThreading_2eParameterizedThreadStart__Invoke(v__start, {});
+				main();
 			} catch (...) {
 			}
 			f_engine()->f_pools__return();
-			auto internal = v__internal;
 			{
 				t_epoch_region region;
 				std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
@@ -56,6 +56,17 @@ void t_System_2eThreading_2eThread::f__start()
 		t_slot::v_decrements->f_push(this);
 		throw std::runtime_error("failed to create thread.");
 	}
+}
+
+void t_System_2eThreading_2eThread::f__start()
+{
+	f__start([this]
+	{
+		if (v__start->f_type()->f__is(&t__type_of<t_System_2eThreading_2eThreadStart>::v__instance))
+			f_t_System_2eThreading_2eThreadStart__Invoke(v__start);
+		else
+			f_t_System_2eThreading_2eParameterizedThreadStart__Invoke(v__start, {});
+	});
 }
 
 void t_System_2eThreading_2eThread::f__join()

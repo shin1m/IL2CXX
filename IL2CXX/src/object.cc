@@ -46,14 +46,37 @@ void t_object::f_collect()
 				}
 			}
 		} else {
-			// TODO: enqueue to-be-finalized objects to the finalizer thread.
-			do p->v_color = e_color__RED; while ((p = p->v_next) != cycle);
-			do p->f_cyclic_decrement(); while ((p = p->v_next) != cycle);
-			do {
-				auto q = p->v_next;
-				f_engine()->f_free_as_collect(p);
-				p = q;
-			} while (p != cycle);
+			auto finalizee = false;
+			do if (p->v_finalizee) finalizee = true; while ((p = p->v_next) != cycle);
+			if (finalizee) {
+				auto& conductor = f_engine()->v_finalizer__conductor;
+				std::lock_guard<std::mutex> lock(conductor.v_mutex);
+				if (conductor.v_quitting) {
+					finalizee = false;
+				} else {
+					auto& queue = f_engine()->v_finalizer__queue;
+					do {
+						auto q = p->v_next;
+						p->v_color = e_color__BLACK;
+						p->v_next = nullptr;
+						if (p->v_finalizee) {
+							++p->v_count;
+							queue.push_back(p);
+						}
+						p = q;
+					} while (p != cycle);
+					conductor.f__wake();
+				}
+			}
+			if (!finalizee) {
+				do p->v_color = e_color__RED; while ((p = p->v_next) != cycle);
+				do p->f_cyclic_decrement(); while ((p = p->v_next) != cycle);
+				do {
+					auto q = p->v_next;
+					f_engine()->f_free_as_collect(p);
+					p = q;
+				} while (p != cycle);
+			}
 		}
 	}
 	auto roots = reinterpret_cast<t_object*>(&v_roots);
@@ -62,7 +85,7 @@ void t_object::f_collect()
 		size_t live = f_engine()->v_object__pool0.f_live() + f_engine()->v_object__pool1.f_live() + f_engine()->v_object__pool2.f_live() + f_engine()->v_object__pool3.f_live() + f_engine()->v_object__allocated - f_engine()->v_object__freed;
 		auto& lower = f_engine()->v_object__lower;
 		if (live < lower) lower = live;
-		if (live - lower < f_engine()->v_options.v_collector__threshold) return;
+		if (live - lower < f_engine()->v_collector__threshold) return;
 		lower = live;
 		++f_engine()->v_collector__collect;
 		auto p = roots;

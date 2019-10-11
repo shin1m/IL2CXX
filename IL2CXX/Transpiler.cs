@@ -1092,7 +1092,7 @@ struct {field}
             string condition_Un(Stack stack, string integer, string @float)
             {
                 if (stack.VariableType == "double") return string.Format(@float, stack.Pop.Variable, stack.Variable);
-                if (stack.VariableType == "t_scoped<t_slot>") return $"{stack.Pop.Variable} {integer} {stack.Variable}";
+                if (stack.VariableType == "t_scoped<t_slot>") return $"static_cast<t_object*>({stack.Pop.Variable}) {integer} static_cast<t_object*>({stack.Variable})";
                 return $"{unsigned(stack.Pop)} {integer} {unsigned(stack)}";
             }
             string @goto(int index, int target) => target < index ? $@"{{

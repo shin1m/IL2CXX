@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
@@ -330,6 +331,7 @@ namespace IL2CXX
 {'\t'}{'\t'}f_engine()->f_tick();
 {'\t'}}} else if (a_1 & 4) {{
 {'\t'}{'\t'}f_engine()->f_wait();
+{'\t'}{'\t'}f_engine()->f_wait();
 {'\t'}{'\t'}if (uint32_t(a_0) > 1) {{
 {'\t'}{'\t'}{'\t'}f_engine()->f_wait();
 {'\t'}{'\t'}{'\t'}f_engine()->f_wait();
@@ -350,6 +352,39 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(GC.WaitForPendingFinalizers)),
                 transpiler => "\tf_engine()->f_finalize();\n"
+            );
+        })
+        .For(typeof(GCHandle), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("InternalAlloc", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => $"\treturn {transpiler.EscapeForVariable(typeof(IntPtr))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(a_0, a_1)) : new t__normal_handle(std::move(a_0))}};\n"
+            );
+            code.For(
+                type.GetMethod("InternalFree", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => "\tdelete static_cast<t__handle*>(a_0.v__5fvalue);\n"
+            );
+            code.For(
+                type.GetMethod("InternalGet", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => "\treturn static_cast<t__handle*>(a_0.v__5fvalue)->f_target();\n"
+            );
+            code.For(
+                type.GetMethod("InternalAddrOfPinnedObject", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => $"\treturn {transpiler.EscapeForVariable(typeof(IntPtr))}{{static_cast<t_object*>(static_cast<t__handle*>(a_0.v__5fvalue)->f_target())}};\n"
+            );
+        })
+        .For(Type.GetType("System.Runtime.CompilerServices.DependentHandle"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("Free"),
+                transpiler => string.Empty
+            );
+        })
+        .For(typeof(Interlocked), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr) }),
+                transpiler => $"\treturn {transpiler.EscapeForVariable(typeof(IntPtr))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1.v__5fvalue)}};\n"
             );
         })
         .For(typeof(Thread), (type, code) =>
@@ -403,13 +438,6 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Monitor.Exit)),
-                transpiler => string.Empty
-            );
-        })
-        .For(Type.GetType("System.Runtime.CompilerServices.DependentHandle"), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("Free"),
                 transpiler => string.Empty
             );
         })

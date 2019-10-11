@@ -7,6 +7,8 @@
 namespace il2cxx
 {
 
+struct t__extension;
+struct t__weak_handle;
 template<typename T>
 struct t__type_of;
 
@@ -19,6 +21,7 @@ class t_object
 	friend struct t__type;
 	friend struct t__type_finalizee;
 	friend class t_engine;
+	friend struct t__weak_handle;
 
 	enum t_color : char
 	{
@@ -79,6 +82,7 @@ class t_object
 	size_t v_rank;
 	t_object* v_next_cycle;
 	t__type* v_type;
+	std::atomic<t__extension*> v_extension{nullptr};
 
 	template<void (t_object::*A_push)()>
 	void f_step();
@@ -199,17 +203,77 @@ public:
 	{
 		return v_type;
 	}
+	t__extension* f_extension();
 };
 
 template<size_t A_rank>
 struct t_object_and : t_object
 {
-	char v_data[sizeof(void*) * (7 + 8 * A_rank)];
+	char v_data[sizeof(void*) * (6 + 8 * A_rank)];
 
 	t_object_and()
 	{
 		v_rank = A_rank;
 	}
+};
+
+struct t__extension
+{
+	std::mutex v_mutex;
+	std::condition_variable v_condition;
+	struct
+	{
+		t__weak_handle* v_previous;
+		t__weak_handle* v_next;
+	} v_weak_handles;
+	t_slot v_weak_handles__cycle;
+	std::mutex v_weak_handles__mutex;
+
+	t__extension();
+	~t__extension();
+	void f_detach();
+	void f_scan(t_scan a_scan);
+};
+
+struct t__handle
+{
+	virtual ~t__handle() = default;
+	virtual t_scoped<t_slot> f_target() const = 0;
+};
+
+struct t__normal_handle : t__handle
+{
+	t_scoped<t_slot> v_target;
+
+	t__normal_handle(t_scoped<t_slot>&& a_target) : v_target(std::move(a_target))
+	{
+	}
+	virtual t_scoped<t_slot> f_target() const;
+};
+
+struct t__weak_handle : t__handle, decltype(t__extension::v_weak_handles)
+{
+	t_object* v_target;
+	bool v_final;
+
+	t__weak_handle(t_object* a_target, bool a_final);
+	virtual ~t__weak_handle();
+	virtual t_scoped<t_slot> f_target() const;
+	virtual void f_scan(t_scan a_scan);
+};
+
+inline t__extension::t__extension() : v_weak_handles{static_cast<t__weak_handle*>(&v_weak_handles), static_cast<t__weak_handle*>(&v_weak_handles)}
+{
+}
+
+struct t__dependent_handle : t__weak_handle
+{
+	t_slot v_secondary;
+
+	t__dependent_handle(t_object* a_target, t_scoped<t_slot>&& a_secondary) : t__weak_handle(a_target, false), v_secondary(std::move(a_secondary))
+	{
+	}
+	virtual void f_scan(t_scan a_scan);
 };
 
 }

@@ -18,7 +18,10 @@ void t_object::f_collect()
 		auto mutated = [&]
 		{
 			if (f_engine()->v_object__reviving)
-				do if (p->v_color != e_color__ORANGE || p->v_cyclic > 0 || p->v_type->v_revive) return true; while ((p = p->v_next) != cycle);
+				do {
+					if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true;
+					if (auto q = p->v_extension.load(std::memory_order_relaxed)) if (q->v_weak_handles__cycle) return true;
+				} while ((p = p->v_next) != cycle);
 			else
 				do if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true; while ((p = p->v_next) != cycle);
 			return false;
@@ -56,6 +59,7 @@ void t_object::f_collect()
 				} else {
 					auto& queue = f_engine()->v_finalizer__queue;
 					do {
+						if (auto q = p->v_extension.load(std::memory_order_relaxed)) q->f_detach();
 						auto q = p->v_next;
 						p->v_color = e_color__BLACK;
 						p->v_next = nullptr;
@@ -138,8 +142,90 @@ void t_object::f_collect()
 
 void t_object::f_cyclic_decrement()
 {
+	if (auto p = v_extension.load(std::memory_order_consume)) {
+		p->f_scan(f_push_and_clear<&t_object::f_cyclic_decrement_push>);
+		v_extension.store(nullptr, std::memory_order_relaxed);
+		delete p;
+	}
 	v_type->f_scan(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
 	v_type->f_cyclic_decrement_push();
+}
+
+t__extension* t_object::f_extension()
+{
+	auto p = v_extension.load(std::memory_order_consume);
+	if (p) return p;
+	t__extension* q = nullptr;
+	p = new t__extension();
+	if (v_extension.compare_exchange_strong(q, p, std::memory_order_consume)) return p;
+	delete p;
+	return q;
+}
+
+t__extension::~t__extension()
+{
+	for (auto p = v_weak_handles.v_next; p != static_cast<t__weak_handle*>(&v_weak_handles); p = p->v_next) p->v_target = nullptr;
+}
+
+void t__extension::f_detach()
+{
+	for (auto p = v_weak_handles.v_next; p != static_cast<t__weak_handle*>(&v_weak_handles); p = p->v_next) {
+		if (p->v_final) continue;
+		p->v_target = nullptr;
+		p->v_previous->v_next = p->v_next;
+		p->v_next->v_previous = p->v_previous;
+	}
+}
+
+void t__extension::f_scan(t_scan a_scan)
+{
+	std::lock_guard<std::mutex> lock(v_weak_handles__mutex);
+	a_scan(v_weak_handles__cycle);
+	for (auto p = v_weak_handles.v_next; p != static_cast<t__weak_handle*>(&v_weak_handles); p = p->v_next) p->f_scan(a_scan);
+}
+
+t_scoped<t_slot> t__normal_handle::f_target() const
+{
+	return v_target;
+}
+
+t__weak_handle::t__weak_handle(t_object* a_target, bool a_final) : v_target(a_target), v_final(a_final)
+{
+	std::lock_guard<std::mutex> lock0(f_engine()->v_object__reviving__mutex);
+	auto extension = v_target->f_extension();
+	std::lock_guard<std::mutex> lock1(extension->v_weak_handles__mutex);
+	if (!extension->v_weak_handles__cycle) extension->v_weak_handles__cycle = v_target;
+	v_previous = extension->v_weak_handles.v_previous;
+	v_next = static_cast<t__weak_handle*>(&extension->v_weak_handles);
+	v_previous->v_next = v_next->v_previous = this;
+}
+
+t__weak_handle::~t__weak_handle()
+{
+	std::lock_guard<std::mutex> lock0(f_engine()->v_object__reviving__mutex);
+	if (!v_target) return;
+	auto extension = v_target->v_extension.load(std::memory_order_relaxed);
+	std::lock_guard<std::mutex> lock1(extension->v_weak_handles__mutex);
+	v_previous->v_next = v_next;
+	v_next->v_previous = v_previous;
+	if (extension->v_weak_handles.v_next == static_cast<t__weak_handle*>(&extension->v_weak_handles)) extension->v_weak_handles__cycle = nullptr;
+}
+
+t_scoped<t_slot> t__weak_handle::f_target() const
+{
+	std::lock_guard<std::mutex> lock(f_engine()->v_object__reviving__mutex);
+	f_engine()->v_object__reviving = true;
+	t_thread::v_current->f_revive();
+	return v_target;
+}
+
+void t__weak_handle::f_scan(t_scan a_scan)
+{
+}
+
+void t__dependent_handle::f_scan(t_scan a_scan)
+{
+	a_scan(v_secondary);
 }
 
 }

@@ -211,6 +211,7 @@ void t_engine::f_collect()
 	f_wait();
 	f_wait();
 	f_wait();
+	f_wait();
 	{
 		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
 		if (--v_collector__full <= 0) v_collector__threshold = v_options.v_collector__threshold;

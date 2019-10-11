@@ -12,6 +12,7 @@ struct t_safe_region;
 class t_engine : public t_slot::t_collector
 {
 	friend class t_object;
+	friend class t__weak_handle;
 	friend struct t_System_2eThreading_2eThread;
 
 	template<typename T, size_t A_size>
@@ -203,10 +204,16 @@ inline void t_object::f_step()
 {
 	v_type->f_scan(this, f_push<A_push>);
 	(v_type->*A_push)();
+	if (auto p = v_extension.load(std::memory_order_consume)) p->f_scan(f_push<A_push>);
 }
 
 inline void t_object::f_decrement_step()
 {
+	if (auto p = v_extension.load(std::memory_order_consume)) {
+		p->f_scan(f_push_and_clear<&t_object::f_decrement_push>);
+		v_extension.store(nullptr, std::memory_order_relaxed);
+		delete p;
+	}
 	v_type->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
 	v_type->f_decrement_push();
 	v_color = e_color__BLACK;

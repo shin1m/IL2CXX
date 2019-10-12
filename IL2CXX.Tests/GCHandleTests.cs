@@ -56,15 +56,15 @@ namespace IL2CXX.Tests
                 Console.WriteLine($"h: {h.Target}");
                 x = null;
                 GC.Collect();
+                GC.WaitForPendingFinalizers();
                 Console.WriteLine($"h: {h.Target}");
                 if (h.Target == null) return 1;
-                GC.WaitForPendingFinalizers();
                 Foo.Resurrected = null;
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
                 Console.WriteLine($"h: {h.Target}");
-                return h.Target == null ? 0 : 1;
+                return h.Target == null ? 0 : 2;
             }
             finally
             {
@@ -85,14 +85,14 @@ namespace IL2CXX.Tests
                 GC.Collect();
                 Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
                 if (w.Target != null) return 1;
-                if (wtr.Target == null) return 1;
                 GC.WaitForPendingFinalizers();
+                if (wtr.Target == null) return 2;
                 Foo.Resurrected = null;
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
                 Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
-                return wtr.Target == null ? 0 : 1;
+                return wtr.Target == null ? 0 : 3;
             }
             finally
             {
@@ -149,13 +149,13 @@ namespace IL2CXX.Tests
             try
             {
                 Console.WriteLine($"allocated: {h.IsAllocated}");
-                if (!h.IsAllocated) return 1;
+                if (!h.IsAllocated) return 2;
             }
             finally
             {
                 h.Free();
             }
-            return h.IsAllocated ? 1 : 0;
+            return h.IsAllocated ? 3 : 0;
         }
         [Test]
         public void TestIsAllocated() => Utilities.Test(IsAllocated);

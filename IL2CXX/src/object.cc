@@ -189,9 +189,8 @@ t_scoped<t_slot> t__normal_handle::f_target() const
 	return v_target;
 }
 
-t__weak_handle::t__weak_handle(t_object* a_target, bool a_final) : v_target(a_target), v_final(a_final)
+void t__weak_handle::f_attach()
 {
-	std::lock_guard<std::mutex> lock0(f_engine()->v_object__reviving__mutex);
 	auto extension = v_target->f_extension();
 	std::lock_guard<std::mutex> lock1(extension->v_weak_handles__mutex);
 	if (!extension->v_weak_handles__cycle) extension->v_weak_handles__cycle = v_target;
@@ -200,9 +199,8 @@ t__weak_handle::t__weak_handle(t_object* a_target, bool a_final) : v_target(a_ta
 	v_previous->v_next = v_next->v_previous = this;
 }
 
-t__weak_handle::~t__weak_handle()
+void t__weak_handle::f_detach()
 {
-	std::lock_guard<std::mutex> lock0(f_engine()->v_object__reviving__mutex);
 	if (!v_target) return;
 	auto extension = v_target->v_extension.load(std::memory_order_relaxed);
 	std::lock_guard<std::mutex> lock1(extension->v_weak_handles__mutex);
@@ -211,12 +209,32 @@ t__weak_handle::~t__weak_handle()
 	if (extension->v_weak_handles.v_next == static_cast<t__weak_handle*>(&extension->v_weak_handles)) extension->v_weak_handles__cycle = nullptr;
 }
 
+t__weak_handle::t__weak_handle(t_object* a_target, bool a_final) : v_target(a_target), v_final(a_final)
+{
+	std::lock_guard<std::mutex> lock0(f_engine()->v_object__reviving__mutex);
+	f_attach();
+}
+
+t__weak_handle::~t__weak_handle()
+{
+	std::lock_guard<std::mutex> lock0(f_engine()->v_object__reviving__mutex);
+	f_detach();
+}
+
 t_scoped<t_slot> t__weak_handle::f_target() const
 {
 	std::lock_guard<std::mutex> lock(f_engine()->v_object__reviving__mutex);
 	f_engine()->v_object__reviving = true;
 	t_thread::v_current->f_revive();
 	return v_target;
+}
+
+void t__weak_handle::f_target__(t_object* a_p)
+{
+	std::lock_guard<std::mutex> lock(f_engine()->v_object__reviving__mutex);
+	f_detach();
+	v_target = a_p;
+	f_attach();
 }
 
 void t__weak_handle::f_scan(t_scan a_scan)

@@ -1133,7 +1133,9 @@ struct {field}
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({set.Operator}{stack.Variable}) {@goto(index, target)}");
+                        writer.WriteLine($" {target:x04}\n\t{{bool b = {set.Operator}{stack.Variable};");
+                        if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
+                        writer.WriteLine($"\tif (b) {@goto(index, target)}}}");
                         return index;
                     };
                 }));
@@ -1155,7 +1157,10 @@ struct {field}
                         var target = baseSet.Target(ref index);
                         bool isPointer(Stack s) => s.Type.IsByRef || s.Type.IsPointer;
                         var format = isPointer(stack.Pop) || isPointer(stack) ? "reinterpret_cast<char*>({0})" : "{0}";
-                        writer.WriteLine($" {target:x04}\n\tif ({string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)}) {@goto(index, target)}");
+                        writer.WriteLine($" {target:x04}\n\t{{bool b = {string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)};");
+                        if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
+                        if (HasSlots(stack.Pop.Type)) writer.WriteLine($"\t{stack.Pop.Variable}.f__destruct();");
+                        writer.WriteLine($"\tif (b) {@goto(index, target)}}}");
                         return index;
                     };
                 }));
@@ -1175,7 +1180,10 @@ struct {field}
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Integer, set.Float)}) {@goto(index, target)}");
+                        writer.WriteLine($" {target:x04}\n\t{{bool b = {condition_Un(stack, set.Integer, set.Float)};");
+                        if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
+                        if (HasSlots(stack.Pop.Type)) writer.WriteLine($"\t{stack.Pop.Variable}.f__destruct();");
+                        writer.WriteLine($"\tif (b) {@goto(index, target)}}}");
                         return index;
                     };
                 }));
@@ -1336,11 +1344,18 @@ struct {field}
                     writer.Write($"\n\t{after.Variable} = ");
                     var type = stack.Type;
                     if (type.IsByRef || type.IsPointer)
+                    {
                         writer.WriteLine($"reinterpret_cast<{after.VariableType}>({stack.Variable});");
+                    }
                     else if (type.IsValueType)
+                    {
                         writer.WriteLine($"static_cast<{after.VariableType}>({stack.Variable});");
+                    }
                     else
+                    {
                         writer.WriteLine($"reinterpret_cast<{after.VariableType}>(static_cast<t_object*>({stack.Variable}));");
+                        if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
+                    }
                     return index;
                 };
             }));
@@ -1557,7 +1572,9 @@ struct {field}
                 {
                     var t = ParseType(ref index);
                     if (!t.IsValueType) throw new Exception(t.ToString());
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = static_cast<{Escape(t)}*>({stack.Variable});");
+                    writer.WriteLine($@" {t}
+{'\t'}{indexToStack[index].Variable} = static_cast<{Escape(t)}*>({stack.Variable});
+{'\t'}{stack.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1566,7 +1583,7 @@ struct {field}
                 x.Estimate = (index, stack) => (int.MaxValue, stack.Pop);
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\tthrow {stack.Variable};");
+                    writer.WriteLine($"\n\tthrow t_scoped<t_slot>(std::move({stack.Variable}));");
                     return index;
                 };
             });
@@ -1583,12 +1600,14 @@ struct {field}
                     writer.WriteLine($" {f.DeclaringType}::[{f}]");
                     withVolatile(() =>
                     {
-                        writer.Write($"\t{indexToStack[index].Variable} = ");
+                        var after = indexToStack[index];
+                        writer.Write($"\t{after.Variable} = ");
                         if (stack.Type.IsValueType)
                             writer.Write($"{stack.Variable}.");
                         else
                             writer.Write($"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->");
                         writer.WriteLine($"{Escape(f)};");
+                        if (after.Variable != stack.Variable && HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     });
                     return index;
                 };
@@ -1609,6 +1628,7 @@ struct {field}
                     else
                         writer.Write($"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->");
                     writer.WriteLine($"{Escape(f)};");
+                    if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1619,7 +1639,11 @@ struct {field}
                 {
                     var f = ParseField(ref index);
                     writer.WriteLine($" {f.DeclaringType}::[{f}]");
-                    withVolatile(() => writer.WriteLine($"\tstatic_cast<{(f.DeclaringType.IsValueType ? EscapeForVariable(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};"));
+                    withVolatile(() =>
+                    {
+                        writer.WriteLine($"\tstatic_cast<{(f.DeclaringType.IsValueType ? EscapeForVariable(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};");
+                        if (HasSlots(stack.Pop.Type)) writer.WriteLine($"\t{stack.Pop.Variable}.f__destruct();");
+                    });
                     return index;
                 };
             });
@@ -1671,7 +1695,7 @@ struct {field}
                 {
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
-                    withVolatile(() => writer.WriteLine($"\t*static_cast<{EscapeForVariable(t)}*>({stack.Pop.Variable}) = {stack.Variable};"));
+                    withVolatile(() => writer.WriteLine($"\t*static_cast<{EscapeForVariable(t)}*>({stack.Pop.Variable}) = std::move({stack.Variable});"));
                     return index;
                 };
             });
@@ -1692,6 +1716,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{stack.VariableType}>({stack.Variable});");
+                    if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     return index;
                 };
             }));
@@ -1724,7 +1749,9 @@ struct {field}
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(NativeInt)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(stack.Type)}*>({stack.Variable})->v__length;");
+                    writer.WriteLine($@"
+{'\t'}{indexToStack[index].Variable} = static_cast<{Escape(stack.Type)}*>({stack.Variable})->v__length;
+{'\t'}{stack.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1739,7 +1766,9 @@ struct {field}
                 {
                     var t = ParseType(ref index);
                     var array = stack.Pop;
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = &static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    writer.WriteLine($@" {t}
+{'\t'}{indexToStack[index].Variable} = &static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];
+{'\t'}{array.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1760,8 +1789,10 @@ struct {field}
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type));
                 x.Generate = (index, stack) =>
                 {
+                    var after = indexToStack[index];
                     var array = stack.Pop;
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    writer.WriteLine($"\n\t{after.Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    if (after.Variable != array.Variable) writer.WriteLine($"\t{array.Variable}.f__destruct();");
                     return index;
                 };
             }));
@@ -1779,7 +1810,9 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = static_cast<{set.Type}>({stack.Variable});");
+                    writer.WriteLine($@"
+{'\t'}static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = static_cast<{set.Type}>({stack.Variable});
+{'\t'}{array.Variable}.f__destruct();");
                     return index;
                 };
             }));
@@ -1789,7 +1822,10 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {FormatMove(GetElementType(array.Type), stack.Variable)};");
+                    writer.WriteLine($@"
+{'\t'}static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {FormatMove(GetElementType(array.Type), stack.Variable)};
+{'\t'}{stack.Variable}.f__destruct();
+{'\t'}{array.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1802,8 +1838,10 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
+                    var after = indexToStack[index];
                     var array = stack.Pop;
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    writer.WriteLine($" {t}\n\t{after.Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    if (after.Variable != array.Variable) writer.WriteLine($"\t{array.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1814,7 +1852,9 @@ struct {field}
                 {
                     var t = ParseType(ref index);
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($" {t}\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {FormatMove(t, stack.Variable)};");
+                    writer.WriteLine($@" {t}
+{'\t'}static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {FormatMove(t, stack.Variable)};
+{'\t'}{array.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1828,7 +1868,9 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = static_cast<{Escape(t)}*>({stack.Variable}){(t.IsValueType ? "->v__value" : string.Empty)};");
+                    var after = indexToStack[index];
+                    writer.WriteLine($" {t}\n\t{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable}){(t.IsValueType ? "->v__value" : string.Empty)};");
+                    if (after.Variable != stack.Variable) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     return index;
                 };
             });
@@ -1849,6 +1891,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{stack.VariableType}>({stack.Variable});");
+                    if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     return index;
                 };
             }));
@@ -1942,6 +1985,8 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = {stack.Pop.Variable} {set.Operator} {stack.Variable} ? 1 : 0;");
+                    if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
+                    if (HasSlots(stack.Pop.Type)) writer.WriteLine($"\t{stack.Pop.Variable}.f__destruct();");
                     return index;
                 };
             }));
@@ -1954,6 +1999,8 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = {condition_Un(stack, set.Integer, set.Float)} ? 1 : 0;");
+                    if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
+                    if (HasSlots(stack.Pop.Type)) writer.WriteLine($"\t{stack.Pop.Variable}.f__destruct();");
                     return index;
                 };
             }));
@@ -1982,7 +2029,9 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
-                    writer.WriteLine($" {m.DeclaringType}::[{m}]\n\t{indexToStack[index].Variable} = &{stack.Variable}->{Escape(m)};");
+                    writer.WriteLine($@" {m.DeclaringType}::[{m}]
+{'\t'}{indexToStack[index].Variable} = &{stack.Variable}->{Escape(m)};
+{'\t'}{stack.Variable}.f__destruct();");
                     return index;
                 };
             });

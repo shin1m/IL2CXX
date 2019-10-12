@@ -380,6 +380,25 @@ namespace IL2CXX
                 transpiler => string.Empty
             );
         })
+        .For(typeof(WeakReference), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("Create", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => "\ta_0->v_m_5fhandle = {new t__weak_handle(a_1, a_2)};\n"
+            );
+            code.For(
+                type.GetMethod("Finalize", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => "\tdelete static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue);\n"
+            );
+            code.For(
+                type.GetProperty(nameof(WeakReference.Target)).GetMethod,
+                transpiler => "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n"
+            );
+            code.For(
+                type.GetProperty(nameof(WeakReference.Target)).SetMethod,
+                transpiler => "\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n"
+            );
+        })
         .For(typeof(WeakReference<>), (type, code) =>
         {
             code.ForGeneric(

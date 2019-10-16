@@ -184,6 +184,7 @@ namespace IL2CXX
                 for (var x = this; x != null; x = x.Pop) yield return x;
             }
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            public bool IsPointer => VariableType == "void*";
         }
         class Instruction
         {
@@ -1092,7 +1093,7 @@ struct {field}
                     return index;
                 };
             });
-            string unsigned(Stack stack) => stack.VariableType == "void*" ? $"reinterpret_cast<uintptr_t>({stack.Variable})" : $"static_cast<u{stack.VariableType}>({stack.Variable})";
+            string unsigned(Stack stack) => stack.IsPointer ? $"reinterpret_cast<uintptr_t>({stack.Variable})" : $"static_cast<u{stack.VariableType}>({stack.Variable})";
             string condition_Un(Stack stack, string integer, string @float)
             {
                 if (stack.VariableType == "double") return string.Format(@float, stack.Pop.Variable, stack.Variable);
@@ -1159,8 +1160,7 @@ struct {field}
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        bool isPointer(Stack s) => s.Type.IsByRef || s.Type.IsPointer;
-                        var format = isPointer(stack.Pop) || isPointer(stack) ? "reinterpret_cast<char*>({0})" : "{0}";
+                        var format = stack.Pop.IsPointer || stack.IsPointer ? "reinterpret_cast<char*>({0})" : "{0}";
                         writer.WriteLine($" {target:x04}\n\t{{bool b = {string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)};");
                         if (HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                         if (HasSlots(stack.Pop.Type)) writer.WriteLine($"\t{stack.Pop.Variable}.f__destruct();");
@@ -1295,8 +1295,11 @@ struct {field}
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type[(stack.Pop.VariableType, stack.VariableType)]));
                 x.Generate = (index, stack) =>
                 {
-                    string operand(Stack s) => s.Type.IsByRef || s.Type.IsPointer ? $"static_cast<char*>({s.Variable})" : s.Variable;
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {operand(stack.Pop)} {set.Operator} {operand(stack)};");
+                    var after = indexToStack[index];
+                    string operand(Stack s) => s.IsPointer ? $"reinterpret_cast<intptr_t>({s.Variable})" : s.Variable;
+                    var result = $"{operand(stack.Pop)} {set.Operator} {operand(stack)}";
+                    if (after.IsPointer) result = $"reinterpret_cast<void*>({result})";
+                    writer.WriteLine($"\n\t{after.Variable} = {result};");
                     return index;
                 };
             }));
@@ -1346,12 +1349,11 @@ struct {field}
                 {
                     var after = indexToStack[index];
                     writer.Write($"\n\t{after.Variable} = ");
-                    var type = stack.Type;
-                    if (type.IsByRef || type.IsPointer)
+                    if (stack.IsPointer)
                     {
                         writer.WriteLine($"static_cast<{after.VariableType}>(reinterpret_cast<uintptr_t>({stack.Variable}));");
                     }
-                    else if (type.IsValueType)
+                    else if (stack.Type.IsValueType)
                     {
                         writer.WriteLine($"static_cast<{after.VariableType}>({stack.Variable});");
                     }

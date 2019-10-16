@@ -467,7 +467,11 @@ struct {field}
                     threadStaticMembers.WriteLine($"\t}} v_{identifier};");
                 }
                 string members;
-                if (primitives.TryGetValue(type, out var name) || type.IsEnum)
+                if (type == typeof(void))
+                {
+                    members = string.Empty;
+                }
+                else if (primitives.TryGetValue(type, out var name) || type.IsEnum)
                 {
                     if (name == null) name = primitives[type.GetEnumUnderlyingType()];
                     members = $@"{'\t'}{name} v__value;
@@ -1088,7 +1092,7 @@ struct {field}
                     return index;
                 };
             });
-            string unsigned(Stack stack) => $"static_cast<u{stack.VariableType}>({stack.Variable})";
+            string unsigned(Stack stack) => stack.VariableType == "void*" ? $"reinterpret_cast<uintptr_t>({stack.Variable})" : $"static_cast<u{stack.VariableType}>({stack.Variable})";
             string condition_Un(Stack stack, string integer, string @float)
             {
                 if (stack.VariableType == "double") return string.Format(@float, stack.Pop.Variable, stack.Variable);
@@ -1345,7 +1349,7 @@ struct {field}
                     var type = stack.Type;
                     if (type.IsByRef || type.IsPointer)
                     {
-                        writer.WriteLine($"reinterpret_cast<{after.VariableType}>({stack.Variable});");
+                        writer.WriteLine($"static_cast<{after.VariableType}>(reinterpret_cast<uintptr_t>({stack.Variable}));");
                     }
                     else if (type.IsValueType)
                     {
@@ -1486,10 +1490,12 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var s = method.Module.ResolveString(ParseI4(ref index));
-                    writer.Write($" {s}\n\t{indexToStack[index].Variable} = f__string(u");
-                    using (var provider = CodeDomProvider.CreateProvider("CSharp"))
-                        provider.GenerateCodeFromExpression(new CodePrimitiveExpression(s), writer, null);
-                    writer.WriteLine("sv);");
+                    using (var sw = new StringWriter())
+                    {
+                        using (var provider = CodeDomProvider.CreateProvider("CSharp"))
+                            provider.GenerateCodeFromExpression(new CodePrimitiveExpression(s), sw, null);
+                        writer.Write($" {s}\n\t{indexToStack[index].Variable} = f__string(u{sw.ToString().Replace($"\" +{Environment.NewLine}    \"", string.Empty)}sv);");
+                    }
                     return index;
                 };
             });
@@ -2123,7 +2129,7 @@ struct {field}
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(int)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {stack.Variable}.f_type();");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = reinterpret_cast<intptr_t>({stack.Variable}.v_Type.v__5fvalue);");
                     return index;
                 };
             });
@@ -2190,12 +2196,12 @@ t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "null
                 memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}")));
                 writer.WriteLine($@"{'\t'}virtual void f_scan(t_object* a_this, t_scan a_scan);
 {'\t'}virtual t_scoped<t_slot> f_clone(const t_object* a_this);");
-                if (type.IsValueType) writer.WriteLine("\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
+                if (type != typeof(void) && type.IsValueType) writer.WriteLine("\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
             }
             writer.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            memberDefinitions.WriteLine($@"}}, sizeof({EscapeForVariable(type)}){(type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" : string.Empty)})
+            memberDefinitions.WriteLine($@"}}, {(type == typeof(void) ? "0" : $"sizeof({EscapeForVariable(type)})")}{(type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" : string.Empty)})
 {{
 }}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
@@ -2207,8 +2213,10 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
 }}
 t_scoped<t_slot> t__type_of<{identifier}>::f_clone(const t_object* a_this)
 {{");
-                memberDefinitions.WriteLine(type.IsValueType
-                    ? $@"{'\t'}auto p = t_object::f_allocate<{identifier}>();
+                memberDefinitions.WriteLine(
+                    type == typeof(void) ? $@"{'\t'}return t_object::f_allocate<{identifier}>();
+}}"
+                    : type.IsValueType ? $@"{'\t'}auto p = t_object::f_allocate<{identifier}>();
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;
 }}

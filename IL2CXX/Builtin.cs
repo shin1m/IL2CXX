@@ -376,8 +376,38 @@ namespace IL2CXX
         .For(Type.GetType("System.Runtime.CompilerServices.DependentHandle"), (type, code) =>
         {
             code.For(
+                type.GetConstructor(new[] { typeof(object), typeof(object) }),
+                transpiler => $"\treturn {transpiler.EscapeForVariable(type)}{{new t__dependent_handle(a_0, std::move(a_1))}};\n"
+            );
+            code.For(
+                type.GetMethod("GetPrimary"),
+                transpiler => "\treturn static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)->f_target();\n"
+            );
+            code.For(
+                type.GetMethod("GetPrimaryAndSecondary"),
+                transpiler => $@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue);
+{'\t'}auto primary = p->f_target();
+{'\t'}*a_1 = primary ? p->v_secondary : nullptr;
+{'\t'}return std::move(primary);
+"
+            );
+            code.For(
+                type.GetMethod("SetPrimary"),
+                transpiler => "\tstatic_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)->f_target__(a_1);\n"
+            );
+            code.For(
+                type.GetMethod("SetSecondary"),
+                transpiler => $@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue);
+{'\t'}if (auto primary = p->f_target()) p->v_secondary = a_1;
+"
+            );
+            code.For(
                 type.GetMethod("Free"),
-                transpiler => string.Empty
+                transpiler => $@"{'\t'}if (auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)) {{
+{'\t'}{'\t'}a_0->v__5fhandle.v__5fvalue = nullptr;
+{'\t'}{'\t'}delete p;
+{'\t'}}}
+"
             );
         })
         .For(typeof(WeakReference), (type, code) =>
@@ -423,6 +453,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr) }),
                 transpiler => $"\treturn {transpiler.EscapeForVariable(typeof(IntPtr))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1.v__5fvalue)}};\n"
+            );
+            code.For(
+                type.GetMethod(nameof(Interlocked.MemoryBarrier)),
+                transpiler => "\tstd::atomic_thread_fence(std::memory_order_seq_cst);\n"
             );
         })
         .For(typeof(Thread), (type, code) =>
@@ -837,6 +871,10 @@ namespace IL2CXX
             code.ForGeneric(
                 methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForVariable(types[0])}*>(reinterpret_cast<char*>(a_0) + reinterpret_cast<intptr_t>(a_1.v__5fvalue));\n"
+            );
+            code.ForGeneric(
+                methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 1),
+                (transpiler, types) => "\treturn std::move(a_0);\n"
             );
             code.For(
                 methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 2).MakeGenericMethod(typeof(byte), typeof(char)),

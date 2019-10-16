@@ -277,6 +277,8 @@ struct t__dependent_handle : t__weak_handle
 	t__dependent_handle(t_object* a_target, t_scoped<t_slot>&& a_secondary) : t__weak_handle(a_target, false), v_secondary(std::move(a_secondary))
 	{
 	}
+	virtual ~t__dependent_handle();
+	virtual void f_target__(t_object* a_p);
 	virtual void f_scan(t_scan a_scan);
 };
 

@@ -191,6 +191,7 @@ t_scoped<t_slot> t__normal_handle::f_target() const
 
 void t__weak_handle::f_attach()
 {
+	if (!v_target) return;
 	auto extension = v_target->f_extension();
 	std::lock_guard<std::mutex> lock1(extension->v_weak_handles__mutex);
 	if (!extension->v_weak_handles__cycle) extension->v_weak_handles__cycle = v_target;
@@ -239,6 +240,17 @@ void t__weak_handle::f_target__(t_object* a_p)
 
 void t__weak_handle::f_scan(t_scan a_scan)
 {
+}
+
+t__dependent_handle::~t__dependent_handle()
+{
+	v_secondary = nullptr;
+}
+
+void t__dependent_handle::f_target__(t_object* a_p)
+{
+	if (!a_p) v_secondary = nullptr;
+	t__weak_handle::f_target__(a_p);
 }
 
 void t__dependent_handle::f_scan(t_scan a_scan)

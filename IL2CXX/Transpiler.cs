@@ -785,7 +785,9 @@ struct {field}
                         {
                             case ExceptionHandlingClauseOptions.Clause:
                                 writer.WriteLine($@"// catch {clause.CatchType}
-}} catch ({EscapeForScoped(clause.CatchType)} e) {{");
+}} catch (t_scoped<t_slot> e) {{
+{'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;
+");
                                 break;
                             case ExceptionHandlingClauseOptions.Filter:
                                 writer.WriteLine($@"// filter

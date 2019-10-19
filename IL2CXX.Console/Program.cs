@@ -77,7 +77,8 @@ namespace IL2CXX.Console
             };
             var correct = Corrector(EnumerateWords(lines).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count()));
             var log = string.Empty;
-            void test(string word) {
+            void test(string word)
+            {
                 var corrected = correct(word);
                 log += $"corrected: {word}: {corrected}\n";
                 Console.WriteLine($"{word}: {corrected}");
@@ -88,7 +89,8 @@ namespace IL2CXX.Console
                 "work",
                 "wide",
                 "wild"
-            }.Select(x => new Thread(() => {
+            }.Select(x => new Thread(() =>
+            {
                 for (var i = 0; i < 10; ++i) test(x);
             })).ToList();
             foreach (var x in ts) x.Start();

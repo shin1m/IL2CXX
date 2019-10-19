@@ -219,8 +219,8 @@ struct t_object_and : t_object
 
 struct t__extension
 {
-	std::mutex v_mutex;
-	std::condition_variable v_condition;
+	std::recursive_timed_mutex v_mutex;
+	std::condition_variable_any v_condition;
 	struct
 	{
 		t__weak_handle* v_previous;

@@ -10,7 +10,8 @@ namespace IL2CXX.Tests
         static int Run()
         {
             var s = "|";
-            var ts = Enumerable.Range(0, 10).Select(x => new Thread(() => {
+            var ts = Enumerable.Range(0, 10).Select(x => new Thread(() =>
+            {
                 for (var i = 0; i < 10; ++i)
                 {
                     s += $"{x}|";

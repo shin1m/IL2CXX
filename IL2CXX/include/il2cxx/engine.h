@@ -280,18 +280,19 @@ t_scoped<t_slot_of<T_array>> f__new_array(size_t a_length)
 inline t_scoped<t_slot_of<t_System_2eString>> f__new_string(size_t a_length)
 {
 	auto p = t_object::f_allocate<t_System_2eString>(sizeof(char16_t) * a_length);
-	p->v__length = a_length;
+	p->v__5fstringLength = a_length;
+	(&p->v__5ffirstChar)[a_length] = u'\0';
 	return p;
 }
 
-inline t_scoped<t_slot_of<t_System_2eString>> f__string(std::u16string_view a_value)
+inline t_scoped<t_slot_of<t_System_2eString>> f__new_string(std::u16string_view a_value)
 {
 	auto p = f__new_string(a_value.size());
-	std::copy(a_value.begin(), a_value.end(), p->f__data());
+	std::copy(a_value.begin(), a_value.end(), &p->v__5ffirstChar);
 	return p;
 }
 
-inline t__type::t__type(t__type* a_base, std::map<t_System_2eType*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element, size_t a_rank) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__size(a_size), v__element(a_element), v__rank(a_rank)
+inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element, size_t a_rank) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__size(a_size), v__element(a_element), v__rank(a_rank)
 {
 	v_type = &t__type_of<t_System_2eType>::v__instance;
 }

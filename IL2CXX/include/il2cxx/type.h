@@ -1,12 +1,25 @@
-struct t__type : t_System_2eType
+#ifndef IL2CXX__TYPE_H
+#define IL2CXX__TYPE_H
+
+#include "object.h"
+#include <map>
+
+namespace il2cxx
+{
+
+struct t__member_info : t_object
+{
+};
+
+struct t__type : t__member_info
 {
 	t__type* v__base;
-	std::map<t_System_2eType*, void**> v__interface_to_methods;
+	std::map<t__type*, void**> v__interface_to_methods;
 	size_t v__size;
 	t__type* v__element;
 	size_t v__rank;
 
-	t__type(t__type* a_base, std::map<t_System_2eType*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
+	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
 	t_scoped<t_slot> f__allocate(size_t a_size)
 	{
 		auto p = t_object::f_local_pool__allocate(a_size);
@@ -30,7 +43,7 @@ struct t__type : t_System_2eType
 		} while (p);
 		return false;
 	}
-	void** f__implementation(t_System_2eType* a_interface) const
+	void** f__implementation(t__type* a_interface) const
 	{
 		auto i = v__interface_to_methods.find(a_interface);
 		return i == v__interface_to_methods.end() ? nullptr : i->second;
@@ -78,3 +91,7 @@ void* f__generic_method(void*& a_site, t__type* a_type)
 {
 	return a_type == &t__type_of<T_type>::v__instance ? reinterpret_cast<void*>(A_method) : f__generic_resolve<T_interface, A_i, A_j>(a_site, a_type);
 }
+
+}
+
+#endif

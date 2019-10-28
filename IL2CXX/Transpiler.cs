@@ -40,7 +40,7 @@ namespace IL2CXX
             public override int GetHashCode() => method.GetHashCode() ^ type.GetHashCode();
         }
         private static MethodKey ToKey(MethodBase method) => new MethodKey(method);
-        abstract class RuntimeDefinition : IEqualityComparer<Type[]>
+        class RuntimeDefinition : IEqualityComparer<Type[]>
         {
             bool IEqualityComparer<Type[]>.Equals(Type[] x, Type[] y) => x.SequenceEqual(y);
             int IEqualityComparer<Type[]>.GetHashCode(Type[] x) => x.Select(y => y.GetHashCode()).Aggregate((y, z) => y % z);
@@ -49,7 +49,7 @@ namespace IL2CXX
             public readonly List<MethodInfo> Methods = new List<MethodInfo>();
             public readonly Dictionary<MethodKey, int> MethodToIndex = new Dictionary<MethodKey, int>();
 
-            protected RuntimeDefinition(Type type) => Type = type;
+            public RuntimeDefinition(Type type) => Type = type;
             protected void Add(MethodInfo method, Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex)
             {
                 var key = ToKey(method);
@@ -57,7 +57,7 @@ namespace IL2CXX
                 Methods.Add(method);
                 if (method.IsGenericMethod) genericMethodToTypesToIndex.Add(key, new Dictionary<Type[], int>(this));
             }
-            protected abstract int GetIndex(MethodKey method);
+            protected virtual int GetIndex(MethodKey method) => throw new NotSupportedException();
             public int GetIndex(MethodBase method) => GetIndex(ToKey(method));
         }
         class InterfaceDefinition : RuntimeDefinition
@@ -154,7 +154,7 @@ namespace IL2CXX
                     if (underlying == typeof(long) || underlying == typeof(ulong))
                     {
                         VariableType = "int64_t";
-                        prefix = "l";
+                        prefix = "j";
                     }
                     else
                     {
@@ -197,6 +197,11 @@ namespace IL2CXX
         private static readonly OpCode[] opcodes2 = new OpCode[256];
         private static readonly Regex unsafeCharacters = new Regex(@"(\W|_)", RegexOptions.Compiled);
         private static string Escape(string name) => unsafeCharacters.Replace(name, m => string.Join(string.Empty, m.Value.Select(x => $"_{(int)x:x}")));
+        private static readonly IReadOnlyDictionary<Type, string> builtinTypes = new Dictionary<Type, string> {
+            [typeof(object)] = "t_object",
+            [typeof(MemberInfo)] = "t__member_info",
+            [typeof(Type)] = "t__type"
+        };
         private static readonly IReadOnlyDictionary<Type, string> primitives = new Dictionary<Type, string> {
             [typeof(bool)] = "bool",
             [typeof(byte)] = "uint8_t",
@@ -396,7 +401,12 @@ namespace IL2CXX
         private RuntimeDefinition Define(Type type)
         {
             if (typeToRuntime.TryGetValue(type, out var definition)) return definition;
-            if (type.IsInterface)
+            if (type.IsByRef || type.IsPointer)
+            {
+                definition = new RuntimeDefinition(type);
+                typeToRuntime.Add(type, definition);
+            }
+            else if (type.IsInterface)
             {
                 definition = new InterfaceDefinition(type, genericMethodToTypesToIndex);
                 typeToRuntime.Add(type, definition);
@@ -427,9 +437,6 @@ struct {Escape(type)}
                 definition = td;
                 typeToRuntime[type] = definition;
                 var identifier = Escape(type);
-                var declaration = $@"// {type.AssemblyQualifiedName}
-struct {identifier}";
-                var @base = type == typeof(object) ? " : t_object" : type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
                 var staticFields = new List<FieldInfo>();
                 var threadStaticFields = new List<FieldInfo>();
                 if (!type.IsEnum)
@@ -467,45 +474,54 @@ struct {field}
                     foreach (var x in threadStaticFields) threadStaticMembers.WriteLine($"\t\t{EscapeForScoped(x.FieldType)} {Escape(x)}{{}};");
                     threadStaticMembers.WriteLine($"\t}} v_{identifier};");
                 }
-                string members;
-                if (type == typeof(void))
+                var declaration = $"// {type.AssemblyQualifiedName}";
+                if (builtinTypes.TryGetValue(type, out var builtinName))
                 {
-                    members = string.Empty;
+                    typeDeclarations.WriteLine($"{declaration}\nusing {identifier} = {builtinName};");
                 }
-                else if (primitives.TryGetValue(type, out var name) || type.IsEnum)
+                else
                 {
-                    if (name == null) name = primitives[type.GetEnumUnderlyingType()];
-                    members = $@"{'\t'}{name} v__value;
+                    declaration += $"\nstruct {identifier}";
+                    var @base = type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
+                    string members;
+                    if (type == typeof(void))
+                    {
+                        members = string.Empty;
+                    }
+                    else if (primitives.TryGetValue(type, out var name) || type.IsEnum)
+                    {
+                        if (name == null) name = primitives[type.GetEnumUnderlyingType()];
+                        members = $@"{'\t'}{name} v__value;
 {'\t'}void f__construct({name} a_value)
 {'\t'}{{
 {'\t'}{'\t'}v__value = a_value;
 {'\t'}}}
 ";
-                }
-                else
-                {
-                    members = builtin.GetFields(this, type);
-                    if (members == null)
+                    }
+                    else
                     {
-                        string scan(Type x, string y) => x.IsValueType ? $"{y}.f__scan(a_scan)" : $"a_scan({y})";
-                        if (type.IsArray)
+                        members = builtin.GetFields(this, type);
+                        if (members == null)
                         {
-                            var element = GetElementType(type);
-                            var elementIdentifier = EscapeForVariable(element);
-                            members = $@"{'\t'}t__bound v__bounds[{type.GetArrayRank()}];
+                            string scan(Type x, string y) => x.IsValueType ? $"{y}.f__scan(a_scan)" : $"a_scan({y})";
+                            if (type.IsArray)
+                            {
+                                var element = GetElementType(type);
+                                var elementIdentifier = EscapeForVariable(element);
+                                members = $@"{'\t'}t__bound v__bounds[{type.GetArrayRank()}];
 {'\t'}{elementIdentifier}* f__data()
 {'\t'}{{
 {'\t'}{'\t'}return reinterpret_cast<{elementIdentifier}*>(this + 1);
 {'\t'}}}
 ";
-                            if (HasSlots(element)) members += $@"{'\t'}void f__scan(t_scan a_scan)
+                                if (HasSlots(element)) members += $@"{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{{
 {'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
 {'\t'}{'\t'}auto p = f__data();
 {'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) {scan(element, "p[i]")};
 {'\t'}}}
 ";
-                            members += $@"{'\t'}t_scoped<t_slot> f__clone() const
+                                members += $@"{'\t'}t_scoped<t_slot> f__clone() const
 {'\t'}{{
 {'\t'}{'\t'}auto p = t_object::f_allocate<{identifier}>(sizeof({identifier}) * v__length);
 {'\t'}{'\t'}p->v__length = v__length;
@@ -516,14 +532,14 @@ struct {field}
 {'\t'}{'\t'}return p;
 {'\t'}}}
 ";
-                        }
-                        else
-                        {
-                            var fields = type.GetFields(declaredAndInstance);
-                            string variables(string indent) => string.Join(string.Empty, fields.Select(x => $"{indent}{EscapeForVariable(x.FieldType)} {Escape(x)};\n"));
-                            string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => HasSlots(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
-                            members = type.IsValueType
-                                ? $@"{variables("\t\t")}
+                            }
+                            else
+                            {
+                                var fields = type.GetFields(declaredAndInstance);
+                                string variables(string indent) => string.Join(string.Empty, fields.Select(x => $"{indent}{EscapeForVariable(x.FieldType)} {Escape(x)};\n"));
+                                string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => HasSlots(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
+                                members = type.IsValueType
+                                    ? $@"{variables("\t\t")}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
 {string.Join(string.Empty, fields.Where(x => HasSlots(x.FieldType)).Select(x => $"\t\t\t{Escape(x)}.f__destruct();\n"))}{'\t'}{'\t'}}}
@@ -531,7 +547,7 @@ struct {field}
 {'\t'}{'\t'}{{
 {scanSlots("\t\t\t")}{'\t'}{'\t'}}}
 "
-                                : $@"{variables("\t")}
+                                    : $@"{variables("\t")}
 {'\t'}void f__scan(t_scan a_scan)
 {'\t'}{{
 {(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
@@ -545,9 +561,9 @@ struct {field}
 {'\t'}{'\t'}return p;
 {'\t'}}}
 ";
+                            }
                         }
-                    }
-                    if (type.IsValueType) members = $@"{'\t'}struct t_value
+                        if (type.IsValueType) members = $@"{'\t'}struct t_value
 {'\t'}{{
 {members}{'\t'}}} v__value;
 {'\t'}void f__construct(t_value&& a_value)
@@ -559,12 +575,13 @@ struct {field}
 {'\t'}{'\t'}v__value.f__scan(a_scan);
 {'\t'}}}
 ";
-                }
-                typeDeclarations.WriteLine($"{declaration};");
-                typeDefinitions.WriteLine($@"
+                    }
+                    typeDeclarations.WriteLine($"{declaration};");
+                    typeDefinitions.WriteLine($@"
 {declaration}{@base}
 {{
 {members}}};");
+                }
                 staticDeclarations.Write(staticMembers);
                 memberDefinitions.Write(staticDefinitions);
                 threadStaticDeclarations.Write(threadStaticMembers);
@@ -582,15 +599,17 @@ struct {field}
         }
         public string Escape(Type type)
         {
-            if (type.IsByRef || type.IsPointer) return $"{Escape(GetElementType(type))}*";
             if (type.IsValueType)
             {
                 Define(type);
             }
             else
             {
-                if (type.IsArray) Escape(GetElementType(type));
+                var e = GetElementType(type);
+                var name = e == null ? null : Escape(e);
                 queuedTypes.Enqueue(type);
+                if (type.IsByRef) return $"{name}&";
+                if (type.IsPointer) return $"{name}*";
             }
             return EscapeType(type);
         }
@@ -632,28 +651,99 @@ struct {field}
         }
         public string FormatMove(Type type, string variable) =>
             type == typeof(bool) ? $"{variable} != 0" :
-            type == typeof(IntPtr) || type == typeof(UIntPtr) ? $"{EscapeForVariable(type)}{{{variable}}}" :
             type.IsByRef || type.IsPointer ? $"reinterpret_cast<{EscapeForVariable(type)}>({variable})" :
             type.IsPrimitive || type.IsEnum ? variable :
             $"std::move({variable})";
-        private void GenerateCall(MethodBase method, string function, IEnumerable<string> variables, Stack after)
+        private string GenerateCall(MethodBase method, string function, IEnumerable<string> variables)
         {
             var arguments = new List<Type>();
             if (!method.IsStatic) arguments.Add(GetThisType(method));
             arguments.AddRange(method.GetParameters().Select(x => x.ParameterType));
-            var call = $@"{function}({
+            return $@"{function}({
     string.Join(",", arguments.Zip(variables.Reverse(), (a, v) => $"\n\t\t{FormatMove(a, v)}"))
 }{(arguments.Count > 0 ? "\n\t" : string.Empty)})";
-            writer.WriteLine(method is MethodInfo m && m.ReturnType != typeof(void) ? $"\t{after.Variable} = {call};" : $"\t{call};");
         }
-        private void GenerateCall(MethodBase method, string function, Stack stack, Stack after) => GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable), after);
+        private void GenerateCall(MethodBase method, string function, Stack stack, Stack after)
+        {
+            var call = GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable));
+            writer.WriteLine(ReturnsValue(method) ? $"\t{after.Variable} = {call};" : $"\t{call};");
+        }
         private string FunctionPointer(MethodBase method)
         {
             var parameters = method.GetParameters().Select(x => x.ParameterType);
             if (!method.IsStatic) parameters = parameters.Prepend(method.DeclaringType.IsValueType ? typeof(object) : GetThisType(method));
-            return $"{(method is MethodInfo m && m.ReturnType != typeof(void) ? EscapeForScoped(m.ReturnType) : "void")}(*)({string.Join(", ", parameters.Select(EscapeForScoped))})";
+            return $"{(ReturnsValue(method) ? EscapeForScoped(((MethodInfo)method).ReturnType) : "void")}(*)({string.Join(", ", parameters.Select(EscapeForScoped))})";
         }
-        private static MethodBase GetGenericTypeMethod(MethodBase method) => MethodBase.GetMethodFromHandle(method.MethodHandle, method.DeclaringType.GetGenericTypeDefinition().TypeHandle);
+        public (string Site, string Function) GetVirtualFunction(MethodBase method, string target)
+        {
+            int indexOf(IEnumerable<IReadOnlyList<MethodInfo>> concretes)
+            {
+                Escape(method);
+                var i = typeToRuntime[method.DeclaringType].GetIndex(method);
+                foreach (var ms in concretes) Enqueue(ms[i]);
+                return i;
+            }
+            (int, int) genericIndexOf(IEnumerable<IReadOnlyList<MethodInfo>> concretes)
+            {
+                var gm = ((MethodInfo)method).GetGenericMethodDefinition();
+                var i = typeToRuntime[method.DeclaringType].GetIndex(gm);
+                var t2i = genericMethodToTypesToIndex[ToKey(gm)];
+                var ga = method.GetGenericArguments();
+                if (!t2i.TryGetValue(ga, out var j))
+                {
+                    j = t2i.Count;
+                    t2i.Add(ga, j);
+                }
+                foreach (var ms in concretes) Enqueue(ms[i].MakeGenericMethod(ga));
+                return (i, j);
+            }
+            Enqueue(method);
+            if (method.DeclaringType.IsInterface)
+            {
+                var concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(method.DeclaringType, out var ms) ? ms : null).Where(y => y != null);
+                string resolve;
+                if (method.IsGenericMethod)
+                {
+                    var (i, j) = genericIndexOf(concretes);
+                    resolve = $"f__generic_resolve<{Escape(method.DeclaringType)}, {i}, {j}>";
+                }
+                else
+                {
+                    resolve = $"f__resolve<{Escape(method.DeclaringType)}, {indexOf(concretes)}>";
+                }
+                return (
+                    $@"{'\t'}{{{{static auto site = reinterpret_cast<void*>({resolve});
+{'\t'}{{0}};
+{'\t'}}}}}",
+                    $"reinterpret_cast<{FunctionPointer(method)}>(reinterpret_cast<void*(*)(void*&, t__type*)>(site)(site, {target}->f_type()))"
+                );
+            }
+            else if (method.IsVirtual)
+            {
+                string at(int i) => $"reinterpret_cast<void**>({target}->f_type() + 1)[{i}]";
+                var concretes = runtimeDefinitions.Where(y => y is TypeDefinition && y.Type.IsSubclassOf(method.DeclaringType)).Select(y => y.Methods);
+                string resolved;
+                if (method.IsGenericMethod)
+                {
+                    var (i, j) = genericIndexOf(concretes);
+                    resolved = $"reinterpret_cast<void**>({at(i)})[{j}]";
+                }
+                else
+                {
+                    resolved = at(indexOf(concretes));
+                }
+                return ("\t{0};", $"reinterpret_cast<{FunctionPointer(method)}>({resolved})");
+            }
+            else
+            {
+                return ("\t{0};", Escape(method));
+            }
+        }
+        public string GenerateVirtualCall(MethodBase method, string target, IEnumerable<string> variables, string prefix)
+        {
+            var (site, function) = GetVirtualFunction(method, target);
+            return string.Format(site, prefix + GenerateCall(method, function, variables.Append(target)));
+        }
         private void Do()
         {
             method = queuedMethods.Dequeue();
@@ -741,24 +831,6 @@ struct {field}
             var index = 0;
             while (index < bytes.Length)
             {
-                var stack = indexToStack[index];
-                if (tries.Count > 0)
-                {
-                    var clause = tries.Peek();
-                    if (index >= clause.HandlerOffset + clause.HandlerLength)
-                    {
-                        tries.Pop();
-                        if (clause.Flags == ExceptionHandlingClauseOptions.Finally)
-                        {
-                            var f = writer;
-                            var t = writers.Pop();
-                            writer = writers.Pop();
-                            writer.Write(f);
-                            writer.Write(t);
-                        }
-                        writer.WriteLine('}');
-                    }
-                }
                 while (tryBegins.Count > 0)
                 {
                     var clause = tryBegins.Peek();
@@ -804,10 +876,28 @@ struct {field}
                         }
                 }
                 writer.Write($"L_{index:x04}: // ");
+                var stack = indexToStack[index];
                 var instruction = instructions1[bytes[index++]];
                 if (instruction.OpCode == OpCodes.Prefix1) instruction = instructions2[bytes[index++]];
                 writer.Write(instruction.OpCode.Name);
                 index = instruction.Generate(index, stack);
+                if (tries.Count > 0)
+                {
+                    var clause = tries.Peek();
+                    if (index >= clause.HandlerOffset + clause.HandlerLength)
+                    {
+                        tries.Pop();
+                        if (clause.Flags == ExceptionHandlingClauseOptions.Finally)
+                        {
+                            var f = writer;
+                            var t = writers.Pop();
+                            writer = writers.Pop();
+                            writer.Write(f);
+                            writer.Write(t);
+                        }
+                        writer.WriteLine('}');
+                    }
+                }
             }
             writer.WriteLine('}');
         }
@@ -1013,12 +1103,12 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var r = ParseR4(ref index);
-                    writer.WriteLine($" {r:G9}\n\t{indexToStack[index].Variable} = ");
-                    if (r == float.PositiveInfinity)
+                    writer.Write($" {r:G9}\n\t{indexToStack[index].Variable} = ");
+                    if (float.IsPositiveInfinity(r))
                         writer.WriteLine("std::numeric_limits<float>::infinity();");
-                    else if (r == float.NegativeInfinity)
+                    else if (float.IsNegativeInfinity(r))
                         writer.WriteLine("-std::numeric_limits<float>::infinity();");
-                    else if (r == float.NaN)
+                    else if (float.IsNaN(r))
                         writer.WriteLine("std::numeric_limits<float>::quiet_NaN();");
                     else
                         writer.WriteLine($"{r:G9};");
@@ -1031,12 +1121,12 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var r = ParseR8(ref index);
-                    writer.WriteLine($" {r:G17}\n\t{indexToStack[index].Variable} = ");
-                    if (r == double.PositiveInfinity)
+                    writer.Write($" {r:G17}\n\t{indexToStack[index].Variable} = ");
+                    if (double.IsPositiveInfinity(r))
                         writer.WriteLine("std::numeric_limits<double>::infinity();");
-                    else if (r == double.NegativeInfinity)
+                    else if (double.IsNegativeInfinity(r))
                         writer.WriteLine("-std::numeric_limits<double>::infinity();");
-                    else if (r == double.NaN)
+                    else if (double.IsNaN(r))
                         writer.WriteLine("std::numeric_limits<double>::quiet_NaN();");
                     else
                         writer.WriteLine($"{r:G17};");
@@ -1238,7 +1328,7 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine();
-                    withVolatile(() => writer.WriteLine($"\t{indexToStack[index].Variable} = *static_cast<{primitives[set.Type]}*>({stack.Variable});"));
+                    withVolatile(() => writer.WriteLine($"\t{indexToStack[index].Variable} = *reinterpret_cast<{primitives[set.Type]}*>({stack.Variable});"));
                     return index;
                 };
             }));
@@ -1269,8 +1359,7 @@ struct {field}
                 (OpCode: OpCodes.Stind_I4, Type: typeof(int)),
                 (OpCode: OpCodes.Stind_I8, Type: typeof(long)),
                 (OpCode: OpCodes.Stind_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Stind_R8, Type: typeof(double)),
-                (OpCode: OpCodes.Stind_I, Type: typeof(NativeInt))
+                (OpCode: OpCodes.Stind_R8, Type: typeof(double))
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop);
@@ -1281,6 +1370,16 @@ struct {field}
                     return index;
                 };
             }));
+            instructions1[OpCodes.Stind_I.Value].For(x =>
+            {
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop);
+                x.Generate = (index, stack) =>
+                {
+                    writer.WriteLine();
+                    withVolatile(() => writer.WriteLine($"\t*reinterpret_cast<intptr_t*>({stack.Pop.Variable}) = {(stack.VariableType == "void*" ? "reinterpret_cast" : "static_cast")}<intptr_t>({stack.Variable});"));
+                    return index;
+                };
+            });
             new[] {
                 (OpCode: OpCodes.Add, Operator: "+", Type: typeOfAdd),
                 (OpCode: OpCodes.Sub, Operator: "-", Type: typeOfAdd),
@@ -1378,64 +1477,15 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
-                    var after = indexToStack[index];
-                    var definition = typeToRuntime[m.DeclaringType];
-                    void generate(string target)
-                    {
-                        void forVirtual(Func<int, string> method, Func<int, int, string> genericMethod, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
-                        {
-                            var variables = stack.Take(m.GetParameters().Length).Select(y => y.Variable).Append(target);
-                            if (m.IsGenericMethod)
-                            {
-                                var gm = ((MethodInfo)m).GetGenericMethodDefinition();
-                                var i = definition.GetIndex(gm);
-                                var t2i = genericMethodToTypesToIndex[ToKey(gm)];
-                                var ga = m.GetGenericArguments();
-                                if (!t2i.TryGetValue(ga, out var j))
-                                {
-                                    j = t2i.Count;
-                                    t2i.Add(ga, j);
-                                }
-                                GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>({genericMethod(i, j)})", variables, after);
-                                foreach (var ms in concretes) Enqueue(ms[i].MakeGenericMethod(ga));
-                            }
-                            else
-                            {
-                                var i = definition.GetIndex(m);
-                                GenerateCall(m, $"reinterpret_cast<{FunctionPointer(m)}>({method(i)})", variables, after);
-                                Escape(m);
-                                foreach (var ms in concretes) Enqueue(ms[i]);
-                            }
-                        }
-                        Enqueue(m);
-                        if (m.DeclaringType.IsInterface)
-                        {
-                            var resolve = $"reinterpret_cast<void*(*)(void*&, t__type*)>(site)(site, {target}->f_type())";
-                            forVirtual(i =>
-                            {
-                                writer.WriteLine($"\t{{static auto site = reinterpret_cast<void*>(f__resolve<{Escape(m.DeclaringType)}, {i}>);");
-                                return resolve;
-                            }, (i, j) =>
-                            {
-                                writer.WriteLine($"\t{{static auto site = reinterpret_cast<void*>(f__generic_resolve<{Escape(m.DeclaringType)}, {i}, {j}>);");
-                                return resolve;
-                            }, runtimeDefinitions.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(m.DeclaringType, out var ms) ? ms : null).Where(y => y != null));
-                            writer.WriteLine($"\t}}");
-                        }
-                        else if (m.IsVirtual)
-                        {
-                            string method(int i) => $"reinterpret_cast<void**>({target}->f_type() + 1)[{i}]";
-                            forVirtual(method, (i, j) => $"reinterpret_cast<void**>({method(i)})[{j}]", runtimeDefinitions.Where(y => !y.Type.IsInterface && y.Type.IsSubclassOf(m.DeclaringType)).Select(y => y.Methods));
-                        }
-                        else
-                        {
-                            GenerateCall(m, Escape(m), stack, after);
-                        }
-                    }
                     writer.WriteLine($" {m.DeclaringType}::[{m}]");
+                    var after = indexToStack[index];
+                    string generate(string target) => GenerateVirtualCall(m, target,
+                        stack.Take(m.GetParameters().Length).Select(y => y.Variable),
+                        ReturnsValue(m) ? $"{after.Variable} = " : string.Empty
+                    );
                     if (constrained == null)
                     {
-                        generate(stack.ElementAt(m.GetParameters().Length).Variable);
+                        writer.WriteLine(generate(stack.ElementAt(m.GetParameters().Length).Variable));
                     }
                     else
                     {
@@ -1444,7 +1494,7 @@ struct {field}
                             if (m.IsVirtual)
                             {
                                 var ct = (TypeDefinition)typeToRuntime[constrained];
-                                var cm = (m.DeclaringType.IsInterface ? ct.InterfaceToMethods[m.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods)[definition.GetIndex(m)];
+                                var cm = (m.DeclaringType.IsInterface ? ct.InterfaceToMethods[m.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods)[typeToRuntime[m.DeclaringType].GetIndex(m)];
                                 if (cm.DeclaringType == constrained)
                                 {
                                     Enqueue(cm);
@@ -1452,10 +1502,9 @@ struct {field}
                                 }
                                 else
                                 {
-                                    var target = stack.ElementAt(m.GetParameters().Length);
-                                    writer.WriteLine($"\t{{auto p = f__new_constructed<{Escape(constrained)}>(std::move(*{FormatMove(MakePointerType(constrained), target.Variable)}));");
-                                    generate("p");
-                                    writer.WriteLine($"\t}}");
+                                    writer.WriteLine($@"{'\t'}{{auto p = f__new_constructed<{Escape(constrained)}>(std::move(*{FormatMove(MakePointerType(constrained), stack.ElementAt(m.GetParameters().Length).Variable)}));
+{generate("p")}
+{'\t'}}}");
                                 }
                             }
                             else
@@ -1466,7 +1515,7 @@ struct {field}
                         }
                         else
                         {
-                            generate($"(*static_cast<{Escape(constrained)}**>({stack.ElementAt(m.GetParameters().Length).Variable}))");
+                            writer.WriteLine(generate($"(*static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({stack.ElementAt(m.GetParameters().Length).Variable}))"));
                         }
                         constrained = null;
                     }
@@ -1498,7 +1547,7 @@ struct {field}
                     {
                         using (var provider = CodeDomProvider.CreateProvider("CSharp"))
                             provider.GenerateCodeFromExpression(new CodePrimitiveExpression(s), sw, null);
-                        writer.Write($" {s}\n\t{indexToStack[index].Variable} = f__string(u{sw.ToString().Replace($"\" +{Environment.NewLine}    \"", string.Empty)}sv);");
+                        writer.WriteLine($" {s}\n\t{indexToStack[index].Variable} = f__new_string(u{sw.ToString().Replace($"\" +{Environment.NewLine}    \"", string.Empty)}sv);");
                     }
                     return index;
                 };
@@ -1561,13 +1610,13 @@ struct {field}
             {
                 x.Estimate = (index, stack) =>
                 {
-                    var t = ParseType(ref index);
-                    return (index, stack.Pop.Push(t));
+                    ParseType(ref index);
+                    return (index, stack.Pop.Push(typeof(object)));
                 };
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) {indexToStack[index].Variable} = nullptr;");
+                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) {indexToStack[index].Variable} = {{}};");
                     return index;
                 };
             });
@@ -1612,10 +1661,10 @@ struct {field}
                     {
                         var after = indexToStack[index];
                         writer.Write($"\t{after.Variable} = ");
-                        if (stack.Type.IsValueType)
+                        if (stack.Type != typeof(NativeInt) && stack.Type.IsValueType)
                             writer.Write($"{stack.Variable}.");
                         else
-                            writer.Write($"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->");
+                            writer.Write($"{(stack.VariableType == "intptr_t" ? "reinterpret_cast" : "static_cast")}<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->");
                         writer.WriteLine($"{Escape(f)};");
                         if (after.Variable != stack.Variable && HasSlots(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     });
@@ -1651,7 +1700,7 @@ struct {field}
                     writer.WriteLine($" {f.DeclaringType}::[{f}]");
                     withVolatile(() =>
                     {
-                        writer.WriteLine($"\tstatic_cast<{(f.DeclaringType.IsValueType ? EscapeForVariable(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};");
+                        writer.WriteLine($"\t{(stack.Pop.VariableType == "intptr_t" ? "reinterpret_cast" : "static_cast")}<{(f.DeclaringType.IsValueType ? EscapeForVariable(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)} = {FormatMove(f.FieldType, stack.Variable)};");
                         if (HasSlots(stack.Pop.Type)) writer.WriteLine($"\t{stack.Pop.Variable}.f__destruct();");
                     });
                     return index;
@@ -1792,28 +1841,36 @@ struct {field}
                 (OpCode: OpCodes.Ldelem_I8, Type: typeof(long)),
                 (OpCode: OpCodes.Ldelem_I, Type: typeof(NativeInt)),
                 (OpCode: OpCodes.Ldelem_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Ldelem_R8, Type: typeof(double)),
-                (OpCode: OpCodes.Ldelem_Ref, Type: typeof(object))
+                (OpCode: OpCodes.Ldelem_R8, Type: typeof(double))
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type));
                 x.Generate = (index, stack) =>
                 {
-                    var after = indexToStack[index];
                     var array = stack.Pop;
-                    writer.WriteLine($"\n\t{after.Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
-                    if (after.Variable != array.Variable) writer.WriteLine($"\t{array.Variable}.f__destruct();");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(set.Type.MakeArrayType())}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    writer.WriteLine($"\t{array.Variable}.f__destruct();");
                     return index;
                 };
             }));
+            instructions1[OpCodes.Ldelem_Ref.Value].For(x =>
+            {
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(object)));
+                x.Generate = (index, stack) =>
+                {
+                    var array = stack.Pop;
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    return index;
+                };
+            });
             new[] {
-                (OpCode: OpCodes.Stelem_I, Type: "int"),
-                (OpCode: OpCodes.Stelem_I1, Type: "int8_t"),
-                (OpCode: OpCodes.Stelem_I2, Type: "int16_t"),
-                (OpCode: OpCodes.Stelem_I4, Type: "int32_t"),
-                (OpCode: OpCodes.Stelem_I8, Type: "int64_t"),
-                (OpCode: OpCodes.Stelem_R4, Type: "float"),
-                (OpCode: OpCodes.Stelem_R8, Type: "double")
+                (OpCode: OpCodes.Stelem_I, Type: typeof(IntPtr)),
+                (OpCode: OpCodes.Stelem_I1, Type: typeof(sbyte)),
+                (OpCode: OpCodes.Stelem_I2, Type: typeof(short)),
+                (OpCode: OpCodes.Stelem_I4, Type: typeof(int)),
+                (OpCode: OpCodes.Stelem_I8, Type: typeof(long)),
+                (OpCode: OpCodes.Stelem_R4, Type: typeof(float)),
+                (OpCode: OpCodes.Stelem_R8, Type: typeof(double))
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Pop);
@@ -1821,7 +1878,7 @@ struct {field}
                 {
                     var array = stack.Pop.Pop;
                     writer.WriteLine($@"
-{'\t'}static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = static_cast<{set.Type}>({stack.Variable});
+{'\t'}static_cast<{Escape(set.Type.MakeArrayType())}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = static_cast<{EscapeForVariable(set.Type)}>({stack.Variable});
 {'\t'}{array.Variable}.f__destruct();");
                     return index;
                 };
@@ -1879,7 +1936,7 @@ struct {field}
                 {
                     var t = ParseType(ref index);
                     var after = indexToStack[index];
-                    writer.WriteLine($" {t}\n\t{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable}){(t.IsValueType ? "->v__value" : string.Empty)};");
+                    writer.WriteLine($" {t}\n\t{after.Variable} = static_cast<{Escape(t.IsInterface ? typeof(object) : t)}*>({stack.Variable}){(t.IsValueType ? "->v__value" : string.Empty)};");
                     if (after.Variable != stack.Variable) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     return index;
                 };
@@ -2039,8 +2096,9 @@ struct {field}
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
+                    var (site, function) = GetVirtualFunction(m, stack.Variable);
                     writer.WriteLine($@" {m.DeclaringType}::[{m}]
-{'\t'}{indexToStack[index].Variable} = &{stack.Variable}->{Escape(m)};
+{string.Format(site, $"\t{indexToStack[index].Variable} = reinterpret_cast<void*>({function})")}
 {'\t'}{stack.Variable}.f__destruct();");
                     return index;
                 };
@@ -2130,10 +2188,10 @@ struct {field}
             });
             instructions2[OpCodes.Refanytype.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(int)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(RuntimeTypeHandle)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = reinterpret_cast<intptr_t>({stack.Variable}.v_Type.v__5fvalue);");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {EscapeForVariable(typeof(RuntimeTypeHandle))}{{static_cast<t__type*>({stack.Variable}.v_Type.v__5fvalue)}};");
                     return index;
                 };
             });
@@ -2142,7 +2200,7 @@ struct {field}
                 x.Estimate = (index, stack) => (index, stack);
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine("\n\treadonly ");
+                    writer.WriteLine();
                     return index;
                 };
             });
@@ -2235,10 +2293,7 @@ void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to
         public void Do(MethodInfo method, TextWriter writer)
         {
             Define(typeof(Type));
-            typeDefinitions.WriteLine("\n#include <il2cxx/type.h>");
             Escape(finalizeOfObject);
-            Define(typeof(IntPtr));
-            Define(typeof(UIntPtr));
             Define(typeof(Thread));
             Enqueue(typeof(ThreadStart).GetMethod("Invoke"));
             Enqueue(typeof(ParameterizedThreadStart).GetMethod("Invoke"));

@@ -204,6 +204,16 @@ public:
 		return v_type;
 	}
 	t__extension* f_extension();
+	void f__scan(t_scan a_scan)
+	{
+	}
+	void f__construct(t_object* a_p) const
+	{
+	}
+	t_scoped<t_slot> f__clone() const
+	{
+		return f_allocate<t_object>();
+	}
 };
 
 template<size_t A_rank>

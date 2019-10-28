@@ -89,8 +89,8 @@ namespace IL2CXX.Tests
                 return corrected == expected;
             }
             if (!test("hell", "hello")) return 1;
-            if (!test("work", "world")) return 1;
-            if (!test("wide", "wide")) return 1;
+            if (!test("work", "world")) return 2;
+            if (!test("wide", "wide")) return 3;
             return 0;
         }
         [Test]

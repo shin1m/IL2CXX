@@ -226,4 +226,51 @@ void t_engine::f_finalize()
 	v_finalizer__conductor.f__wait(lock);
 }
 
+std::u16string f__u16string(std::string_view a_x)
+{
+	std::vector<char16_t> cs;
+	std::mbstate_t state{};
+	char16_t c;
+	auto p = a_x.data();
+	auto q = p + a_x.size();
+	while (p < q) {
+		auto n = std::mbrtoc16(&c, p, q - p, &state);
+		switch (n) {
+		case size_t(-3):
+			cs.push_back(c);
+			break;
+		case size_t(-2):
+			p = q;
+			break;
+		case size_t(-1):
+			++p;
+			break;
+		case 0:
+			cs.push_back('\0');
+			++p;
+			break;
+		default:
+			cs.push_back(c);
+			p += n;
+			break;
+		}
+	}
+	if (std::mbrtoc16(&c, p, 0, &state) == size_t(-3)) cs.push_back(c);
+	return {cs.begin(), cs.end()};
+}
+
+std::string f__string(std::u16string_view a_x)
+{
+	std::vector<char> cs;
+	std::mbstate_t state{};
+	char mb[MB_LEN_MAX];
+	for (auto c : a_x) {
+		auto n = std::c16rtomb(mb, c, &state);
+		if (n != size_t(-1)) cs.insert(cs.end(), mb, mb + n);
+	}
+	auto n = std::c16rtomb(mb, u'\0', &state);
+	if (n != size_t(-1) && n > 1) cs.insert(cs.end(), mb, mb + n - 1);
+	return {cs.begin(), cs.end()};
+}
+
 }

@@ -292,6 +292,17 @@ public:
 		f_decrements()->f_push(v_p);
 		v_p = nullptr;
 	}
+	bool f_compare_exchange(t_slot& a_expected, t_slot&& a_desired)
+	{
+		t_object* p = a_expected;
+		if (v_p.compare_exchange_strong(p, a_desired)) {
+			a_desired.v_p.store(nullptr);
+			if (p) f_decrements()->f_push(p);
+			return true;
+		}
+		a_expected = p;
+		return false;
+	}
 };
 
 template<typename T>

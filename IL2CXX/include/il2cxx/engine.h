@@ -147,6 +147,7 @@ private:
 		f_free(a_p);
 	}
 	void f_collector();
+	static void f_finalize(t_object* a_p);
 	void f_finalizer();
 
 public:
@@ -277,6 +278,11 @@ t_scoped<t_slot_of<T_array>> f__new_array(size_t a_length)
 	return p;
 }
 
+inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element, size_t a_rank) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__size(a_size), v__element(a_element), v__rank(a_rank)
+{
+	v_type = &t__type_of<t__type>::v__instance;
+}
+
 inline t_scoped<t_slot_of<t_System_2eString>> f__new_string(size_t a_length)
 {
 	auto p = t_object::f_allocate<t_System_2eString>(sizeof(char16_t) * a_length);
@@ -290,11 +296,6 @@ inline t_scoped<t_slot_of<t_System_2eString>> f__new_string(std::u16string_view 
 	auto p = f__new_string(a_value.size());
 	std::copy(a_value.begin(), a_value.end(), &p->v__5ffirstChar);
 	return p;
-}
-
-inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element, size_t a_rank) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__size(a_size), v__element(a_element), v__rank(a_rank)
-{
-	v_type = &t__type_of<t_System_2eType>::v__instance;
 }
 
 }

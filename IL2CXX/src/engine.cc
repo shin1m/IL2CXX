@@ -91,7 +91,7 @@ void t_engine::f_finalizer()
 				v_finalizer__queue.pop_front();
 			}
 			p->f_type()->f_suppress_finalize(p);
-			reinterpret_cast<void(*)(t_scoped<t_slot_of<t_System_2eObject>>)>(reinterpret_cast<void**>(p->f_type() + 1)[2])(t_slot(p, t_slot::t_pass()));
+			f_finalize(p);
 		}
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer quitting...\n");

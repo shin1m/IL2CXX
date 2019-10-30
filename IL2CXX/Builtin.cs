@@ -274,8 +274,9 @@ namespace IL2CXX
 {'\t'}}}
 ";
             code.For(
-                type.GetMethod(nameof(Array.Copy), new[] { type, typeof(int), type, typeof(int), typeof(int) }),
-                transpiler => $@"{'\t'}if (a_0->f_type() == a_2->f_type()) {{
+                type.GetMethod(nameof(Array.Copy), BindingFlags.Static | BindingFlags.NonPublic, null, new[] { type, typeof(int), type, typeof(int), typeof(int), typeof(bool) }, null),
+                transpiler => $@"{'\t'}if (a_5) throw std::runtime_error(""NotImplementedException"");
+{'\t'}if (a_0->f_type() == a_2->f_type()) {{
 {'\t'}{'\t'}auto rank = a_0->f_type()->v__rank;
 {'\t'}{'\t'}auto n = a_0->f_type()->v__element->v__size;
 {'\t'}{'\t'}a_0->f_type()->v__element->f_copy(reinterpret_cast<char*>(a_0->f__bounds() + rank) + a_1 * n, a_4, reinterpret_cast<char*>(a_2->f__bounds() + rank) + a_3 * n);
@@ -286,15 +287,13 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Array.GetLowerBound)),
-                transpiler => $@"
-{'\t'}if (a_1 < 0 || a_1 >= a_0->f_type()->v__rank) throw std::out_of_range(""IndexOutOfRangeException"");
+                transpiler => $@"{'\t'}if (a_1 < 0 || a_1 >= a_0->f_type()->v__rank) throw std::out_of_range(""IndexOutOfRangeException"");
 {'\t'}return a_0->f__bounds()[a_1].v_lower;
 "
             );
             code.For(
                 type.GetMethod(nameof(Array.GetUpperBound)),
-                transpiler => $@"
-{'\t'}if (a_1 < 0 || a_1 >= a_0->f_type()->v__rank) throw std::out_of_range(""IndexOutOfRangeException"");
+                transpiler => $@"{'\t'}if (a_1 < 0 || a_1 >= a_0->f_type()->v__rank) throw std::out_of_range(""IndexOutOfRangeException"");
 {'\t'}auto& bound = a_0->f__bounds()[a_1];
 {'\t'}return bound.v_lower + bound.v_length - 1;
 "
@@ -595,11 +594,22 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("wstrcpy", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => $"\tstd::copy_n(a_1, a_2, a_0);\n"
+                transpiler => "\tstd::copy_n(a_1, a_2, a_0);\n"
             );
             code.For(
                 type.GetConstructor(new[] { typeof(ReadOnlySpan<char>) }),
-                transpiler => $"\treturn f__new_string(std::u16string_view(static_cast<char16_t*>(a_0.v__5fpointer.v__5fvalue.v__5fvalue), a_0.v__5flength));\n"
+                transpiler => "\treturn f__new_string(std::u16string_view(static_cast<char16_t*>(a_0.v__5fpointer.v__5fvalue.v__5fvalue), a_0.v__5flength));\n"
+            );
+            code.For(
+                type.GetConstructor(new[] { typeof(char[]) }),
+                transpiler => "\treturn f__new_string(std::u16string_view(a_0->f__data(), a_0->v__length));\n"
+            );
+            code.For(
+                type.GetConstructor(new[] { typeof(char), typeof(int) }),
+                transpiler => $@"{'\t'}auto p = f__new_string(a_1);
+{'\t'}std::fill_n(&p->v__5ffirstChar, a_1, a_0);
+{'\t'}return p;
+"
             );
             code.For(
                 type.GetProperty(nameof(string.Length)).GetMethod,
@@ -637,7 +647,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(string.Join), new[] { typeof(string), typeof(object[]) }),
-                transpiler => $"\treturn f__new_string(u\"join\"sv);\n"
+                transpiler => "\treturn f__new_string(u\"join\"sv);\n"
             );
             code.For(
                 type.GetMethod(nameof(string.Split), new[] { typeof(char), typeof(StringSplitOptions) }),
@@ -645,8 +655,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(string.ToLowerInvariant), Type.EmptyTypes),
-                transpiler => $@"
-{'\t'}auto n = a_0->v__5fstringLength;
+                transpiler => $@"{'\t'}auto n = a_0->v__5fstringLength;
 {'\t'}auto p = f__new_string(n);
 {'\t'}auto q = &a_0->v__5ffirstChar;
 {'\t'}std::transform(q, q + n, &p->v__5ffirstChar, [](auto x)
@@ -679,11 +688,11 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => $"\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n"
+                transpiler => "\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n"
             );
             code.For(
                 type.GetMethod(nameof(object.ToString), new[] { typeof(string), typeof(IFormatProvider) }),
-                transpiler => $"\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n"
+                transpiler => "\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n"
             );
         })
         .For(typeof(float), (type, code) =>
@@ -736,7 +745,7 @@ namespace IL2CXX
         {
             code.ForGeneric(
                 type.GetProperty(nameof(SZArrayHelper<object>.Count)).GetMethod,
-                (transpiler, types) => $"\treturn a_0->v__length;\n"
+                (transpiler, types) => "\treturn a_0->v__length;\n"
             );
             code.ForGeneric(
                 type.GetProperty("Item").GetMethod,
@@ -813,7 +822,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(Math.Sqrt)),
-                transpiler => $"\treturn std::sqrt(a_0);\n"
+                transpiler => "\treturn std::sqrt(a_0);\n"
             );
         })
         .For(typeof(Random), (type, code) =>

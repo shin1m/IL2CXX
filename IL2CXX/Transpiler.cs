@@ -2356,8 +2356,14 @@ struct t_thread_static
 }};
 
 IL2CXX__PORTABLE__THREAD t_thread_static* t_thread_static::v_instance;");
-            writer.WriteLine(functionDefinitions);
-            writer.WriteLine($@"}}
+            writer.Write(functionDefinitions);
+            writer.WriteLine($@"
+void t_engine::f_finalize(t_object* a_p)
+{{
+{'\t'}reinterpret_cast<void(*)(t_scoped<t_slot_of<t_object>>)>(reinterpret_cast<void**>(a_p->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(t_slot(a_p, t_slot::t_pass()));
+}}
+
+}}
 
 #include ""slot.cc""
 #include ""object.cc""

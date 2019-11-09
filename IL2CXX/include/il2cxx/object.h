@@ -266,13 +266,13 @@ struct t__weak_handle : t__handle, decltype(t__extension::v_weak_handles)
 	t_object* v_target;
 	bool v_final;
 
-	void f_attach();
-	void f_detach();
+	void f_attach(t_scoped<t_slot>&& a_target);
+	t_scoped<t_slot> f_detach();
 
-	t__weak_handle(t_object* a_target, bool a_final);
+	t__weak_handle(t_scoped<t_slot>&& a_target, bool a_final);
 	virtual ~t__weak_handle();
 	virtual t_scoped<t_slot> f_target() const;
-	virtual void f_target__(t_object* a_p);
+	virtual void f_target__(t_scoped<t_slot>&& a_p);
 	virtual void f_scan(t_scan a_scan);
 };
 
@@ -284,11 +284,11 @@ struct t__dependent_handle : t__weak_handle
 {
 	t_slot v_secondary;
 
-	t__dependent_handle(t_object* a_target, t_scoped<t_slot>&& a_secondary) : t__weak_handle(a_target, false), v_secondary(std::move(a_secondary))
+	t__dependent_handle(t_scoped<t_slot>&& a_target, t_scoped<t_slot>&& a_secondary) : t__weak_handle(std::move(a_target), false), v_secondary(std::move(a_secondary))
 	{
 	}
 	virtual ~t__dependent_handle();
-	virtual void f_target__(t_object* a_p);
+	virtual void f_target__(t_scoped<t_slot>&& a_p);
 	virtual void f_scan(t_scan a_scan);
 };
 

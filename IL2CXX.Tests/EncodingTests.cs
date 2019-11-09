@@ -19,9 +19,10 @@ namespace IL2CXX.Tests
         static int GetString()
         {
             var x = Encoding.UTF8.GetString(new[] { (byte)0xce, (byte)0xa0 });
+            Console.WriteLine(x);
             return x == "\u03a0" ? 0 : 1;
         }
-        [Test, Explicit]
+        [Test]
         public void TestGetString() => Utilities.Test(GetString);
         static int Convert()
         {
@@ -31,7 +32,7 @@ namespace IL2CXX.Tests
             if (ascii[0] != '?') return 2;
             return 0;
         }
-        [Test, Explicit]
+        [Test]
         public void TestConvert() => Utilities.Test(Convert);
     }
 }

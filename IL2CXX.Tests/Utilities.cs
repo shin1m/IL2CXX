@@ -49,7 +49,7 @@ namespace IL2CXX.Tests
                 new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, writer);
             Assert.AreEqual(0, Spawn("make", "run", build, new[] {
                 ("CXXFLAGS", $"'-I{include}' '-I{src}' -std=c++17 -g"),
-                ("LDFLAGS", $"-lpthread")
+                ("LDFLAGS", $"-lpthread -ldl")
             }, Console.Error.WriteLine, Console.Error.WriteLine));
             Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", "", Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
         }

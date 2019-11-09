@@ -43,19 +43,19 @@ void t_engine::f_collector()
 				else
 					*p = q->v_next;
 				if (*p) (*p)->f_epoch_request();
-				auto tail = q->v_increments.v_tail + 1;
+				auto tail = q->v_increments.v_tail;
 				q->v_increments.f_flush();
 				q->v_decrements.f_flush();
 				{
 					std::lock_guard<std::mutex> lock(v_object__reviving__mutex);
 					if (q->v_reviving) {
 						size_t n = t_slot::t_increments::V_SIZE;
-						size_t epoch = (q->v_increments.v_tail + 1 + n - tail) % n;
+						size_t epoch = (q->v_increments.v_tail + n - tail) % n;
 						size_t reviving = (q->v_reviving + n - tail) % n;
-						if (epoch > reviving)
-							q->v_reviving = nullptr;
-						else
+						if (epoch < reviving)
 							v_object__reviving = true;
+						else
+							q->v_reviving = nullptr;
 					}
 				}
 				if (q->v_done >= 3) delete q;

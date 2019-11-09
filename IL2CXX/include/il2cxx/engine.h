@@ -256,7 +256,7 @@ template<typename T>
 t_scoped<t_slot_of<T>> f__new_zerod()
 {
 	auto p = t_object::f_allocate<T>();
-	std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p)) + sizeof(t_object), sizeof(T) - sizeof(t_object), '\0');
+	std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), sizeof(T) - sizeof(t_object), '\0');
 	return p;
 }
 
@@ -278,7 +278,7 @@ t_scoped<t_slot_of<T_array>> f__new_array(size_t a_length)
 	return p;
 }
 
-inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element, size_t a_rank) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__size(a_size), v__element(a_element), v__rank(a_rank)
+inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element, size_t a_rank) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank)
 {
 	v_type = &t__type_of<t__type>::v__instance;
 }
@@ -297,6 +297,33 @@ inline t_scoped<t_slot_of<t_System_2eString>> f__new_string(std::u16string_view 
 	std::copy(a_value.begin(), a_value.end(), &p->v__5ffirstChar);
 	return p;
 }
+
+template<typename T>
+class t__lazy
+{
+	T v_p;
+	bool v_initializing = false;
+	std::atomic_bool v_initialized{false};
+	std::recursive_mutex v_mutex;
+
+public:
+	T* f_get()
+	{
+		if (v_initialized.load(std::memory_order_acquire)) return &v_p;
+		t_thread::v_current->f_epoch_enter();
+		std::lock_guard<std::recursive_mutex> lock(v_mutex);
+		t_thread::v_current->f_epoch_leave();
+		if (v_initializing) return &v_p;
+		v_initializing = true;
+		v_p.f_initialize();
+		v_initialized.store(true, std::memory_order_release);
+		return &v_p;
+	}
+	T* operator->()
+	{
+		return f_get();
+	}
+};
 
 }
 

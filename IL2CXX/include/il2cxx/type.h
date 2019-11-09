@@ -15,11 +15,13 @@ struct t__type : t__member_info
 {
 	t__type* v__base;
 	std::map<t__type*, void**> v__interface_to_methods;
+	bool v__managed;
 	size_t v__size;
 	t__type* v__element;
 	size_t v__rank;
+	void* v__multicast_invoke = nullptr;
 
-	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
+	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
 	t_scoped<t_slot> f__allocate(size_t a_size)
 	{
 		auto p = t_object::f_local_pool__allocate(a_size);

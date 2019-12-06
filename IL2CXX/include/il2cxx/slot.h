@@ -292,6 +292,10 @@ public:
 		f_decrements()->f_push(v_p);
 		v_p = nullptr;
 	}
+	t_slot f_exchange(t_slot&& a_desired)
+	{
+		return {v_p.exchange(a_desired.v_p.exchange(nullptr)), t_pass()};
+	}
 	bool f_compare_exchange(t_slot& a_expected, t_slot&& a_desired)
 	{
 		t_object* p = a_expected;

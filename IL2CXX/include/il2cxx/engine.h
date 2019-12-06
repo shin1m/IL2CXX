@@ -160,6 +160,12 @@ public:
 	void f_shutdown();
 	void f_collect();
 	void f_finalize();
+	size_t f_load_count() const
+	{
+		auto allocated = v_object__pool0.f_allocated() + v_object__pool1.f_allocated() + v_object__pool2.f_allocated() + v_object__pool3.f_allocated() + v_object__allocated;
+		auto freed = v_object__pool0.f_freed() + v_object__pool1.f_freed() + v_object__pool2.f_freed() + v_object__pool3.f_freed() + v_object__freed;
+		return allocated - freed;
+	}
 };
 
 template<size_t A_rank>

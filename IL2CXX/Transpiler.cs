@@ -24,7 +24,7 @@ namespace IL2CXX
     public class Transpiler
     {
         private const BindingFlags declaredAndInstance = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        struct MethodKey : IEquatable<MethodKey>
+        public struct MethodKey : IEquatable<MethodKey>
         {
             private readonly RuntimeMethodHandle method;
             private readonly RuntimeTypeHandle type;
@@ -41,7 +41,7 @@ namespace IL2CXX
             public override int GetHashCode() => method.GetHashCode() ^ type.GetHashCode();
         }
         private static MethodKey ToKey(MethodBase method) => new MethodKey(method);
-        class RuntimeDefinition : IEqualityComparer<Type[]>
+        public class RuntimeDefinition : IEqualityComparer<Type[]>
         {
             bool IEqualityComparer<Type[]>.Equals(Type[] x, Type[] y) => x.SequenceEqual(y);
             int IEqualityComparer<Type[]>.GetHashCode(Type[] x) => x.Select(y => y.GetHashCode()).Aggregate((y, z) => y % z);
@@ -222,20 +222,18 @@ namespace IL2CXX
             [typeof(float)] = "float",
             [typeof(void)] = "void"
         };
-        private static readonly Type pointerType = typeof(void).MakePointerType();
         private static readonly Type typedReferenceByRefType = typeof(TypedReferenceTag).MakeByRefType();
-        private static readonly Type typedReferencePointerType = typeof(TypedReferenceTag).MakePointerType();
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfAdd = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
             [("int32_t", "intptr_t")] = typeof(NativeInt),
-            [("int32_t", "void*")] = pointerType,
+            [("int32_t", "void*")] = typeof(void*),
             [("int64_t", "int64_t")] = typeof(long),
             [("intptr_t", "int32_t")] = typeof(NativeInt),
             [("intptr_t", "intptr_t")] = typeof(NativeInt),
-            [("intptr_t", "void*")] = pointerType,
+            [("intptr_t", "void*")] = typeof(void*),
             [("double", "double")] = typeof(double),
-            [("void*", "int32_t")] = pointerType,
-            [("void*", "intptr_t")] = pointerType,
+            [("void*", "int32_t")] = typeof(void*),
+            [("void*", "intptr_t")] = typeof(void*),
             [("void*", "void*")] = typeof(NativeInt)
         };
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un = new Dictionary<(string, string), Type> {
@@ -297,7 +295,7 @@ namespace IL2CXX
         private bool @volatile;
 
         private static Type MakeByRefType(Type type) => type == typeof(TypedReference) ? typedReferenceByRefType : type.MakeByRefType();
-        private static Type MakePointerType(Type type) => type == typeof(TypedReference) ? typedReferencePointerType : type.MakePointerType();
+        private static Type MakePointerType(Type type) => type == typeof(TypedReference) ? typeof(TypedReferenceTag*) : type.MakePointerType();
         private static Type GetElementType(Type type)
         {
             var t = type.GetElementType();
@@ -362,7 +360,7 @@ namespace IL2CXX
             method.Module.ResolveField(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
         private MethodBase ParseMethod(ref int index) =>
             method.Module.ResolveMethod(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
-        private Type GetThisType(MethodBase method)
+        private static Type GetThisType(MethodBase method)
         {
             var type = method.DeclaringType;
             return type.IsValueType ? MakePointerType(type) : type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SZArrayHelper<>) ? type.GetGenericArguments()[0].MakeArrayType() : type;
@@ -372,11 +370,12 @@ namespace IL2CXX
             var parameters = method.GetParameters();
             return method.IsStatic ? parameters[index].ParameterType : index > 0 ? parameters[index - 1].ParameterType : GetThisType(method);
         }
-        private bool ReturnsValue(MethodBase method) => method is MethodInfo x && x.ReturnType != typeof(void);
+        private static Type GetReturnType(MethodBase method) => method is MethodInfo x ? x.ReturnType : typeof(void);
         private Stack EstimateCall(MethodBase method, Stack stack)
         {
             stack = stack.ElementAt(method.GetParameters().Length + (method.IsStatic ? 0 : 1));
-            return method is MethodInfo x && x.ReturnType != typeof(void) ? stack.Push(x.ReturnType) : stack;
+            var @return = GetReturnType(method);
+            return @return == typeof(void) ? stack : stack.Push(@return);
         }
         private void Estimate(int index, Stack stack)
         {
@@ -402,7 +401,7 @@ namespace IL2CXX
         }
         public void Enqueue(MethodBase method) => queuedMethods.Enqueue(method);
         private bool IsManaged(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum || x == typeof(NativeInt));
-        private RuntimeDefinition Define(Type type)
+        public RuntimeDefinition Define(Type type)
         {
             if (typeToRuntime.TryGetValue(type, out var definition)) return definition;
             if (type.IsByRef || type.IsPointer)
@@ -686,13 +685,13 @@ struct t__static_{identifier}
         private void GenerateCall(MethodBase method, string function, Stack stack, Stack after)
         {
             var call = GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable));
-            writer.WriteLine(ReturnsValue(method) ? $"\t{after.Variable} = {call};" : $"\t{call};");
+            writer.WriteLine(GetReturnType(method) == typeof(void) ? $"\t{call};" : $"\t{after.Variable} = {call};");
         }
         private string FunctionPointer(MethodBase method)
         {
             var parameters = method.GetParameters().Select(x => x.ParameterType);
             if (!method.IsStatic) parameters = parameters.Prepend(method.DeclaringType.IsValueType ? typeof(object) : GetThisType(method));
-            return $"{(ReturnsValue(method) ? EscapeForScoped(((MethodInfo)method).ReturnType) : "void")}(*)({string.Join(", ", parameters.Select(EscapeForScoped))})";
+            return $"{EscapeForScoped(GetReturnType(method))}(*)({string.Join(", ", parameters.Select(EscapeForScoped))})";
         }
         public (string Site, string Function) GetVirtualFunction(MethodBase method, string target)
         {
@@ -783,7 +782,7 @@ struct t__static_{identifier}
             string argument(Type t, int i) => $"\n\t{EscapeForScoped(t)} a_{i}";
             var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
             if (method is MethodInfo) prototype.Write(attributes(string.Empty, ((MethodInfo)method).ReturnParameter));
-            var returns = method is MethodInfo m ? m.ReturnType == typeof(void) ? "void" : EscapeForScoped(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForScoped(method.DeclaringType);
+            var returns = method is MethodInfo m ? EscapeForScoped(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForScoped(method.DeclaringType);
             var identifier = Escape(method);
             prototype.Write($@"
 {returns}
@@ -811,6 +810,7 @@ struct t__static_{identifier}
                 functionDeclarations.WriteLine("// DLL import:");
                 functionDeclarations.WriteLine($"//\tValue: {dllimport.Value}");
                 functionDeclarations.WriteLine($"//\tEntryPoint: {dllimport.EntryPoint}");
+                functionDeclarations.WriteLine($"//\tSetLastError: {dllimport.SetLastError}");
                 writer.WriteLine(prototype);
                 writer.WriteLine('{');
                 foreach (var (x, i) in method.GetParameters().Select((x, i) => (Parameter: x, i)).Where(x => Attribute.IsDefined(x.Parameter, typeof(OutAttribute))))
@@ -822,12 +822,18 @@ struct t__static_{identifier}
                 writer.Write($@"{'\t'}static t_library library(""{dllimport.Value}""s, ""{dllimport.EntryPoint ?? method.Name}"");
 {'\t'}");
                 if (returns != "void") writer.Write("auto result = ");
-                writer.Write($"library.f_as<{returns}(*)(");
+                var @return = GetReturnType(method);
+                writer.Write($"library.f_as<{(typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : returns)}(*)(");
                 writer.WriteLine(string.Join(",", method.GetParameters().Select(x =>
                 {
                     if (x.ParameterType == typeof(string)) return dllimport.CharSet == CharSet.Unicode ? "const char16_t*" : "const char*";
                     if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType == typeof(StringBuilder)) return dllimport.CharSet == CharSet.Unicode ? "char16_t*" : "char*";
-                    if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) return "void**";
+                    if (x.ParameterType.IsByRef)
+                    {
+                        var e = GetElementType(x.ParameterType);
+                        if (e == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(e)) return "void**";
+                    }
+                    if (typeof(SafeHandle).IsAssignableFrom(x.ParameterType)) return "void*";
                     if (IsManaged(x.ParameterType))
                     {
                         if (x.ParameterType.IsValueType) return EscapeForScoped(x.ParameterType);
@@ -838,9 +844,19 @@ struct t__static_{identifier}
                 writer.Write("\t)>()(");
                 writer.WriteLine(string.Join(",", method.GetParameters().Select((x, i) =>
                 {
-                    if (x.ParameterType == typeof(string)) return $"&a_{i}->v__5ffirstChar";
+                    if (x.ParameterType == typeof(string))
+                    {
+                        var s = $"&a_{i}->v__5ffirstChar";
+                        return dllimport.CharSet == CharSet.Unicode ? s : $"f__string({{{s}, static_cast<size_t>(a_{i}->v__5fstringLength)}}).c_str()";
+                    }
                     if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType == typeof(StringBuilder)) return $"a_{i}->v_m_5fChunkChars->f__data()";
-                    if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) return $"&p{i}";
+                    if (x.ParameterType.IsByRef)
+                    {
+                        var e = GetElementType(x.ParameterType);
+                        if (e == typeof(IntPtr)) return $"&a_{i}->v__5fvalue";
+                        if (typeof(SafeHandle).IsAssignableFrom(e)) return $"&p{i}";
+                    }
+                    if (typeof(SafeHandle).IsAssignableFrom(x.ParameterType)) return $"a_{i}->v_handle";
                     if (IsManaged(x.ParameterType))
                     {
                         if (x.ParameterType.IsValueType) return $"a_{i}";
@@ -853,7 +869,19 @@ struct t__static_{identifier}
                 {
                     if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) writer.WriteLine($"\t(*a_{i})->v_handle = p{i};");
                 }
-                if (returns != "void") writer.WriteLine("\treturn result;");
+                if (typeof(SafeHandle).IsAssignableFrom(@return))
+                {
+                    ConstructorInfo getCI(Type type) => type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(bool) }, null);
+                    var ci = getCI(@return) ?? getCI(typeof(SafeHandle));
+                    writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
+{'\t'}{Escape(ci)}(p, result, true);
+{'\t'}return p;");
+                    Enqueue(ci);
+                }
+                else if (@return != typeof(void))
+                {
+                    writer.WriteLine("\treturn result;");
+                }
                 writer.WriteLine('}');
                 return;
             }
@@ -937,8 +965,7 @@ struct t__static_{identifier}
                             case ExceptionHandlingClauseOptions.Clause:
                                 writer.WriteLine($@"// catch {clause.CatchType}
 }} catch (t_scoped<t_slot> e) {{
-{'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;
-");
+{'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;");
                                 break;
                             case ExceptionHandlingClauseOptions.Filter:
                                 writer.WriteLine($@"// filter
@@ -1250,13 +1277,14 @@ struct t__static_{identifier}
             });
             instructions1[OpCodes.Ret.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (int.MaxValue, ReturnsValue(method) ? stack.Pop : stack);
+                x.Estimate = (index, stack) => (int.MaxValue, GetReturnType(method) == typeof(void) ? stack : stack.Pop);
                 x.Generate = (index, stack) =>
                 {
                     writer.Write("\n\treturn");
-                    if (method is MethodInfo m && m.ReturnType != typeof(void))
+                    var @return = GetReturnType(method);
+                    if (@return != typeof(void))
                     {
-                        writer.Write($" {FormatMove(m.ReturnType, stack.Variable)}");
+                        writer.Write($" {FormatMove(@return, stack.Variable)}");
                         stack = stack.Pop;
                     }
                     writer.WriteLine(";");
@@ -1527,19 +1555,19 @@ struct t__static_{identifier}
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
                 x.Generate = (index, stack) =>
                 {
-                    var after = indexToStack[index];
-                    writer.Write($"\n\t{after.Variable} = ");
+                    writer.Write($"\n\t{indexToStack[index].Variable} = ");
+                    var type = primitives[set.Type];
                     if (stack.IsPointer)
                     {
-                        writer.WriteLine($"static_cast<{after.VariableType}>(reinterpret_cast<uintptr_t>({stack.Variable}));");
+                        writer.WriteLine($"static_cast<{type}>(reinterpret_cast<uintptr_t>({stack.Variable}));");
                     }
                     else if (stack.Type.IsValueType)
                     {
-                        writer.WriteLine($"static_cast<{after.VariableType}>({stack.Variable});");
+                        writer.WriteLine($"static_cast<{type}>({stack.Variable});");
                     }
                     else
                     {
-                        writer.WriteLine($"reinterpret_cast<{after.VariableType}>(static_cast<t_object*>({stack.Variable}));");
+                        writer.WriteLine($"reinterpret_cast<{type}>(static_cast<t_object*>({stack.Variable}));");
                         if (IsManaged(stack.Type)) writer.WriteLine($"\t{stack.Variable}.f__destruct();");
                     }
                     return index;
@@ -1560,7 +1588,7 @@ struct t__static_{identifier}
                     var after = indexToStack[index];
                     string generate(string target) => GenerateVirtualCall(m, target,
                         stack.Take(m.GetParameters().Length).Select(y => y.Variable),
-                        ReturnsValue(m) ? $"{after.Variable} = " : string.Empty
+                        GetReturnType(m) == typeof(void) ? string.Empty : $"{after.Variable} = "
                     );
                     if (constrained == null)
                     {
@@ -1626,7 +1654,8 @@ struct t__static_{identifier}
                     {
                         using (var provider = CodeDomProvider.CreateProvider("CSharp"))
                             provider.GenerateCodeFromExpression(new CodePrimitiveExpression(s), sw, null);
-                        writer.WriteLine($" {s}\n\t{indexToStack[index].Variable} = f__new_string(u{sw.ToString().Replace($"\" +{Environment.NewLine}    \"", string.Empty)}sv);");
+                        var sl = sw.ToString().Replace($"\" +{Environment.NewLine}    \"", string.Empty);
+                        writer.WriteLine($" {sl}\n\t{indexToStack[index].Variable} = f__new_string(u{sl}sv);");
                     }
                     return index;
                 };
@@ -2196,7 +2225,7 @@ struct t__static_{identifier}
             });
             instructions2[OpCodes.Localloc.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(MakePointerType(typeof(byte))));
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(byte*)));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = alloca({stack.Variable});");
@@ -2365,7 +2394,7 @@ t_scoped<t_slot> t__type_of<{identifier}>::f_clone(const t_object* a_this)
 }}
 void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to)
 {{
-{'\t'}std::copy_n(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));
+{'\t'}f__copy(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));
 }}"
                     : $@"{'\t'}return static_cast<const {identifier}*>(a_this)->f__clone();
 }}");

@@ -1,5 +1,4 @@
 #include <il2cxx/thread.h>
-#include <thread>
 
 namespace il2cxx
 {
@@ -62,10 +61,10 @@ void t_System_2eThreading_2eThread::f__start()
 {
 	f__start([this]
 	{
-		if (v__start->f_type()->f__is(&t__type_of<t_System_2eThreading_2eThreadStart>::v__instance))
-			f_t_System_2eThreading_2eThreadStart__Invoke(v__start);
+		if (v__5fdelegate->f_type()->f__is(&t__type_of<t_System_2eThreading_2eThreadStart>::v__instance))
+			f_t_System_2eThreading_2eThreadStart__Invoke(v__5fdelegate);
 		else
-			f_t_System_2eThreading_2eParameterizedThreadStart__Invoke(v__start, {});
+			f_t_System_2eThreading_2eParameterizedThreadStart__Invoke(v__5fdelegate, v__5fthreadStartArg);
 	});
 }
 

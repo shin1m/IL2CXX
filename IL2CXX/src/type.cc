@@ -27,7 +27,7 @@ void t__type::f_suppress_finalize(t_object* a_this)
 
 void t__type::f_copy(const char* a_from, size_t a_n, char* a_to)
 {
-	std::copy_n(reinterpret_cast<const t_slot*>(a_from), a_n, reinterpret_cast<t_slot*>(a_to));
+	f__copy(reinterpret_cast<const t_slot*>(a_from), a_n, reinterpret_cast<t_slot*>(a_to));
 }
 
 t_scoped<t_slot> t__type_finalizee::f_allocate(size_t a_size)

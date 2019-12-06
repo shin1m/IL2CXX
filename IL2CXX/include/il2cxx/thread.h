@@ -2,6 +2,7 @@
 #define IL2CXX__THREAD_H
 
 #include "object.h"
+#include <thread>
 
 namespace il2cxx
 {

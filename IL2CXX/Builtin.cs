@@ -722,6 +722,7 @@ namespace IL2CXX
 {'\t'}{transpiler.EscapeForVariable(typeof(Delegate))} v__5fdelegate;
 {'\t'}{transpiler.EscapeForVariable(typeof(object))} v__5fthreadStartArg;
 {'\t'}t_thread* v__internal;
+{'\t'}{transpiler.EscapeForVariable(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
 
 {'\t'}void f__scan(t_scan a_scan)
 {'\t'}{{
@@ -730,6 +731,7 @@ namespace IL2CXX
 {'\t'}{'\t'}a_scan(v__5fsynchronizationContext);
 {'\t'}{'\t'}a_scan(v__5fdelegate);
 {'\t'}{'\t'}a_scan(v__5fthreadStartArg);
+{'\t'}{'\t'}a_scan(v__deserialization_tracker);
 {'\t'}}}
 {'\t'}template<typename T>
 {'\t'}void f__start(T a_do);
@@ -796,7 +798,10 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("GetThreadDeserializationTracker", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => "\tthrow std::runtime_error(\"NotImplementedException\");\n"
+                transpiler => $@"{'\t'}auto p = {transpiler.Escape(typeof(Thread))}::f__current();
+{'\t'}if (!p->v__deserialization_tracker) p->v__deserialization_tracker = f__new_zerod<{transpiler.Escape(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))}>();
+{'\t'}return p->v__deserialization_tracker;
+"
             );
         })
         .For(typeof(ThreadPool), (type, code) =>
@@ -1105,7 +1110,9 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Environment.GetEnvironmentVariable), new[] { typeof(string) }),
-                transpiler => "\treturn f__new_string(f__u16string(std::getenv(f__string({&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}).c_str())));\n"
+                transpiler => $@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
+{'\t'}return p ? f__new_string(f__u16string(p)) : nullptr;
+"
             );
         })
         .For(Type.GetType("System.Runtime.CompilerServices.JitHelpers"), (type, code) =>
@@ -1486,6 +1493,15 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("BufferTrimmed", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => string.Empty
+            );
+        })
+        .For(Type.GetType("System.CLRConfig"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("GetBoolValue", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => $@"{'\t'}*a_1 = false;
+{'\t'}return false;
+"
             );
         });
     }

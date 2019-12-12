@@ -272,6 +272,7 @@ namespace IL2CXX
         private readonly StringWriter staticDeclarations = new StringWriter();
         private readonly StringWriter threadStaticDeclarations = new StringWriter();
         private readonly StringWriter memberDefinitions = new StringWriter();
+        private readonly StringWriter fieldDefinitions = new StringWriter();
         private readonly StringWriter functionDeclarations = new StringWriter();
         private readonly StringWriter functionDefinitions = new StringWriter();
         private readonly List<RuntimeDefinition> runtimeDefinitions = new List<RuntimeDefinition>();
@@ -451,7 +452,18 @@ struct {Escape(type)}
                     staticDefinitions.WriteLine($@"
 struct t__static_{identifier}
 {{");
-                    foreach (var x in staticFields) staticDefinitions.WriteLine($"\t{EscapeForScoped(x.FieldType)} {Escape(x)}{{}};");
+                    if (type.Name == "<PrivateImplementationDetails>")
+                        foreach (var x in staticFields)
+                        {
+                            var bytes = new byte[Marshal.SizeOf(x.FieldType)];
+                            RuntimeHelpers.InitializeArray(bytes, x.FieldHandle);
+                            if (x.FieldType.Name.StartsWith("__StaticArrayInitTypeSize="))
+                                staticDefinitions.WriteLine($"\t{EscapeForScoped(x.FieldType)} {Escape(x)}{{{Escape(x.FieldType)}::t_value{{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}}}};");
+                            else
+                                staticDefinitions.WriteLine($"\t{EscapeForScoped(x.FieldType)} {Escape(x)}{{static_cast<{EscapeForScoped(x.FieldType)}>(0x{string.Join(string.Empty, bytes.Reverse().Select(y => $"{y:x02}"))})}};");
+                        }
+                    else
+                        foreach (var x in staticFields) staticDefinitions.WriteLine($"\t{EscapeForScoped(x.FieldType)} {Escape(x)}{{}};");
                     staticDefinitions.WriteLine($@"{'\t'}void f_initialize()
 {'\t'}{{");
                     if (initialize != null) staticDefinitions.WriteLine(initialize);
@@ -462,22 +474,10 @@ struct t__static_{identifier}
                     }
                     staticDefinitions.WriteLine($@"{'\t'}}}
 }};");
-                    foreach (var x in staticFields)
-                    {
-                        var content = string.Empty;
-                        if (x.FieldType.Name.StartsWith("__StaticArrayInitTypeSize="))
-                        {
-                            var bytes = new byte[Marshal.SizeOf(x.FieldType)];
-                            RuntimeHelpers.InitializeArray(bytes, x.FieldHandle);
-                            content = $"\tuint8_t v__content[{bytes.Length}] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};\n";
-                        }
-                        var field = $"t__field_{identifier}__{Escape(x.Name)}";
-                        staticDefinitions.WriteLine($@"struct {field}
+                    foreach (var x in staticFields) fieldDefinitions.WriteLine($@"void* f__field_{identifier}__{Escape(x.Name)}()
 {{
-{content}{'\t'}static {field} v__instance;
-}};
-{field} {field}::v__instance;");
-                    }
+{'\t'}return &t_static::v_instance->v_{identifier}->{Escape(x)};
+}}");
                     staticMembers.WriteLine($"\tt__lazy<t__static_{identifier}> v_{identifier};");
                 }
                 var threadStaticMembers = new StringWriter();
@@ -547,10 +547,31 @@ struct t__static_{identifier}
 {'\t'}}}
 ";
                             }
+                            else if (type.DeclaringType?.Name == "<PrivateImplementationDetails>" && type.Name.StartsWith("__StaticArrayInitTypeSize="))
+                            {
+                                members = $@"{'\t'}{'\t'}uint8_t v__content[{Marshal.SizeOf(type)}];
+{'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+";
+                            }
                             else
                             {
                                 var fields = type.GetFields(declaredAndInstance);
-                                string variables(string indent) => string.Join(string.Empty, fields.Select(x => $"{indent}{EscapeForVariable(x.FieldType)} {Escape(x)};\n"));
+                                string variables(string indent)
+                                {
+                                    var s = string.Join(string.Empty, fields.Select(x => $"{indent}{EscapeForVariable(x.FieldType)} {Escape(x)};\n"));
+                                    try
+                                    {
+                                        var size = fields.Sum(x => Marshal.SizeOf(x.FieldType));
+                                        var layout = type.StructLayoutAttribute;
+                                        if (layout.Size > size) s += $"{indent}char v__padding[{layout.Size - size}];\n";
+                                    } catch { }
+                                    return s;
+                                }
                                 string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => IsManaged(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
                                 members = type.IsValueType
                                     ? $@"{variables("\t\t")}
@@ -2095,7 +2116,7 @@ struct t__static_{identifier}
                     switch (member)
                     {
                         case FieldInfo f:
-                            writer.WriteLine($"{Escape(typeof(RuntimeFieldHandle))}::t_value{{&t__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}::v__instance}};");
+                            writer.WriteLine($"{Escape(typeof(RuntimeFieldHandle))}::t_value{{f__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}()}};");
                             break;
                         case MethodInfo m:
                             writer.WriteLine($"{Escape(m)}::v__handle;");
@@ -2466,7 +2487,9 @@ struct t_thread_static
 {'\t'}}}
 }};
 
-IL2CXX__PORTABLE__THREAD t_thread_static* t_thread_static::v_instance;");
+IL2CXX__PORTABLE__THREAD t_thread_static* t_thread_static::v_instance;
+");
+            writer.WriteLine(fieldDefinitions);
             writer.Write(functionDefinitions);
             writer.WriteLine($@"
 void t_engine::f_finalize(t_object* a_p)

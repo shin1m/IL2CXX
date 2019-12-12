@@ -51,7 +51,7 @@ namespace IL2CXX.Tests
                 ("CXXFLAGS", $"'-I{include}' '-I{src}' -std=c++17 -g"),
                 ("LDFLAGS", $"-lpthread -ldl")
             }, Console.Error.WriteLine, Console.Error.WriteLine));
-            Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", "", Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
+            Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
         }
         public static void Test(Func<int> method) => Test(method.Method);
     }

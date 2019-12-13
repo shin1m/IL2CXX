@@ -563,14 +563,32 @@ struct t__static_{identifier}
                                 var fields = type.GetFields(declaredAndInstance);
                                 string variables(string indent)
                                 {
-                                    var s = string.Join(string.Empty, fields.Select(x => $"{indent}{EscapeForVariable(x.FieldType)} {Escape(x)};\n"));
-                                    try
+                                    var sb = new StringBuilder();
+                                    var i = 0;
+                                    void variable(FieldInfo x)
                                     {
-                                        var size = fields.Sum(x => Marshal.SizeOf(x.FieldType));
-                                        var layout = type.StructLayoutAttribute;
-                                        if (layout.Size > size) s += $"{indent}char v__padding[{layout.Size - size}];\n";
-                                    } catch { }
-                                    return s;
+                                        sb.AppendLine($"{indent}{EscapeForVariable(x.FieldType)} {Escape(x)};");
+                                        try
+                                        {
+                                            i += Marshal.SizeOf(x.FieldType);
+                                        } catch { }
+                                    }
+                                    void padding(int j)
+                                    {
+                                        if (j > i) sb.AppendLine($"{indent}char v__padding{i}[{j - i}];");
+                                        i = j;
+                                    }
+                                    var layout = type.StructLayoutAttribute;
+                                    if (layout?.Value == LayoutKind.Explicit)
+                                        foreach (var x in fields)
+                                        {
+                                            padding(x.GetCustomAttribute<FieldOffsetAttribute>().Value);
+                                            variable(x);
+                                        }
+                                    else
+                                        foreach (var x in fields) variable(x);
+                                    if (layout != null) padding(layout.Size);
+                                    return sb.ToString();
                                 }
                                 string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => IsManaged(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
                                 members = type.IsValueType
@@ -825,7 +843,7 @@ struct t__static_{identifier}
                 writer.WriteLine($"{prototype}\n{{\n{builtin}}}");
                 return;
             }
-            var dllimport = (DllImportAttribute)method.GetCustomAttributes(typeof(DllImportAttribute), false).FirstOrDefault();
+            var dllimport = method.GetCustomAttribute<DllImportAttribute>();
             if (dllimport != null)
             {
                 functionDeclarations.WriteLine("// DLL import:");

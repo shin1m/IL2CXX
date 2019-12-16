@@ -97,6 +97,13 @@ public:
 			++v_collector__tick;
 			v_collector__conductor.f__wake();
 		}
+		void f__wait()
+		{
+			std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+			++v_collector__wait;
+			v_collector__conductor.f__wake();
+			v_collector__conductor.v_done.wait(lock);
+		}
 		void f_wait();
 	};
 

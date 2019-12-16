@@ -128,10 +128,17 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 
 t_engine::~t_engine()
 {
-	f_wait();
-	f_wait();
-	f_wait();
-	f_wait();
+	{
+		auto internal = v_thread->v__internal;
+		v_thread.f__destruct();
+		internal->f_epoch_enter();
+		std::lock_guard<std::mutex> lock(v_thread__mutex);
+		++internal->v_done;
+	}
+	f__wait();
+	f__wait();
+	f__wait();
+	f__wait();
 	v_collector__conductor.f_quit();
 	assert(!v_thread__internals);
 	v_object__pool0.f_clear();
@@ -192,13 +199,6 @@ void t_engine::f_shutdown()
 		v_finalizer__conductor.f_quit();
 		std::unique_lock<std::mutex> lock(v_thread__mutex);
 		while (v_thread__internals->v_next && v_thread__internals->v_done <= 0) v_thread__condition.wait(lock);
-	}
-	{
-		auto internal = v_thread->v__internal;
-		v_thread.f__destruct();
-		t_epoch_region region;
-		std::lock_guard<std::mutex> lock(v_thread__mutex);
-		++internal->v_done;
 	}
 }
 

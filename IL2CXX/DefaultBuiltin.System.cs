@@ -433,14 +433,15 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("InternalAllocLike", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => $@"{'\t'}auto type = a_0->f_type();
-{'\t'}auto p = type->f__allocate(type->v__size);
-{'\t'}std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), type->v__size - sizeof(t_object), '\0');
+{'\t'}auto n = sizeof({transpiler.Escape(typeof(MulticastDelegate))});
+{'\t'}auto p = type->f__allocate(n);
+{'\t'}std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), n - sizeof(t_object), '\0');
 {'\t'}return p;
 "
             );
             code.For(
                 type.GetMethod("GetInvokeMethod", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => "\tthrow std::runtime_error(\"NotImplementedException\");\n"
+                transpiler => "\treturn {};\n"
             );
             code.For(
                 type.GetMethod("GetMulticastInvoke", BindingFlags.Instance | BindingFlags.NonPublic),

@@ -42,42 +42,38 @@ namespace IL2CXX
             var handle = method.MethodHandle;
             if (type.IsSubclassOf(typeof(Delegate)) && type != typeof(MulticastDelegate))
             {
-                if (!TypeToCode.TryGetValue(type, out var @delegate))
-                {
-                    @delegate = new Code();
-                    TypeToCode.Add(type, @delegate);
-                }
-                if (@delegate.Initialize == null)
-                {
-                    var invoke = (MethodInfo)type.GetMethod("Invoke");
-                    transpiler.Enqueue(invoke);
-                    @delegate.Initialize = _ =>
-                    {
-                        var @return = invoke.ReturnType;
-                        var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                        string call(string x) => $"{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((__, i) => $"a_{i + 1}").Prepend(x))});";
-                        return $@"{'\t'}{'\t'}t__type_of<{transpiler.Escape(type)}>::v__instance.v__multicast_invoke = reinterpret_cast<void*>(static_cast<{transpiler.EscapeForVariable(@return)}(*)({string.Join(",", parameters.Prepend(typeof(MulticastDelegate)).Select(transpiler.EscapeForScoped))})>([]({string.Join(",", parameters.Prepend(typeof(MulticastDelegate)).Select((x, i) => $"\n\t\t\t{transpiler.EscapeForScoped(x)} a_{i}"))}
-{'\t'}{'\t'}) -> {transpiler.EscapeForVariable(@return)}
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f__data();
-{'\t'}{'\t'}{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
-{'\t'}{'\t'}{'\t'}for (intptr_t i = 0; i < n; ++i) {call("xs[i]")}
-{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}{call("xs[n]")}
-{'\t'}{'\t'}}}));";
-                    };
-                }
+                var invoke = type.GetMethod("Invoke");
                 if (handle == type.GetConstructor(new[] { typeof(object), typeof(IntPtr) }).MethodHandle)
                 {
+                    var @return = invoke.ReturnType;
+                    var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                     return $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}p->v__5ftarget = std::move(a_0);
-{'\t'}p->v__5fmethodPtr = a_1;
+{'\t'}if (p->v__5ftarget) {{
+{'\t'}{'\t'}p->v__5fmethodPtr = a_1;
+{'\t'}}} else {{
+{'\t'}{'\t'}p->v__5ftarget = p;
+{'\t'}{'\t'}p->v__5fmethodPtr = reinterpret_cast<void*>(static_cast<{
+    transpiler.EscapeForScoped(@return)
+}(*)({
+    string.Join(",", parameters.Prepend(type).Select(x => $"\n\t\t\t{transpiler.EscapeForScoped(x)}"))
+}
+{'\t'}{'\t'})>([]({
+    string.Join(",", parameters.Prepend(type).Select((_, i) => $"\n\t\t\tauto a_{i}"))
+}
+{'\t'}{'\t'})
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForScoped(@return))}(*)({string.Join(", ", parameters.Select(transpiler.EscapeForScoped))})>(a_0->v__5fmethodPtrAux.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.FormatMove(x, $"a_{i + 1}")))});
+{'\t'}{'\t'}}}));
+{'\t'}{'\t'}p->v__5fmethodPtrAux = a_1;
+{'\t'}}}
 {'\t'}return p;
 ";
                 }
-                else if (handle == type.GetMethod("Invoke").MethodHandle)
+                else if (handle == invoke.MethodHandle)
                 {
-                    var @return = ((MethodInfo)method).ReturnType;
-                    var parameters = method.GetParameters().Select(x => x.ParameterType);
+                    var @return = invoke.ReturnType;
+                    var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                     return $"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForScoped(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(transpiler.EscapeForScoped))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.FormatMove(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n";
                 }
             }

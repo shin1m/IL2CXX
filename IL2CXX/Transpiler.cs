@@ -33,26 +33,53 @@ namespace IL2CXX
 
             public readonly TypeDefinition Base;
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new Dictionary<Type, MethodInfo[]>();
+            public readonly string MulticastInvoke;
 
-            public TypeDefinition(Type type, TypeDefinition @base, Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex, IEnumerable<(Type Type, InterfaceDefinition Definition)> interfaces) : base(type)
+            public TypeDefinition(Type type, Transpiler transpiler) : base(type)
             {
-                Base = @base;
+                if (Type.BaseType != null)
+                {
+                    Base = (TypeDefinition)transpiler.Define(Type.BaseType);
+                    Methods.AddRange(Base.Methods);
+                }
                 IsManaged = Type == typeof(object) || Type != typeof(ValueType) && Base.IsManaged;
-                if (Base != null) Methods.AddRange(Base.Methods);
                 foreach (var x in Type.GetMethods(declaredAndInstance).Where(x => x.IsVirtual))
                 {
                     var i = GetIndex(x.GetBaseDefinition());
                     if (i < 0)
-                        Add(x, genericMethodToTypesToIndex);
+                        Add(x, transpiler.genericMethodToTypesToIndex);
                     else
                         Methods[i] = x;
                 }
-                foreach (var (key, definition) in interfaces)
+                foreach (var x in Type.GetInterfaces())
                 {
+                    var definition = (InterfaceDefinition)transpiler.Define(x);
                     var methods = new MethodInfo[definition.Methods.Count];
-                    var map = (Type.IsArray && key.IsGenericType ? typeof(SZArrayHelper<>).MakeGenericType(GetElementType(Type)) : Type).GetInterfaceMap(key);
+                    var map = (Type.IsArray && x.IsGenericType ? typeof(SZArrayHelper<>).MakeGenericType(GetElementType(Type)) : Type).GetInterfaceMap(x);
                     foreach (var (i, t) in map.InterfaceMethods.Zip(map.TargetMethods, (i, t) => (i, t))) methods[definition.GetIndex(i)] = t;
-                    InterfaceToMethods.Add(key, methods);
+                    InterfaceToMethods.Add(x, methods);
+                }
+                if (Type.IsSubclassOf(typeof(Delegate)) && Type != typeof(MulticastDelegate))
+                {
+                    var invoke = (MethodInfo)Type.GetMethod("Invoke");
+                    transpiler.Enqueue(invoke);
+                    var @return = invoke.ReturnType;
+                    var parameters = invoke.GetParameters().Select(x => x.ParameterType);
+                    MulticastInvoke = $@"reinterpret_cast<void*>(static_cast<{
+    transpiler.EscapeForScoped(@return)
+}(*)({
+    string.Join(",", parameters.Prepend(typeof(MulticastDelegate)).Select(x => $"\n\t\t\t{transpiler.EscapeForScoped(x)}"))
+}
+{'\t'}{'\t'})>([]({
+    string.Join(",", parameters.Prepend(typeof(MulticastDelegate)).Select((_, i) => $"\n\t\t\tauto a_{i}"))
+}
+{'\t'}{'\t'})
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f__data();
+{'\t'}{'\t'}{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
+{'\t'}{'\t'}{'\t'}for (intptr_t i = 0; i < n; ++i) {transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend("xs[i]"))});
+{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((x, i) => transpiler.FormatMove(x, $"a_{i + 1}")).Prepend("xs[n]"))});
+{'\t'}{'\t'}}}))";
                 }
             }
             protected override int GetIndex(MethodKey method) => MethodToIndex.TryGetValue(method, out var i) ? i : Base?.GetIndex(method) ?? -1;
@@ -378,7 +405,7 @@ struct {Escape(type)}
             else
             {
                 typeToRuntime.Add(type, null);
-                var td = new TypeDefinition(type, type.BaseType == null ? null : (TypeDefinition)Define(type.BaseType), genericMethodToTypesToIndex, type.GetInterfaces().Select(x => (x, (InterfaceDefinition)Define(x))));
+                var td = new TypeDefinition(type, this);
                 void enqueue(MethodInfo m, MethodInfo concrete)
                 {
                     if (m.IsGenericMethod)
@@ -1057,10 +1084,22 @@ t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "null
 {'\t'}virtual t_scoped<t_slot> f_clone(const t_object* a_this);");
                 if (type != typeof(void) && type.IsValueType) writer.WriteLine("\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
             }
+            else
+            {
+                td = null;
+            }
             writer.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            memberDefinitions.WriteLine($@"}}, {(definition.IsManaged ? "true" : "false")}, {(type == typeof(void) ? "0" : $"sizeof({EscapeForVariable(type)})")}{(type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" : string.Empty)})
+            memberDefinitions.WriteLine($@"}}, {(
+    definition.IsManaged ? "true" : "false"
+)}, {(
+    type == typeof(void) ? "0" : $"sizeof({EscapeForVariable(type)})"
+)}{(
+    type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" :
+    td?.MulticastInvoke != null ? $", nullptr, 0, {td.MulticastInvoke}" :
+    string.Empty
+)})
 {{
 }}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");

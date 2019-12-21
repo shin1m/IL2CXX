@@ -19,9 +19,9 @@ struct t__type : t__member_info
 	size_t v__size;
 	t__type* v__element;
 	size_t v__rank;
-	void* v__multicast_invoke = nullptr;
+	void* v__multicast_invoke;
 
-	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0);
+	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr);
 	t_scoped<t_slot> f__allocate(size_t a_size)
 	{
 		auto p = t_object::f_local_pool__allocate(a_size);

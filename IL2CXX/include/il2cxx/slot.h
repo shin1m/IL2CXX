@@ -60,6 +60,116 @@ struct t_conductor
 	}
 };
 
+template<typename T>
+struct t_scoped : T
+{
+	t_scoped()
+	{
+		this->f__construct();
+	}
+	t_scoped(const t_scoped& a_value)
+	{
+		this->f__construct(a_value);
+	}
+	t_scoped(t_scoped&& a_value)
+	{
+		this->f__construct(std::move(a_value));
+	}
+	template<typename U>
+	t_scoped(U&& a_value)
+	{
+		this->f__construct(std::forward<U>(a_value));
+	}
+	~t_scoped()
+	{
+		this->f__destruct();
+	}
+	t_scoped& operator=(const t_scoped& a_value)
+	{
+		this->f__assign(a_value);
+		return *this;
+	}
+	t_scoped& operator=(t_scoped&& a_value)
+	{
+		this->f__assign(std::move(a_value));
+		return *this;
+	}
+	template<typename U>
+	t_scoped& operator=(U&& a_value)
+	{
+		this->f__assign(std::forward<U>(a_value));
+		return *this;
+	}
+};
+
+template<typename T>
+struct t_stacked : T
+{
+	template<typename U>
+	t_stacked& operator=(U&& a_value)
+	{
+		this->f__assign(std::forward<U>(a_value));
+		return *this;
+	}
+};
+
+template<typename T>
+struct t_member : T
+{
+	t_member() = default;
+	t_member(const t_member& a_value)
+	{
+		this->f__construct(a_value);
+	}
+	t_member(t_member&& a_value) : t_member(static_cast<T&&>(a_value))
+	{
+	}
+	template<typename U>
+	t_member(U&& a_value)
+	{
+		this->f__construct(std::forward<U>(a_value));
+	}
+	t_member(T&& a_value)
+	{
+		this->f__construct(a_value);
+		a_value.f__clear();
+	}
+	template<typename U>
+	t_member(t_stacked<U>&& a_value)
+	{
+		this->f__construct(a_value);
+		a_value.f__destruct();
+	}
+	t_member& operator=(const t_member& a_value)
+	{
+		this->f__assign(a_value);
+		return *this;
+	}
+	t_member& operator=(t_member&& a_value)
+	{
+		return *this = static_cast<T&&>(a_value);
+	}
+	template<typename U>
+	t_member& operator=(U&& a_value)
+	{
+		this->f__assign(std::forward<U>(a_value));
+		return *this;
+	}
+	t_member& operator=(T&& a_value)
+	{
+		this->f__assign(a_value);
+		a_value.f__clear();
+		return *this;
+	}
+	template<typename U>
+	t_member& operator=(t_stacked<U>&& a_value)
+	{
+		this->f__assign(a_value);
+		a_value.f__destruct();
+		return *this;
+	}
+};
+
 class t_slot
 {
 	friend class t__type;
@@ -210,52 +320,83 @@ protected:
 	t_slot(t_object* a_p, const t_pass&) : v_p(a_p)
 	{
 	}
-	void f_assign(t_object* a_p)
+
+public:
+	t_slot() = default;
+	t_slot(const t_slot& a_value) = delete;
+	t_slot(t_slot&& a_value) = delete;
+	template<typename T>
+	t_slot(T a_value) = delete;
+	void f__construct()
+	{
+		v_p.store(nullptr);
+	}
+	void f__construct(t_object* a_p)
+	{
+		if (a_p) f_increments()->f_push(a_p);
+		v_p.store(a_p);
+	}
+	void f__construct(t_object& a_p)
+	{
+		f_increments()->f_push(&a_p);
+		v_p.store(&a_p);
+	}
+	void f__construct(const t_slot& a_value)
+	{
+		f__construct(a_value.v_p.load());
+	}
+	void f__construct(t_slot&& a_value)
+	{
+		v_p.store(a_value.v_p.exchange(nullptr));
+	}
+	template<typename T>
+	void f__construct(t_stacked<T>&& a_value)
+	{
+		v_p.store(a_value.v_p.load());
+	}
+	void f__destruct()
+	{
+		if (auto p = v_p.load()) f_decrements()->f_push(p);
+	}
+	void f__clear()
+	{
+		if (auto p = v_p.exchange(nullptr)) f_decrements()->f_push(p);
+	}
+	void f__assign(t_object* a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
 		if (auto p = v_p.exchange(a_p)) f_decrements()->f_push(p);
 	}
-	void f_assign(t_object& a_p)
+	void f__assign(t_object& a_p)
 	{
 		f_increments()->f_push(&a_p);
 		if (auto p = v_p.exchange(&a_p)) f_decrements()->f_push(p);
 	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(const t_slot& a_value)
+	void f__assign(const t_slot& a_value)
 	{
 		auto p = a_value.v_p.load();
 		if (p) f_increments()->f_push(p);
 		p = v_p.exchange(p);
 		if (p) f_decrements()->f_push(p);
 	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(t_slot&& a_value)
+	void f__assign(t_slot&& a_value)
 	{
-		if (&a_value == this) return;
+		assert(&a_value != this);
 		auto p = v_p.exchange(a_value.v_p.exchange(nullptr));
 		if (p) f_decrements()->f_push(p);
 	}
-
-public:
-	t_slot(t_object* a_p = nullptr) : v_p(a_p)
+	void f__assign_from_stack(t_slot&& a_value)
 	{
-		if (v_p) f_increments()->f_push(v_p);
+		auto p = v_p.exchange(a_value.v_p.load());
+		if (p) f_decrements()->f_push(p);
 	}
-	t_slot(const t_slot& a_value) : v_p(a_value.v_p.load())
+	template<typename T>
+	void f__assign(t_stacked<T>&& a_value)
 	{
-		if (auto p = v_p.load()) f_increments()->f_push(p);
+		f__assign_from_stack(std::move(a_value));
 	}
-	t_slot(t_slot&& a_value) : v_p(a_value.v_p.exchange(nullptr))
-	{
-	}
-	t_slot& operator=(const t_slot& a_value)
-	{
-		f_assign(a_value);
-		return *this;
-	}
-	t_slot& operator=(t_slot&& a_value)
-	{
-		f_assign(std::move(a_value));
-		return *this;
-	}
+	template<typename T>
+	t_slot& operator=(T a_value) = delete;
 	bool operator==(const t_slot& a_value) const
 	{
 		return v_p == a_value.v_p;
@@ -281,24 +422,6 @@ public:
 	{
 		return v_p;
 	}
-	void f_construct(const t_slot& a_value)
-	{
-		assert(!v_p);
-		auto p = a_value.v_p.load();
-		if (p) f_increments()->f_push(p);
-		v_p = p;
-	}
-	void f_construct(t_slot&& a_value)
-	{
-		f_construct(a_value);
-		a_value.f__destruct();
-	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE void f__destruct()
-	{
-		if (!v_p) return;
-		f_decrements()->f_push(v_p);
-		v_p = nullptr;
-	}
 	t_slot f_exchange(t_slot&& a_desired)
 	{
 		return {v_p.exchange(a_desired.v_p.exchange(nullptr)), t_pass()};
@@ -311,69 +434,15 @@ public:
 			if (p) f_decrements()->f_push(p);
 			return true;
 		}
-		a_expected = p;
+		a_expected.f__assign(p);
 		return false;
 	}
 };
 
 template<typename T>
-class t_slot_of : public t_slot
+struct t_slot_of : t_slot
 {
-	friend struct t__type;
-	friend struct t__type_finalizee;
-	friend class t_object;
-
-	t_slot_of(T* a_p, const t_pass&) : t_slot(a_p, t_pass())
-	{
-	}
-
-public:
-	t_slot_of(T* a_p = nullptr) : t_slot(a_p)
-	{
-	}
-	t_slot_of(const t_slot& a_value) : t_slot(a_value)
-	{
-	}
-	t_slot_of(t_slot&& a_value) : t_slot(std::move(a_value))
-	{
-	}
-	t_slot_of(const t_slot_of& a_value) : t_slot(a_value)
-	{
-	}
-	t_slot_of(t_slot_of&& a_value) : t_slot(std::move(a_value))
-	{
-	}
-	t_slot_of& operator=(T* a_p)
-	{
-		f_assign(a_p);
-		return *this;
-	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE t_slot_of& operator=(const t_slot& a_value)
-	{
-		f_assign(a_value);
-		return *this;
-	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE t_slot_of& operator=(t_slot&& a_value)
-	{
-		f_assign(std::move(a_value));
-		return *this;
-	}
-	t_slot_of& operator=(const t_slot_of& a_value)
-	{
-		f_assign(a_value);
-		return *this;
-	}
-	t_slot_of& operator=(t_slot_of&& a_value)
-	{
-		f_assign(std::move(a_value));
-		return *this;
-	}
-	/*void f_construct(T* a_p = nullptr)
-	{
-		assert(!v_p);
-		if (a_p) f_increments()->f_push(a_p);
-		v_p = a_p;
-	}*/
+	using t_slot::t_slot;
 	operator T*() const
 	{
 		return static_cast<T*>(v_p.load());
@@ -381,34 +450,6 @@ public:
 	T* operator->() const
 	{
 		return static_cast<T*>(v_p.load());
-	}
-};
-
-template<typename T>
-struct t_scoped : T
-{
-	using T::T;
-	template<typename U>
-	t_scoped(U&& a_value) : T(std::forward<U>(a_value))
-	{
-	}
-	template<typename U>
-	t_scoped(const t_scoped<U>& a_value) : T(a_value)
-	{
-	}
-	template<typename U>
-	t_scoped(t_scoped<U>&& a_value) : T(std::move(a_value))
-	{
-	}
-	~t_scoped()
-	{
-		this->f__destruct();
-	}
-	template<typename U>
-	t_scoped& operator=(U&& a_value)
-	{
-		static_cast<T&>(*this) = std::forward<U>(a_value);
-		return *this;
 	}
 };
 

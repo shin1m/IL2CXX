@@ -21,7 +21,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("InternalAlloc", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => $"\treturn {transpiler.EscapeForVariable(typeof(IntPtr))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(std::move(a_0), a_1)) : new t__normal_handle(std::move(a_0))}};\n"
+                transpiler => $"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(std::move(a_0), a_1)) : new t__normal_handle(std::move(a_0))}};\n"
             );
             code.For(
                 type.GetMethod("InternalFree", BindingFlags.Static | BindingFlags.NonPublic),
@@ -36,7 +36,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetConstructor(new[] { typeof(object), typeof(object) }),
-                transpiler => $"\treturn {transpiler.EscapeForVariable(type)}{{new t__dependent_handle(std::move(a_0), std::move(a_1))}};\n"
+                transpiler => $"\treturn {transpiler.EscapeForValue(type)}{{new t__dependent_handle(std::move(a_0), std::move(a_1))}};\n"
             );
             code.For(
                 type.GetMethod("GetPrimary"),
@@ -46,7 +46,7 @@ namespace IL2CXX
                 type.GetMethod("GetPrimaryAndSecondary"),
                 transpiler => $@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue);
 {'\t'}auto primary = p->f_target();
-{'\t'}*a_1 = primary ? p->v_secondary : nullptr;
+{'\t'}*static_cast<{transpiler.EscapeForMember(typeof(object))}*>(a_1) = primary ? p->v_secondary : nullptr;
 {'\t'}return std::move(primary);
 "
             );
@@ -150,11 +150,11 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(ulong)),
-                (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForVariable(types[0])}*>(reinterpret_cast<char*>(a_0) + a_1);\n"
+                (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + a_1);\n"
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
-                (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForVariable(types[0])}*>(reinterpret_cast<char*>(a_0) + reinterpret_cast<intptr_t>(a_1.v__5fvalue));\n"
+                (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + reinterpret_cast<intptr_t>(a_1.v__5fvalue));\n"
             );
             code.ForGeneric(
                 type.GetMethod("AreSame"),
@@ -166,7 +166,7 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 2),
-                (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForVariable(types[1])}*>(a_0);\n"
+                (transpiler, types) => $"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[1])}*>(a_0);\n"
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "AsPointer" && x.GetGenericArguments().Length == 1),
@@ -174,15 +174,15 @@ namespace IL2CXX
             );
             foreach (var m in methods.Where(x => x.Name == "ReadUnaligned" && x.GetGenericArguments().Length == 1))
                 code.ForGeneric(m,
-                    (transpiler, types) => $"\treturn *reinterpret_cast<{transpiler.EscapeForVariable(types[0])}*>(a_0);\n"
+                    (transpiler, types) => $"\treturn *reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0);\n"
                 );
             foreach (var m in methods.Where(x => x.Name == "WriteUnaligned" && x.GetGenericArguments().Length == 1))
                 code.ForGeneric(m,
-                    (transpiler, types) => $"\t*reinterpret_cast<{transpiler.EscapeForVariable(types[0])}*>(a_0) = a_1;\n"
+                    (transpiler, types) => $"\t*reinterpret_cast<{transpiler.EscapeForMember(types[0])}*>(a_0) = a_1;\n"
                 );
             code.ForGeneric(
                 methods.First(x => x.Name == "SizeOf" && x.GetGenericArguments().Length == 1),
-                (transpiler, types) => $"\treturn sizeof({transpiler.EscapeForVariable(types[0])});\n"
+                (transpiler, types) => $"\treturn sizeof({transpiler.EscapeForValue(types[0])});\n"
             );
         });
     }

@@ -78,7 +78,7 @@ private:
 	t_thread* v_thread__internals = new t_thread();
 	std::mutex v_thread__mutex;
 	std::condition_variable v_thread__condition;
-	t_scoped<t_slot_of<t_System_2eThreading_2eThread>> v_thread;
+	t_slot_of<t_System_2eThreading_2eThread> v_thread;
 	t_conductor v_finalizer__conductor;
 	std::deque<t_object*> v_finalizer__queue;
 	const t_options& v_options;

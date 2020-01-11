@@ -28,7 +28,7 @@ struct t__type : t__member_info
 		p->v_next = nullptr;
 		t_slot::f_increments()->f_push(this);
 		p->v_type = this;
-		return {p, t_slot::t_pass()};
+		return t_slot(p, t_slot::t_pass());
 	}
 	virtual t_scoped<t_slot> f_allocate(size_t a_size);
 	virtual void f_scan(t_object* a_this, t_scan a_scan);

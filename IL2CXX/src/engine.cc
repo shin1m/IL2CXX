@@ -106,7 +106,7 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 	v_object__pool1.f_grow();
 	v_object__pool2.f_grow();
 	v_object__pool3.f_grow();
-	v_thread = f__new_zerod<t_System_2eThreading_2eThread>();
+	v_thread.f__construct(f__new_zerod<t_System_2eThreading_2eThread>());
 	v_thread->v__internal = v_thread__internals;
 	t_System_2eThreading_2eThread::v__current = v_thread;
 	{

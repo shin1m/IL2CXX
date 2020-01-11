@@ -11,7 +11,21 @@ namespace IL2CXX
         private static Action<Type, Builtin.Code> ForIntPtr(string native) => (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__5fvalue;
+{'\t'}{'\t'}void f__construct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__construct(const t_value& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__5fvalue = a_value.v__5fvalue;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__assign(const t_value& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__5fvalue = a_value.v__5fvalue;
+{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__clear()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
@@ -147,6 +161,14 @@ namespace IL2CXX
         .For(typeof(RuntimeFieldHandle), (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__field;
+{'\t'}{'\t'}void f__construct(const t_value& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__field = a_value.v__field;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__assign(const t_value& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__field = a_value.v__field;
+{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
@@ -156,15 +178,39 @@ namespace IL2CXX
 ", false);
             code.For(
                 type.GetProperty(nameof(RuntimeFieldHandle.Value)).GetMethod,
-                transpiler => $"\treturn {transpiler.EscapeForVariable(typeof(IntPtr))}{{a_0->v__field}};\n"
+                transpiler => $"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{a_0->v__field}};\n"
             );
         })
         .For(typeof(RuntimeTypeHandle), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}{'\t'}{transpiler.EscapeForVariable(typeof(Type))} v__type;
+            code.Members = transpiler => ($@"{'\t'}{'\t'}{transpiler.EscapeForMember(typeof(Type))} v__type;
+{'\t'}{'\t'}void f__construct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__type.f__construct();
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__construct(const t_value& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__type.f__construct(a_value.v__type);
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__construct(t_value&& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__type.f__construct(std::move(a_value.v__type));
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__assign(const t_value& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__type.f__assign(a_value.v__type);
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__assign(t_value&& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__type.f__assign(std::move(a_value.v__type));
+{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}v__type.f__destruct();
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__clear()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__type.f__clear();
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{'\t'}{{
@@ -246,9 +292,9 @@ namespace IL2CXX
 {'\t'}size_t n = 0;
 {'\t'}for (size_t i = 0; i < a_2; ++i) n = n * bounds[i].v_length + (a_3[i] - bounds[i].v_lower);
 {'\t'}auto type = a_0->f_type();
-{'\t'}auto p = reinterpret_cast<{transpiler.EscapeForVariable(typeof(TypedReference))}*>(a_1);
-{'\t'}p->v_Type = {{type->v__element}};
-{'\t'}p->v_Value = {{reinterpret_cast<char*>(bounds + type->v__rank) + n * type->v__element->v__size}};
+{'\t'}auto p = reinterpret_cast<{transpiler.EscapeForValue(typeof(TypedReference))}*>(a_1);
+{'\t'}p->v_Type = {transpiler.EscapeForValue(typeof(IntPtr))}{{type->v__element}};
+{'\t'}p->v_Value = {transpiler.EscapeForValue(typeof(IntPtr))}{{reinterpret_cast<char*>(bounds + type->v__rank) + n * type->v__element->v__size}};
 "
             );
             code.For(
@@ -362,7 +408,7 @@ namespace IL2CXX
                     var array = transpiler.Escape(typeof(Array));
                     return $@"{'\t'}auto type = static_cast<t__type*>(static_cast<void*>(a_0));
 {'\t'}auto n = type->v__element->v__size * a_1;
-{'\t'}{transpiler.EscapeForVariable(typeof(Array))} p = type->f__allocate(sizeof({array}) + sizeof({array}::t__bound) + n);
+{'\t'}{transpiler.EscapeForScoped(typeof(Array))} p = type->f__allocate(sizeof({array}) + sizeof({array}::t__bound) + n);
 {'\t'}p->v__length = a_1;
 {'\t'}p->f__bounds()[0] = {{size_t(a_1), 0}};
 {'\t'}if (!a_2) std::fill_n(reinterpret_cast<char*>(p->f__bounds() + 1), n, '\0');
@@ -386,7 +432,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("Create", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => "\ta_0->v_m_5fhandle = {new t__weak_handle(std::move(a_1), a_2)};\n"
+                transpiler => $"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(std::move(a_1), a_2)}};\n"
             );
             code.For(
                 type.GetMethod("Finalize", BindingFlags.Instance | BindingFlags.NonPublic),
@@ -409,7 +455,7 @@ namespace IL2CXX
         {
             code.ForGeneric(
                 type.GetMethod("Create", BindingFlags.Instance | BindingFlags.NonPublic),
-                (transpiler, types) => "\ta_0->v_m_5fhandle = {new t__weak_handle(std::move(a_1), a_2)};\n"
+                (transpiler, types) => $"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(std::move(a_1), a_2)}};\n"
             );
             code.ForGeneric(
                 type.GetMethod("Finalize", BindingFlags.Instance | BindingFlags.NonPublic),
@@ -547,7 +593,7 @@ namespace IL2CXX
                 {
                     var method = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string) });
                     transpiler.Enqueue(method);
-                    return $"\treturn a_1 && a_1->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(string))}>::v__instance) && {transpiler.Escape(method)}(a_0, static_cast<{transpiler.EscapeForVariable(typeof(string))}>(a_1));\n";
+                    return $"\treturn a_1 && a_1->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(string))}>::v__instance) && {transpiler.Escape(method)}(a_0, std::move(a_1));\n";
                 }
             );
             code.For(
@@ -577,7 +623,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(string.Split), new[] { typeof(char), typeof(StringSplitOptions) }),
-                transpiler => $"\treturn f__new_array<{transpiler.Escape(typeof(string[]))}, {transpiler.EscapeForVariable(typeof(string))}>(0);\n"
+                transpiler => $"\treturn f__new_array<{transpiler.Escape(typeof(string[]))}, {transpiler.EscapeForMember(typeof(string))}>(0);\n"
             );
             code.For(
                 type.GetMethod(nameof(string.ToLowerInvariant), Type.EmptyTypes),
@@ -655,7 +701,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("InternalToObject", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => $@"{'\t'}auto p = static_cast<{transpiler.EscapeForVariable(type)}*>(a_0);
+                transpiler => $@"{'\t'}auto p = static_cast<{transpiler.EscapeForValue(type)}*>(a_0);
 {'\t'}auto type = static_cast<t__type*>(p->v_Type.v__5fvalue);
 {'\t'}auto value = p->v_Value.v__5fvalue;
 {'\t'}if (type->f__is(&t__type_of<{transpiler.Escape(typeof(ValueType))}>::v__instance)) {{
@@ -663,7 +709,7 @@ namespace IL2CXX
 {'\t'}{'\t'}type->f_copy(reinterpret_cast<char*>(value), 1, reinterpret_cast<char*>(p + 1));
 {'\t'}{'\t'}return p;
 {'\t'}}} else {{
-{'\t'}{'\t'}return *static_cast<{transpiler.EscapeForVariable(typeof(object))}*>(value);
+{'\t'}{'\t'}return *static_cast<{transpiler.EscapeForValue(typeof(object))}*>(value);
 {'\t'}}}
 "
             );
@@ -693,7 +739,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Environment.FailFast), new[] { typeof(string), typeof(Exception) }),
                 transpiler => $@"{'\t'}std::cerr << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}) << std::endl;
-{transpiler.GenerateVirtualCall(typeof(object).GetMethod(nameof(object.ToString)), "a_1", Enumerable.Empty<string>(), "auto s = ")}
+{transpiler.GenerateVirtualCall(typeof(object).GetMethod(nameof(object.ToString)), "a_1", Enumerable.Empty<string>(), x => $"auto s = {x};")}
 {'\t'}std::cerr << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
 {'\t'}std::abort();
 "
@@ -709,11 +755,11 @@ namespace IL2CXX
         {
             code.ForGeneric(
                 type.GetConstructor(new[] { type.GetGenericArguments()[0].MakeByRefType() }),
-                (transpiler, types) => $"\treturn {transpiler.EscapeForVariable(type.MakeGenericType(types))}{{{{a_0}}}};\n"
+                (transpiler, types) => $"\treturn {transpiler.EscapeForValue(type.MakeGenericType(types))}{{{{a_0}}}};\n"
             );
             code.ForGeneric(
                 type.GetProperty("Value").GetMethod,
-                (transpiler, types) => $"\treturn static_cast<{transpiler.EscapeForVariable(types[0].MakeByRefType())}>(a_0->v__5fvalue.v__5fvalue);\n"
+                (transpiler, types) => $"\treturn static_cast<{transpiler.EscapeForValue(types[0].MakeByRefType())}>(a_0->v__5fvalue.v__5fvalue);\n"
             );
         })
         .For(typeof(DateTime), (type, code) =>
@@ -795,7 +841,7 @@ namespace IL2CXX
         })
         .For(typeof(ModuleHandle), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForVariable(typeof(Module))} v_m_5fptr;
+            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(Module))} v_m_5fptr;
 ", true);
         })
         .For(typeof(MissingMemberException), (type, code) =>

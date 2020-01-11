@@ -236,7 +236,7 @@ struct t__extension
 		t__weak_handle* v_previous;
 		t__weak_handle* v_next;
 	} v_weak_handles;
-	t_slot v_weak_handles__cycle;
+	t_member<t_slot> v_weak_handles__cycle;
 	std::mutex v_weak_handles__mutex;
 
 	t__extension();
@@ -282,7 +282,7 @@ inline t__extension::t__extension() : v_weak_handles{static_cast<t__weak_handle*
 
 struct t__dependent_handle : t__weak_handle
 {
-	t_slot v_secondary;
+	t_member<t_slot> v_secondary;
 
 	t__dependent_handle(t_scoped<t_slot>&& a_target, t_scoped<t_slot>&& a_secondary) : t__weak_handle(std::move(a_target), false), v_secondary(std::move(a_secondary))
 	{

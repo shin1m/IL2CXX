@@ -25,7 +25,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr), typeof(IntPtr) }),
                 transpiler => $@"{'\t'}void* p = a_2;
 {'\t'}reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).compare_exchange_strong(p, a_1);
-{'\t'}return {transpiler.EscapeForVariable(typeof(IntPtr))}{{p}};
+{'\t'}return {transpiler.EscapeForValue(typeof(IntPtr))}{{p}};
 "
             );
             code.For(
@@ -44,7 +44,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr) }),
-                transpiler => $"\treturn {transpiler.EscapeForVariable(typeof(IntPtr))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1)}};\n"
+                transpiler => $"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1)}};\n"
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(object).MakeByRefType(), typeof(object) }),
@@ -73,12 +73,12 @@ namespace IL2CXX
 {'\t'}{'\t'}return v__current;
 {'\t'}}}
 
-{'\t'}{transpiler.EscapeForVariable(typeof(ExecutionContext))} v__5fexecutionContext;
-{'\t'}{transpiler.EscapeForVariable(typeof(SynchronizationContext))} v__5fsynchronizationContext;
-{'\t'}{transpiler.EscapeForVariable(typeof(Delegate))} v__5fdelegate;
-{'\t'}{transpiler.EscapeForVariable(typeof(object))} v__5fthreadStartArg;
+{'\t'}{transpiler.EscapeForMember(typeof(ExecutionContext))} v__5fexecutionContext;
+{'\t'}{transpiler.EscapeForMember(typeof(SynchronizationContext))} v__5fsynchronizationContext;
+{'\t'}{transpiler.EscapeForMember(typeof(Delegate))} v__5fdelegate;
+{'\t'}{transpiler.EscapeForMember(typeof(object))} v__5fthreadStartArg;
 {'\t'}t_thread* v__internal;
-{'\t'}{transpiler.EscapeForVariable(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
+{'\t'}{transpiler.EscapeForMember(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
 
 {'\t'}void f__scan(t_scan a_scan)
 {'\t'}{{

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Resources;
 
@@ -18,18 +20,18 @@ namespace IL2CXX
         })
         .For(typeof(ResourceReader), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}t_slot_of<t_System_2eIO_2eBinaryReader> v__5fstore;
-{'\t'}t_slot_of<t_System_2eCollections_2eGeneric_2eDictionary_602_5bSystem_2eString_2cSystem_2eResources_2eResourceLocator_5d> v__5fresCache;
+            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(BinaryReader))} v__5fstore;
+{'\t'}{transpiler.EscapeForMember(typeof(Dictionary<,>).MakeGenericType(typeof(string), Type.GetType("System.Resources.ResourceLocator")))} v__5fresCache;
 {'\t'}int64_t v__5fnameSectionOffset;
 {'\t'}int64_t v__5fdataSectionOffset;
-{'\t'}t_slot_of<t_System_2eInt32_5b_5d> v__5fnameHashes;
+{'\t'}{transpiler.EscapeForMember(typeof(int[]))} v__5fnameHashes;
 {'\t'}int32_t* v__5fnameHashesPtr;
-{'\t'}t_slot_of<t_System_2eInt32_5b_5d> v__5fnamePositions;
+{'\t'}{transpiler.EscapeForMember(typeof(int[]))} v__5fnamePositions;
 {'\t'}int32_t* v__5fnamePositionsPtr;
-{'\t'}{transpiler.EscapeForVariable(typeof(Type[]))} v__5ftypeTable;
-{'\t'}t_slot_of<t_System_2eInt32_5b_5d> v__5ftypeNamePositions;
+{'\t'}{transpiler.EscapeForMember(typeof(Type[]))} v__5ftypeTable;
+{'\t'}{transpiler.EscapeForMember(typeof(int[]))} v__5ftypeNamePositions;
 {'\t'}int32_t v__5fnumResources;
-{'\t'}t_slot_of<t_System_2eIO_2eUnmanagedMemoryStream> v__5fums;
+{'\t'}{transpiler.EscapeForMember(typeof(UnmanagedMemoryStream))} v__5fums;
 {'\t'}int32_t v__5fversion;
 ", true);
             code.For(

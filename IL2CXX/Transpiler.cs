@@ -607,12 +607,12 @@ struct t__static_{identifier}
 {'\t'}{'\t'}void f__assign(t_value&& a_value)
 {'\t'}{'\t'}{{
 {string.Join(string.Empty, fields.Select(x => set(x, "f__assign", $"std::move(a_value.{Escape(x)})")))}{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__assign_from_stack(t_value&& a_value)
+{'\t'}{'\t'}void f__assign_from_stacked(t_value&& a_value)
 {'\t'}{'\t'}{{
-{string.Join(string.Empty, fields.Select(x => set(x, "f__assign_from_stack", $"std::move(a_value.{Escape(x)})")))}{'\t'}{'\t'}}}
+{string.Join(string.Empty, fields.Select(x => set(x, "f__assign_from_stacked", $"std::move(a_value.{Escape(x)})")))}{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__assign(t_stacked<t_value>&& a_value)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}f__assign_from_stack(std::move(a_value));
+{'\t'}{'\t'}{'\t'}f__assign_from_stacked(std::move(a_value));
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
@@ -625,9 +625,7 @@ struct t__static_{identifier}
 {scanSlots("\t\t\t")}{'\t'}{'\t'}}}
 {'\t'}{'\t'}t_value() = default;
 {'\t'}{'\t'}t_value(const t_value& a_value) = delete;
-{'\t'}{'\t'}t_value(t_value&& a_value) = delete;
-{'\t'}{'\t'}template<typename T>
-{'\t'}{'\t'}t_value& operator=(T a_value) = delete;
+{'\t'}{'\t'}t_value& operator=(const t_value& a_value) = delete;
 "
                                         : $@"{variables("\t\t")}
 {'\t'}{'\t'}void f__construct()
@@ -641,7 +639,7 @@ struct t__static_{identifier}
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}*this = a_value;
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__assign_from_stack(t_value&& a_value)
+{'\t'}{'\t'}void f__assign_from_stacked(t_value&& a_value)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}*this = a_value;
 {'\t'}{'\t'}}}

@@ -183,47 +183,39 @@ namespace IL2CXX
         })
         .For(typeof(RuntimeTypeHandle), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}{'\t'}{transpiler.EscapeForMember(typeof(Type))} v__type;
+            code.Members = transpiler => ($@"{'\t'}{'\t'}{transpiler.Escape(typeof(Type))}* v__type;
 {'\t'}{'\t'}void f__construct()
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type.f__construct();
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__construct(const t_value& a_value)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type.f__construct(a_value.v__type);
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__construct(t_value&& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type.f__construct(std::move(a_value.v__type));
+{'\t'}{'\t'}{'\t'}v__type = a_value.v__type;
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__assign(const t_value& a_value)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type.f__assign(a_value.v__type);
+{'\t'}{'\t'}{'\t'}v__type = a_value.v__type;
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__assign(t_value&& a_value)
+{'\t'}{'\t'}void f__assign_from_stacked(t_value&& a_value)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type.f__assign(std::move(a_value.v__type));
+{'\t'}{'\t'}{'\t'}v__type = a_value.v__type;
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type.f__destruct();
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__clear()
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type.f__clear();
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}a_scan(v__type);
 {'\t'}{'\t'}}}
 ", true);
             code.For(
                 type.GetMethod(nameof(object.GetHashCode)),
-                transpiler => "\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0->v__type));\n"
+                transpiler => "\treturn reinterpret_cast<intptr_t>(a_0->v__type);\n"
             );
             code.For(
                 type.GetProperty(nameof(RuntimeTypeHandle.Value)).GetMethod,
-                transpiler => "\treturn static_cast<t_object*>(a_0->v__type);\n"
+                transpiler => "\treturn a_0->v__type;\n"
             );
         })
         .For(typeof(Array), (type, code) =>

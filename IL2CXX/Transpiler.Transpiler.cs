@@ -1148,7 +1148,7 @@ namespace IL2CXX
                             writer.Write(after.Construct($"{Escape(m)}::v__handle"));
                             break;
                         case Type t:
-                            writer.Write(after.Construct($"{Escape(typeof(RuntimeTypeHandle))}::t_value{{&t__type_of<{Escape(t)}>::v__instance}}"));
+                            writer.Write(after.Construct($"{EscapeForValue(typeof(RuntimeTypeHandle))}{{&t__type_of<{Escape(t)}>::v__instance}}"));
                             break;
                     }
                     return index;

@@ -121,51 +121,20 @@ struct t_member : T
 	{
 		this->f__construct(a_value);
 	}
-	t_member(t_member&& a_value) : t_member(static_cast<T&&>(a_value))
-	{
-	}
 	template<typename U>
 	t_member(U&& a_value)
 	{
 		this->f__construct(std::forward<U>(a_value));
-	}
-	t_member(T&& a_value)
-	{
-		this->f__construct(a_value);
-		a_value.f__clear();
-	}
-	template<typename U>
-	t_member(t_stacked<U>&& a_value)
-	{
-		this->f__construct(a_value);
-		a_value.f__destruct();
 	}
 	t_member& operator=(const t_member& a_value)
 	{
 		this->f__assign(a_value);
 		return *this;
 	}
-	t_member& operator=(t_member&& a_value)
-	{
-		return *this = static_cast<T&&>(a_value);
-	}
 	template<typename U>
 	t_member& operator=(U&& a_value)
 	{
 		this->f__assign(std::forward<U>(a_value));
-		return *this;
-	}
-	t_member& operator=(T&& a_value)
-	{
-		this->f__assign(a_value);
-		a_value.f__clear();
-		return *this;
-	}
-	template<typename U>
-	t_member& operator=(t_stacked<U>&& a_value)
-	{
-		this->f__assign(a_value);
-		a_value.f__destruct();
 		return *this;
 	}
 };
@@ -322,11 +291,6 @@ protected:
 	}
 
 public:
-	t_slot() = default;
-	t_slot(const t_slot& a_value) = delete;
-	t_slot(t_slot&& a_value) = delete;
-	template<typename T>
-	t_slot(T a_value) = delete;
 	void f__construct()
 	{
 		v_p.store(nullptr);
@@ -335,11 +299,6 @@ public:
 	{
 		if (a_p) f_increments()->f_push(a_p);
 		v_p.store(a_p);
-	}
-	void f__construct(t_object& a_p)
-	{
-		f_increments()->f_push(&a_p);
-		v_p.store(&a_p);
 	}
 	void f__construct(const t_slot& a_value)
 	{
@@ -354,23 +313,10 @@ public:
 	{
 		v_p.store(a_value.v_p.load());
 	}
-	void f__destruct()
-	{
-		if (auto p = v_p.load()) f_decrements()->f_push(p);
-	}
-	void f__clear()
-	{
-		if (auto p = v_p.exchange(nullptr)) f_decrements()->f_push(p);
-	}
 	void f__assign(t_object* a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
 		if (auto p = v_p.exchange(a_p)) f_decrements()->f_push(p);
-	}
-	void f__assign(t_object& a_p)
-	{
-		f_increments()->f_push(&a_p);
-		if (auto p = v_p.exchange(&a_p)) f_decrements()->f_push(p);
 	}
 	void f__assign(const t_slot& a_value)
 	{
@@ -381,11 +327,10 @@ public:
 	}
 	void f__assign(t_slot&& a_value)
 	{
-		assert(&a_value != this);
 		auto p = v_p.exchange(a_value.v_p.exchange(nullptr));
 		if (p) f_decrements()->f_push(p);
 	}
-	void f__assign_from_stack(t_slot&& a_value)
+	void f__assign_from_stacked(t_slot&& a_value)
 	{
 		auto p = v_p.exchange(a_value.v_p.load());
 		if (p) f_decrements()->f_push(p);
@@ -393,10 +338,19 @@ public:
 	template<typename T>
 	void f__assign(t_stacked<T>&& a_value)
 	{
-		f__assign_from_stack(std::move(a_value));
+		f__assign_from_stacked(std::move(a_value));
 	}
-	template<typename T>
-	t_slot& operator=(T a_value) = delete;
+	void f__destruct()
+	{
+		if (auto p = v_p.load()) f_decrements()->f_push(p);
+	}
+	void f__clear()
+	{
+		if (auto p = v_p.exchange(nullptr)) f_decrements()->f_push(p);
+	}
+	t_slot() = default;
+	t_slot(const t_slot& a_value) = delete;
+	t_slot& operator=(const t_slot& a_value) = delete;
 	bool operator==(const t_slot& a_value) const
 	{
 		return v_p == a_value.v_p;

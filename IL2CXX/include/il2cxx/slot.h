@@ -293,46 +293,46 @@ protected:
 public:
 	void f__construct()
 	{
-		v_p.store(nullptr);
+		v_p.store(nullptr, std::memory_order_relaxed);
 	}
 	void f__construct(t_object* a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
-		v_p.store(a_p);
+		v_p.store(a_p, std::memory_order_relaxed);
 	}
 	void f__construct(const t_slot& a_value)
 	{
-		f__construct(a_value.v_p.load());
+		f__construct(a_value.v_p.load(std::memory_order_relaxed));
 	}
 	void f__construct(t_slot&& a_value)
 	{
-		v_p.store(a_value.v_p.exchange(nullptr));
+		v_p.store(a_value.v_p.exchange(nullptr, std::memory_order_relaxed), std::memory_order_relaxed);
 	}
 	template<typename T>
 	void f__construct(t_stacked<T>&& a_value)
 	{
-		v_p.store(a_value.v_p.load());
+		v_p.store(a_value.v_p.load(std::memory_order_relaxed), std::memory_order_relaxed);
 	}
 	void f__assign(t_object* a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
-		if (auto p = v_p.exchange(a_p)) f_decrements()->f_push(p);
+		if (auto p = v_p.exchange(a_p, std::memory_order_relaxed)) f_decrements()->f_push(p);
 	}
 	void f__assign(const t_slot& a_value)
 	{
-		auto p = a_value.v_p.load();
+		auto p = a_value.v_p.load(std::memory_order_relaxed);
 		if (p) f_increments()->f_push(p);
-		p = v_p.exchange(p);
+		p = v_p.exchange(p, std::memory_order_relaxed);
 		if (p) f_decrements()->f_push(p);
 	}
 	void f__assign(t_slot&& a_value)
 	{
-		auto p = v_p.exchange(a_value.v_p.exchange(nullptr));
+		auto p = v_p.exchange(a_value.v_p.exchange(nullptr, std::memory_order_relaxed), std::memory_order_relaxed);
 		if (p) f_decrements()->f_push(p);
 	}
 	void f__assign_from_stacked(t_slot&& a_value)
 	{
-		auto p = v_p.exchange(a_value.v_p.load());
+		auto p = v_p.exchange(a_value.v_p.load(std::memory_order_relaxed), std::memory_order_relaxed);
 		if (p) f_decrements()->f_push(p);
 	}
 	template<typename T>
@@ -342,18 +342,18 @@ public:
 	}
 	void f__destruct()
 	{
-		if (auto p = v_p.load()) f_decrements()->f_push(p);
+		if (auto p = v_p.load(std::memory_order_relaxed)) f_decrements()->f_push(p);
 	}
 	void f__clear()
 	{
-		if (auto p = v_p.exchange(nullptr)) f_decrements()->f_push(p);
+		if (auto p = v_p.exchange(nullptr, std::memory_order_relaxed)) f_decrements()->f_push(p);
 	}
 	t_slot() = default;
 	t_slot(const t_slot& a_value) = delete;
 	t_slot& operator=(const t_slot& a_value) = delete;
 	bool operator==(const t_slot& a_value) const
 	{
-		return v_p == a_value.v_p;
+		return v_p.load(std::memory_order_relaxed) == a_value.v_p.load(std::memory_order_relaxed);
 	}
 	bool operator!=(const t_slot& a_value) const
 	{
@@ -361,30 +361,30 @@ public:
 	}
 	operator bool() const
 	{
-		return v_p;
+		return v_p.load(std::memory_order_relaxed);
 	}
 	operator t_object*() const
 	{
-		return v_p;
+		return v_p.load(std::memory_order_relaxed);
 	}
 	template<typename T>
 	explicit operator T*() const
 	{
-		return static_cast<T*>(v_p.load());
+		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
 	}
 	t_object* operator->() const
 	{
-		return v_p;
+		return v_p.load(std::memory_order_relaxed);
 	}
 	t_slot f_exchange(t_slot&& a_desired)
 	{
-		return {v_p.exchange(a_desired.v_p.exchange(nullptr)), t_pass()};
+		return {v_p.exchange(a_desired.v_p.exchange(nullptr, std::memory_order_relaxed)), t_pass()};
 	}
 	bool f_compare_exchange(t_slot& a_expected, t_slot&& a_desired)
 	{
 		t_object* p = a_expected;
 		if (v_p.compare_exchange_strong(p, a_desired)) {
-			a_desired.v_p.store(nullptr);
+			a_desired.v_p.store(nullptr, std::memory_order_relaxed);
 			if (p) f_decrements()->f_push(p);
 			return true;
 		}
@@ -399,11 +399,11 @@ struct t_slot_of : t_slot
 	using t_slot::t_slot;
 	operator T*() const
 	{
-		return static_cast<T*>(v_p.load());
+		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
 	}
 	T* operator->() const
 	{
-		return static_cast<T*>(v_p.load());
+		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
 	}
 };
 

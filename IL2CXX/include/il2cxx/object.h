@@ -57,15 +57,15 @@ class t_object
 	template<void (t_object::*A_push)()>
 	static void f_push(t_slot& a_slot)
 	{
-		if (auto p = a_slot.v_p.load()) (p->*A_push)();
+		if (auto p = a_slot.v_p.load(std::memory_order_relaxed)) (p->*A_push)();
 	}
 	template<void (t_object::*A_push)()>
 	static void f_push_and_clear(t_slot& a_slot)
 	{
-		auto p = a_slot.v_p.load();
+		auto p = a_slot.v_p.load(std::memory_order_relaxed);
 		if (!p) return;
 		(p->*A_push)();
-		a_slot.v_p = nullptr;
+		a_slot.v_p.store(nullptr, std::memory_order_relaxed);
 	}
 	static void f_collect();
 	template<size_t A_rank>

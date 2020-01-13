@@ -856,8 +856,8 @@ struct t__static_{identifier}
             var key = ToKey(method);
             if (!visitedMethods.Add(key) || method.IsAbstract) return;
             var builtin = this.builtin.GetBody(this, method);
-            var prototype = new StringWriter();
-            prototype.Write($@"
+            var description = new StringWriter();
+            description.Write($@"
 // {method.DeclaringType.AssemblyQualifiedName}
 // {method}
 // {(method.IsPublic ? "public " : string.Empty)}{(method.IsPrivate ? "private " : string.Empty)}{(method.IsStatic ? "static " : string.Empty)}{(method.IsFinal ? "final " : string.Empty)}{(method.IsVirtual ? "virtual " : string.Empty)}{method.MethodImplementationFlags}");
@@ -868,13 +868,13 @@ struct t__static_{identifier}
             if (!method.IsStatic && !(method.IsConstructor && builtin != null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
             string argument(Type t, int i) => $"\n\t{EscapeForScoped(t)} a_{i}";
             var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
-            if (method is MethodInfo) prototype.Write(attributes(string.Empty, ((MethodInfo)method).ReturnParameter));
+            if (method is MethodInfo) description.Write(attributes(string.Empty, ((MethodInfo)method).ReturnParameter));
             var returns = method is MethodInfo m ? EscapeForScoped(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForScoped(method.DeclaringType);
             var identifier = Escape(method);
-            prototype.Write($@"
-{returns}
+            var prototype = $@"{returns}
 {identifier}({string.Join(",", arguments)}
-)");
+)";
+            functionDeclarations.WriteLine(description);
             functionDeclarations.Write(prototype);
             functionDeclarations.WriteLine(';');
             if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
@@ -886,6 +886,8 @@ struct t__static_{identifier}
     string.Join(", ", arguments.Skip(1).Select((x, i) => $"std::move(a_{i + 1})").Prepend($"&static_cast<{Escape(method.DeclaringType)}*>(a_0)->v__value"))
 });
 }}");
+            writer.WriteLine(description);
+            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining)) writer.Write("inline ");
             if (builtin != null)
             {
                 writer.WriteLine($"{prototype}\n{{\n{builtin}}}");
@@ -907,11 +909,13 @@ struct t__static_{identifier}
                     writer.WriteLine($"\t*static_cast<{EscapeForMember(e)}*>(a_{i}) = {EscapeForValue(e)}{{}};");
                     if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(e)) writer.WriteLine($"\tvoid* p{i};");
                 }
-                writer.Write($@"{'\t'}static t_library library(""{dllimport.Value}""s, ""{dllimport.EntryPoint ?? method.Name}"");
-{'\t'}");
-                if (returns != "void") writer.Write("auto result = ");
+                writer.WriteLine($"\tstatic t_library library(\"{dllimport.Value}\"s, \"{dllimport.EntryPoint ?? method.Name}\");");
                 var @return = GetReturnType(method);
-                writer.Write($"library.f_as<{(typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : returns)}(*)(");
+                var nreturns = typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : returns;
+                if (nreturns != "void") writer.WriteLine($"\t{nreturns} result;");
+                writer.Write("\t{t_epoch_region region;\n\t");
+                if (nreturns != "void") writer.Write("result = ");
+                writer.Write($"library.f_as<{nreturns}(*)(");
                 writer.WriteLine(string.Join(",", method.GetParameters().Select(x =>
                 {
                     if (x.ParameterType == typeof(string)) return dllimport.CharSet == CharSet.Unicode ? "const char16_t*" : "const char*";
@@ -921,7 +925,7 @@ struct t__static_{identifier}
                         var e = GetElementType(x.ParameterType);
                         if (e == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(e)) return "void**";
                     }
-                    if (typeof(SafeHandle).IsAssignableFrom(x.ParameterType)) return "void*";
+                    if (x.ParameterType == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(x.ParameterType)) return "void*";
                     if (IsComposite(x.ParameterType))
                     {
                         if (x.ParameterType.IsValueType) return EscapeForScoped(x.ParameterType);
@@ -952,7 +956,7 @@ struct t__static_{identifier}
                     }
                     return $"a_{i}";
                 }).Select(x => $"\n\t\t{x}")));
-                writer.WriteLine("\t);");
+                writer.WriteLine("\t);}");
                 foreach (var (x, i) in method.GetParameters().Select((x, i) => (Parameter: x, i)).Where(x => Attribute.IsDefined(x.Parameter, typeof(OutAttribute))))
                 {
                     if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) writer.WriteLine($"\t(*a_{i})->v_handle = p{i};");
@@ -1022,7 +1026,7 @@ struct t__static_{identifier}
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
-            writer.WriteLine("\tf_epoch_point();");
+            if (!method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining)) writer.WriteLine("\tf_epoch_point();");
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
             var index = 0;
             while (index < bytes.Length)

@@ -825,7 +825,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(Console.WriteLine), new[] { typeof(string) }),
-                transpiler => $@"{'\t'}f_epoch_point();
+                transpiler => $@"{'\t'}t_epoch_region region;
 {'\t'}if (auto p = static_cast<{transpiler.Escape(typeof(string))}*>(a_0)) std::cout << f__string({{&p->v__5ffirstChar, static_cast<size_t>(p->v__5fstringLength)}});
 {'\t'}std::cout << std::endl;
 "

@@ -171,22 +171,17 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => $@"{'\t'}t_epoch_region region;
-{'\t'}a_0->f_extension()->v_mutex.lock();
+                transpiler => $@"{'\t'}a_0->f_extension()->v_mutex.lock();
 {'\t'}*a_1 = true;
 "
             );
             code.For(
                 type.GetMethod("ReliableEnterTimeout", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => $@"{'\t'}t_epoch_region region;
-{'\t'}*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));
-"
+                transpiler => "\t*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));\n"
             );
             code.For(
                 type.GetMethod(nameof(Monitor.Enter), new[] { typeof(object) }),
-                transpiler => $@"{'\t'}t_epoch_region region;
-{'\t'}a_0->f_extension()->v_mutex.lock();
-"
+                transpiler => "\ta_0->f_extension()->v_mutex.lock();\n"
             );
             code.For(
                 type.GetMethod(nameof(Monitor.Exit)),
@@ -209,7 +204,6 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => $@"{'\t'}if (a_0) throw std::runtime_error(""NotSupportedException"");
-{'\t'}t_epoch_region region;
 {'\t'}auto p = a_2->f_extension();
 {'\t'}std::unique_lock<std::recursive_timed_mutex> lock(p->v_mutex, std::adopt_lock);
 {'\t'}auto finally = f__finally([&]

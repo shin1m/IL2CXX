@@ -323,10 +323,6 @@ namespace IL2CXX
                 if (stack.VariableType == "t_stacked<t_slot>") return $"static_cast<t_object*>({stack.Pop.Variable}) {integer} static_cast<t_object*>({stack.Variable})";
                 return $"{unsigned(stack.Pop)} {integer} {unsigned(stack)}";
             }
-            string @goto(int index, int target) => target < index ? $@"{{
-{'\t'}{'\t'}f_epoch_point();
-{'\t'}{'\t'}goto L_{target:x04};
-{'\t'}}}" : $"goto L_{target:x04};";
             new[] {
                 (OpCode: OpCodes.Br_S, Target: (ParseBranchTarget)ParseBranchTargetI1),
                 (OpCode: OpCodes.Br, Target: (ParseBranchTarget)ParseBranchTargetI4)
@@ -342,9 +338,7 @@ namespace IL2CXX
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}");
-                        if (target < index) writer.WriteLine("\tf_epoch_point();");
-                        writer.WriteLine($"\tgoto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\tgoto L_{target:x04};");
                         return index;
                     };
                 });
@@ -363,7 +357,7 @@ namespace IL2CXX
                         var target = baseSet.Target(ref index);
                         writer.WriteLine($" {target:x04}\n\t{{bool b = {set.Operator}{stack.Variable};");
                         writer.Write(stack.Destruct);
-                        writer.WriteLine($"\tif (b) {@goto(index, target)}}}");
+                        writer.WriteLine($"\tif (b) goto L_{target:x04};}}");
                         return index;
                     };
                 }));
@@ -387,7 +381,7 @@ namespace IL2CXX
                         writer.WriteLine($" {target:x04}\n\t{{bool b = {string.Format(format, stack.Pop.Variable)} {set.Operator} {string.Format(format, stack.Variable)};");
                         writer.Write(stack.Destruct);
                         writer.Write(stack.Pop.Destruct);
-                        writer.WriteLine($"\tif (b) {@goto(index, target)}}}");
+                        writer.WriteLine($"\tif (b) goto L_{target:x04};}}");
                         return index;
                     };
                 }));
@@ -410,7 +404,7 @@ namespace IL2CXX
                         writer.WriteLine($" {target:x04}\n\t{{bool b = {condition_Un(stack, set.Integer, set.Float)};");
                         writer.Write(stack.Destruct);
                         writer.Write(stack.Pop.Destruct);
-                        writer.WriteLine($"\tif (b) {@goto(index, target)}}}");
+                        writer.WriteLine($"\tif (b) goto L_{target:x04};}}");
                         return index;
                     };
                 }));

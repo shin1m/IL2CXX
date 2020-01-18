@@ -36,8 +36,10 @@ void t_engine::f_collector()
 			if (v_thread__internals) v_thread__internals->f_epoch_request();
 			for (auto p = &v_thread__internals; *p;) {
 				auto q = *p;
-				q->f_epoch_wait();
-				if (q->v_done > 0) ++q->v_done;
+				if (q->v_done > 0)
+					++q->v_done;
+				else if (q->v_done == 0)
+					f_epoch_wait();
 				if (q->v_done < 3)
 					p = &q->v_next;
 				else
@@ -76,7 +78,6 @@ void t_engine::f_finalizer()
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer starting...\n");
 	while (true) {
 		{
-			t_epoch_region region;
 			std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
 			if (v_finalizer__conductor.v_quitting) break;
 			v_finalizer__conductor.f__next(lock);
@@ -84,7 +85,6 @@ void t_engine::f_finalizer()
 		while (true) {
 			t_object* p;
 			{
-				t_epoch_region region;
 				std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
 				if (v_finalizer__queue.empty()) break;
 				p = v_finalizer__queue.front();
@@ -95,12 +95,18 @@ void t_engine::f_finalizer()
 		}
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer quitting...\n");
-	t_epoch_region region;
 	v_finalizer__conductor.f_exit();
 }
 
 t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_options(a_options), v_collector__threshold(v_options.v_collector__threshold)
 {
+	if (sem_init(&v_epoch__done, 0, 0) == -1) throw std::system_error(errno, std::system_category());
+	v_epoch__default_handler = std::signal(SIGUSR1, [](int)
+	{
+		t_thread::v_current->f_epoch();
+		if (sem_post(&f_engine()->v_epoch__done) == -1) std::terminate();
+	});
+	if (v_epoch__default_handler == SIG_ERR) throw std::system_error(errno, std::system_category());
 	v_thread__internals->f_initialize();
 	v_object__pool0.f_grow();
 	v_object__pool1.f_grow();
@@ -116,7 +122,6 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 	}
 	{
 		auto finalizer = f__new_zerod<t_System_2eThreading_2eThread>();
-		t_epoch_region region;
 		std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
 		finalizer->f__start([this]
 		{
@@ -131,20 +136,22 @@ t_engine::~t_engine()
 	{
 		auto internal = v_thread->v__internal;
 		v_thread.f__destruct();
-		internal->f_epoch_enter();
+		internal->f_epoch();
 		std::lock_guard<std::mutex> lock(v_thread__mutex);
 		++internal->v_done;
 	}
-	f__wait();
-	f__wait();
-	f__wait();
-	f__wait();
+	f_wait();
+	f_wait();
+	f_wait();
+	f_wait();
 	v_collector__conductor.f_quit();
 	assert(!v_thread__internals);
 	v_object__pool0.f_clear();
 	v_object__pool1.f_clear();
 	v_object__pool2.f_clear();
 	v_object__pool3.f_clear();
+	std::signal(SIGUSR1, v_epoch__default_handler);
+	sem_destroy(&v_epoch__done);
 	if (v_options.v_verbose) {
 		std::fprintf(stderr, "statistics:\n\tt_object:\n");
 		size_t allocated = 0;
@@ -173,7 +180,6 @@ t_engine::~t_engine()
 void t_engine::f_shutdown()
 {
 	{
-		t_epoch_region region;
 		std::unique_lock<std::mutex> lock(v_thread__mutex);
 		auto internal = v_thread->v__internal;
 		while (true) {
@@ -195,7 +201,6 @@ void t_engine::f_shutdown()
 	f_wait();
 	assert(!v_thread__internals->v_next->v_next);
 	{
-		t_epoch_region region;
 		v_finalizer__conductor.f_quit();
 		std::unique_lock<std::mutex> lock(v_thread__mutex);
 		while (v_thread__internals->v_next && v_thread__internals->v_done <= 0) v_thread__condition.wait(lock);
@@ -220,7 +225,6 @@ void t_engine::f_collect()
 
 void t_engine::f_finalize()
 {
-	t_epoch_region region;
 	std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
 	v_finalizer__conductor.f__wake();
 	v_finalizer__conductor.f__wait(lock);

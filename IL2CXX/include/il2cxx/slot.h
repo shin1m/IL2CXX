@@ -2,13 +2,13 @@
 #define IL2CXX__SLOT_H
 
 #include "define.h"
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <type_traits>
 #include <cassert>
 #include <cinttypes>
 #include <cstddef>
-#include <condition_variable>
-#include <atomic>
-#include <mutex>
-#include <type_traits>
 
 namespace il2cxx
 {
@@ -176,14 +176,13 @@ public:
 			++v_collector__tick;
 			v_collector__conductor.f__wake();
 		}
-		void f__wait()
+		void f_wait()
 		{
 			std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
 			++v_collector__wait;
 			v_collector__conductor.f__wake();
 			v_collector__conductor.v_done.wait(lock);
 		}
-		void f_wait();
 	};
 
 protected:
@@ -195,7 +194,7 @@ protected:
 		t_object* volatile* v_head{v_objects};
 		t_object* volatile* v_next = v_objects + V_SIZE / 2;
 		t_object* volatile v_objects[V_SIZE];
-		t_object* volatile* v_epoch;
+		std::atomic<t_object* volatile*> v_epoch;
 		t_object* volatile* v_tail{v_objects + V_SIZE - 1};
 
 		void f_next() noexcept;
@@ -239,7 +238,7 @@ protected:
 	{
 		void f_flush()
 		{
-			f__flush(v_epoch, [](auto x)
+			f__flush(v_epoch.load(std::memory_order_acquire), [](auto x)
 			{
 				x->f_increment();
 			});
@@ -259,7 +258,7 @@ protected:
 			{
 				x->f_decrement();
 			});
-			v_last = v_epoch;
+			v_last = v_epoch.load(std::memory_order_acquire);
 		}
 	};
 	class t_pass

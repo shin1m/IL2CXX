@@ -911,11 +911,7 @@ struct t__static_{identifier}
                 }
                 writer.WriteLine($"\tstatic t_library library(\"{dllimport.Value}\"s, \"{dllimport.EntryPoint ?? method.Name}\");");
                 var @return = GetReturnType(method);
-                var nreturns = typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : returns;
-                if (nreturns != "void") writer.WriteLine($"\t{nreturns} result;");
-                writer.Write("\t{t_epoch_region region;\n\t");
-                if (nreturns != "void") writer.Write("result = ");
-                writer.Write($"library.f_as<{nreturns}(*)(");
+                writer.Write($"\t{(@return == typeof(void) ? string.Empty : "auto result = ")}library.f_as<{(typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : returns)}(*)(");
                 writer.WriteLine(string.Join(",", method.GetParameters().Select(x =>
                 {
                     if (x.ParameterType == typeof(string)) return dllimport.CharSet == CharSet.Unicode ? "const char16_t*" : "const char*";
@@ -956,7 +952,7 @@ struct t__static_{identifier}
                     }
                     return $"a_{i}";
                 }).Select(x => $"\n\t\t{x}")));
-                writer.WriteLine("\t);}");
+                writer.WriteLine("\t);");
                 foreach (var (x, i) in method.GetParameters().Select((x, i) => (Parameter: x, i)).Where(x => Attribute.IsDefined(x.Parameter, typeof(OutAttribute))))
                 {
                     if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) writer.WriteLine($"\t(*a_{i})->v_handle = p{i};");
@@ -1026,7 +1022,6 @@ struct t__static_{identifier}
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
-            if (!method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining)) writer.WriteLine("\tf_epoch_point();");
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
             var index = 0;
             while (index < bytes.Length)

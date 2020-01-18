@@ -3,6 +3,7 @@
 
 #include "thread.h"
 #include <deque>
+#include <semaphore.h>
 
 namespace il2cxx
 {
@@ -75,6 +76,8 @@ private:
 	std::mutex v_object__reviving__mutex;
 	size_t v_object__release = 0;
 	size_t v_object__collect = 0;
+	sem_t v_epoch__done;
+	void(*v_epoch__default_handler)(int);
 	t_thread* v_thread__internals = new t_thread();
 	std::mutex v_thread__mutex;
 	std::condition_variable v_thread__condition;
@@ -145,6 +148,10 @@ private:
 	{
 		++v_object__collect;
 		f_free(a_p);
+	}
+	void f_epoch_wait()
+	{
+		while (sem_wait(&v_epoch__done) == -1) if (errno != EINTR) throw std::system_error(errno, std::system_category());
 	}
 	void f_collector();
 	static void f_finalize(t_object* a_p);
@@ -316,9 +323,7 @@ public:
 	T* f_get()
 	{
 		if (v_initialized.load(std::memory_order_acquire)) return &v_p;
-		t_thread::v_current->f_epoch_enter();
 		std::lock_guard<std::recursive_mutex> lock(v_mutex);
-		t_thread::v_current->f_epoch_leave();
 		if (v_initializing) return &v_p;
 		v_initializing = true;
 		v_p.f_initialize();

@@ -148,7 +148,7 @@ void t_object::f_cyclic_decrement()
 		delete p;
 	}
 	v_type->f_scan(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
-	v_type->f_cyclic_decrement_push();
+	//v_type->f_cyclic_decrement_push();
 }
 
 t__extension* t_object::f_extension()

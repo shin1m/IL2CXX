@@ -217,7 +217,7 @@ template<void (t_object::*A_push)()>
 inline void t_object::f_step()
 {
 	v_type->f_scan(this, f_push<A_push>);
-	(v_type->*A_push)();
+	//(v_type->*A_push)();
 	if (auto p = v_extension.load(std::memory_order_consume)) p->f_scan(f_push<A_push>);
 }
 
@@ -229,7 +229,7 @@ inline void t_object::f_decrement_step()
 		delete p;
 	}
 	v_type->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
-	v_type->f_decrement_push();
+	//v_type->f_decrement_push();
 	v_color = e_color__BLACK;
 	if (v_next) {
 		v_next->v_previous = v_previous;

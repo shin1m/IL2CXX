@@ -26,7 +26,7 @@ struct t__type : t__member_info
 	{
 		auto p = t_object::f_local_pool__allocate(a_size);
 		p->v_next = nullptr;
-		t_slot::f_increments()->f_push(this);
+		//t_slot::f_increments()->f_push(this);
 		p->v_type = this;
 		return t_slot(p, t_slot::t_pass());
 	}

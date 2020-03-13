@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cinttypes>
 #include <cstddef>
+#include <cstring>
 
 namespace il2cxx
 {
@@ -61,43 +62,31 @@ struct t_conductor
 };
 
 template<typename T>
-struct t_scoped : T
+struct t_root : T
 {
-	t_scoped()
+	t_root() : T(T{})
 	{
-		this->f__construct();
 	}
-	t_scoped(const t_scoped& a_value)
+	t_root(const t_root& a_value) : T(a_value)
 	{
-		this->f__construct(a_value);
-	}
-	t_scoped(t_scoped&& a_value)
-	{
-		this->f__construct(std::move(a_value));
 	}
 	template<typename U>
-	t_scoped(U&& a_value)
+	t_root(U&& a_value) : T(std::forward<U>(a_value))
 	{
-		this->f__construct(std::forward<U>(a_value));
 	}
-	~t_scoped()
+	~t_root()
 	{
 		this->f__destruct();
 	}
-	t_scoped& operator=(const t_scoped& a_value)
+	t_root& operator=(const t_root& a_value)
 	{
-		this->f__assign(a_value);
-		return *this;
-	}
-	t_scoped& operator=(t_scoped&& a_value)
-	{
-		this->f__assign(std::move(a_value));
+		static_cast<T&>(*this) = a_value;
 		return *this;
 	}
 	template<typename U>
-	t_scoped& operator=(U&& a_value)
+	t_root& operator=(U&& a_value)
 	{
-		this->f__assign(std::forward<U>(a_value));
+		static_cast<T&>(*this) = std::forward<U>(a_value);
 		return *this;
 	}
 };
@@ -105,37 +94,24 @@ struct t_scoped : T
 template<typename T>
 struct t_stacked : T
 {
+	t_stacked() = default;
+	template<typename U>
+	t_stacked(U&& a_value)
+	{
+		std::memcpy(this, &a_value, sizeof(T));
+	}
+	t_stacked(const t_stacked& a_value) : t_stacked(static_cast<const T&>(a_value))
+	{
+	}
 	template<typename U>
 	t_stacked& operator=(U&& a_value)
 	{
-		this->f__assign(std::forward<U>(a_value));
+		std::memcpy(this, &a_value, sizeof(T));
 		return *this;
 	}
-};
-
-template<typename T>
-struct t_member : T
-{
-	t_member() = default;
-	t_member(const t_member& a_value)
+	t_stacked& operator=(const t_stacked& a_value)
 	{
-		this->f__construct(a_value);
-	}
-	template<typename U>
-	t_member(U&& a_value)
-	{
-		this->f__construct(std::forward<U>(a_value));
-	}
-	t_member& operator=(const t_member& a_value)
-	{
-		this->f__assign(a_value);
-		return *this;
-	}
-	template<typename U>
-	t_member& operator=(U&& a_value)
-	{
-		this->f__assign(std::forward<U>(a_value));
-		return *this;
+		return *this = static_cast<const T&>(a_value);
 	}
 };
 
@@ -145,6 +121,7 @@ class t_slot
 	friend class t__type_finalizee;
 	friend class t_engine;
 	friend class t_object;
+	friend struct t__weak_handle;
 	friend struct t_thread;
 	friend struct t_System_2eThreading_2eThread;
 	friend t_engine* f_engine();
@@ -181,7 +158,7 @@ public:
 			std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
 			++v_collector__wait;
 			v_collector__conductor.f__wake();
-			v_collector__conductor.v_done.wait(lock);
+			v_collector__conductor.f__wait(lock);
 		}
 	};
 
@@ -261,9 +238,6 @@ protected:
 			v_last = v_epoch.load(std::memory_order_acquire);
 		}
 	};
-	class t_pass
-	{
-	};
 
 	static IL2CXX__PORTABLE__THREAD t_collector* v_collector;
 	static IL2CXX__PORTABLE__THREAD t_increments* v_increments;
@@ -285,78 +259,28 @@ protected:
 
 	std::atomic<t_object*> v_p;
 
-	t_slot(t_object* a_p, const t_pass&) : v_p(a_p)
-	{
-	}
-
 public:
-	void f__construct()
-	{
-		v_p.store(nullptr, std::memory_order_relaxed);
-	}
-	void f__construct(t_object* a_p)
+	t_slot() = default;
+	t_slot(t_object* a_p) : v_p(a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
-		v_p.store(a_p, std::memory_order_relaxed);
 	}
-	void f__construct(const t_slot& a_value)
+	t_slot(const t_slot& a_value) : t_slot(static_cast<t_object*>(a_value))
 	{
-		f__construct(a_value.v_p.load(std::memory_order_relaxed));
 	}
-	void f__construct(t_slot&& a_value)
-	{
-		v_p.store(a_value.v_p.exchange(nullptr, std::memory_order_relaxed), std::memory_order_relaxed);
-	}
-	template<typename T>
-	void f__construct(t_stacked<T>&& a_value)
-	{
-		v_p.store(a_value.v_p.load(std::memory_order_relaxed), std::memory_order_relaxed);
-	}
-	void f__assign(t_object* a_p)
+	t_slot& operator=(t_object* a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
 		if (auto p = v_p.exchange(a_p, std::memory_order_relaxed)) f_decrements()->f_push(p);
+		return *this;
 	}
-	void f__assign(const t_slot& a_value)
+	t_slot& operator=(const t_slot& a_value)
 	{
-		auto p = a_value.v_p.load(std::memory_order_relaxed);
-		if (p) f_increments()->f_push(p);
-		p = v_p.exchange(p, std::memory_order_relaxed);
-		if (p) f_decrements()->f_push(p);
-	}
-	void f__assign(t_slot&& a_value)
-	{
-		auto p = v_p.exchange(a_value.v_p.exchange(nullptr, std::memory_order_relaxed), std::memory_order_relaxed);
-		if (p) f_decrements()->f_push(p);
-	}
-	void f__assign_from_stacked(t_slot&& a_value)
-	{
-		auto p = v_p.exchange(a_value.v_p.load(std::memory_order_relaxed), std::memory_order_relaxed);
-		if (p) f_decrements()->f_push(p);
-	}
-	template<typename T>
-	void f__assign(t_stacked<T>&& a_value)
-	{
-		f__assign_from_stacked(std::move(a_value));
+		return *this = static_cast<t_object*>(a_value);
 	}
 	void f__destruct()
 	{
 		if (auto p = v_p.load(std::memory_order_relaxed)) f_decrements()->f_push(p);
-	}
-	void f__clear()
-	{
-		if (auto p = v_p.exchange(nullptr, std::memory_order_relaxed)) f_decrements()->f_push(p);
-	}
-	t_slot() = default;
-	t_slot(const t_slot& a_value) = delete;
-	t_slot& operator=(const t_slot& a_value) = delete;
-	bool operator==(const t_slot& a_value) const
-	{
-		return v_p.load(std::memory_order_relaxed) == a_value.v_p.load(std::memory_order_relaxed);
-	}
-	bool operator!=(const t_slot& a_value) const
-	{
-		return !operator==(a_value);
 	}
 	operator bool() const
 	{
@@ -375,27 +299,23 @@ public:
 	{
 		return v_p.load(std::memory_order_relaxed);
 	}
-	t_slot f_exchange(t_slot&& a_desired)
-	{
-		return {v_p.exchange(a_desired.v_p.exchange(nullptr, std::memory_order_relaxed)), t_pass()};
-	}
-	bool f_compare_exchange(t_slot& a_expected, t_slot&& a_desired)
-	{
-		t_object* p = a_expected;
-		if (v_p.compare_exchange_strong(p, a_desired)) {
-			a_desired.v_p.store(nullptr, std::memory_order_relaxed);
-			if (p) f_decrements()->f_push(p);
-			return true;
-		}
-		a_expected.f__assign(p);
-		return false;
-	}
 };
 
 template<typename T>
 struct t_slot_of : t_slot
 {
 	using t_slot::t_slot;
+	t_slot_of& operator=(const t_slot_of& a_value)
+	{
+		static_cast<t_slot&>(*this) = a_value;
+		return *this;
+	}
+	template<typename U>
+	t_slot_of& operator=(U&& a_value)
+	{
+		static_cast<t_slot&>(*this) = std::forward<U>(a_value);
+		return *this;
+	}
 	operator T*() const
 	{
 		return static_cast<T*>(v_p.load(std::memory_order_relaxed));

@@ -48,22 +48,22 @@ namespace IL2CXX
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                     return $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
-{'\t'}p->v__5ftarget = std::move(a_0);
+{'\t'}p->v__5ftarget = a_0;
 {'\t'}if (p->v__5ftarget) {{
 {'\t'}{'\t'}p->v__5fmethodPtr = a_1;
 {'\t'}}} else {{
 {'\t'}{'\t'}p->v__5ftarget = p;
 {'\t'}{'\t'}p->v__5fmethodPtr = reinterpret_cast<void*>(static_cast<{
-    transpiler.EscapeForScoped(@return)
+    transpiler.EscapeForValue(@return)
 }(*)({
-    string.Join(",", parameters.Prepend(type).Select(x => $"\n\t\t\t{transpiler.EscapeForScoped(x)}"))
+    string.Join(",", parameters.Prepend(type).Select(x => $"\n\t\t\t{transpiler.EscapeForValue(x)}"))
 }
 {'\t'}{'\t'})>([]({
     string.Join(",", parameters.Prepend(type).Select((_, i) => $"\n\t\t\tauto a_{i}"))
 }
 {'\t'}{'\t'})
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForScoped(@return))}(*)({string.Join(", ", parameters.Select(transpiler.EscapeForScoped))})>(a_0->v__5fmethodPtrAux.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.FormatMove(x, $"a_{i + 1}")))});
+{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForValue(@return))}(*)({string.Join(", ", parameters.Select(x => transpiler.EscapeForValue(x)))})>(a_0->v__5fmethodPtrAux.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")))});
 {'\t'}{'\t'}}}));
 {'\t'}{'\t'}p->v__5fmethodPtrAux = a_1;
 {'\t'}}}
@@ -74,7 +74,7 @@ namespace IL2CXX
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    return $"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForScoped(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(transpiler.EscapeForScoped))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.FormatMove(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n";
+                    return $"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForValue(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForValue(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n";
                 }
             }
             if (TypeToCode.TryGetValue(type, out var code))

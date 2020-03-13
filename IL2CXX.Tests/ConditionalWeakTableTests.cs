@@ -4,18 +4,26 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    using static Utilities;
+
     class ConditionalWeakTableTests
     {
         static int Default()
         {
             var table = new ConditionalWeakTable<string, string>();
-            var x = "Hello";
-            var y = "World";
-            table.Add(x, y);
-            if (!table.TryGetValue(x, out var z) || z != y) return 1;
-            var wx = new WeakReference<string>(x);
-            var wy = new WeakReference<string>(y);
-            x = y = z = null;
+            string x = null;
+            string y = null;
+            WithPadding(() =>
+            {
+                x = "Hello";
+                y = "World";
+                table.Add(x, y);
+            });
+            if (WithPadding(() => !table.TryGetValue(x, out var z) || z != y)) return 1;
+            var (wx, wy) = WithPadding(() => (
+                new WeakReference<string>(x), new WeakReference<string>(y)
+            ));
+            WithPadding(() => x = y = null);
             GC.Collect();
             return wx.TryGetTarget(out _) || wy.TryGetTarget(out _) ? 2 : 0;
         }

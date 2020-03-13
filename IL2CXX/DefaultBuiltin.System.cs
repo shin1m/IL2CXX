@@ -11,31 +11,22 @@ namespace IL2CXX
         private static Action<Type, Builtin.Code> ForIntPtr(string native) => (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__5fvalue;
-{'\t'}{'\t'}void f__construct()
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__construct(const t_value& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__5fvalue = a_value.v__5fvalue;
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__assign(const t_value& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__5fvalue = a_value.v__5fvalue;
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__destruct()
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__clear()
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__scan(t_scan a_scan)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
 {'\t'}{'\t'}t_value() = default;
 {'\t'}{'\t'}t_value(void* a_value) : v__5fvalue(a_value)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}t_value({native} a_value) : v__5fvalue(reinterpret_cast<void*>(a_value))
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__5fvalue = a_value.v__5fvalue;
+{'\t'}{'\t'}{'\t'}return *this;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}operator void*() const
@@ -161,13 +152,14 @@ namespace IL2CXX
         .For(typeof(RuntimeFieldHandle), (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__field;
-{'\t'}{'\t'}void f__construct(const t_value& a_value)
+{'\t'}{'\t'}t_value() = default;
+{'\t'}{'\t'}t_value(const t_value& a_value) : v__field(a_value.v__field)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__field = a_value.v__field;
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__assign(const t_value& a_value)
+{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}v__field = a_value.v__field;
+{'\t'}{'\t'}{'\t'}return *this;
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
@@ -183,26 +175,24 @@ namespace IL2CXX
         })
         .For(typeof(RuntimeTypeHandle), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}{'\t'}{transpiler.Escape(typeof(Type))}* v__type;
-{'\t'}{'\t'}void f__construct()
+            code.Members = transpiler => ($@"{'\t'}{'\t'}t__type* v__type;
+{'\t'}{'\t'}t_value() = default;
+{'\t'}{'\t'}t_value(t__type* a_type) : v__type(a_type)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__construct(const t_value& a_value)
+{'\t'}{'\t'}t_value(const t_value& a_value) : t_value(a_value.v__type)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type = a_value.v__type;
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__assign(const t_value& a_value)
+{'\t'}{'\t'}t_value& operator=(t__type* a_type)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type = a_value.v__type;
+{'\t'}{'\t'}{'\t'}v__type = a_type;
+{'\t'}{'\t'}{'\t'}return *this;
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__assign_from_stacked(t_value&& a_value)
+{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type = a_value.v__type;
+{'\t'}{'\t'}{'\t'}return *this = a_value.v__type;
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__clear()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
@@ -319,7 +309,7 @@ namespace IL2CXX
             code.ForGeneric(
                 type.GetProperty("Item").SetMethod,
                 (transpiler, types) => $@"{'\t'}if (a_1 < 0 || a_1 >= a_0->v__length) throw std::out_of_range(""IndexOutOfRangeException"");
-{'\t'}a_0->f__data()[a_1] = std::move(a_2);
+{'\t'}a_0->f__data()[a_1] = a_2;
 "
             );
             code.ForGeneric(
@@ -332,10 +322,11 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetMethod(nameof(SZArrayHelper<object>.GetEnumerator)),
-                (transpiler, types) => $@"{'\t'}auto p = t_object::f_allocate<{transpiler.Escape(typeof(SZArrayHelper<>).GetNestedType(nameof(SZArrayHelper<object>.Enumerator)).MakeGenericType(types))}>();
-{'\t'}p->v_array = a_0;
-{'\t'}p->v_index = -1;
-{'\t'}return p;
+                (transpiler, types) => $@"{'\t'}return t_object::f_new<{transpiler.Escape(typeof(SZArrayHelper<>).GetNestedType(nameof(SZArrayHelper<object>.Enumerator)).MakeGenericType(types))}>(0, [&](auto p)
+{'\t'}{{
+{'\t'}{'\t'}new(&p->v_array) decltype(p->v_array)(a_0);
+{'\t'}{'\t'}p->v_index = -1;
+{'\t'}}});
 "
             );
             code.ForGeneric(
@@ -400,10 +391,11 @@ namespace IL2CXX
                     var array = transpiler.Escape(typeof(Array));
                     return $@"{'\t'}auto type = static_cast<t__type*>(static_cast<void*>(a_0));
 {'\t'}auto n = type->v__element->v__size * a_1;
-{'\t'}{transpiler.EscapeForScoped(typeof(Array))} p = type->f__allocate(sizeof({array}) + sizeof({array}::t__bound) + n);
+{'\t'}auto p = static_cast<{transpiler.EscapeForValue(typeof(Array))}>(f_engine()->f_object__allocate(sizeof({array}) + sizeof({array}::t__bound) + n));
 {'\t'}p->v__length = a_1;
 {'\t'}p->f__bounds()[0] = {{size_t(a_1), 0}};
 {'\t'}if (!a_2) std::fill_n(reinterpret_cast<char*>(p->f__bounds() + 1), n, '\0');
+{'\t'}type->f__finish(p);
 {'\t'}return p;
 ";
                 }
@@ -424,7 +416,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("Create", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => $"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(std::move(a_1), a_2)}};\n"
+                transpiler => $"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(a_1, a_2)}};\n"
             );
             code.For(
                 type.GetMethod("Finalize", BindingFlags.Instance | BindingFlags.NonPublic),
@@ -440,14 +432,14 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.Target)).SetMethod,
-                transpiler => "\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(std::move(a_1));\n"
+                transpiler => "\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n"
             );
         })
         .For(typeof(WeakReference<>), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod("Create", BindingFlags.Instance | BindingFlags.NonPublic),
-                (transpiler, types) => $"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(std::move(a_1), a_2)}};\n"
+                (transpiler, types) => $"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(a_1, a_2)}};\n"
             );
             code.ForGeneric(
                 type.GetMethod("Finalize", BindingFlags.Instance | BindingFlags.NonPublic),
@@ -455,11 +447,11 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetProperty("Target", BindingFlags.Instance | BindingFlags.NonPublic).GetMethod,
-                (transpiler, types) => "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n"
+                (transpiler, types) => $"\treturn static_cast<{transpiler.EscapeForValue(types[0])}>(static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target());\n"
             );
             code.ForGeneric(
                 type.GetProperty("Target", BindingFlags.Instance | BindingFlags.NonPublic).SetMethod,
-                (transpiler, types) => "\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(std::move(a_1));\n"
+                (transpiler, types) => "\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n"
             );
         })
         .For(typeof(Delegate), (type, code) =>
@@ -472,9 +464,10 @@ namespace IL2CXX
                 type.GetMethod("InternalAllocLike", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => $@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto n = sizeof({transpiler.Escape(typeof(MulticastDelegate))});
-{'\t'}auto p = type->f__allocate(n);
+{'\t'}auto p = f_engine()->f_object__allocate(n);
 {'\t'}std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), n - sizeof(t_object), '\0');
-{'\t'}return p;
+{'\t'}type->f__finish(p);
+{'\t'}return static_cast<{transpiler.EscapeForValue(typeof(MulticastDelegate))}>(p);
 "
             );
             code.For(
@@ -585,7 +578,7 @@ namespace IL2CXX
                 {
                     var method = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string) });
                     transpiler.Enqueue(method);
-                    return $"\treturn a_1 && a_1->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(string))}>::v__instance) && {transpiler.Escape(method)}(a_0, std::move(a_1));\n";
+                    return $"\treturn a_1 && a_1->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(string))}>::v__instance) && {transpiler.Escape(method)}(a_0, static_cast<{transpiler.EscapeForValue(typeof(string))}>(a_1));\n";
                 }
             );
             code.For(
@@ -697,8 +690,9 @@ namespace IL2CXX
 {'\t'}auto type = static_cast<t__type*>(p->v_Type.v__5fvalue);
 {'\t'}auto value = p->v_Value.v__5fvalue;
 {'\t'}if (type->f__is(&t__type_of<{transpiler.Escape(typeof(ValueType))}>::v__instance)) {{
-{'\t'}{'\t'}auto p = type->f_allocate(sizeof(t_object) + type->v__size);
+{'\t'}{'\t'}auto p = f_engine()->f_object__allocate(sizeof(t_object) + type->v__size);
 {'\t'}{'\t'}type->f_copy(reinterpret_cast<char*>(value), 1, reinterpret_cast<char*>(p + 1));
+{'\t'}{'\t'}type->f__finish(p);
 {'\t'}{'\t'}return p;
 {'\t'}}} else {{
 {'\t'}{'\t'}return *static_cast<{transpiler.EscapeForValue(typeof(object))}*>(value);
@@ -747,7 +741,10 @@ namespace IL2CXX
         {
             code.ForGeneric(
                 type.GetConstructor(new[] { type.GetGenericArguments()[0].MakeByRefType() }),
-                (transpiler, types) => $"\treturn {transpiler.EscapeForValue(type.MakeGenericType(types))}{{{{a_0}}}};\n"
+                (transpiler, types) => $@"{'\t'}{transpiler.EscapeForValue(type.MakeGenericType(types))} a;
+{'\t'}a.v__5fvalue = {{a_0}};
+{'\t'}return a;
+"
             );
             code.ForGeneric(
                 type.GetProperty("Value").GetMethod,
@@ -825,7 +822,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(Console.WriteLine), new[] { typeof(string) }),
-                transpiler => $@"{'\t'}if (auto p = static_cast<{transpiler.Escape(typeof(string))}*>(a_0)) std::cout << f__string({{&p->v__5ffirstChar, static_cast<size_t>(p->v__5fstringLength)}});
+                transpiler => $@"{'\t'}if (a_0) std::cout << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}});
 {'\t'}std::cout << std::endl;
 "
             );

@@ -2,7 +2,6 @@
 #define IL2CXX__TYPE_H
 
 #include "object.h"
-#include <map>
 
 namespace il2cxx
 {
@@ -22,17 +21,14 @@ struct t__type : t__member_info
 	void* v__multicast_invoke;
 
 	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr);
-	t_scoped<t_slot> f__allocate(size_t a_size)
+	void f__finish(t_object* a_p)
 	{
-		auto p = t_object::f_local_pool__allocate(a_size);
-		p->v_next = nullptr;
 		//t_slot::f_increments()->f_push(this);
-		p->v_type = this;
-		return t_slot(p, t_slot::t_pass());
+		a_p->v_type.store(this, std::memory_order_release);
+		t_slot::f_decrements()->f_push(a_p);
 	}
-	virtual t_scoped<t_slot> f_allocate(size_t a_size);
 	virtual void f_scan(t_object* a_this, t_scan a_scan);
-	virtual t_scoped<t_slot> f_clone(const t_object* a_this);
+	virtual t_object* f_clone(const t_object* a_this);
 	virtual void f_register_finalize(t_object* a_this);
 	virtual void f_suppress_finalize(t_object* a_this);
 	virtual void f_copy(const char* a_from, size_t a_n, char* a_to);
@@ -55,13 +51,11 @@ struct t__type : t__member_info
 struct t__type_finalizee : t__type
 {
 	using t__type::t__type;
-	t_scoped<t_slot> f__allocate(size_t a_size)
+	void f__finish(t_object* a_p)
 	{
-		auto p = t__type::f__allocate(a_size);
-		p->v_finalizee = true;
-		return p;
+		a_p->v_finalizee = true;
+		t__type::f__finish(a_p);
 	}
-	virtual t_scoped<t_slot> f_allocate(size_t a_size);
 	virtual void f_register_finalize(t_object* a_this);
 	virtual void f_suppress_finalize(t_object* a_this);
 };

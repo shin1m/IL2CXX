@@ -3,6 +3,8 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    using static Utilities;
+
     class FinalizerTests
     {
         class Foo : IDisposable
@@ -33,8 +35,11 @@ namespace IL2CXX.Tests
         }
         static int CollectAndWait()
         {
-            new Foo(true);
-            new Foo(false);
+            WithPadding(() =>
+            {
+                new Foo(true);
+                new Foo(false);
+            });
             GC.Collect();
             GC.WaitForPendingFinalizers();
             Console.WriteLine($"finalized: {Foo.Finalized}");
@@ -44,7 +49,10 @@ namespace IL2CXX.Tests
         public void TestCollectAndWait() => Utilities.Test(CollectAndWait);
         static int Suppress()
         {
-            using (new Foo(false)) { }
+            WithPadding(() =>
+            {
+                using (new Foo(false)) { }
+            });
             GC.Collect();
             GC.WaitForPendingFinalizers();
             Console.WriteLine($"finalized: {Foo.Finalized}");
@@ -78,16 +86,19 @@ namespace IL2CXX.Tests
         }
         static int Resurrect()
         {
-            new Bar();
+            WithPadding(() =>
+            {
+                new Bar();
+            });
             GC.Collect();
             GC.WaitForPendingFinalizers();
-            Console.WriteLine($"resurrected: {Bar.Resurrected}");
-            if (Bar.Resurrected == null) return 1;
-            Bar.Resurrected = null;
+            WithPadding(() => Console.WriteLine($"resurrected: {Bar.Resurrected}"));
+            if (WithPadding(() => Bar.Resurrected == null)) return 1;
+            WithPadding(() => Bar.Resurrected = null);
             GC.Collect();
             GC.WaitForPendingFinalizers();
             Console.WriteLine($"finalized: {Bar.Finalized}");
-            return Bar.Finalized == 1 ? 0 : 1;
+            return Bar.Finalized == 1 ? 0 : 2;
         }
         [Test]
         public void TestResurrect() => Utilities.Test(Resurrect);

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using NUnit.Framework;
 
@@ -49,10 +50,26 @@ namespace IL2CXX.Tests
                 new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, writer);
             Assert.AreEqual(0, Spawn("make", "run", build, new[] {
                 ("CXXFLAGS", $"'-I{include}' '-I{src}' -std=c++17 -g"),
-                ("LDFLAGS", $"-lpthread -ldl")
+                ("LDFLAGS", $"-lpthread -ldl -lunwind -lunwind-x86_64")
             }, Console.Error.WriteLine, Console.Error.WriteLine));
             Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
         }
         public static void Test(Func<int> method) => Test(method.Method);
+
+        [StructLayout(LayoutKind.Sequential, Size = 4096)]
+        struct Padding
+        { }
+#pragma warning disable CS0219
+        public static void WithPadding(Action x)
+        {
+            var p = new Padding();
+            x();
+        }
+        public static T WithPadding<T>(Func<T> x)
+        {
+            var p = new Padding();
+            return x();
+        }
+#pragma warning restore CS0219
     }
 }

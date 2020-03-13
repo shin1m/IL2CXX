@@ -14,42 +14,9 @@ class t_engine : public t_slot::t_collector
 {
 	friend class t_object;
 	friend class t__weak_handle;
+	friend class t_thread;
 	friend struct t_System_2eThreading_2eThread;
 
-	template<typename T, size_t A_size>
-	struct t_pool : t_shared_pool<T, A_size>
-	{
-		size_t v_freed = 0;
-
-		void f_return_all()
-		{
-			auto p = t_local_pool<T>::f_detach();
-			while (p) {
-				auto q = p;
-				size_t n = 0;
-				while (++n < A_size && q->v_next) q = q->v_next;
-				auto p0 = p;
-				p = q->v_next;
-				q->v_next = nullptr;
-				t_shared_pool<T, A_size>::f_free(p0, n);
-			}
-		}
-		void f_return()
-		{
-			t_shared_pool<T, A_size>::f_free(t_local_pool<T>::f_detach(), v_freed);
-			v_freed = 0;
-		}
-		void f_free(decltype(T::v_next) a_p)
-		{
-			assert(t_thread::v_current == nullptr);
-			t_local_pool<T>::f_free(a_p);
-			if (++v_freed >= A_size) f_return();
-		}
-		size_t f_live() const
-		{
-			return this->f_allocated() - this->f_freed() - v_freed;
-		}
-	};
 public:
 	struct t_options
 	{
@@ -63,25 +30,20 @@ public:
 	};
 
 private:
-	static IL2CXX__PORTABLE__THREAD size_t v_local_object__allocated;
-
-	t_pool<t_object_and<0>, 4096> v_object__pool0;
-	t_pool<t_object_and<1>, 4096> v_object__pool1;
-	t_pool<t_object_and<2>, 4096> v_object__pool2;
-	t_pool<t_object_and<3>, 4096> v_object__pool3;
-	std::atomic<size_t> v_object__allocated = 0;
-	size_t v_object__freed = 0;
+	t_pool<t_object, void(*)()> v_object__pool;
 	size_t v_object__lower = 0;
 	bool v_object__reviving = false;
 	std::mutex v_object__reviving__mutex;
 	size_t v_object__release = 0;
 	size_t v_object__collect = 0;
-	sem_t v_epoch__done;
-	void(*v_epoch__default_handler)(int);
+	sem_t v_epoch__received;
+	sigset_t v_epoch__notsigusr2;
+	struct sigaction v_epoch__old_sigusr1;
+	struct sigaction v_epoch__old_sigusr2;
 	t_thread* v_thread__internals = new t_thread();
 	std::mutex v_thread__mutex;
 	std::condition_variable v_thread__condition;
-	t_slot_of<t_System_2eThreading_2eThread> v_thread;
+	t_slot_of<t_System_2eThreading_2eThread> v_thread{};
 	t_conductor v_finalizer__conductor;
 	std::deque<t_object*> v_finalizer__queue;
 	const t_options& v_options;
@@ -89,55 +51,14 @@ private:
 	size_t v_collector__full = 0;
 	bool v_shuttingdown = false;
 
-	void f_pools__return();
-	decltype(auto) f_object__pool(std::integral_constant<size_t, 0>)
+	void f_object__return()
 	{
-		return (v_object__pool0);
-	}
-	decltype(auto) f_object__pool(std::integral_constant<size_t, 1>)
-	{
-		return (v_object__pool1);
-	}
-	decltype(auto) f_object__pool(std::integral_constant<size_t, 2>)
-	{
-		return (v_object__pool2);
-	}
-	decltype(auto) f_object__pool(std::integral_constant<size_t, 3>)
-	{
-		return (v_object__pool3);
-	}
-	template<size_t A_rank>
-	t_object* f_object__pool__allocate();
-	t_object* f_object__allocate(size_t a_size)
-	{
-		if (++v_local_object__allocated >= 1024) {
-			v_object__allocated += 1024;
-			v_local_object__allocated = 0;
-		}
-		auto p = new(new char[a_size]) t_object;
-		p->v_rank = 4;
-		return p;
+		v_object__pool.f_return();
 	}
 	void f_free(t_object* a_p)
 	{
 		a_p->v_count = 1;
-		switch (a_p->v_rank) {
-		case 0:
-			v_object__pool0.f_free(a_p);
-			break;
-		case 1:
-			v_object__pool1.f_free(a_p);
-			break;
-		case 2:
-			v_object__pool2.f_free(a_p);
-			break;
-		case 3:
-			v_object__pool3.f_free(a_p);
-			break;
-		default:
-			++v_object__freed;
-			delete a_p;
-		}
+		v_object__pool.f_free(a_p);
 	}
 	void f_free_as_release(t_object* a_p)
 	{
@@ -149,9 +70,21 @@ private:
 		++v_object__collect;
 		f_free(a_p);
 	}
-	void f_epoch_wait()
+	t_object* f_find(void* a_p)
 	{
-		while (sem_wait(&v_epoch__done) == -1) if (errno != EINTR) throw std::system_error(errno, std::system_category());
+		auto p = v_object__pool.f_find(a_p);
+		return p && p->v_type.load(std::memory_order_acquire) ? p : nullptr;
+	}
+	void f_epoch_suspend()
+	{
+		if (sem_post(&v_epoch__received) == -1) _exit(errno);
+		sigsuspend(&v_epoch__notsigusr2);
+		if (sem_post(&v_epoch__received) == -1) _exit(errno);
+	}
+	void f_epoch_send(pthread_t a_thread, int a_signal)
+	{
+		pthread_kill(a_thread, a_signal);
+		while (sem_wait(&v_epoch__received) == -1) if (errno != EINTR) throw std::system_error(errno, std::generic_category());
 	}
 	void f_collector();
 	static void f_finalize(t_object* a_p);
@@ -160,6 +93,12 @@ private:
 public:
 	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
 	~t_engine();
+	t_object* f_object__allocate(size_t a_size)
+	{
+		auto p = v_object__pool.f_allocate(a_size);
+		p->v_next = nullptr;
+		return p;
+	}
 	bool f_shuttingdown() const
 	{
 		return v_shuttingdown;
@@ -169,55 +108,25 @@ public:
 	void f_finalize();
 	size_t f_load_count() const
 	{
-		auto allocated = v_object__pool0.f_allocated() + v_object__pool1.f_allocated() + v_object__pool2.f_allocated() + v_object__pool3.f_allocated() + v_object__allocated;
-		auto freed = v_object__pool0.f_freed() + v_object__pool1.f_freed() + v_object__pool2.f_freed() + v_object__pool3.f_freed() + v_object__freed;
-		return allocated - freed;
+		size_t n = 0;
+		v_object__pool.f_statistics([&](auto, auto a_allocated, auto a_freed)
+		{
+			n += a_allocated - a_freed;
+		});
+		return n;
 	}
 };
-
-template<size_t A_rank>
-inline t_object* t_engine::f_object__pool__allocate()
-{
-	auto p = f_object__pool(std::integral_constant<size_t, A_rank>()).f_allocate(false);
-	if (!p) {
-		f_wait();
-		p = f_object__pool(std::integral_constant<size_t, A_rank>()).f_allocate();
-	}
-	return p;
-}
 
 inline t_engine* f_engine()
 {
 	return static_cast<t_engine*>(t_slot::v_collector);
 }
 
-template<size_t A_rank>
-inline t_object* t_object::f_pool__allocate()
-{
-	return f_engine()->f_object__pool__allocate<A_rank>();
-}
-
-inline t_object* t_object::f_local_pool__allocate(size_t a_size)
-{
-	switch ((a_size - sizeof(void*) * 8 - 1) / (sizeof(void*) * 8)) {
-	case 0:
-		return t_local_pool<t_object_and<0>>::f_allocate(f_pool__allocate<0>);
-	case 1:
-		return t_local_pool<t_object_and<1>>::f_allocate(f_pool__allocate<1>);
-	case 2:
-		return t_local_pool<t_object_and<2>>::f_allocate(f_pool__allocate<2>);
-	case 3:
-		return t_local_pool<t_object_and<3>>::f_allocate(f_pool__allocate<3>);
-	default:
-		return f_engine()->f_object__allocate(a_size);
-	}
-}
-
 template<void (t_object::*A_push)()>
 inline void t_object::f_step()
 {
-	v_type->f_scan(this, f_push<A_push>);
-	//(v_type->*A_push)();
+	f_type()->f_scan(this, f_push<A_push>);
+	//(f_type()->*A_push)();
 	if (auto p = v_extension.load(std::memory_order_consume)) p->f_scan(f_push<A_push>);
 }
 
@@ -228,8 +137,9 @@ inline void t_object::f_decrement_step()
 		v_extension.store(nullptr, std::memory_order_relaxed);
 		delete p;
 	}
-	v_type->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
-	//v_type->f_decrement_push();
+	f_type()->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
+	//f_type()->f_decrement_push();
+	v_type.store(nullptr, std::memory_order_relaxed);
 	v_color = e_color__BLACK;
 	if (v_next) {
 		v_next->v_previous = v_previous;
@@ -259,52 +169,78 @@ inline void t_object::f_decrement()
 	}
 }
 
-template<typename T>
-inline t_scoped<t_slot_of<T>> t_object::f_allocate(size_t a_extra)
+template<typename T, typename T_construct>
+inline T* t_object::f_new(size_t a_extra, T_construct a_construct)
 {
-	return t__type_of<T>::v__instance.f__allocate(sizeof(T) + a_extra);
-}
-
-template<typename T>
-t_scoped<t_slot_of<T>> f__new_zerod()
-{
-	auto p = t_object::f_allocate<T>();
-	std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), sizeof(T) - sizeof(t_object), '\0');
+	auto p = static_cast<T*>(f_engine()->f_object__allocate(sizeof(T) + a_extra));
+	a_construct(p);
+	t__type_of<T>::v__instance.f__finish(p);
 	return p;
 }
 
-template<typename T, typename... T_an>
-t_scoped<t_slot_of<T>> f__new_constructed(T_an&&... a_n)
+inline void t_thread::f_epoch_suspend()
 {
-	auto p = t_object::f_allocate<T>();
-	p->f__construct(std::forward<T_an>(a_n)...);
-	return p;
+#if WIN32
+	SuspendThread(v_handle);
+	f_epoch_get();
+#else
+	f_engine()->f_epoch_send(v_handle, SIGUSR1);
+#endif
 }
 
-template<typename T_array, typename T_element>
-t_scoped<t_slot_of<T_array>> f__new_array(size_t a_length)
+inline void t_thread::f_epoch_resume()
 {
-	auto p = t_object::f_allocate<T_array>(sizeof(T_element) * a_length);
-	p->v__length = a_length;
-	p->v__bounds[0] = {a_length, 0};
-	std::fill_n(reinterpret_cast<char*>(p->f__data()), sizeof(T_element) * a_length, '\0');
-	return p;
+#if WIN32
+	ResumeThread(v_handle);
+#else
+	f_engine()->f_epoch_send(v_handle, SIGUSR2);
+#endif
 }
 
 inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element, size_t a_rank, void* a_multicast_invoke) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank), v__multicast_invoke(a_multicast_invoke)
 {
-	v_type = &t__type_of<t__type>::v__instance;
+	v_type.store(&t__type_of<t__type>::v__instance, std::memory_order_relaxed);
 }
 
-inline t_scoped<t_slot_of<t_System_2eString>> f__new_string(size_t a_length)
+template<typename T>
+T* f__new_zerod()
 {
-	auto p = t_object::f_allocate<t_System_2eString>(sizeof(char16_t) * a_length);
-	p->v__5fstringLength = a_length;
-	(&p->v__5ffirstChar)[a_length] = u'\0';
-	return p;
+	return t_object::f_new<T>(0, [](auto p)
+	{
+		std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), sizeof(T) - sizeof(t_object), '\0');
+	});
 }
 
-inline t_scoped<t_slot_of<t_System_2eString>> f__new_string(std::u16string_view a_value)
+template<typename T, typename... T_an>
+T* f__new_constructed(T_an&&... a_n)
+{
+	return t_object::f_new<T>(0, [&](auto p)
+	{
+		p->f__construct(std::forward<T_an>(a_n)...);
+	});
+}
+
+template<typename T_array, typename T_element>
+T_array* f__new_array(size_t a_length)
+{
+	return t_object::f_new<T_array>(sizeof(T_element) * a_length, [&](auto p)
+	{
+		p->v__length = a_length;
+		p->v__bounds[0] = {a_length, 0};
+		std::fill_n(reinterpret_cast<char*>(p->f__data()), sizeof(T_element) * a_length, '\0');
+	});
+}
+
+inline t_System_2eString* f__new_string(size_t a_length)
+{
+	return t_object::f_new<t_System_2eString>(sizeof(char16_t) * a_length, [&](auto p)
+	{
+		p->v__5fstringLength = a_length;
+		(&p->v__5ffirstChar)[a_length] = u'\0';
+	});
+}
+
+inline t_System_2eString* f__new_string(std::u16string_view a_value)
 {
 	auto p = f__new_string(a_value.size());
 	std::copy(a_value.begin(), a_value.end(), &p->v__5ffirstChar);

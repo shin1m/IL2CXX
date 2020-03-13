@@ -3,6 +3,8 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    using static Utilities;
+
     class WeakReferenceTests
     {
         class Foo
@@ -28,10 +30,14 @@ namespace IL2CXX.Tests
         }
         static int Default()
         {
-            var x = new Foo();
-            var w = new WeakReference(x);
-            if (w.Target != x) return 1;
-            x = null;
+            Foo x = null;
+            var w = WithPadding(() =>
+            {
+                x = new Foo();
+                return new WeakReference(x);
+            });
+            if (WithPadding(() => w.Target != x)) return 1;
+            WithPadding(() => x = null);
             GC.Collect();
             return w.Target == null ? 0 : 2;
         }
@@ -39,14 +45,18 @@ namespace IL2CXX.Tests
         public void TestDefault() => Utilities.Test(Default);
         static int TrackResurrection()
         {
-            var x = new Foo();
-            var w = new WeakReference(x, true);
-            if (w.Target != x) return 1;
-            x = null;
+            Foo x = null;
+            var w = WithPadding(() =>
+            {
+                x = new Foo();
+                return new WeakReference(x, true);
+            });
+            if (WithPadding(() => w.Target != x)) return 1;
+            WithPadding(() => x = null);
             GC.Collect();
             GC.WaitForPendingFinalizers();
-            if (w.Target == null) return 2;
-            Foo.Resurrected = null;
+            if (WithPadding(() => w.Target == null)) return 2;
+            WithPadding(() => Foo.Resurrected = null);
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
@@ -66,29 +76,37 @@ namespace IL2CXX.Tests
         public void TestSetTarget() => Utilities.Test(SetTarget);
         static int DefaultOfT()
         {
-            var x = new Foo();
-            var w = new WeakReference<Foo>(x);
-            if (!w.TryGetTarget(out var y) || y != x) return 1;
-            x = y = null;
+            Foo x = null;
+            var w = WithPadding(() =>
+            {
+                x = new Foo();
+                return new WeakReference<Foo>(x);
+            });
+            if (WithPadding(() => !w.TryGetTarget(out var y) || y != x)) return 1;
+            WithPadding(() => x = null);
             GC.Collect();
-            return w.TryGetTarget(out y) ? 2 : 0;
+            return w.TryGetTarget(out _) ? 2 : 0;
         }
         [Test]
         public void TestDefaultOfT() => Utilities.Test(DefaultOfT);
         static int TrackResurrectionOfT()
         {
-            var x = new Foo();
-            var w = new WeakReference<Foo>(x, true);
-            if (!w.TryGetTarget(out var y) || y != x) return 1;
-            x = y = null;
+            Foo x = null;
+            var w = WithPadding(() =>
+            {
+                x = new Foo();
+                return new WeakReference<Foo>(x, true);
+            });
+            if (WithPadding(() => !w.TryGetTarget(out var y) || y != x)) return 1;
+            WithPadding(() => x = null);
             GC.Collect();
             GC.WaitForPendingFinalizers();
-            if (!w.TryGetTarget(out y)) return 2;
-            Foo.Resurrected = y = null;
+            if (WithPadding(() => !w.TryGetTarget(out _))) return 2;
+            WithPadding(() => Foo.Resurrected = null);
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            return w.TryGetTarget(out y) ? 3 : 0;
+            return w.TryGetTarget(out _) ? 3 : 0;
         }
         [Test]
         public void TestTrackResurrectionOfT() => Utilities.Test(TrackResurrectionOfT);

@@ -18,7 +18,7 @@ namespace IL2CXX
                 transpiler.Enqueue(constructor);
                 return $@"{'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
-{'\t'}t_static::v_instance->v_{transpiler.Escape(gt)}->v__3cDefault_3ek_5f_5fBackingField = std::move(p);
+{'\t'}t_static::v_instance->v_{transpiler.Escape(gt)}->v__3cDefault_3ek_5f_5fBackingField = p;
 ";
             });
         })

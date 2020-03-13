@@ -4,6 +4,8 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    using static Utilities;
+
     class GCHandleTests
     {
         class Foo
@@ -30,15 +32,22 @@ namespace IL2CXX.Tests
         }
         static int Weak()
         {
-            var x = new Foo();
-            var h = GCHandle.Alloc(x, GCHandleType.Weak);
+            Foo x = null;
+            var h = WithPadding(() =>
+            {
+                x = new Foo();
+                return GCHandle.Alloc(x, GCHandleType.Weak);
+            });
             try
             {
-                Console.WriteLine($"h: {h.Target}");
-                x = null;
+                WithPadding(() =>
+                {
+                    Console.WriteLine($"h: {h.Target}");
+                    x = null;
+                });
                 GC.Collect();
                 Console.WriteLine($"h: {h.Target}");
-                return h.Target == null ? 0 : 1;
+                return h.Target == null ? 0 : 2;
             }
             finally
             {
@@ -49,17 +58,27 @@ namespace IL2CXX.Tests
         public void TestWeak() => Utilities.Test(Weak);
         static int WeakTrackResurrection()
         {
-            var x = new Foo();
-            var h = GCHandle.Alloc(x, GCHandleType.WeakTrackResurrection);
+            Foo x = null;
+            var h = WithPadding(() =>
+            {
+                x = new Foo();
+                return GCHandle.Alloc(x, GCHandleType.WeakTrackResurrection);
+            });
             try
             {
-                Console.WriteLine($"h: {h.Target}");
-                x = null;
+                WithPadding(() =>
+                {
+                    Console.WriteLine($"h: {h.Target}");
+                    x = null;
+                });
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                Console.WriteLine($"h: {h.Target}");
-                if (h.Target == null) return 1;
-                Foo.Resurrected = null;
+                if (WithPadding(() =>
+                {
+                    Console.WriteLine($"h: {h.Target}");
+                    return h.Target == null;
+                })) return 1;
+                WithPadding(() => Foo.Resurrected = null);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
@@ -75,19 +94,31 @@ namespace IL2CXX.Tests
         public void TestWeakTrackResurrection() => Utilities.Test(WeakTrackResurrection);
         static int WeakHandles()
         {
-            var x = new Foo();
-            var w = GCHandle.Alloc(x, GCHandleType.Weak);
-            var wtr = GCHandle.Alloc(x, GCHandleType.WeakTrackResurrection);
+            Foo x = null;
+            var (w, wtr) = WithPadding(() =>
+            {
+                x = new Foo();
+                return (
+                    GCHandle.Alloc(x, GCHandleType.Weak),
+                    GCHandle.Alloc(x, GCHandleType.WeakTrackResurrection)
+                );
+            });
             try
             {
-                Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
-                x = null;
+                WithPadding(() =>
+                {
+                    Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
+                    x = null;
+                });
                 GC.Collect();
-                Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
-                if (w.Target != null) return 1;
+                if (WithPadding(() =>
+                {
+                    Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
+                    return w.Target != null;
+                })) return 1;
                 GC.WaitForPendingFinalizers();
-                if (wtr.Target == null) return 2;
-                Foo.Resurrected = null;
+                if (WithPadding(() => wtr.Target == null)) return 2;
+                WithPadding(() => Foo.Resurrected = null);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();

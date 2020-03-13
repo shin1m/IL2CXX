@@ -30,7 +30,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(object).MakeByRefType(), typeof(object), typeof(object) }),
-                transpiler => $@"{'\t'}a_0->f_compare_exchange(a_2, std::move(a_1));
+                transpiler => $@"{'\t'}f__compare_exchange(*a_0, a_2, a_1);
 {'\t'}return a_2;
 "
             );
@@ -48,7 +48,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(object).MakeByRefType(), typeof(object) }),
-                transpiler => "\treturn a_0->f_exchange(std::move(a_1));\n"
+                transpiler => "\treturn f__exchange(*a_0, a_1);\n"
             );
             code.For(
                 type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(int).MakeByRefType(), typeof(int) }, null),
@@ -97,14 +97,14 @@ namespace IL2CXX
             code.For(
                 type.GetConstructor(new[] { typeof(ThreadStart) }),
                 transpiler => $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
-{'\t'}p->v__5fdelegate = std::move(a_0);
+{'\t'}p->v__5fdelegate = a_0;
 {'\t'}return p;
 "
             );
             code.For(
                 type.GetConstructor(new[] { typeof(ParameterizedThreadStart) }),
                 transpiler => $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
-{'\t'}p->v__5fdelegate = std::move(a_0);
+{'\t'}p->v__5fdelegate = a_0;
 {'\t'}return p;
 "
             );

@@ -1,6 +1,5 @@
 #include "type.h"
 #include <algorithm>
-#include <exception>
 #include <iostream>
 #include <limits>
 #include <random>

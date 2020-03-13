@@ -3,18 +3,6 @@
 namespace il2cxx
 {
 
-IL2CXX__PORTABLE__THREAD size_t t_engine::v_local_object__allocated;
-
-void t_engine::f_pools__return()
-{
-	v_object__pool0.f_return_all();
-	v_object__pool1.f_return_all();
-	v_object__pool2.f_return_all();
-	v_object__pool3.f_return_all();
-	v_object__allocated += v_local_object__allocated;
-	v_local_object__allocated = 0;
-}
-
 void t_engine::f_collector()
 {
 	t_slot::v_collector = this;
@@ -33,22 +21,12 @@ void t_engine::f_collector()
 		}
 		{
 			std::lock_guard<std::mutex> lock(v_thread__mutex);
-			if (v_thread__internals) v_thread__internals->f_epoch_request();
-			for (auto p = &v_thread__internals; *p;) {
+			auto p = &v_thread__internals;
+			while (*p) {
 				auto q = *p;
-				if (q->v_done > 0)
-					++q->v_done;
-				else if (q->v_done == 0)
-					f_epoch_wait();
-				if (q->v_done < 3)
-					p = &q->v_next;
-				else
-					*p = q->v_next;
-				if (*p) (*p)->f_epoch_request();
-				auto tail = q->v_increments.v_tail;
-				q->v_increments.f_flush();
-				q->v_decrements.f_flush();
-				{
+				if (q->v_done >= 0) {
+					auto tail = q->v_increments.v_tail;
+					q->f_epoch();
 					std::lock_guard<std::mutex> lock(v_object__reviving__mutex);
 					if (q->v_reviving) {
 						size_t n = t_slot::t_increments::V_SIZE;
@@ -60,14 +38,16 @@ void t_engine::f_collector()
 							q->v_reviving = nullptr;
 					}
 				}
-				if (q->v_done >= 3) delete q;
+				if (q->v_done < 3) {
+					p = &q->v_next;
+				} else {
+					*p = q->v_next;
+					delete q;
+				}
 			}
 		}
 		t_object::f_collect();
-		if (v_object__pool0.v_freed > 0) v_object__pool0.f_return();
-		if (v_object__pool1.v_freed > 0) v_object__pool1.f_return();
-		if (v_object__pool2.v_freed > 0) v_object__pool2.f_return();
-		if (v_object__pool3.v_freed > 0) v_object__pool3.f_return();
+		v_object__pool.f_flush();
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "collector quitting...\n");
 	v_collector__conductor.f_exit();
@@ -82,6 +62,12 @@ void t_engine::f_finalizer()
 			if (v_finalizer__conductor.v_quitting) break;
 			v_finalizer__conductor.f__next(lock);
 		}
+		[this]
+		{
+		char padding[4096];
+		std::memset(padding, 0, sizeof(padding));
+		[this]
+		{
 		while (true) {
 			t_object* p;
 			{
@@ -92,27 +78,40 @@ void t_engine::f_finalizer()
 			}
 			p->f_type()->f_suppress_finalize(p);
 			f_finalize(p);
+			t_slot::f_decrements()->f_push(p);
 		}
+		}();
+		}();
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer quitting...\n");
 	v_finalizer__conductor.f_exit();
 }
 
-t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_options(a_options), v_collector__threshold(v_options.v_collector__threshold)
+t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_object__pool([]
 {
-	if (sem_init(&v_epoch__done, 0, 0) == -1) throw std::system_error(errno, std::system_category());
-	v_epoch__default_handler = std::signal(SIGUSR1, [](int)
+	f_engine()->f_wait();
+}), v_options(a_options), v_collector__threshold(v_options.v_collector__threshold)
+{
+	if (sem_init(&v_epoch__received, 0, 0) == -1) throw std::system_error(errno, std::generic_category());
+	sigfillset(&v_epoch__notsigusr2);
+	sigdelset(&v_epoch__notsigusr2, SIGUSR2);
+	struct sigaction sa;
+	sa.sa_handler = [](int)
 	{
-		t_thread::v_current->f_epoch();
-		if (sem_post(&f_engine()->v_epoch__done) == -1) std::terminate();
-	});
-	if (v_epoch__default_handler == SIG_ERR) throw std::system_error(errno, std::system_category());
-	v_thread__internals->f_initialize();
-	v_object__pool0.f_grow();
-	v_object__pool1.f_grow();
-	v_object__pool2.f_grow();
-	v_object__pool3.f_grow();
-	v_thread.f__construct(f__new_zerod<t_System_2eThreading_2eThread>());
+	};
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if (sigaction(SIGUSR2, &sa, &v_epoch__old_sigusr2) == -1) throw std::system_error(errno, std::generic_category());
+	sa.sa_handler = [](int)
+	{
+		t_thread::v_current->f_epoch_get();
+		f_engine()->f_epoch_suspend();
+	};
+	sigaddset(&sa.sa_mask, SIGUSR2);
+	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
+	v_thread__internals->f_initialize(this);
+	v_object__pool.f_grow();
+	v_thread = f__new_zerod<t_System_2eThreading_2eThread>();
 	v_thread->v__internal = v_thread__internals;
 	t_System_2eThreading_2eThread::v__current = v_thread;
 	{
@@ -136,7 +135,7 @@ t_engine::~t_engine()
 	{
 		auto internal = v_thread->v__internal;
 		v_thread.f__destruct();
-		internal->f_epoch();
+		internal->f_epoch_get();
 		std::lock_guard<std::mutex> lock(v_thread__mutex);
 		++internal->v_done;
 	}
@@ -146,34 +145,22 @@ t_engine::~t_engine()
 	f_wait();
 	v_collector__conductor.f_quit();
 	assert(!v_thread__internals);
-	v_object__pool0.f_clear();
-	v_object__pool1.f_clear();
-	v_object__pool2.f_clear();
-	v_object__pool3.f_clear();
-	std::signal(SIGUSR1, v_epoch__default_handler);
-	sem_destroy(&v_epoch__done);
+	if (sem_destroy(&v_epoch__received) == -1) std::exit(errno);
+	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
+	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
 	if (v_options.v_verbose) {
 		std::fprintf(stderr, "statistics:\n\tt_object:\n");
 		size_t allocated = 0;
 		size_t freed = 0;
-		auto f = [&](auto& a_pool, size_t a_rank)
+		v_object__pool.f_statistics([&](auto a_rank, auto a_allocated, auto a_freed)
 		{
-			size_t x = a_pool.f_allocated();
-			size_t y = a_pool.f_freed();
-			std::fprintf(stderr, "\t\trank%zu: %zu - %zu = %zu\n", a_rank, x, y, x - y);
-			allocated += x;
-			freed += y;
-		};
-		f(v_object__pool0, 0);
-		f(v_object__pool1, 1);
-		f(v_object__pool2, 2);
-		f(v_object__pool3, 3);
-		std::fprintf(stderr, "\t\trank4: %zu - %zu = %zu\n", static_cast<size_t>(v_object__allocated), v_object__freed, v_object__allocated - v_object__freed);
-		allocated += v_object__allocated;
-		freed += v_object__freed;
+			std::fprintf(stderr, "\t\trank%zu: %zu - %zu = %zu\n", a_rank, a_allocated, a_freed, a_allocated - a_freed);
+			allocated += a_allocated;
+			freed += a_freed;
+		});
 		std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
 		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
-		if (allocated != freed) std::exit(EXIT_FAILURE);
+		if (allocated != freed) std::terminate();
 	}
 }
 
@@ -190,7 +177,7 @@ void t_engine::f_shutdown()
 		}
 	}
 	v_shuttingdown = true;
-	f_pools__return();
+	f_object__return();
 	{
 		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
 		if (v_collector__full++ <= 0) v_collector__threshold = 0;

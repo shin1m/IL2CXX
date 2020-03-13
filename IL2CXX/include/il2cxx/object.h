@@ -14,12 +14,11 @@ struct t__type_of;
 
 class t_object
 {
+	template<typename T, typename T_wait> friend class t_pool;
 	friend class t_slot;
-	template<typename T, size_t A_size> friend class t_shared_pool;
-	template<typename T> friend class t_local_pool;
-	template<size_t A_rank> friend class t_object_and;
 	friend struct t__type;
 	friend struct t__type_finalizee;
+	friend class t_thread;
 	friend class t_engine;
 	friend struct t__weak_handle;
 
@@ -68,9 +67,6 @@ class t_object
 		a_slot.v_p.store(nullptr, std::memory_order_relaxed);
 	}
 	static void f_collect();
-	template<size_t A_rank>
-	static t_object* f_pool__allocate();
-	static t_object* f_local_pool__allocate(size_t a_size);
 
 	t_object* v_next;
 	t_object* v_previous;
@@ -81,7 +77,7 @@ class t_object
 	size_t v_cyclic;
 	size_t v_rank;
 	t_object* v_next_cycle;
-	t__type* v_type;
+	std::atomic<t__type*> v_type{nullptr};
 	std::atomic<t__extension*> v_extension{nullptr};
 
 	template<void (t_object::*A_push)()>
@@ -196,12 +192,12 @@ class t_object
 	void f_cyclic_decrement();
 
 public:
-	template<typename T>
-	static t_scoped<t_slot_of<T>> f_allocate(size_t a_extra = 0);
+	template<typename T, typename T_construct>
+	static T* f_new(size_t a_extra, T_construct a_construct);
 
 	t__type* f_type() const
 	{
-		return v_type;
+		return v_type.load(std::memory_order_relaxed);
 	}
 	t__extension* f_extension();
 	void f__scan(t_scan a_scan)
@@ -210,20 +206,11 @@ public:
 	void f__construct(t_object* a_p) const
 	{
 	}
-	t_scoped<t_slot> f__clone() const
+	t_object* f__clone() const
 	{
-		return f_allocate<t_object>();
-	}
-};
-
-template<size_t A_rank>
-struct t_object_and : t_object
-{
-	char v_data[sizeof(void*) * (6 + 8 * A_rank)];
-
-	t_object_and()
-	{
-		v_rank = A_rank;
+		return f_new<t_object>(0, [](auto)
+		{
+		});
 	}
 };
 
@@ -236,7 +223,7 @@ struct t__extension
 		t__weak_handle* v_previous;
 		t__weak_handle* v_next;
 	} v_weak_handles;
-	t_member<t_slot> v_weak_handles__cycle;
+	t_slot v_weak_handles__cycle{};
 	std::mutex v_weak_handles__mutex;
 
 	t__extension();
@@ -248,17 +235,17 @@ struct t__extension
 struct t__handle
 {
 	virtual ~t__handle() = default;
-	virtual t_scoped<t_slot> f_target() const = 0;
+	virtual t_object* f_target() const = 0;
 };
 
 struct t__normal_handle : t__handle
 {
-	t_scoped<t_slot> v_target;
+	t_root<t_slot> v_target;
 
-	t__normal_handle(t_scoped<t_slot>&& a_target) : v_target(std::move(a_target))
+	t__normal_handle(t_object* a_target) : v_target(a_target)
 	{
 	}
-	virtual t_scoped<t_slot> f_target() const;
+	virtual t_object* f_target() const;
 };
 
 struct t__weak_handle : t__handle, decltype(t__extension::v_weak_handles)
@@ -266,13 +253,13 @@ struct t__weak_handle : t__handle, decltype(t__extension::v_weak_handles)
 	t_object* v_target;
 	bool v_final;
 
-	void f_attach(t_scoped<t_slot>&& a_target);
-	t_scoped<t_slot> f_detach();
+	void f_attach(t_root<t_slot>& a_target);
+	t_object* f_detach();
 
-	t__weak_handle(t_scoped<t_slot>&& a_target, bool a_final);
+	t__weak_handle(t_object* a_target, bool a_final);
 	virtual ~t__weak_handle();
-	virtual t_scoped<t_slot> f_target() const;
-	virtual void f_target__(t_scoped<t_slot>&& a_p);
+	virtual t_object* f_target() const;
+	virtual void f_target__(t_object* a_p);
 	virtual void f_scan(t_scan a_scan);
 };
 
@@ -282,13 +269,13 @@ inline t__extension::t__extension() : v_weak_handles{static_cast<t__weak_handle*
 
 struct t__dependent_handle : t__weak_handle
 {
-	t_member<t_slot> v_secondary;
+	t_slot v_secondary;
 
-	t__dependent_handle(t_scoped<t_slot>&& a_target, t_scoped<t_slot>&& a_secondary) : t__weak_handle(std::move(a_target), false), v_secondary(std::move(a_secondary))
+	t__dependent_handle(t_object* a_target, t_object* a_secondary) : t__weak_handle(a_target, false), v_secondary(a_secondary)
 	{
 	}
 	virtual ~t__dependent_handle();
-	virtual void f_target__(t_scoped<t_slot>&& a_p);
+	virtual void f_target__(t_object* a_p);
 	virtual void f_scan(t_scan a_scan);
 };
 

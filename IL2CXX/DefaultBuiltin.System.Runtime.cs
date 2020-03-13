@@ -21,7 +21,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("InternalAlloc", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => $"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(std::move(a_0), a_1)) : new t__normal_handle(std::move(a_0))}};\n"
+                transpiler => $"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(a_0, a_1)) : new t__normal_handle(a_0)}};\n"
             );
             code.For(
                 type.GetMethod("InternalFree", BindingFlags.Static | BindingFlags.NonPublic),
@@ -36,7 +36,10 @@ namespace IL2CXX
         {
             code.For(
                 type.GetConstructor(new[] { typeof(object), typeof(object) }),
-                transpiler => $"\treturn {transpiler.EscapeForValue(type)}{{new t__dependent_handle(std::move(a_0), std::move(a_1))}};\n"
+                transpiler => $@"{'\t'}{transpiler.EscapeForValue(type)} value;
+{'\t'}value.v__5fhandle = new t__dependent_handle(a_0, a_1);
+{'\t'}return value;
+"
             );
             code.For(
                 type.GetMethod("GetPrimary"),
@@ -46,13 +49,13 @@ namespace IL2CXX
                 type.GetMethod("GetPrimaryAndSecondary"),
                 transpiler => $@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue);
 {'\t'}auto primary = p->f_target();
-{'\t'}*static_cast<{transpiler.EscapeForMember(typeof(object))}*>(a_1) = primary ? p->v_secondary : nullptr;
-{'\t'}return std::move(primary);
+{'\t'}f__store(*a_1, primary ? static_cast<t_object*>(p->v_secondary) : nullptr);
+{'\t'}return primary;
 "
             );
             code.For(
                 type.GetMethod("SetPrimary"),
-                transpiler => "\tstatic_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)->f_target__(std::move(a_1));\n"
+                transpiler => "\tstatic_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)->f_target__(a_1);\n"
             );
             code.For(
                 type.GetMethod("SetSecondary"),
@@ -162,7 +165,7 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 1),
-                (transpiler, types) => "\treturn std::move(a_0);\n"
+                (transpiler, types) => $"\treturn static_cast<{transpiler.EscapeForValue(types[0])}>(a_0);\n"
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 2),

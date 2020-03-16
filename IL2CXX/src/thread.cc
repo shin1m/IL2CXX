@@ -1,25 +1,251 @@
 #include <il2cxx/thread.h>
 #include <sys/resource.h>
 
-extern "C" int _Unwind_RaiseException(void* exception_object)
+extern "C"
 {
-	static auto original = reinterpret_cast<int(*)(void*)>(dlsym(RTLD_NEXT, "_Unwind_RaiseException"));
-	if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->f_unthunk();
-	return original(exception_object);
+
+enum _Unwind_Reason_Code
+{
+	_URC_NO_REASON = 0,
+	_URC_FOREIGN_EXCEPTION_CAUGHT = 1,
+	_URC_FATAL_PHASE2_ERROR = 2,
+	_URC_FATAL_PHASE1_ERROR = 3,
+	_URC_NORMAL_STOP = 4,
+	_URC_END_OF_STACK = 5,
+	_URC_HANDLER_FOUND = 6,
+	_URC_INSTALL_CONTEXT = 7,
+	_URC_CONTINUE_UNWIND = 8
+};
+typedef int _Unwind_Action;
+#define _UA_SEARCH_PHASE        1
+#define _UA_CLEANUP_PHASE       2
+#define _UA_HANDLER_FRAME       4
+#define _UA_FORCE_UNWIND        8
+#define _UA_END_OF_STACK       16
+struct _Unwind_Context;
+struct _Unwind_Exception;
+typedef void(*_Unwind_Exception_Cleanup_Fn)(_Unwind_Reason_Code, _Unwind_Exception*);
+typedef _Unwind_Reason_Code(*_Unwind_Stop_Fn)(int, _Unwind_Action, uint64_t, _Unwind_Exception*, _Unwind_Context*, void*);
+struct _Unwind_Exception
+{
+	uint64_t exception_class;
+	_Unwind_Exception_Cleanup_Fn exception_cleanup;
+	unsigned long private_1;
+	unsigned long private_2;
+} __attribute__((__aligned__));
+
+#define _U_VERSION      1
+typedef _Unwind_Reason_Code(*_Unwind_Personality_Fn)(int, _Unwind_Action, uint64_t, _Unwind_Exception*, _Unwind_Context*);
+struct _Unwind_Context
+{
+	unw_cursor_t cursor;
+	int end_of_stack = 0;
+};
+
+#define __IL2CXX_UNWIND_GETCONTEXT(error)\
+	_Unwind_Context context;\
+	unw_context_t uc;\
+	if (unw_getcontext(&uc) < 0 || unw_init_local(&context.cursor, &uc) < 0) return error;
+
+static _Unwind_Reason_Code _Unwind_Phase2(_Unwind_Exception* exception_object, _Unwind_Context* context)
+{
+	auto stop = reinterpret_cast<_Unwind_Stop_Fn>(exception_object->private_1);
+	auto exception_class = exception_object->exception_class;
+	auto stop_parameter = reinterpret_cast<void*>(exception_object->private_2);
+	_Unwind_Action actions = _UA_CLEANUP_PHASE;
+	if (stop) actions |= _UA_FORCE_UNWIND;
+	while (true) {
+		auto ret = unw_step(&context->cursor);
+		if (ret <= 0) {
+			if (ret < 0) return _URC_FATAL_PHASE2_ERROR;
+			actions |= _UA_END_OF_STACK;
+			context->end_of_stack = 1;
+		}
+		if (stop && stop(_U_VERSION, actions, exception_class, exception_object, context, stop_parameter) != _URC_NO_REASON) return _URC_FATAL_PHASE2_ERROR;
+		unw_proc_info_t pi;
+		if (context->end_of_stack || unw_get_proc_info(&context->cursor, &pi) < 0) return _URC_FATAL_PHASE2_ERROR;
+		auto personality = reinterpret_cast<_Unwind_Personality_Fn>(static_cast<uintptr_t>(pi.handler));
+		if (!personality) continue;
+		if (!stop) {
+			unw_word_t ip;
+			if (unw_get_reg(&context->cursor, UNW_REG_IP, &ip) < 0) return _URC_FATAL_PHASE2_ERROR;
+			if ((unsigned long)stop_parameter == ip) {
+				actions |= _UA_HANDLER_FRAME;
+				if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(false);
+			}
+		}
+		auto reason = personality(_U_VERSION, actions, exception_class, exception_object, context);
+		if (reason != _URC_CONTINUE_UNWIND) {
+			if (reason != _URC_INSTALL_CONTEXT) return _URC_FATAL_PHASE2_ERROR;
+			unw_resume(&context->cursor);
+			abort();
+		}
+		if (actions & _UA_HANDLER_FRAME) abort();
+	}
+	return _URC_FATAL_PHASE2_ERROR;
 }
 
-extern "C" void _Unwind_Resume(void* exception_object)
+_Unwind_Reason_Code _Unwind_RaiseException(_Unwind_Exception* exception_object)
 {
-	static auto original = reinterpret_cast<void(*)(void*)>(dlsym(RTLD_NEXT, "_Unwind_Resume"));
-	if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->f_unthunk();
-	original(exception_object);
+	if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(true);
+	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE1_ERROR)
+	auto exception_class = exception_object->exception_class;
+	while (true) {
+		auto ret = unw_step(&context.cursor);
+		if (ret <= 0) return ret == 0 ? _URC_END_OF_STACK : _URC_FATAL_PHASE1_ERROR;
+		if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->f_unthunk(context.cursor);
+		unw_proc_info_t pi;
+		if (unw_get_proc_info(&context.cursor, &pi) < 0) return _URC_FATAL_PHASE1_ERROR;
+		auto personality = reinterpret_cast<_Unwind_Personality_Fn>(static_cast<uintptr_t>(pi.handler));
+		if (!personality) continue;
+		auto reason = personality(_U_VERSION, _UA_SEARCH_PHASE, exception_class, exception_object, &context);
+		if (reason == _URC_CONTINUE_UNWIND) continue;
+		if (reason == _URC_HANDLER_FOUND) break;
+		return _URC_FATAL_PHASE1_ERROR;
+	}
+	unw_word_t ip;
+	if (unw_get_reg(&context.cursor, UNW_REG_IP, &ip) < 0) return _URC_FATAL_PHASE1_ERROR;
+	exception_object->private_1 = 0;
+	exception_object->private_2 = ip;
+	if (unw_init_local(&context.cursor, &uc) < 0) return _URC_FATAL_PHASE1_ERROR;
+	return _Unwind_Phase2(exception_object, &context);
 }
 
-extern "C" void* __cxa_begin_catch(void* exceptionObject)
+_Unwind_Reason_Code _Unwind_ForcedUnwind(_Unwind_Exception* exception_object, _Unwind_Stop_Fn stop, void* stop_parameter)
 {
-	if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->f_rethunk();
-	static auto original = reinterpret_cast<void*(*)(void*)>(dlsym(RTLD_NEXT, "__cxa_begin_catch"));
-	return original(exceptionObject);
+	if (!stop) return _URC_FATAL_PHASE2_ERROR;
+	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE2_ERROR)
+	exception_object->private_1 = reinterpret_cast<unsigned long>(stop);
+	exception_object->private_2 = reinterpret_cast<unsigned long>(stop_parameter);
+	return _Unwind_Phase2(exception_object, &context);
+}
+
+void _Unwind_Resume(_Unwind_Exception* exception_object)
+{
+	__IL2CXX_UNWIND_GETCONTEXT(abort())
+	_Unwind_Phase2(exception_object, &context);
+	abort();
+}
+
+void _Unwind_DeleteException(_Unwind_Exception* exception_object)
+{
+	auto cleanup = exception_object->exception_cleanup;
+	if (cleanup) cleanup(_URC_FOREIGN_EXCEPTION_CAUGHT, exception_object);
+}
+
+unsigned long _Unwind_GetGR(_Unwind_Context* context, int index)
+{
+	if (index == UNW_REG_SP && context->end_of_stack) return 0;
+	unw_word_t val;
+	unw_get_reg(&context->cursor, index, &val);
+	return val;
+}
+
+void _Unwind_SetGR(_Unwind_Context* context, int index, unsigned long new_value)
+{
+#ifdef UNW_TARGET_X86
+	index = dwarf_to_unw_regnum(index);
+#endif
+	unw_set_reg(&context->cursor, index, new_value);
+#ifdef UNW_TARGET_IA64
+	if (index >= UNW_IA64_GR && index <= UNW_IA64_GR + 127) unw_set_reg(&context->cursor, UNW_IA64_NAT + (index - UNW_IA64_GR), 0);
+#endif
+}
+
+unsigned long _Unwind_GetIP(_Unwind_Context* context)
+{
+	unw_word_t val;
+	unw_get_reg(&context->cursor, UNW_REG_IP, &val);
+	return val;
+}
+
+unsigned long _Unwind_GetIPInfo(_Unwind_Context* context, int* ip_before_insn)
+{
+	unw_word_t val;
+	unw_get_reg(&context->cursor, UNW_REG_IP, &val);
+	*ip_before_insn = unw_is_signal_frame(&context->cursor);
+	return val;
+}
+
+void _Unwind_SetIP(_Unwind_Context* context, unsigned long new_value)
+{
+	unw_set_reg(&context->cursor, UNW_REG_IP, new_value);
+}
+
+unsigned long _Unwind_GetLanguageSpecificData(_Unwind_Context* context)
+{
+	unw_proc_info_t pi;
+	pi.lsda = 0;
+	unw_get_proc_info(&context->cursor, &pi);
+	return pi.lsda;
+}
+
+unsigned long _Unwind_GetRegionStart(_Unwind_Context* context)
+{
+	unw_proc_info_t pi;
+	pi.start_ip = 0;
+	unw_get_proc_info(&context->cursor, &pi);
+	return pi.start_ip;
+}
+
+_Unwind_Reason_Code _Unwind_Resume_or_Rethrow(_Unwind_Exception* exception_object)
+{
+	if (!exception_object->private_1) return _Unwind_RaiseException(exception_object);
+	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE2_ERROR)
+	return _Unwind_Phase2(exception_object, &context);
+}
+
+unsigned long _Unwind_GetBSP(_Unwind_Context* context)
+{
+#ifdef UNW_TARGET_IA64
+	unw_word_t val;
+	unw_get_reg(&context->cursor, UNW_IA64_BSP, &val);
+	return val;
+#else
+	return 0;
+#endif
+}
+
+unsigned long _Unwind_GetCFA(_Unwind_Context* context)
+{
+	unw_word_t val;
+	unw_get_reg(&context->cursor, UNW_REG_SP, &val);
+	return val;
+}
+
+unsigned long _Unwind_GetDataRelBase(_Unwind_Context* context)
+{
+	unw_proc_info_t pi;
+	pi.gp = 0;
+	unw_get_proc_info(&context->cursor, &pi);
+	return pi.gp;
+}
+
+unsigned long _Unwind_GetTextRelBase(_Unwind_Context* context)
+{
+	return 0;
+}
+
+typedef _Unwind_Reason_Code (*_Unwind_Trace_Fn)(_Unwind_Context*, void*);
+
+_Unwind_Reason_Code _Unwind_Backtrace(_Unwind_Trace_Fn trace, void* trace_parameter)
+{
+	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE1_ERROR)
+	while (true) {
+		auto ret = unw_step(&context.cursor);
+		if (ret <= 0) return ret == 0 ? _URC_END_OF_STACK : _URC_FATAL_PHASE1_ERROR;
+		if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->f_unthunk(context.cursor);
+		if (trace(&context, trace_parameter) != _URC_NO_REASON) return _URC_FATAL_PHASE1_ERROR;
+	}
+}
+
+void* _Unwind_FindEnclosingFunction(void* ip)
+{
+	unw_proc_info_t pi;
+	if (unw_get_proc_info_by_ip(unw_local_addr_space, static_cast<unw_word_t>(reinterpret_cast<uintptr_t>(ip)), &pi, 0) < 0) return NULL;
+	return reinterpret_cast<void*>(static_cast<uintptr_t>(pi.start_ip));
+}
+
 }
 
 namespace il2cxx
@@ -115,24 +341,12 @@ void t_thread::f_thunk(unw_cursor_t& a_cursor)
 	}
 }
 
-void t_thread::f_unthunk()
+void t_thread::f_unthunk(unw_cursor_t& a_cursor)
 {
-	v_throwing.store(true);
-	auto bottom = v_stack_frames + sysconf(_SC_PAGESIZE) / sizeof(t_frame) - 1;
-	while (v_stack_preserved < bottom) {
-		std::memcpy(v_stack_preserved->v_base, v_stack_preserved->f_return_address(), sizeof(void*));
-		++v_stack_preserved;
-	}
-}
-
-void t_thread::f_rethunk()
-{
-	unw_context_t context;
-	unw_getcontext(&context);
-	unw_cursor_t cursor;
-	unw_init_local(&cursor, &context);
-	f_thunk(cursor);
-	v_throwing.store(false);
+	void* ip;
+	if (unw_get_reg(&a_cursor, UNW_REG_IP, reinterpret_cast<unw_word_t*>(&ip)) < 0 || ip != v_stack_preserved->v_thunk) return;
+	if (unw_set_reg(&a_cursor, UNW_REG_IP, *reinterpret_cast<unw_word_t*>(v_stack_preserved->f_return_address())) < 0) return;
+	++v_stack_preserved;
 }
 
 void t_thread::f_epoch()
@@ -156,13 +370,10 @@ void t_thread::f_epoch()
 			f_dump(cursor);
 		} while (unw_is_signal_frame(&cursor) <= 0);
 		m = v_stack_bottom - top;
-		if (v_throwing.load()) {
-			n = 0;
-			std::copy(top, v_stack_bottom, v_stack_current - m);
-		} else {
-			auto p = std::max(v_stack_preserved->v_base, reinterpret_cast<t_object**>(reinterpret_cast<uintptr_t>(v_stack_dirty) / sizeof(t_object*) * sizeof(t_object*)));
-			n = v_stack_bottom - p;
-			std::copy(top, p, v_stack_current - m);
+		auto p = std::max(v_stack_preserved->v_base, reinterpret_cast<t_object**>(reinterpret_cast<uintptr_t>(v_stack_dirty) / sizeof(t_object*) * sizeof(t_object*)));
+		n = v_stack_bottom - p;
+		std::copy(top, p, v_stack_current - m);
+		if (!v_unwinding.load()) {
 			void* ip;
 			unw_get_reg(&cursor, UNW_REG_IP, reinterpret_cast<unw_word_t*>(&ip));
 			if (ip < v_stack_frames->v_thunk || ip >= v_stack_preserved + 1) f_thunk(cursor);

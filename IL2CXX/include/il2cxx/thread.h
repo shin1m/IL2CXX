@@ -6,6 +6,7 @@
 #include <csignal>
 #include <unistd.h>
 #include <sys/mman.h>
+#define UNW_LOCAL_ONLY
 #include <libunwind.h>
 
 namespace il2cxx
@@ -45,7 +46,7 @@ struct t_thread
 	t_frame* v_stack_preserved;
 	unw_context_t v_unw_context;
 	void* v_stack_dirty;
-	std::atomic_bool v_throwing = false;
+	std::atomic_bool v_unwinding = false;
 	t_object* volatile* v_reviving = nullptr;
 
 	t_thread();
@@ -55,8 +56,7 @@ struct t_thread
 	}
 	void f_initialize(void* a_bottom);
 	void f_thunk(unw_cursor_t& a_cursor);
-	void f_unthunk();
-	void f_rethunk();
+	void f_unthunk(unw_cursor_t& a_cursor);
 	void f_epoch_get()
 	{
 		unw_getcontext(&v_unw_context);

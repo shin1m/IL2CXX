@@ -1,7 +1,7 @@
 #ifndef IL2CXX__OBJECT_H
 #define IL2CXX__OBJECT_H
 
-#include "pool.h"
+#include "heap.h"
 #include "slot.h"
 
 namespace il2cxx
@@ -14,7 +14,7 @@ struct t__type_of;
 
 class t_object
 {
-	template<typename T, typename T_wait> friend class t_pool;
+	template<typename T, typename T_wait> friend class t_heap;
 	friend class t_slot;
 	friend struct t__type;
 	friend struct t__type_finalizee;

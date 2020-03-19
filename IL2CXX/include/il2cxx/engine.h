@@ -30,7 +30,7 @@ public:
 	};
 
 private:
-	t_pool<t_object, void(*)()> v_object__pool;
+	t_heap<t_object, void(*)()> v_object__heap;
 	size_t v_object__lower = 0;
 	bool v_object__reviving = false;
 	std::mutex v_object__reviving__mutex;
@@ -53,12 +53,12 @@ private:
 
 	void f_object__return()
 	{
-		v_object__pool.f_return();
+		v_object__heap.f_return();
 	}
 	void f_free(t_object* a_p)
 	{
 		a_p->v_count = 1;
-		v_object__pool.f_free(a_p);
+		v_object__heap.f_free(a_p);
 	}
 	void f_free_as_release(t_object* a_p)
 	{
@@ -72,7 +72,7 @@ private:
 	}
 	t_object* f_find(void* a_p)
 	{
-		auto p = v_object__pool.f_find(a_p);
+		auto p = v_object__heap.f_find(a_p);
 		return p && p->v_type.load(std::memory_order_acquire) ? p : nullptr;
 	}
 	void f_epoch_suspend()
@@ -95,7 +95,7 @@ public:
 	~t_engine();
 	t_object* f_object__allocate(size_t a_size)
 	{
-		auto p = v_object__pool.f_allocate(a_size);
+		auto p = v_object__heap.f_allocate(a_size);
 		p->v_next = nullptr;
 		return p;
 	}
@@ -109,7 +109,7 @@ public:
 	size_t f_load_count() const
 	{
 		size_t n = 0;
-		v_object__pool.f_statistics([&](auto, auto a_allocated, auto a_freed)
+		v_object__heap.f_statistics([&](auto, auto a_allocated, auto a_freed)
 		{
 			n += a_allocated - a_freed;
 		});

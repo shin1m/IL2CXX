@@ -47,7 +47,7 @@ void t_engine::f_collector()
 			}
 		}
 		t_object::f_collect();
-		v_object__pool.f_flush();
+		v_object__heap.f_flush();
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "collector quitting...\n");
 	v_collector__conductor.f_exit();
@@ -87,7 +87,7 @@ void t_engine::f_finalizer()
 	v_finalizer__conductor.f_exit();
 }
 
-t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_object__pool([]
+t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_object__heap([]
 {
 	f_engine()->f_wait();
 }), v_options(a_options), v_collector__threshold(v_options.v_collector__threshold)
@@ -110,7 +110,7 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 	sigaddset(&sa.sa_mask, SIGUSR2);
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
 	v_thread__internals->f_initialize(this);
-	v_object__pool.f_grow();
+	v_object__heap.f_grow();
 	v_thread = f__new_zerod<t_System_2eThreading_2eThread>();
 	v_thread->v__internal = v_thread__internals;
 	t_System_2eThreading_2eThread::v__current = v_thread;
@@ -152,7 +152,7 @@ t_engine::~t_engine()
 		std::fprintf(stderr, "statistics:\n\tt_object:\n");
 		size_t allocated = 0;
 		size_t freed = 0;
-		v_object__pool.f_statistics([&](auto a_rank, auto a_allocated, auto a_freed)
+		v_object__heap.f_statistics([&](auto a_rank, auto a_allocated, auto a_freed)
 		{
 			std::fprintf(stderr, "\t\trank%zu: %zu - %zu = %zu\n", a_rank, a_allocated, a_freed, a_allocated - a_freed);
 			allocated += a_allocated;

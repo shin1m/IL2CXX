@@ -1,5 +1,5 @@
-#ifndef IL2CXX__POOL_H
-#define IL2CXX__POOL_H
+#ifndef IL2CXX__HEAP_H
+#define IL2CXX__HEAP_H
 
 #include "define.h"
 #include <list>
@@ -12,7 +12,7 @@ namespace il2cxx
 {
 
 template<typename T, typename T_wait>
-class t_pool
+class t_heap
 {
 	struct t_chunk
 	{
@@ -28,7 +28,7 @@ class t_pool
 		size_t v_returned = 0;
 		size_t v_freed = 0;
 
-		void f_grow(t_pool& a_pool)
+		void f_grow(t_heap& a_heap)
 		{
 			auto size = 128 << A_rank;
 			auto block = new char[size * A_size];
@@ -43,15 +43,15 @@ class t_pool
 			q->v_rank = A_rank;
 			q = reinterpret_cast<T*>(block);
 			v_chunks.push_back({q, A_size});
-			std::lock_guard<std::mutex> lock(a_pool.v_mutex);
-			a_pool.v_blocks.emplace(q, A_size);
+			std::lock_guard<std::mutex> lock(a_heap.v_mutex);
+			a_heap.v_blocks.emplace(q, A_size);
 		}
-		T* f_allocate(t_pool* a_pool)
+		T* f_allocate(t_heap* a_heap)
 		{
 			std::lock_guard<std::mutex> lock(v_mutex);
 			if (v_chunks.empty()) {
-				if (!a_pool) return nullptr;
-				f_grow(*a_pool);
+				if (!a_heap) return nullptr;
+				f_grow(*a_heap);
 			}
 			auto p = v_chunks.front().v_head;
 			v_allocated += v_chunks.front().v_size;
@@ -117,10 +117,10 @@ class t_pool
 	}
 
 public:
-	t_pool(T_wait&& a_wait) : v_wait(std::move(a_wait))
+	t_heap(T_wait&& a_wait) : v_wait(std::move(a_wait))
 	{
 	}
-	~t_pool()
+	~t_heap()
 	{
 		for (auto& x : v_blocks) delete x.first;
 	}
@@ -214,7 +214,7 @@ public:
 
 template<typename T, typename T_wait>
 template<size_t A_rank>
-IL2CXX__PORTABLE__THREAD T* t_pool<T, T_wait>::v_head;
+IL2CXX__PORTABLE__THREAD T* t_heap<T, T_wait>::v_head;
 
 }
 

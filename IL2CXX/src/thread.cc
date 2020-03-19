@@ -1,6 +1,7 @@
 #include <il2cxx/thread.h>
 #include <sys/resource.h>
 
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 extern "C"
 {
 
@@ -247,6 +248,7 @@ void* _Unwind_FindEnclosingFunction(void* ip)
 }
 
 }
+#endif
 
 namespace il2cxx
 {
@@ -261,6 +263,7 @@ t_thread::t_thread()
 	auto p = v_stack_buffer.get() + limit.rlim_cur;
 	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object**>(p);
 	v_stack_current = reinterpret_cast<t_object**>(p + limit.rlim_cur);
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 	union
 	{
 		t_frame** pp;
@@ -268,26 +271,27 @@ t_thread::t_thread()
 	};
 	pp = &v_stack_preserved;
 	uint8_t thunk[32] = {
-		//movabs $0x0,%rcx
-		// 0: 48 b9 00 00 00 00 00 00 00 00
-		0x48, 0xb9, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7],
-		//lea 0xf(%rip),%rdx        # 0x20
-		// a: 48 8d 15 0f 00 00 00
-		0x48, 0x8d, 0x15, 0x0f, 0x00, 0x00, 0x00,
-		//mov %rdx,(%rcx)
-		//11: 48 89 11
-		0x48, 0x89, 0x11,
-		//movabs $0x0,%rcx
-		//14: 48 b9 00 00 00 00 00 00 00 00
-		0x48, 0xb9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		//jmpq *%rcx
-		//1e: ff e1
-		0xff, 0xe1
+		//movabs $0x0,%rdi
+		// 0: 48 bf 00 00 00 00 00 00 00 00
+		0x48, 0xbf, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7],
+		//lea 0xf(%rip),%rsi        # 0x20
+		// a: 48 8d 35 0f 00 00 00
+		0x48, 0x8d, 0x35, 0x0f, 0x00, 0x00, 0x00,
+		//mov %rsi,(%rdi)
+		//11: 48 89 37
+		0x48, 0x89, 0x37,
+		//movabs $0x0,%rdi
+		//14: 48 bf 00 00 00 00 00 00 00 00
+		0x48, 0xbf, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		//jmpq *%rdi
+		//1e: ff e7
+		0xff, 0xe7
 	};
 	auto page = sysconf(_SC_PAGESIZE);
 	v_stack_frames = static_cast<t_frame*>(mmap(NULL, page, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
 	v_stack_preserved = v_stack_frames + page / sizeof(t_frame) - 1;
 	for (auto p = v_stack_frames; p <= v_stack_preserved; ++p) std::memcpy(p->v_thunk, thunk, sizeof(thunk));
+#endif
 }
 
 void t_thread::f_initialize(void* a_bottom)
@@ -297,20 +301,24 @@ void t_thread::f_initialize(void* a_bottom)
 #else
 	v_handle = pthread_self();
 #endif
-	v_stack_preserved->v_base = v_stack_bottom = reinterpret_cast<t_object**>(a_bottom);
+	v_stack_bottom = reinterpret_cast<t_object**>(a_bottom);
 	auto page = sysconf(_SC_PAGESIZE);
 	rlimit limit;
 	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
-	v_stack_dirty = v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit.rlim_cur);
+	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit.rlim_cur);
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
+	v_stack_preserved->v_base = v_stack_bottom;
+	v_stack_dirty = v_stack_limit;
+#endif
 	v_current = this;
 	t_slot::v_increments = &v_increments;
 	t_slot::v_decrements = &v_decrements;
 	v_done = 0;
 }
 
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 void f_dump(unw_cursor_t& a_cursor)
 {
-	return;
 	char cs[1024];
 	unw_word_t offset;
 	unw_get_proc_name(&a_cursor, cs, sizeof(cs), &offset);
@@ -326,9 +334,12 @@ void t_thread::f_thunk(unw_cursor_t& a_cursor)
 	auto frame = v_stack_frames;
 	while (true) {
 		if (unw_step(&a_cursor) <= 0) throw std::system_error(errno, std::generic_category());
+#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
 		f_dump(a_cursor);
+#endif
 		unw_get_reg(&a_cursor, UNW_REG_SP, reinterpret_cast<unw_word_t*>(&frame->v_base));
 		if (--frame->v_base >= v_stack_preserved->v_base) break;
+		if (frame >= v_stack_preserved) throw std::length_error("frame");
 		void* ip;
 		unw_get_reg(&a_cursor, UNW_REG_IP, reinterpret_cast<unw_word_t*>(&ip));
 		if (ip != *frame->v_base) throw std::domain_error("ip");
@@ -348,6 +359,7 @@ void t_thread::f_unthunk(unw_cursor_t& a_cursor)
 	if (unw_set_reg(&a_cursor, UNW_REG_IP, *reinterpret_cast<unw_word_t*>(v_stack_preserved->f_return_address())) < 0) return;
 	++v_stack_preserved;
 }
+#endif
 
 void t_thread::f_epoch()
 {
@@ -358,19 +370,27 @@ void t_thread::f_epoch()
 		m = n = 0;
 	} else {
 		f_epoch_suspend();
-		//std::fprintf(stderr, "THREAD(%p), PRESERVED(%p)\n", this, v_stack_preserved->v_base);
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
+		std::fprintf(stderr, "THREAD(%p), PRESERVED(%p)\n", this, v_stack_preserved->v_base);
+#endif
 		unw_cursor_t cursor;
 		unw_init_local2(&cursor, &v_unw_context, UNW_INIT_SIGNAL_FRAME);
 		if (unw_step(&cursor) <= 0) throw std::system_error(errno, std::generic_category());
+#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
 		f_dump(cursor);
+#endif
 		t_object** top;
 		do {
 			unw_get_reg(&cursor, UNW_REG_SP, reinterpret_cast<unw_word_t*>(&top));
 			if (unw_step(&cursor) <= 0) throw std::system_error(errno, std::generic_category());
+#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
 			f_dump(cursor);
+#endif
 		} while (unw_is_signal_frame(&cursor) <= 0);
 		m = v_stack_bottom - top;
 		auto p = std::max(v_stack_preserved->v_base, reinterpret_cast<t_object**>(reinterpret_cast<uintptr_t>(v_stack_dirty) / sizeof(t_object*) * sizeof(t_object*)));
+		v_stack_dirty = top;
 		n = v_stack_bottom - p;
 		std::copy(top, p, v_stack_current - m);
 		if (!v_unwinding.load()) {
@@ -378,7 +398,11 @@ void t_thread::f_epoch()
 			unw_get_reg(&cursor, UNW_REG_IP, reinterpret_cast<unw_word_t*>(&ip));
 			if (ip < v_stack_frames->v_thunk || ip >= v_stack_preserved + 1) f_thunk(cursor);
 		}
-		v_stack_dirty = top;
+#else
+		m = v_stack_bottom - v_stack_top;
+		n = 0;
+		std::copy(v_stack_top, v_stack_bottom, v_stack_current - m);
+#endif
 		f_epoch_resume();
 	}
 	auto top0 = v_stack_current - m;

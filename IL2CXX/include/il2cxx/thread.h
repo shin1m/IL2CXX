@@ -1,19 +1,24 @@
 #ifndef IL2CXX__THREAD_H
 #define IL2CXX__THREAD_H
 
+#define IL2CXX__PARTIAL_STACK_SCAN
+
 #include "object.h"
 #include <thread>
 #include <csignal>
 #include <unistd.h>
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 #include <sys/mman.h>
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
+#endif
 
 namespace il2cxx
 {
 
 struct t_thread
 {
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 	struct t_frame
 	{
 		t_object** v_base;
@@ -23,6 +28,7 @@ struct t_thread
 			return v_thunk + 22;
 		}
 	};
+#endif
 
 	static IL2CXX__PORTABLE__THREAD t_thread* v_current;
 
@@ -42,24 +48,37 @@ struct t_thread
 	t_object** v_stack_current;
 	t_object** v_stack_bottom;
 	void* v_stack_limit;
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 	t_frame* v_stack_frames;
 	t_frame* v_stack_preserved;
 	unw_context_t v_unw_context;
 	void* v_stack_dirty;
 	std::atomic_bool v_unwinding = false;
+#else
+	t_object** v_stack_top;
+#endif
 	t_object* volatile* v_reviving = nullptr;
 
 	t_thread();
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 	~t_thread()
 	{
 		munmap(v_stack_frames, sysconf(_SC_PAGESIZE));
 	}
+#endif
 	void f_initialize(void* a_bottom);
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 	void f_thunk(unw_cursor_t& a_cursor);
 	void f_unthunk(unw_cursor_t& a_cursor);
+#endif
 	void f_epoch_get()
 	{
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 		unw_getcontext(&v_unw_context);
+#else
+		t_object* dummy = nullptr;
+		v_stack_top = &dummy;
+#endif
 		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_release);
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_release);
 	}
@@ -84,9 +103,11 @@ struct t_thread
 	void f_store(T_field& a_field, T_value&& a_value)
 	{
 		auto p = &a_field;
-		if (p > v_stack_limit) {
+		if (p > v_stack_limit && p <= static_cast<void*>(v_stack_bottom)) {
 			std::memcpy(p, &a_value, sizeof(T_field));
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 			if (++p > v_stack_dirty) v_stack_dirty = p;
+#endif
 		} else {
 			f_assign(a_field, std::forward<T_value>(a_value));
 		}
@@ -94,9 +115,11 @@ struct t_thread
 	t_object* f_exchange(t_object*& a_target, t_object* a_desired)
 	{
                 auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
-		if (p > v_stack_limit) {
+		if (p > v_stack_limit && p <= static_cast<void*>(v_stack_bottom)) {
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 			if (++p > v_stack_dirty) v_stack_dirty = p;
+#endif
 		} else {
 			if (a_desired) v_increments.f_push(a_desired);
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
@@ -107,9 +130,11 @@ struct t_thread
 	bool f_compare_exchange(t_object*& a_target, t_object*& a_expected, t_object* a_desired)
 	{
                 auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
-		if (p > v_stack_limit) {
+		if (p > v_stack_limit && p <= static_cast<void*>(v_stack_bottom)) {
 			if (p->compare_exchange_strong(a_expected, a_desired)) {
+#ifdef IL2CXX__PARTIAL_STACK_SCAN
 				if (++p > v_stack_dirty) v_stack_dirty = p;
+#endif
 				return true;
 			}
 		} else {

@@ -21,11 +21,10 @@ public:
 	struct t_options
 	{
 #ifdef NDEBUG
-		size_t v_collector__threshold = 1024 * 16;
+		size_t v_collector__threshold = 1024 * 64;
 #else
 		size_t v_collector__threshold = 64;
 #endif
-		size_t v_stack_size = 1 << 10;
 		bool v_verbose = false;
 	};
 
@@ -70,8 +69,9 @@ private:
 		++v_object__collect;
 		f_free(a_p);
 	}
-	t_object* f_find(void* a_p)
+	t_object* f_object__find(void* a_p)
 	{
+		if (reinterpret_cast<uintptr_t>(a_p) & 127) return nullptr;
 		auto p = v_object__heap.f_find(a_p);
 		return p && p->v_type.load(std::memory_order_acquire) ? p : nullptr;
 	}

@@ -7,6 +7,8 @@
 #include <mutex>
 #include <new>
 #include <cstddef>
+#include <unistd.h>
+#include <sys/mman.h>
 
 namespace il2cxx
 {
@@ -31,7 +33,8 @@ class t_heap
 		void f_grow(t_heap& a_heap)
 		{
 			auto size = 128 << A_rank;
-			auto block = new char[size * A_size];
+			auto length = size * A_size;
+			auto block = static_cast<char*>(mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
 			auto p = block;
 			for (size_t i = 1; i < A_size; ++i) {
 				auto q = new(p) T;
@@ -44,7 +47,7 @@ class t_heap
 			q = reinterpret_cast<T*>(block);
 			v_chunks.push_back({q, A_size});
 			std::lock_guard<std::mutex> lock(a_heap.v_mutex);
-			a_heap.v_blocks.emplace(q, A_size);
+			a_heap.v_blocks.emplace(q, length);
 		}
 		T* f_allocate(t_heap* a_heap)
 		{
@@ -122,7 +125,7 @@ public:
 	}
 	~t_heap()
 	{
-		for (auto& x : v_blocks) delete x.first;
+		for (auto& x : v_blocks) munmap(x.first, x.second);
 	}
 	size_t f_live() const
 	{
@@ -156,9 +159,9 @@ public:
 		if (n == 0) return f_allocate(v_of3);
 		std::lock_guard<std::mutex> lock(v_mutex);
 		++v_allocated;
-		auto p = new(new char[a_size]) T;
-		p->v_rank = 4;
-		v_blocks.emplace(p, 1);
+		auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
+		p->v_rank = 57;
+		v_blocks.emplace(p, a_size);
 		return p;
 	}
 	void f_return()
@@ -192,23 +195,25 @@ public:
 			break;
 		default:
 			std::lock_guard<std::mutex> lock(v_mutex);
-			v_blocks.erase(a_p);
-			delete a_p;
+			auto i = v_blocks.find(a_p);
+			munmap(a_p, i->second);
+			v_blocks.erase(i);
 			++v_freed;
 		}
 	}
+	std::mutex& f_mutex()
+	{
+		return v_mutex;
+	}
 	T* f_find(void* a_p)
 	{
-		std::lock_guard<std::mutex> lock(v_mutex);
 		auto i = v_blocks.lower_bound(static_cast<T*>(a_p));
 		if (i == v_blocks.end() || i->first != a_p) {
 			if (i == v_blocks.begin()) return nullptr;
 			--i;
 		}
-		if (i->second == 1) return a_p == i->first ? static_cast<T*>(a_p) : nullptr;
 		auto j = static_cast<char*>(a_p) - reinterpret_cast<char*>(i->first);
-		auto rank = i->first->v_rank + 7;
-		return j >> rank < i->second && (j & (1 << rank) - 1) == 0 ? static_cast<T*>(a_p) : nullptr;
+		return j < i->second && (j & (128 << i->first->v_rank) - 1) == 0 ? static_cast<T*>(a_p) : nullptr;
 	}
 };
 

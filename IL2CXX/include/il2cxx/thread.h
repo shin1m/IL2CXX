@@ -6,9 +6,7 @@
 #include "object.h"
 #include <thread>
 #include <csignal>
-#include <unistd.h>
 #ifdef IL2CXX__PARTIAL_STACK_SCAN
-#include <sys/mman.h>
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #endif
@@ -103,7 +101,7 @@ struct t_thread
 	void f_store(T_field& a_field, T_value&& a_value)
 	{
 		auto p = &a_field;
-		if (p > v_stack_limit && p <= static_cast<void*>(v_stack_bottom)) {
+		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			std::memcpy(p, &a_value, sizeof(T_field));
 #ifdef IL2CXX__PARTIAL_STACK_SCAN
 			if (++p > v_stack_dirty) v_stack_dirty = p;
@@ -115,7 +113,7 @@ struct t_thread
 	t_object* f_exchange(t_object*& a_target, t_object* a_desired)
 	{
                 auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
-		if (p > v_stack_limit && p <= static_cast<void*>(v_stack_bottom)) {
+		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
 #ifdef IL2CXX__PARTIAL_STACK_SCAN
 			if (++p > v_stack_dirty) v_stack_dirty = p;
@@ -130,7 +128,7 @@ struct t_thread
 	bool f_compare_exchange(t_object*& a_target, t_object*& a_expected, t_object* a_desired)
 	{
                 auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
-		if (p > v_stack_limit && p <= static_cast<void*>(v_stack_bottom)) {
+		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			if (p->compare_exchange_strong(a_expected, a_desired)) {
 #ifdef IL2CXX__PARTIAL_STACK_SCAN
 				if (++p > v_stack_dirty) v_stack_dirty = p;

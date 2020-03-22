@@ -405,26 +405,32 @@ void t_thread::f_epoch()
 #endif
 		f_epoch_resume();
 	}
-	auto top0 = v_stack_current - m;
-	auto bottom0 = v_stack_current - n;
-	auto top1 = v_stack_last_top;
-	auto top = v_stack_last_top = v_stack_last_bottom - m;
 	std::vector<t_object*> decrements;
-	if (top < top1) {
-		do {
-			auto p = f_engine()->f_find(*top0++);
+	{
+		auto top0 = v_stack_current - m;
+		auto bottom0 = v_stack_current - n;
+		auto top1 = v_stack_last_top;
+		auto top = v_stack_last_top = v_stack_last_bottom - m;
+		std::lock_guard<std::mutex> lock(f_engine()->v_object__heap.f_mutex());
+		if (top < top1) {
+			do {
+				auto p = f_engine()->f_object__find(*top0++);
+				if (p) p->f_increment();
+				*top++ = p;
+			} while (top < top1);
+		} else {
+			for (; top1 < top; ++top1) if (*top1) decrements.push_back(*top1);
+		}
+		for (; top0 < bottom0; ++top) {
+			auto p = *top0++;
+			auto q = *top;
+			if (p == q) continue;
+			p = f_engine()->f_object__find(p);
+			if (p == q) continue;
 			if (p) p->f_increment();
-			*top++ = p;
-		} while (top < top1);
-	} else {
-		for (; top1 < top; ++top1) if (*top1) decrements.push_back(*top1);
-	}
-	for (; top0 < bottom0; ++top) {
-		auto p = f_engine()->f_find(*top0++);
-		if (p == *top) continue;
-		if (p) p->f_increment();
-		if (*top) decrements.push_back(*top);
-		*top = p;
+			if (q) decrements.push_back(q);
+			*top = p;
+		}
 	}
 	v_increments.f_flush();
 	for (auto p : decrements) p->f_decrement();

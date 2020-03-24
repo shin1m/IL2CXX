@@ -104,6 +104,7 @@ struct t_thread
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			std::memcpy(p, &a_value, sizeof(T_field));
 #ifdef IL2CXX__PARTIAL_STACK_SCAN
+			std::atomic_signal_fence(std::memory_order_release);
 			if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
 		} else {
@@ -116,6 +117,7 @@ struct t_thread
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
 #ifdef IL2CXX__PARTIAL_STACK_SCAN
+			std::atomic_signal_fence(std::memory_order_release);
 			if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
 		} else {

@@ -333,16 +333,16 @@ void t_thread::f_thunk(unw_cursor_t& a_cursor)
 {
 	auto frame = v_stack_frames;
 	while (true) {
+		if (frame >= v_stack_preserved) throw std::length_error("frame");
 		if (unw_step(&a_cursor) <= 0) throw std::system_error(errno, std::generic_category());
 #ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
 		f_dump(a_cursor);
 #endif
 		unw_get_reg(&a_cursor, UNW_REG_SP, reinterpret_cast<unw_word_t*>(&frame->v_base));
 		if (--frame->v_base >= v_stack_preserved->v_base) break;
-		if (frame >= v_stack_preserved) throw std::length_error("frame");
 		void* ip;
 		unw_get_reg(&a_cursor, UNW_REG_IP, reinterpret_cast<unw_word_t*>(&ip));
-		if (ip != *frame->v_base) throw std::domain_error("ip");
+		if (ip != *frame->v_base) return;
 		++frame;
 	}
 	while (frame > v_stack_frames) {

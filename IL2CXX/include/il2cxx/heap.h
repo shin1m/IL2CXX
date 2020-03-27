@@ -97,9 +97,9 @@ class t_heap
 	T_wait v_wait;
 	std::map<T*, size_t> v_blocks;
 	std::mutex v_mutex;
-	t_of<0, 4096> v_of0;
-	t_of<1, 4096> v_of1;
-	t_of<2, 4096> v_of2;
+	t_of<0, 4096 * 8> v_of0;
+	t_of<1, 4096 * 4> v_of1;
+	t_of<2, 4096 * 2> v_of2;
 	t_of<3, 4096> v_of3;
 	size_t v_allocated = 0;
 	size_t v_freed = 0;

@@ -334,11 +334,11 @@ void t_slot::t_queue<A_SIZE>::f_next() noexcept
 		++v_head;
 		while (v_tail == v_head) v_collector->f_wait();
 		auto tail = v_tail;
-		v_next = std::min(tail < v_head ? v_objects + V_SIZE - 1 : tail - 1, v_head + V_SIZE / 2);
+		v_next = std::min(tail < v_head ? v_objects + V_SIZE - 1 : tail - 1, v_head + V_SIZE / 8);
 	} else {
 		v_head = v_objects;
 		while (v_tail == v_head) v_collector->f_wait();
-		v_next = std::min(v_tail - 1, v_head + V_SIZE / 2);
+		v_next = std::min(v_tail - 1, v_head + V_SIZE / 8);
 	}
 }
 

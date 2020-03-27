@@ -405,7 +405,7 @@ void t_thread::f_epoch()
 #endif
 		f_epoch_resume();
 	}
-	std::vector<t_object*> decrements;
+	auto decrements = v_stack_last_bottom;
 	{
 		auto top0 = v_stack_current - m;
 		auto bottom0 = v_stack_current - n;
@@ -419,7 +419,7 @@ void t_thread::f_epoch()
 				*top++ = p;
 			} while (top < top1);
 		} else {
-			for (; top1 < top; ++top1) if (*top1) decrements.push_back(*top1);
+			for (; top1 < top; ++top1) if (*top1) *decrements++ = *top1;
 		}
 		for (; top0 < bottom0; ++top) {
 			auto p = *top0++;
@@ -428,12 +428,12 @@ void t_thread::f_epoch()
 			p = f_engine()->f_object__find(p);
 			if (p == q) continue;
 			if (p) p->f_increment();
-			if (q) decrements.push_back(q);
+			if (q) *decrements++ = q;
 			*top = p;
 		}
 	}
 	v_increments.f_flush();
-	for (auto p : decrements) p->f_decrement();
+	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();
 }
 

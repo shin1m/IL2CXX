@@ -115,7 +115,6 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 		std::thread(&t_engine::f_collector, this).detach();
 		v_collector__conductor.f__wait(lock);
 	}
-	v_object__heap.f_grow();
 	v_thread = f__new_zerod<t_System_2eThreading_2eThread>();
 	v_thread->v__internal = v_thread__internals;
 	t_System_2eThreading_2eThread::v__current = v_thread;

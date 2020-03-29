@@ -2,10 +2,11 @@
 #define IL2CXX__HEAP_H
 
 #include "define.h"
-#include <list>
+#include <atomic>
 #include <map>
 #include <mutex>
 #include <new>
+#include <csignal>
 #include <cstddef>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -16,21 +17,15 @@ namespace il2cxx
 template<typename T, typename T_wait>
 class t_heap
 {
-	struct t_chunk
-	{
-		T* v_head;
-		size_t v_size;
-	};
 	template<size_t A_rank, size_t A_size>
 	struct t_of
 	{
-		std::list<t_chunk> v_chunks;
-		std::mutex v_mutex;
-		size_t v_allocated = 0;
+		std::atomic<T*> v_chunks = nullptr;
+		std::atomic_size_t v_allocated = 0;
 		size_t v_returned = 0;
 		size_t v_freed = 0;
 
-		void f_grow(t_heap& a_heap)
+		T* f_grow(t_heap& a_heap)
 		{
 			auto size = 128 << A_rank;
 			auto length = size * A_size;
@@ -45,26 +40,30 @@ class t_heap
 			q->v_next = nullptr;
 			q->v_rank = A_rank;
 			q = reinterpret_cast<T*>(block);
-			v_chunks.push_back({q, A_size});
-			std::lock_guard<std::mutex> lock(a_heap.v_mutex);
+			q->v_cyclic = A_size;
+			pthread_sigmask(SIG_BLOCK, &a_heap.v_sigusr1, NULL);
+			a_heap.v_mutex.lock();
 			a_heap.v_blocks.emplace(q, length);
+			a_heap.v_mutex.unlock();
+			pthread_sigmask(SIG_UNBLOCK, &a_heap.v_sigusr1, NULL);
+			return q;
 		}
 		T* f_allocate(t_heap* a_heap)
 		{
-			std::lock_guard<std::mutex> lock(v_mutex);
-			if (v_chunks.empty()) {
+			auto p = v_chunks.load(std::memory_order_relaxed);
+			while (p && !v_chunks.compare_exchange_weak(p, p->v_previous, std::memory_order_acquire));
+			if (!p) {
 				if (!a_heap) return nullptr;
-				f_grow(*a_heap);
+				p = f_grow(*a_heap);
 			}
-			auto p = v_chunks.front().v_head;
-			v_allocated += v_chunks.front().v_size;
-			v_chunks.pop_front();
+			v_allocated.fetch_add(p->v_cyclic, std::memory_order_relaxed);
 			return p;
 		}
 		void f_return(size_t a_n)
 		{
-			std::lock_guard<std::mutex> lock(v_mutex);
-			v_chunks.push_back({v_head<A_rank>, a_n});
+			v_head<A_rank>->v_cyclic = a_n;
+			v_head<A_rank>->v_previous = v_chunks.load(std::memory_order_relaxed);
+			while (!v_chunks.compare_exchange_weak(v_head<A_rank>->v_previous, v_head<A_rank>, std::memory_order_release));
 			v_head<A_rank> = nullptr;
 			v_returned += a_n;
 		}
@@ -87,7 +86,7 @@ class t_heap
 		}
 		size_t f_live() const
 		{
-			return v_allocated - v_returned - v_freed;
+			return v_allocated.load(std::memory_order_relaxed) - v_returned - v_freed;
 		}
 	};
 
@@ -96,6 +95,7 @@ class t_heap
 
 	T_wait v_wait;
 	std::map<T*, size_t> v_blocks;
+	sigset_t v_sigusr1;
 	std::mutex v_mutex;
 	t_of<0, 4096 * 8> v_of0;
 	t_of<1, 4096 * 4> v_of1;
@@ -122,6 +122,8 @@ class t_heap
 public:
 	t_heap(T_wait&& a_wait) : v_wait(std::move(a_wait))
 	{
+		sigemptyset(&v_sigusr1);
+		sigaddset(&v_sigusr1, SIGUSR1);
 	}
 	~t_heap()
 	{
@@ -134,18 +136,11 @@ public:
 	template<typename T_each>
 	void f_statistics(T_each a_each) const
 	{
-		a_each(0, v_of0.v_allocated, v_of0.v_returned);
-		a_each(1, v_of1.v_allocated, v_of1.v_returned);
-		a_each(2, v_of2.v_allocated, v_of2.v_returned);
-		a_each(3, v_of3.v_allocated, v_of3.v_returned);
+		a_each(0, v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned);
+		a_each(1, v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned);
+		a_each(2, v_of2.v_allocated.load(std::memory_order_relaxed), v_of2.v_returned);
+		a_each(3, v_of3.v_allocated.load(std::memory_order_relaxed), v_of3.v_returned);
 		a_each(4, v_allocated, v_freed);
-	}
-	void f_grow()
-	{
-		v_of0.f_grow(*this);
-		v_of1.f_grow(*this);
-		v_of2.f_grow(*this);
-		v_of3.f_grow(*this);
 	}
 	T* f_allocate(size_t a_size)
 	{
@@ -157,11 +152,14 @@ public:
 		if (n == 0) return f_allocate(v_of2);
 		n >>= 1;
 		if (n == 0) return f_allocate(v_of3);
-		std::lock_guard<std::mutex> lock(v_mutex);
-		++v_allocated;
 		auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
 		p->v_rank = 57;
+		pthread_sigmask(SIG_BLOCK, &v_sigusr1, NULL);
+		v_mutex.lock();
 		v_blocks.emplace(p, a_size);
+		++v_allocated;
+		v_mutex.unlock();
+		pthread_sigmask(SIG_UNBLOCK, &v_sigusr1, NULL);
 		return p;
 	}
 	void f_return()
@@ -194,10 +192,12 @@ public:
 			v_of3.f_free(a_p);
 			break;
 		default:
-			std::lock_guard<std::mutex> lock(v_mutex);
+			v_mutex.lock();
 			auto i = v_blocks.find(a_p);
-			munmap(a_p, i->second);
+			auto n = i->second;
 			v_blocks.erase(i);
+			v_mutex.unlock();
+			munmap(a_p, n);
 			++v_freed;
 		}
 	}

@@ -5,7 +5,6 @@
 
 #include "object.h"
 #include <thread>
-#include <csignal>
 #ifdef IL2CXX__PARTIAL_STACK_SCAN
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>

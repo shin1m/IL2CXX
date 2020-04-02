@@ -109,7 +109,7 @@ public:
 	size_t f_load_count() const
 	{
 		size_t n = 0;
-		v_object__heap.f_statistics([&](auto, auto a_allocated, auto a_freed)
+		v_object__heap.f_statistics([&](auto, auto, auto a_allocated, auto a_freed)
 		{
 			n += a_allocated - a_freed;
 		});

@@ -21,6 +21,7 @@ class t_heap
 	struct t_of
 	{
 		std::atomic<T*> v_chunks = nullptr;
+		std::atomic_size_t v_grown = 0;
 		std::atomic_size_t v_allocated = 0;
 		size_t v_returned = 0;
 		size_t v_freed = 0;
@@ -41,11 +42,16 @@ class t_heap
 			q->v_rank = A_rank;
 			q = reinterpret_cast<T*>(block);
 			q->v_cyclic = A_size;
+#ifdef IL2CXX__STACK_SCAN_DIRECT
 			pthread_sigmask(SIG_BLOCK, &a_heap.v_sigusr1, NULL);
+#endif
 			a_heap.v_mutex.lock();
 			a_heap.v_blocks.emplace(q, length);
 			a_heap.v_mutex.unlock();
+#ifdef IL2CXX__STACK_SCAN_DIRECT
 			pthread_sigmask(SIG_UNBLOCK, &a_heap.v_sigusr1, NULL);
+#endif
+			v_grown.fetch_add(A_size, std::memory_order_relaxed);
 			return q;
 		}
 		T* f_allocate(t_heap* a_heap)
@@ -95,12 +101,17 @@ class t_heap
 
 	T_wait v_wait;
 	std::map<T*, size_t> v_blocks;
+#ifdef IL2CXX__STACK_SCAN_DIRECT
 	sigset_t v_sigusr1;
+#endif
 	std::mutex v_mutex;
-	t_of<0, 4096 * 8> v_of0;
-	t_of<1, 4096 * 4> v_of1;
-	t_of<2, 4096 * 2> v_of2;
-	t_of<3, 4096> v_of3;
+	t_of<0, 1024 * 64> v_of0;
+	t_of<1, 1024 * 16> v_of1;
+	t_of<2, 1024 * 4> v_of2;
+	t_of<3, 1024> v_of3;
+	t_of<4, 1024 / 4> v_of4;
+	t_of<5, 1024 / 16> v_of5;
+	t_of<6, 1024 / 64> v_of6;
 	size_t v_allocated = 0;
 	size_t v_freed = 0;
 
@@ -122,8 +133,10 @@ class t_heap
 public:
 	t_heap(T_wait&& a_wait) : v_wait(std::move(a_wait))
 	{
+#ifdef IL2CXX__STACK_SCAN_DIRECT
 		sigemptyset(&v_sigusr1);
 		sigaddset(&v_sigusr1, SIGUSR1);
+#endif
 	}
 	~t_heap()
 	{
@@ -131,16 +144,19 @@ public:
 	}
 	size_t f_live() const
 	{
-		return v_of0.f_live() + v_of1.f_live() + v_of2.f_live() + v_of3.f_live() + v_allocated - v_freed;
+		return v_of0.f_live() + v_of1.f_live() + v_of2.f_live() + v_of3.f_live() + v_of4.f_live() + v_of5.f_live() + v_of6.f_live() + v_allocated - v_freed;
 	}
 	template<typename T_each>
 	void f_statistics(T_each a_each) const
 	{
-		a_each(0, v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned);
-		a_each(1, v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned);
-		a_each(2, v_of2.v_allocated.load(std::memory_order_relaxed), v_of2.v_returned);
-		a_each(3, v_of3.v_allocated.load(std::memory_order_relaxed), v_of3.v_returned);
-		a_each(4, v_allocated, v_freed);
+		a_each(0, v_of0.v_grown.load(std::memory_order_relaxed), v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned);
+		a_each(1, v_of1.v_grown.load(std::memory_order_relaxed), v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned);
+		a_each(2, v_of2.v_grown.load(std::memory_order_relaxed), v_of2.v_allocated.load(std::memory_order_relaxed), v_of2.v_returned);
+		a_each(3, v_of3.v_grown.load(std::memory_order_relaxed), v_of3.v_allocated.load(std::memory_order_relaxed), v_of3.v_returned);
+		a_each(4, v_of4.v_grown.load(std::memory_order_relaxed), v_of4.v_allocated.load(std::memory_order_relaxed), v_of4.v_returned);
+		a_each(5, v_of5.v_grown.load(std::memory_order_relaxed), v_of5.v_allocated.load(std::memory_order_relaxed), v_of5.v_returned);
+		a_each(6, v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned);
+		a_each(57, 0, v_allocated, v_freed);
 	}
 	T* f_allocate(size_t a_size)
 	{
@@ -152,14 +168,24 @@ public:
 		if (n == 0) return f_allocate(v_of2);
 		n >>= 1;
 		if (n == 0) return f_allocate(v_of3);
+		n >>= 1;
+		if (n == 0) return f_allocate(v_of4);
+		n >>= 1;
+		if (n == 0) return f_allocate(v_of5);
+		n >>= 1;
+		if (n == 0) return f_allocate(v_of6);
 		auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
 		p->v_rank = 57;
+#ifdef IL2CXX__STACK_SCAN_DIRECT
 		pthread_sigmask(SIG_BLOCK, &v_sigusr1, NULL);
+#endif
 		v_mutex.lock();
 		v_blocks.emplace(p, a_size);
 		++v_allocated;
 		v_mutex.unlock();
+#ifdef IL2CXX__STACK_SCAN_DIRECT
 		pthread_sigmask(SIG_UNBLOCK, &v_sigusr1, NULL);
+#endif
 		return p;
 	}
 	void f_return()
@@ -168,6 +194,9 @@ public:
 		v_of1.f_return();
 		v_of2.f_return();
 		v_of3.f_return();
+		v_of4.f_return();
+		v_of5.f_return();
+		v_of6.f_return();
 	}
 	void f_flush()
 	{
@@ -175,6 +204,9 @@ public:
 		if (v_of1.v_freed > 0) v_of1.f_flush();
 		if (v_of2.v_freed > 0) v_of2.f_flush();
 		if (v_of3.v_freed > 0) v_of3.f_flush();
+		if (v_of4.v_freed > 0) v_of4.f_flush();
+		if (v_of5.v_freed > 0) v_of5.f_flush();
+		if (v_of6.v_freed > 0) v_of6.f_flush();
 	}
 	void f_free(T* a_p)
 	{
@@ -190,6 +222,15 @@ public:
 			break;
 		case 3:
 			v_of3.f_free(a_p);
+			break;
+		case 4:
+			v_of4.f_free(a_p);
+			break;
+		case 5:
+			v_of5.f_free(a_p);
+			break;
+		case 6:
+			v_of6.f_free(a_p);
 			break;
 		default:
 			v_mutex.lock();

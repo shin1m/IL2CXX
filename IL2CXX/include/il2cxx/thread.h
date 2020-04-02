@@ -1,11 +1,9 @@
 #ifndef IL2CXX__THREAD_H
 #define IL2CXX__THREAD_H
 
-#define IL2CXX__PARTIAL_STACK_SCAN
-
 #include "object.h"
 #include <thread>
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #endif
@@ -15,7 +13,7 @@ namespace il2cxx
 
 struct t_thread
 {
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 	struct t_frame
 	{
 		t_object** v_base;
@@ -42,10 +40,10 @@ struct t_thread
 	std::unique_ptr<char[]> v_stack_buffer;
 	t_object** v_stack_last_top;
 	t_object** v_stack_last_bottom;
-	t_object** v_stack_current;
+	t_object** v_stack_copy;
 	t_object** v_stack_bottom;
 	void* v_stack_limit;
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 	t_frame* v_stack_frames;
 	t_frame* v_stack_preserved;
 	unw_context_t v_unw_context;
@@ -57,20 +55,20 @@ struct t_thread
 	t_object* volatile* v_reviving = nullptr;
 
 	t_thread();
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 	~t_thread()
 	{
 		munmap(v_stack_frames, sysconf(_SC_PAGESIZE));
 	}
 #endif
 	void f_initialize(void* a_bottom);
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 	void f_thunk(unw_cursor_t& a_cursor);
 	void f_unthunk(unw_cursor_t& a_cursor);
 #endif
 	void f_epoch_get()
 	{
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 		unw_getcontext(&v_unw_context);
 #else
 		t_object* dummy = nullptr;
@@ -102,7 +100,7 @@ struct t_thread
 		auto p = &a_field;
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			std::memcpy(p, &a_value, sizeof(T_field));
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 			std::atomic_signal_fence(std::memory_order_release);
 			if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
@@ -115,7 +113,7 @@ struct t_thread
                 auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 			std::atomic_signal_fence(std::memory_order_release);
 			if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
@@ -131,7 +129,7 @@ struct t_thread
                 auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			if (p->compare_exchange_strong(a_expected, a_desired)) {
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 				if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
 				return true;

@@ -151,9 +151,9 @@ t_engine::~t_engine()
 		std::fprintf(stderr, "statistics:\n\tt_object:\n");
 		size_t allocated = 0;
 		size_t freed = 0;
-		v_object__heap.f_statistics([&](auto a_rank, auto a_allocated, auto a_freed)
+		v_object__heap.f_statistics([&](auto a_rank, auto a_grown, auto a_allocated, auto a_freed)
 		{
-			std::fprintf(stderr, "\t\trank%zu: %zu - %zu = %zu\n", a_rank, a_allocated, a_freed, a_allocated - a_freed);
+			std::fprintf(stderr, "\t\trank%zu: %zu: %zu - %zu = %zu\n", a_rank, a_grown, a_allocated, a_freed, a_allocated - a_freed);
 			allocated += a_allocated;
 			freed += a_freed;
 		});

@@ -1,7 +1,7 @@
 #include <il2cxx/thread.h>
 #include <sys/resource.h>
 
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 extern "C"
 {
 
@@ -262,8 +262,8 @@ t_thread::t_thread()
 	v_stack_buffer = std::make_unique<char[]>(limit.rlim_cur * 2);
 	auto p = v_stack_buffer.get() + limit.rlim_cur;
 	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object**>(p);
-	v_stack_current = reinterpret_cast<t_object**>(p + limit.rlim_cur);
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+	v_stack_copy = reinterpret_cast<t_object**>(p + limit.rlim_cur);
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 	union
 	{
 		t_frame** pp;
@@ -306,7 +306,7 @@ void t_thread::f_initialize(void* a_bottom)
 	rlimit limit;
 	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
 	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit.rlim_cur);
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 	v_stack_preserved->v_base = v_stack_bottom;
 	v_stack_dirty = v_stack_limit;
 #endif
@@ -316,7 +316,7 @@ void t_thread::f_initialize(void* a_bottom)
 	v_done = 0;
 }
 
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
 void f_dump(unw_cursor_t& a_cursor)
 {
 	char cs[1024];
@@ -335,7 +335,7 @@ void t_thread::f_thunk(unw_cursor_t& a_cursor)
 	while (true) {
 		if (frame >= v_stack_preserved) throw std::length_error("frame");
 		if (unw_step(&a_cursor) <= 0) throw std::system_error(errno, std::generic_category());
-#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
+#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
 		f_dump(a_cursor);
 #endif
 		unw_get_reg(&a_cursor, UNW_REG_SP, reinterpret_cast<unw_word_t*>(&frame->v_base));
@@ -363,75 +363,82 @@ void t_thread::f_unthunk(unw_cursor_t& a_cursor)
 
 void t_thread::f_epoch()
 {
-	size_t m;
-	size_t n;
+	t_object** top0;
+	t_object** bottom0;
+	auto top1 = v_stack_last_bottom;
 	if (v_done > 0) {
 		++v_done;
-		m = n = 0;
+		top0 = bottom0 = nullptr;
 	} else {
 		f_epoch_suspend();
-#ifdef IL2CXX__PARTIAL_STACK_SCAN
-#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
+#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
 		std::fprintf(stderr, "THREAD(%p), PRESERVED(%p)\n", this, v_stack_preserved->v_base);
 #endif
 		unw_cursor_t cursor;
 		unw_init_local2(&cursor, &v_unw_context, UNW_INIT_SIGNAL_FRAME);
 		if (unw_step(&cursor) <= 0) throw std::system_error(errno, std::generic_category());
-#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
+#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
 		f_dump(cursor);
 #endif
 		t_object** top;
 		do {
 			unw_get_reg(&cursor, UNW_REG_SP, reinterpret_cast<unw_word_t*>(&top));
 			if (unw_step(&cursor) <= 0) throw std::system_error(errno, std::generic_category());
-#ifdef IL2CXX__PARTIAL_STACK_SCAN_DUMP
+#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
 			f_dump(cursor);
 #endif
 		} while (unw_is_signal_frame(&cursor) <= 0);
-		m = v_stack_bottom - top;
-		auto p = std::max(v_stack_preserved->v_base, reinterpret_cast<t_object**>(reinterpret_cast<uintptr_t>(v_stack_dirty) / sizeof(t_object*) * sizeof(t_object*)));
+		auto bottom = std::max(v_stack_preserved->v_base, reinterpret_cast<t_object**>(reinterpret_cast<uintptr_t>(v_stack_dirty) / sizeof(t_object*) * sizeof(t_object*)));
 		v_stack_dirty = top;
-		n = v_stack_bottom - p;
-		std::copy(top, p, v_stack_current - m);
 		if (!v_unwinding.load()) {
 			void* ip;
 			unw_get_reg(&cursor, UNW_REG_IP, reinterpret_cast<unw_word_t*>(&ip));
 			if (ip < v_stack_frames->v_thunk || ip >= v_stack_preserved + 1) f_thunk(cursor);
 		}
 #else
-		m = v_stack_bottom - v_stack_top;
-		n = 0;
-		std::copy(v_stack_top, v_stack_bottom, v_stack_current - m);
+		auto top = v_stack_top;
+		auto bottom = v_stack_bottom;
 #endif
+		auto n = v_stack_bottom - top;
+#ifdef IL2CXX__STACK_SCAN_DIRECT
+		top0 = top;
+		bottom0 = bottom;
+#else
+		top0 = v_stack_copy - n;
+		bottom0 = std::copy(top, bottom, top0);
 		f_epoch_resume();
+#endif
+		top1 -= n;
 	}
 	auto decrements = v_stack_last_bottom;
 	{
-		auto top0 = v_stack_current - m;
-		auto bottom0 = v_stack_current - n;
-		auto top1 = v_stack_last_top;
-		auto top = v_stack_last_top = v_stack_last_bottom - m;
+		auto top2 = v_stack_last_top;
+		v_stack_last_top = top1;
 		std::lock_guard<std::mutex> lock(f_engine()->v_object__heap.f_mutex());
-		if (top < top1) {
+		if (top1 < top2) {
 			do {
 				auto p = f_engine()->f_object__find(*top0++);
 				if (p) p->f_increment();
-				*top++ = p;
-			} while (top < top1);
+				*top1++ = p;
+			} while (top1 < top2);
 		} else {
-			for (; top1 < top; ++top1) if (*top1) *decrements++ = *top1;
+			for (; top2 < top1; ++top2) if (*top2) *decrements++ = *top2;
 		}
-		for (; top0 < bottom0; ++top) {
+		for (; top0 < bottom0; ++top1) {
 			auto p = *top0++;
-			auto q = *top;
+			auto q = *top1;
 			if (p == q) continue;
 			p = f_engine()->f_object__find(p);
 			if (p == q) continue;
 			if (p) p->f_increment();
 			if (q) *decrements++ = q;
-			*top = p;
+			*top1 = p;
 		}
 	}
+#ifdef IL2CXX__STACK_SCAN_DIRECT
+	if (v_done <= 0) f_epoch_resume();
+#endif
 	v_increments.f_flush();
 	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();

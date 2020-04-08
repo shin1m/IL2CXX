@@ -565,42 +565,64 @@ namespace IL2CXX
                     var m = ParseMethod(ref index);
                     writer.WriteLine($" {m.DeclaringType}::[{m}]");
                     var after = indexToStack[index];
-                    string generate(string target) => GenerateVirtualCall(m, target,
+                    string generateVirtual(string target) => GenerateVirtualCall(m, target,
                         stack.Take(m.GetParameters().Length).Select(y => y.Variable),
                         y => $"\t{(GetReturnType(m) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{y};\n"
                     );
+                    void generateConcrete(MethodBase cm)
+                    {
+                        Enqueue(cm);
+                        GenerateCall(cm, Escape(cm), stack, after);
+                    }
+                    MethodInfo concrete(Type type)
+                    {
+                        var ct = (TypeDefinition)Define(type);
+                        return (m.DeclaringType.IsInterface ? ct.InterfaceToMethods[m.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods)[Define(m.DeclaringType).GetIndex(m)];
+                    }
+                    var isConcrete = !m.DeclaringType.IsInterface && (!m.IsVirtual || m.IsFinal);
+                    var @this = stack.ElementAt(m.GetParameters().Length);
                     if (constrained == null)
                     {
-                        writer.Write(generate(stack.ElementAt(m.GetParameters().Length).Variable));
+                        if (isConcrete)
+                            generateConcrete(m);
+                        else if (@this.Type.IsSealed)
+                            generateConcrete(concrete(@this.Type));
+                        else
+                            writer.Write(generateVirtual(@this.Variable));
                     }
                     else
                     {
                         if (constrained.IsValueType)
                         {
-                            if (m.IsVirtual)
+                            if (isConcrete)
                             {
-                                var ct = (TypeDefinition)Define(constrained);
-                                var cm = (m.DeclaringType.IsInterface ? ct.InterfaceToMethods[m.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods)[Define(m.DeclaringType).GetIndex(m)];
-                                if (cm.DeclaringType == constrained)
-                                {
-                                    Enqueue(cm);
-                                    GenerateCall(cm, Escape(cm), stack, after);
-                                }
-                                else
-                                {
-                                    writer.WriteLine($@"{'\t'}{{auto p = f__new_constructed<{Escape(constrained)}>(*{CastValue(MakePointerType(constrained), stack.ElementAt(m.GetParameters().Length).Variable)});
-{generate("p")}{'\t'}}}");
-                                }
+                                generateConcrete(m);
                             }
                             else
                             {
-                                Enqueue(m);
-                                GenerateCall(m, Escape(m), stack, after);
+                                var cm = concrete(constrained);
+                                if (cm.DeclaringType == constrained)
+                                    generateConcrete(cm);
+                                else
+                                    writer.WriteLine($@"{'\t'}{{auto p = f__new_constructed<{Escape(constrained)}>(*{CastValue(MakePointerType(constrained), @this.Variable)});
+{generateVirtual("p")}{'\t'}}}");
                             }
                         }
                         else
                         {
-                            writer.Write(generate($"(*static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({stack.ElementAt(m.GetParameters().Length).Variable}))"));
+                            var target = $"(*static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({@this.Variable}))";
+                            void generate(MethodBase cm)
+                            {
+                                Enqueue(cm);
+                                var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append(target));
+                                writer.Write($"\t{(GetReturnType(cm) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};\n");
+                            }
+                            if (isConcrete)
+                                generate(m);
+                            else if (constrained.IsSealed)
+                                generate(concrete(constrained));
+                            else
+                                writer.Write(generateVirtual(target));
                         }
                         constrained = null;
                     }

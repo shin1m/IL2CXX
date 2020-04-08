@@ -322,11 +322,10 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetMethod(nameof(SZArrayHelper<object>.GetEnumerator)),
-                (transpiler, types) => $@"{'\t'}return t_object::f_new<{transpiler.Escape(typeof(SZArrayHelper<>).GetNestedType(nameof(SZArrayHelper<object>.Enumerator)).MakeGenericType(types))}>(0, [&](auto p)
-{'\t'}{{
-{'\t'}{'\t'}new(&p->v_array) decltype(p->v_array)(a_0);
-{'\t'}{'\t'}p->v_index = -1;
-{'\t'}}});
+                (transpiler, types) => $@"{'\t'}t__new<{transpiler.Escape(typeof(SZArrayHelper<>).GetNestedType(nameof(SZArrayHelper<object>.Enumerator)).MakeGenericType(types))}> p(0);
+{'\t'}new(&p->v_array) decltype(p->v_array)(a_0);
+{'\t'}p->v_index = -1;
+{'\t'}return p;
 "
             );
             code.ForGeneric(
@@ -574,12 +573,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(object.Equals), new[] { typeof(object) }),
-                transpiler =>
-                {
-                    var method = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string) });
-                    transpiler.Enqueue(method);
-                    return $"\treturn a_1 && a_1->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(string))}>::v__instance) && {transpiler.Escape(method)}(a_0, static_cast<{transpiler.EscapeForValue(typeof(string))}>(a_1));\n";
-                }
+                transpiler => null
             );
             code.For(
                 type.GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(StringComparison) }),

@@ -268,13 +268,13 @@ public:
 	t_slot(const t_slot& a_value) : t_slot(static_cast<t_object*>(a_value))
 	{
 	}
-	t_slot& operator=(t_object* a_p)
+	t_slot& IL2CXX__PORTABLE__ALWAYS_INLINE operator=(t_object* a_p)
 	{
 		if (a_p) f_increments()->f_push(a_p);
 		if (auto p = v_p.exchange(a_p, std::memory_order_relaxed)) f_decrements()->f_push(p);
 		return *this;
 	}
-	t_slot& operator=(const t_slot& a_value)
+	t_slot& IL2CXX__PORTABLE__ALWAYS_INLINE operator=(const t_slot& a_value)
 	{
 		return *this = static_cast<t_object*>(a_value);
 	}
@@ -305,13 +305,13 @@ template<typename T>
 struct t_slot_of : t_slot
 {
 	using t_slot::t_slot;
-	t_slot_of& operator=(const t_slot_of& a_value)
+	t_slot_of& IL2CXX__PORTABLE__ALWAYS_INLINE operator=(const t_slot_of& a_value)
 	{
 		static_cast<t_slot&>(*this) = a_value;
 		return *this;
 	}
 	template<typename U>
-	t_slot_of& operator=(U&& a_value)
+	t_slot_of& IL2CXX__PORTABLE__ALWAYS_INLINE operator=(U&& a_value)
 	{
 		static_cast<t_slot&>(*this) = std::forward<U>(a_value);
 		return *this;

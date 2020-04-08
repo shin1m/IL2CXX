@@ -56,7 +56,7 @@ class t_heap
 		}
 		T* f_allocate(t_heap* a_heap)
 		{
-			auto p = v_chunks.load(std::memory_order_relaxed);
+			auto p = v_chunks.load(std::memory_order_acquire);
 			while (p && !v_chunks.compare_exchange_weak(p, p->v_previous, std::memory_order_acquire));
 			if (!p) {
 				if (!a_heap) return nullptr;

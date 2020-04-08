@@ -12,6 +12,23 @@ struct t__weak_handle;
 template<typename T>
 struct t__type_of;
 
+template<typename T>
+struct t__new
+{
+	T* v_p;
+
+	t__new(size_t a_extra);
+	~t__new();
+	operator T*() const
+	{
+		return v_p;
+	}
+	T* operator->() const
+	{
+		return v_p;
+	}
+};
+
 class t_object
 {
 	template<typename T, typename T_wait> friend class t_heap;
@@ -192,9 +209,6 @@ class t_object
 	void f_cyclic_decrement();
 
 public:
-	template<typename T, typename T_construct>
-	static T* f_new(size_t a_extra, T_construct a_construct);
-
 	t__type* f_type() const
 	{
 		return v_type.load(std::memory_order_relaxed);
@@ -208,9 +222,7 @@ public:
 	}
 	t_object* f__clone() const
 	{
-		return f_new<t_object>(0, [](auto)
-		{
-		});
+		return t__new<t_object>(0);
 	}
 };
 

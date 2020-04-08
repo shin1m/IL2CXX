@@ -21,7 +21,7 @@ struct t__type : t__member_info
 	void* v__multicast_invoke;
 
 	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr);
-	void f__finish(t_object* a_p)
+	void IL2CXX__PORTABLE__ALWAYS_INLINE f__finish(t_object* a_p)
 	{
 		//t_slot::f_increments()->f_push(this);
 		a_p->v_type.store(this, std::memory_order_release);
@@ -51,7 +51,7 @@ struct t__type : t__member_info
 struct t__type_finalizee : t__type
 {
 	using t__type::t__type;
-	void f__finish(t_object* a_p)
+	void IL2CXX__PORTABLE__ALWAYS_INLINE f__finish(t_object* a_p)
 	{
 		a_p->v_finalizee = true;
 		t__type::f__finish(a_p);

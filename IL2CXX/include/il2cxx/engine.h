@@ -122,6 +122,17 @@ inline t_engine* f_engine()
 	return static_cast<t_engine*>(t_slot::v_collector);
 }
 
+template<typename T>
+inline t__new<T>::t__new(size_t a_extra) : v_p(static_cast<T*>(f_engine()->f_object__allocate(sizeof(T) + a_extra)))
+{
+}
+
+template<typename T>
+inline t__new<T>::~t__new()
+{
+	t__type_of<T>::v__instance.f__finish(v_p);
+}
+
 template<void (t_object::*A_push)()>
 inline void t_object::f_step()
 {
@@ -169,15 +180,6 @@ inline void t_object::f_decrement()
 	}
 }
 
-template<typename T, typename T_construct>
-inline T* t_object::f_new(size_t a_extra, T_construct a_construct)
-{
-	auto p = static_cast<T*>(f_engine()->f_object__allocate(sizeof(T) + a_extra));
-	a_construct(p);
-	t__type_of<T>::v__instance.f__finish(p);
-	return p;
-}
-
 inline void t_thread::f_epoch_suspend()
 {
 #if WIN32
@@ -205,39 +207,35 @@ inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interfac
 template<typename T>
 T* f__new_zerod()
 {
-	return t_object::f_new<T>(0, [](auto p)
-	{
-		std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), sizeof(T) - sizeof(t_object), '\0');
-	});
+	t__new<T> p(0);
+	std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), sizeof(T) - sizeof(t_object), '\0');
+	return p;
 }
 
 template<typename T, typename... T_an>
 T* f__new_constructed(T_an&&... a_n)
 {
-	return t_object::f_new<T>(0, [&](auto p)
-	{
-		p->f__construct(std::forward<T_an>(a_n)...);
-	});
+	t__new<T> p(0);
+	p->f__construct(std::forward<T_an>(a_n)...);
+	return p;
 }
 
 template<typename T_array, typename T_element>
 T_array* f__new_array(size_t a_length)
 {
-	return t_object::f_new<T_array>(sizeof(T_element) * a_length, [&](auto p)
-	{
-		p->v__length = a_length;
-		p->v__bounds[0] = {a_length, 0};
-		std::fill_n(reinterpret_cast<char*>(p->f__data()), sizeof(T_element) * a_length, '\0');
-	});
+	t__new<T_array> p(sizeof(T_element) * a_length);
+	p->v__length = a_length;
+	p->v__bounds[0] = {a_length, 0};
+	std::fill_n(reinterpret_cast<char*>(p->f__data()), sizeof(T_element) * a_length, '\0');
+	return p;
 }
 
-inline t_System_2eString* f__new_string(size_t a_length)
+inline t_System_2eString* IL2CXX__PORTABLE__ALWAYS_INLINE f__new_string(size_t a_length)
 {
-	return t_object::f_new<t_System_2eString>(sizeof(char16_t) * a_length, [&](auto p)
-	{
-		p->v__5fstringLength = a_length;
-		(&p->v__5ffirstChar)[a_length] = u'\0';
-	});
+	t__new<t_System_2eString> p(sizeof(char16_t) * a_length);
+	p->v__5fstringLength = a_length;
+	(&p->v__5ffirstChar)[a_length] = u'\0';
+	return p;
 }
 
 inline t_System_2eString* f__new_string(std::u16string_view a_value)
@@ -250,27 +248,35 @@ inline t_System_2eString* f__new_string(std::u16string_view a_value)
 template<typename T>
 class t__lazy
 {
+	std::atomic<T*> v_initialized = nullptr;
+	std::recursive_mutex v_mutex;
 	T v_p;
 	bool v_initializing = false;
-	std::atomic_bool v_initialized{false};
-	std::recursive_mutex v_mutex;
+
+	T* f_initialize();
 
 public:
 	T* f_get()
 	{
-		if (v_initialized.load(std::memory_order_acquire)) return &v_p;
-		std::lock_guard<std::recursive_mutex> lock(v_mutex);
-		if (v_initializing) return &v_p;
-		v_initializing = true;
-		v_p.f_initialize();
-		v_initialized.store(true, std::memory_order_release);
-		return &v_p;
+		auto p = v_initialized.load(std::memory_order_consume);
+		return p ? p : f_initialize();
 	}
 	T* operator->()
 	{
 		return f_get();
 	}
 };
+
+template<typename T>
+T* t__lazy<T>::f_initialize()
+{
+	std::lock_guard<std::recursive_mutex> lock(v_mutex);
+	if (v_initializing) return &v_p;
+	v_initializing = true;
+	v_p.f_initialize();
+	v_initialized.store(&v_p, std::memory_order_release);
+	return &v_p;
+}
 
 }
 

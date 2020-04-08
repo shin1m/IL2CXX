@@ -527,14 +527,13 @@ struct t__static_{identifier}
 ";
                                 members += $@"{'\t'}t_object* f__clone() const
 {'\t'}{{
-{'\t'}{'\t'}return t_object::f_new<{identifier}>(sizeof({identifier}) * v__length, [this](auto p)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}p->v__length = v__length;
-{'\t'}{'\t'}{'\t'}std::copy_n(v__bounds, {type.GetArrayRank()}, p->v__bounds);
-{'\t'}{'\t'}{'\t'}auto p0 = reinterpret_cast<const {elementIdentifier}*>(this + 1);
-{'\t'}{'\t'}{'\t'}auto p1 = p->f__data();
-{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) new(p1 + i) {elementIdentifier}(p0[i]);
-{'\t'}{'\t'}}});
+{'\t'}{'\t'}t__new<{identifier}> p(sizeof({identifier}) * v__length);
+{'\t'}{'\t'}p->v__length = v__length;
+{'\t'}{'\t'}std::copy_n(v__bounds, {type.GetArrayRank()}, p->v__bounds);
+{'\t'}{'\t'}auto p0 = reinterpret_cast<const {elementIdentifier}*>(this + 1);
+{'\t'}{'\t'}auto p1 = p->f__data();
+{'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) new(p1 + i) {elementIdentifier}(p0[i]);
+{'\t'}{'\t'}return p;
 {'\t'}}}
 ";
                             }
@@ -618,10 +617,9 @@ struct t__static_{identifier}
 {(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__construct(a_p);\n")}{string.Join(string.Empty, fields.Select(x => $"{'\t'}{'\t'}new(&a_p->{Escape(x)}) decltype({Escape(x)})({Escape(x)});\n"))}{'\t'}}}
 {'\t'}t_object* f__clone() const
 {'\t'}{{
-{'\t'}{'\t'}return t_object::f_new<{identifier}>(0, [this](auto p)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}f__construct(p);
-{'\t'}{'\t'}}});
+{'\t'}{'\t'}t__new<{identifier}> p(0);
+{'\t'}{'\t'}f__construct(p);
+{'\t'}{'\t'}return p;
 {'\t'}}}
 ";
                             }
@@ -846,7 +844,9 @@ struct t__static_{identifier}
 });
 }}");
             writer.WriteLine(description);
-            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining)) writer.Write("inline ");
+            var body = method.GetMethodBody();
+            bytes = body?.GetILAsByteArray();
+            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining) || builtin != null || bytes?.Length <= 64) writer.Write("inline ");
             if (builtin != null)
             {
                 writer.WriteLine($"{prototype}\n{{\n{builtin}}}");
@@ -932,8 +932,6 @@ struct t__static_{identifier}
                 writer.WriteLine('}');
                 return;
             }
-            var body = method.GetMethodBody();
-            bytes = body?.GetILAsByteArray();
             if (bytes == null)
             {
                 functionDeclarations.WriteLine("// TO BE PROVIDED");
@@ -1142,11 +1140,11 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
 t_object* t__type_of<{identifier}>::f_clone(const t_object* a_this)
 {{");
                 memberDefinitions.WriteLine(
-                    type == typeof(void) ? $@"{'\t'}return t_object::f_new<{identifier}>(0, [](auto) {{}});
+                    type == typeof(void) ? $@"{'\t'}return t__new<{identifier}>(0);
 }}"
-                    : type.IsValueType ? $@"{'\t'}return t_object::f_new<{identifier}>(0, [&](auto p) {{
-{'\t'}{'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
-{'\t'}}});
+                    : type.IsValueType ? $@"{'\t'}t__new<{identifier}> p(0);
+{'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
+{'\t'}return p;
 }}
 void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to)
 {{

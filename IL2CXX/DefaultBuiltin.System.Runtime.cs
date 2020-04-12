@@ -94,7 +94,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.InitializeArray)),
-                transpiler => "\tstd::copy_n(static_cast<char*>(a_1.v__field), a_0->f_type()->v__element->v__size * a_0->v__length, reinterpret_cast<char*>(a_0->f__bounds() + a_0->f_type()->v__rank));\n"
+                transpiler => "\tstd::memcpy(a_0->f__bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n"
             );
             code.ForGeneric(
                 type.GetMethod("IsReferenceOrContainsReferences"),

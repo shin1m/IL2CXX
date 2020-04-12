@@ -243,7 +243,6 @@ protected:
 	static IL2CXX__PORTABLE__THREAD t_increments* v_increments;
 	static IL2CXX__PORTABLE__THREAD t_decrements* v_decrements;
 
-#ifdef IL2CXX__PORTABLE__SUPPORTS_THREAD_EXPORT
 	static t_increments* f_increments()
 	{
 		return v_increments;
@@ -252,10 +251,6 @@ protected:
 	{
 		return v_decrements;
 	}
-#else
-	static IL2CXX__PORTABLE__EXPORT t_increments* f_increments();
-	static IL2CXX__PORTABLE__EXPORT t_decrements* f_decrements();
-#endif
 
 	std::atomic<t_object*> v_p;
 

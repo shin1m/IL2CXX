@@ -124,8 +124,18 @@ class t_object
 			f_push(this);
 		}
 	}
+	bool f_queue_finalize();
 	void f_decrement_step();
-	void f_decrement();
+	void f_decrement()
+	{
+		assert(v_count > 0);
+		if (--v_count > 0) {
+			v_color = e_color__PURPLE;
+			if (!v_next) f_append(this);
+		} else if (!v_finalizee || !f_queue_finalize()) {
+			f_loop<&t_object::f_decrement_step>();
+		}
+	}
 	void f_mark_gray_push()
 	{
 		if (v_color != e_color__GRAY) {

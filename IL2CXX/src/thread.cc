@@ -406,7 +406,9 @@ void t_thread::f_epoch()
 		bottom0 = bottom;
 #else
 		top0 = v_stack_copy - n;
-		bottom0 = std::copy(top, bottom, top0);
+		auto m = bottom - top;
+		std::memcpy(top0, top, m * sizeof(t_object**));
+		bottom0 = top0 + m;
 		f_epoch_resume();
 #endif
 		top1 -= n;

@@ -526,7 +526,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("wstrcpy", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => "\tstd::copy_n(a_1, a_2, a_0);\n"
+                transpiler => "\tstd::memcpy(a_0, a_1, a_2 * sizeof(char16_t));\n"
             );
             code.For(
                 type.GetConstructor(new[] { typeof(char*) }),

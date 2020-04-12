@@ -85,12 +85,12 @@ struct t_thread
 		v_reviving = v_increments.v_head;
 	}
 	template<typename T>
-	void f_assign(T*& a_field, T* a_value)
+	static void f_assign(T*& a_field, T* a_value)
 	{
 		reinterpret_cast<t_slot&>(a_field) = a_value;
 	}
 	template<typename T_field, typename T_value>
-	void f_assign(T_field& a_field, T_value&& a_value)
+	static void f_assign(T_field& a_field, T_value&& a_value)
 	{
 		a_field = std::forward<T_value>(a_value);
 	}

@@ -140,6 +140,17 @@ void t_object::f_collect()
 	}
 }
 
+bool t_object::f_queue_finalize()
+{
+	auto& conductor = f_engine()->v_finalizer__conductor;
+	std::lock_guard<std::mutex> lock(conductor.v_mutex);
+	if (conductor.v_quitting) return false;
+	f_increment();
+	f_engine()->v_finalizer__queue.push_back(this);
+	conductor.f__wake();
+	return true;
+}
+
 void t_object::f_cyclic_decrement()
 {
 	if (auto p = v_extension.load(std::memory_order_consume)) {

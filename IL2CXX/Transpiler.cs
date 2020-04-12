@@ -529,7 +529,7 @@ struct t__static_{identifier}
 {'\t'}{{
 {'\t'}{'\t'}t__new<{identifier}> p(sizeof({identifier}) * v__length);
 {'\t'}{'\t'}p->v__length = v__length;
-{'\t'}{'\t'}std::copy_n(v__bounds, {type.GetArrayRank()}, p->v__bounds);
+{'\t'}{'\t'}std::memcpy(p->v__bounds, v__bounds, sizeof(v__bounds));
 {'\t'}{'\t'}auto p0 = reinterpret_cast<const {elementIdentifier}*>(this + 1);
 {'\t'}{'\t'}auto p1 = p->f__data();
 {'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) new(p1 + i) {elementIdentifier}(p0[i]);
@@ -579,7 +579,7 @@ struct t__static_{identifier}
 {string.Join(",\n", fields.Select(x => $"\t\t\t{Escape(x)}(a_value.{Escape(x)})"))}
 " : string.Empty)}{'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
+{'\t'}{'\t'}t_value& IL2CXX__PORTABLE__ALWAYS_INLINE operator=(const t_value& a_value)
 {'\t'}{'\t'}{{
 {string.Join(string.Empty, fields.Select(x => $"\t\t\t{Escape(x)} = a_value.{Escape(x)};\n"))}{'\t'}{'\t'}{'\t'}return *this;
 {'\t'}{'\t'}}}

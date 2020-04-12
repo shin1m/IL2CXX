@@ -159,27 +159,6 @@ inline void t_object::f_decrement_step()
 	f_engine()->f_free_as_release(this);
 }
 
-inline void t_object::f_decrement()
-{
-	assert(v_count > 0);
-	if (--v_count > 0) {
-		v_color = e_color__PURPLE;
-		if (!v_next) f_append(this);
-	} else {
-		if (v_finalizee) {
-			auto& conductor = f_engine()->v_finalizer__conductor;
-			std::lock_guard<std::mutex> lock(conductor.v_mutex);
-			if (!conductor.v_quitting) {
-				f_increment();
-				f_engine()->v_finalizer__queue.push_back(this);
-				conductor.f__wake();
-				return;
-			}
-		}
-		f_loop<&t_object::f_decrement_step>();
-	}
-}
-
 inline void t_thread::f_epoch_suspend()
 {
 #if WIN32
@@ -241,7 +220,7 @@ inline t_System_2eString* IL2CXX__PORTABLE__ALWAYS_INLINE f__new_string(size_t a
 inline t_System_2eString* f__new_string(std::u16string_view a_value)
 {
 	auto p = f__new_string(a_value.size());
-	std::copy(a_value.begin(), a_value.end(), &p->v__5ffirstChar);
+	std::memcpy(&p->v__5ffirstChar, a_value.data(), a_value.size() * sizeof(char16_t));
 	return p;
 }
 

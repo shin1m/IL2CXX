@@ -7,6 +7,13 @@ namespace IL2CXX
     partial class DefaultBuiltin
     {
         private static Builtin SetupSystemDiagnostics(this Builtin @this) => @this
+        .For(typeof(Debug), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(Debug.Assert), new[] { typeof(bool) }),
+                transpiler => "\tif (!a_0) throw std::logic_error(\"Debug.Assert failed.\");\n"
+            );
+        })
         .For(typeof(Debugger), (type, code) =>
         {
             code.For(

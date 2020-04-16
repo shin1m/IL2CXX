@@ -178,7 +178,7 @@ inline void t_thread::f_epoch_resume()
 #endif
 }
 
-inline t__type::t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element, size_t a_rank, void* a_multicast_invoke) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank), v__multicast_invoke(a_multicast_invoke)
+inline t__type::t__type(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element, size_t a_rank, void* a_multicast_invoke) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank), v__multicast_invoke(a_multicast_invoke)
 {
 	v_type.store(&t__type_of<t__type>::v__instance, std::memory_order_relaxed);
 }

@@ -347,10 +347,16 @@ namespace IL2CXX
             method.Module.ResolveField(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
         private MethodBase ParseMethod(ref int index) =>
             method.Module.ResolveMethod(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
+        private static Type GetThisType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SZArrayHelper<>) ? type.GetGenericArguments()[0].MakeArrayType() : type;
         private static Type GetThisType(MethodBase method)
         {
             var type = method.DeclaringType;
-            return type.IsValueType ? MakePointerType(type) : type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SZArrayHelper<>) ? type.GetGenericArguments()[0].MakeArrayType() : type;
+            return type.IsValueType ? MakePointerType(type) : GetThisType(type);
+        }
+        private static Type GetVirtualThisType(MethodBase method)
+        {
+            var type = method.DeclaringType;
+            return type.IsValueType ? typeof(object) : GetThisType(type);
         }
         private Type GetArgumentType(int index)
         {
@@ -731,81 +737,87 @@ struct t__static_{identifier}
             var call = GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable));
             writer.Write($"\t{(GetReturnType(method) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};\n");
         }
-        private string FunctionPointer(MethodBase method)
+        private int EnqueueIndexOf(MethodBase method, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
         {
-            var parameters = method.GetParameters().Select(x => x.ParameterType);
-            if (!method.IsStatic) parameters = parameters.Prepend(method.DeclaringType.IsValueType ? typeof(object) : GetThisType(method));
+            Escape(method);
+            var i = Define(method.DeclaringType).GetIndex(method);
+            foreach (var ms in concretes) Enqueue(ms[i]);
+            return i;
+        }
+        private (int, int) EnqueueGenericIndexOf(MethodBase method, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
+        {
+            var gm = ((MethodInfo)method).GetGenericMethodDefinition();
+            var i = Define(method.DeclaringType).GetIndex(gm);
+            var t2i = genericMethodToTypesToIndex[ToKey(gm)];
+            var ga = method.GetGenericArguments();
+            if (!t2i.TryGetValue(ga, out var j))
+            {
+                j = t2i.Count;
+                t2i.Add(ga, j);
+            }
+            foreach (var ms in concretes) Enqueue(ms[i].MakeGenericMethod(ga));
+            return (i, j);
+        }
+        public string GetVirtualFunctionPointer(MethodBase method)
+        {
+            var parameters = method.GetParameters().Select(x => x.ParameterType).Prepend(GetVirtualThisType(method));
             return $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", parameters.Select(EscapeForStacked))})";
         }
-        public (string Site, string Function) GetVirtualFunction(MethodBase method, string target)
+        public string GetVirtualFunction(MethodBase method, string target)
         {
-            int indexOf(IEnumerable<IReadOnlyList<MethodInfo>> concretes)
-            {
-                Escape(method);
-                var i = Define(method.DeclaringType).GetIndex(method);
-                foreach (var ms in concretes) Enqueue(ms[i]);
-                return i;
-            }
-            (int, int) genericIndexOf(IEnumerable<IReadOnlyList<MethodInfo>> concretes)
-            {
-                var gm = ((MethodInfo)method).GetGenericMethodDefinition();
-                var i = Define(method.DeclaringType).GetIndex(gm);
-                var t2i = genericMethodToTypesToIndex[ToKey(gm)];
-                var ga = method.GetGenericArguments();
-                if (!t2i.TryGetValue(ga, out var j))
-                {
-                    j = t2i.Count;
-                    t2i.Add(ga, j);
-                }
-                foreach (var ms in concretes) Enqueue(ms[i].MakeGenericMethod(ga));
-                return (i, j);
-            }
             Enqueue(method);
-            if (method.DeclaringType.IsInterface)
-            {
-                var concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(y => y.InterfaceToMethods.TryGetValue(method.DeclaringType, out var ms) ? ms : null).Where(y => y != null);
-                string resolve;
-                if (method.IsGenericMethod)
-                {
-                    var (i, j) = genericIndexOf(concretes);
-                    resolve = $"f__generic_resolve<{Escape(method.DeclaringType)}, {i}, {j}>";
-                }
-                else
-                {
-                    resolve = $"f__resolve<{Escape(method.DeclaringType)}, {indexOf(concretes)}>";
-                }
-                return (
-                    $@"{'\t'}{{{{static auto site = reinterpret_cast<void*>({resolve});
-{{0}}{'\t'}}}}}
-",
-                    $"reinterpret_cast<{FunctionPointer(method)}>(reinterpret_cast<void*(*)(void*&, t__type*)>(site)(site, {target}->f_type()))"
-                );
-            }
-            else if (method.IsVirtual)
+            if (method.IsVirtual)
             {
                 string at(int i) => $"reinterpret_cast<void**>({target}->f_type() + 1)[{i}]";
                 var concretes = runtimeDefinitions.Where(y => y is TypeDefinition && y.Type.IsSubclassOf(method.DeclaringType)).Select(y => y.Methods);
-                string resolved;
                 if (method.IsGenericMethod)
                 {
-                    var (i, j) = genericIndexOf(concretes);
-                    resolved = $"reinterpret_cast<void**>({at(i)})[{j}]";
+                    var (i, j) = EnqueueGenericIndexOf(method, concretes);
+                    return $"reinterpret_cast<{GetVirtualFunctionPointer(method)}>(reinterpret_cast<void**>({at(i)})[{j}])";
                 }
                 else
                 {
-                    resolved = at(indexOf(concretes));
+                    return $"reinterpret_cast<{GetVirtualFunctionPointer(method)}>({at(EnqueueIndexOf(method, concretes))})";
                 }
-                return ("{0}", $"reinterpret_cast<{FunctionPointer(method)}>({resolved})");
             }
             else
             {
-                return ("{0}", Escape(method));
+                return Escape(method);
+            }
+        }
+        private string GetInterfaceFunction(MethodBase method, Func<string, string> normal, Func<string, string> generic)
+        {
+            Enqueue(method);
+            var concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(x => x.InterfaceToMethods.TryGetValue(method.DeclaringType, out var ms) ? ms : null).Where(x => x != null);
+            if (method.IsGenericMethod)
+            {
+                var (i, j) = EnqueueGenericIndexOf(method, concretes);
+                return generic($"{Escape(method.DeclaringType)}, {i}, {j}");
+            }
+            else
+            {
+                return normal($"{Escape(method.DeclaringType)}, {EnqueueIndexOf(method, concretes)}");
             }
         }
         public string GenerateVirtualCall(MethodBase method, string target, IEnumerable<string> variables, Func<string, string> construct)
         {
-            var (site, function) = GetVirtualFunction(method, target);
-            return string.Format(site, construct(GenerateCall(method, function, variables.Append(target))));
+            if (method.DeclaringType.IsInterface)
+            {
+                var types = string.Join(", ", method.GetParameters().Select(x => x.ParameterType).Prepend(GetReturnType(method)).Select(EscapeForStacked));
+                return $@"{'\t'}{{static auto site = &{GetInterfaceFunction(method,
+                    x => $"f__invoke<{x}, {types}>",
+                    x => $"f__generic_invoke<{x}, {types}>"
+                )};
+{construct($@"site(
+{'\t'}{'\t'}{CastValue(typeof(object), target)},
+{string.Join(string.Empty, method.GetParameters().Zip(variables.Reverse(), (a, v) => $"\t\t{CastValue(a.ParameterType, v)},\n"))}{'\t'}{'\t'}reinterpret_cast<void**>(&site)
+{'\t'})")}{'\t'}}}
+";
+            }
+            else
+            {
+                return construct(GenerateCall(method, GetVirtualFunction(method, target), variables.Append(target)));
+            }
         }
         private void ProcessNextMethod()
         {
@@ -1095,19 +1107,24 @@ t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "null
                 writeMethods(td.Methods, (i, m, name) => name, (i, j, m, name) => name, x => x.GetBaseDefinition(), "\t");
                 foreach (var p in td.InterfaceToMethods)
                 {
-                    writer.WriteLine($@"{'\t'}struct
-{'\t'}{{");
+                    string types(MethodInfo m) => string.Join(", ", m.GetParameters().Select(x => x.ParameterType).Prepend(GetReturnType(m)).Select(EscapeForStacked));
                     var ii = Escape(p.Key);
                     var ms = typeToRuntime[p.Key].Methods;
+                    writer.WriteLine($@"{'\t'}struct
+{'\t'}{{");
+                    writeMethods(p.Value, (i, m, name) => name, (i, j, m, name) => name, x => ms[Array.IndexOf(p.Value, x)], "\t\t");
+                    writer.WriteLine($@"{'\t'}}} v_interface__{ii}__methods;
+{'\t'}struct
+{'\t'}{{");
                     writeMethods(p.Value,
-                        (i, m, name) => $"f__method<{ii}, {i}, {identifier}, {FunctionPointer(m)}, {name}>",
-                        (i, j, m, name) => $"f__generic_method<{ii}, {i}, {j}, {identifier}, {FunctionPointer(m)}, {name}>",
+                        (i, m, name) => $"f__method<{ii}, {i}, {identifier}, {GetVirtualFunctionPointer(m)}, {name}, {types(m)}>",
+                        (i, j, m, name) => $"f__generic_method<{ii}, {i}, {j}, {identifier}, {GetVirtualFunctionPointer(m)}, {name}, {types(m)}>",
                         x => ms[Array.IndexOf(p.Value, x)],
                         "\t\t"
                     );
-                    writer.WriteLine($"\t}} v_interface__{ii};");
+                    writer.WriteLine($"\t}} v_interface__{ii}__thunks;");
                 }
-                memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, reinterpret_cast<void**>(&v_interface__{Escape(p.Key)})}}")));
+                memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
                 writer.WriteLine($@"{'\t'}virtual void f_scan(t_object* a_this, t_scan a_scan);
 {'\t'}virtual t_object* f_clone(const t_object* a_this);");
                 if (type != typeof(void) && type.IsValueType) writer.WriteLine("\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");

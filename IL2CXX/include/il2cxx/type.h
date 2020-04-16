@@ -13,14 +13,14 @@ struct t__member_info : t_object
 struct t__type : t__member_info
 {
 	t__type* v__base;
-	std::map<t__type*, void**> v__interface_to_methods;
+	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
 	bool v__managed;
 	size_t v__size;
 	t__type* v__element;
 	size_t v__rank;
 	void* v__multicast_invoke;
 
-	t__type(t__type* a_base, std::map<t__type*, void**>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr);
+	t__type(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr);
 	void IL2CXX__PORTABLE__ALWAYS_INLINE f__finish(t_object* a_p)
 	{
 		//t_slot::f_increments()->f_push(this);
@@ -44,7 +44,7 @@ struct t__type : t__member_info
 	void** f__implementation(t__type* a_interface) const
 	{
 		auto i = v__interface_to_methods.find(a_interface);
-		return i == v__interface_to_methods.end() ? nullptr : i->second;
+		return i == v__interface_to_methods.end() ? nullptr : i->second.first;
 	}
 };
 
@@ -61,31 +61,43 @@ struct t__type_finalizee : t__type
 };
 
 template<typename T_interface, size_t A_i>
-void* f__resolve(void*& a_site, t__type* a_type)
+void* f__resolve(t_object* a_this)
 {
-	auto p = a_type->v__interface_to_methods[&t__type_of<T_interface>::v__instance][A_i];
-	a_site = p;
-	return reinterpret_cast<void*(*)(void*&, t__type*)>(p)(a_site, a_type);
+	return a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].second[A_i];
 }
 
-template<typename T_interface, size_t A_i, typename T_type, typename T_method, T_method A_method>
-void* f__method(void*& a_site, t__type* a_type)
+template<typename T_interface, size_t A_i, typename T_r, typename... T_an>
+T_r f__invoke(t_object* a_this, T_an... a_n, void** a_site)
 {
-	return a_type == &t__type_of<T_type>::v__instance ? reinterpret_cast<void*>(A_method) : f__resolve<T_interface, A_i>(a_site, a_type);
+	auto p = a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].first[A_i];
+	*a_site = p;
+	return reinterpret_cast<T_r(*)(t_object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
+}
+
+template<typename T_interface, size_t A_i, typename T_type, typename T_method, T_method A_method, typename T_r, typename... T_an>
+T_r f__method(t_object* a_this, T_an... a_n, void** a_site)
+{
+	return a_this->f_type() == &t__type_of<T_type>::v__instance ? A_method(static_cast<T_type*>(a_this), a_n...) : f__invoke<T_interface, A_i, T_r, T_an...>(a_this, a_n..., a_site);
 }
 
 template<typename T_interface, size_t A_i, size_t A_j>
-void* f__generic_resolve(void*& a_site, t__type* a_type)
+void* f__generic_resolve(t_object* a_this)
 {
-	auto p = reinterpret_cast<void**>(a_type->v__interface_to_methods[&t__type_of<T_interface>::v__instance][A_i])[A_j];
-	a_site = p;
-	return reinterpret_cast<void*(*)(void*&, t__type*)>(p)(a_site, a_type);
+	return reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].second[A_i])[A_j];
 }
 
-template<typename T_interface, size_t A_i, size_t A_j, typename T_type, typename T_method, T_method A_method>
-void* f__generic_method(void*& a_site, t__type* a_type)
+template<typename T_interface, size_t A_i, size_t A_j, typename T_r, typename... T_an>
+T_r f__generic_invoke(t_object* a_this, T_an... a_n, void** a_site)
 {
-	return a_type == &t__type_of<T_type>::v__instance ? reinterpret_cast<void*>(A_method) : f__generic_resolve<T_interface, A_i, A_j>(a_site, a_type);
+	auto p = reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].first[A_i])[A_j];
+	*a_site = p;
+	return reinterpret_cast<T_r(*)(t_object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
+}
+
+template<typename T_interface, size_t A_i, size_t A_j, typename T_type, typename T_method, T_method A_method, typename T_r, typename... T_an>
+T_r f__generic_method(t_object* a_this, T_an... a_n, void** a_site)
+{
+	return a_this->f_type() == &t__type_of<T_type>::v__instance ? A_method(static_cast<T_type*>(a_this), a_n...) : f__generic_invoke<T_interface, A_i, A_j, T_r, T_an...>(a_this, a_n..., a_site);
 }
 
 }

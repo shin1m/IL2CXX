@@ -1181,8 +1181,13 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
-                    var (site, function) = GetVirtualFunction(m, stack.Variable);
-                    writer.WriteLine($" {m.DeclaringType}::[{m}]\n{string.Format(site, $"\t{indexToStack[index].Variable} = reinterpret_cast<void*>({function});\n")}");
+                    var function = m.DeclaringType.IsInterface
+                        ? $@"{GetInterfaceFunction(m,
+                            y => $"f__resolve<{y}>",
+                            y => $"f__generic_resolve<{y}>"
+                        )}({stack.Variable})"
+                        : $"reinterpret_cast<void*>({GetVirtualFunction(m, stack.Variable)})";
+                    writer.WriteLine($" {m.DeclaringType}::[{m}]\n\t{indexToStack[index].Variable} = {function};");
                     return index;
                 };
             });

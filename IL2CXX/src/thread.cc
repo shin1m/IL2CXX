@@ -72,7 +72,7 @@ static _Unwind_Reason_Code _Unwind_Phase2(_Unwind_Exception* exception_object, _
 			if (unw_get_reg(&context->cursor, UNW_REG_IP, &ip) < 0) return _URC_FATAL_PHASE2_ERROR;
 			if ((unsigned long)stop_parameter == ip) {
 				actions |= _UA_HANDLER_FRAME;
-				if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(false);
+				if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(false, std::memory_order_relaxed);
 			}
 		}
 		auto reason = personality(_U_VERSION, actions, exception_class, exception_object, context);
@@ -88,7 +88,7 @@ static _Unwind_Reason_Code _Unwind_Phase2(_Unwind_Exception* exception_object, _
 
 _Unwind_Reason_Code _Unwind_RaiseException(_Unwind_Exception* exception_object)
 {
-	if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(true);
+	if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(true, std::memory_order_relaxed);
 	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE1_ERROR)
 	auto exception_class = exception_object->exception_class;
 	while (true) {
@@ -391,7 +391,7 @@ void t_thread::f_epoch()
 		} while (unw_is_signal_frame(&cursor) <= 0);
 		auto bottom = std::max(v_stack_preserved->v_base, reinterpret_cast<t_object**>(reinterpret_cast<uintptr_t>(v_stack_dirty) / sizeof(t_object*) * sizeof(t_object*)));
 		v_stack_dirty = top;
-		if (!v_unwinding.load()) {
+		if (!v_unwinding.load(std::memory_order_relaxed) && !f_engine()->v_shuttingdown) {
 			void* ip;
 			unw_get_reg(&cursor, UNW_REG_IP, reinterpret_cast<unw_word_t*>(&ip));
 			if (ip < v_stack_frames->v_thunk || ip >= v_stack_preserved + 1) f_thunk(cursor);

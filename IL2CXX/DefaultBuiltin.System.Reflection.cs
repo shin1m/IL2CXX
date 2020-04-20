@@ -25,11 +25,11 @@ namespace IL2CXX
 ", true);
             code.For(
                 type.GetProperty(nameof(CustomAttributeData.ConstructorArguments)).GetMethod,
-                transpiler => "\tthrow std::runtime_error(\"NotImplementedException\");\n"
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", false)
             );
             code.For(
                 type.GetProperty(nameof(CustomAttributeData.NamedArguments)).GetMethod,
-                transpiler => "\tthrow std::runtime_error(\"NotImplementedException\");\n"
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", false)
             );
         });
     }

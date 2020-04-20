@@ -10,7 +10,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => null
+                transpiler => default
             );
         });
     }

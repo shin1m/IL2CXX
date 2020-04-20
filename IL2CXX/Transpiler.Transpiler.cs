@@ -676,7 +676,7 @@ namespace IL2CXX
                     string call(IEnumerable<string> xs) => $"{Escape(m)}({string.Join(",", xs)}\n\t)";
                     var parameters = m.GetParameters();
                     var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{CastValue(p.ParameterType, s.Variable)}");
-                    if (builtin.GetBody(this, m) != null)
+                    if (builtin.GetBody(this, m).body != null)
                         writer.WriteLine($"\t{after.Variable} = {call(arguments)};");
                     else if (m.DeclaringType.IsValueType)
                         writer.WriteLine($"\t{after.Variable} = {EscapeForValue(m.DeclaringType)}{{}};\n\t{call(arguments.Prepend($"\n\t\t&{after.Variable}"))};");

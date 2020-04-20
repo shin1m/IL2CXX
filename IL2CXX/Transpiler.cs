@@ -347,16 +347,11 @@ namespace IL2CXX
             method.Module.ResolveField(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
         private MethodBase ParseMethod(ref int index) =>
             method.Module.ResolveMethod(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
-        private static Type GetThisType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SZArrayHelper<>) ? type.GetGenericArguments()[0].MakeArrayType() : type;
+        private static Type GetVirtualThisType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SZArrayHelper<>) ? type.GetGenericArguments()[0].MakeArrayType() : type;
         private static Type GetThisType(MethodBase method)
         {
             var type = method.DeclaringType;
-            return type.IsValueType ? MakePointerType(type) : GetThisType(type);
-        }
-        private static Type GetVirtualThisType(MethodBase method)
-        {
-            var type = method.DeclaringType;
-            return type.IsValueType ? typeof(object) : GetThisType(type);
+            return type.IsValueType ? MakePointerType(type) : GetVirtualThisType(type);
         }
         private Type GetArgumentType(int index)
         {
@@ -585,7 +580,7 @@ struct t__static_{identifier}
 {string.Join(",\n", fields.Select(x => $"\t\t\t{Escape(x)}(a_value.{Escape(x)})"))}
 " : string.Empty)}{'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value& IL2CXX__PORTABLE__ALWAYS_INLINE operator=(const t_value& a_value)
+{'\t'}{'\t'}IL2CXX__PORTABLE__ALWAYS_INLINE t_value& operator=(const t_value& a_value)
 {'\t'}{'\t'}{{
 {string.Join(string.Empty, fields.Select(x => $"\t\t\t{Escape(x)} = a_value.{Escape(x)};\n"))}{'\t'}{'\t'}{'\t'}return *this;
 {'\t'}{'\t'}}}
@@ -758,11 +753,8 @@ struct t__static_{identifier}
             foreach (var ms in concretes) Enqueue(ms[i].MakeGenericMethod(ga));
             return (i, j);
         }
-        public string GetVirtualFunctionPointer(MethodBase method)
-        {
-            var parameters = method.GetParameters().Select(x => x.ParameterType).Prepend(GetVirtualThisType(method));
-            return $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", parameters.Select(EscapeForStacked))})";
-        }
+        private string GetVirtualFunctionPointer(MethodBase method) =>
+            $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", method.GetParameters().Select(x => EscapeForStacked(x.ParameterType)).Prepend($"{Escape(GetVirtualThisType(method.DeclaringType))}*"))})";
         public string GetVirtualFunction(MethodBase method, string target)
         {
             Enqueue(method);
@@ -834,11 +826,11 @@ struct t__static_{identifier}
             var parameters = method.GetParameters().Select(x => (
                 Prefix: $"{attributes("\t", x)}\n\t// {x}", Type: x.ParameterType
             ));
-            if (!method.IsStatic && !(method.IsConstructor && builtin != null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
+            if (!method.IsStatic && !(method.IsConstructor && builtin.body != null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
             string argument(Type t, int i) => $"\n\t{EscapeForStacked(t)} a_{i}";
             var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
             if (method is MethodInfo) description.Write(attributes(string.Empty, ((MethodInfo)method).ReturnParameter));
-            var returns = method is MethodInfo m ? EscapeForStacked(m.ReturnType) : method.IsStatic || builtin == null ? "void" : EscapeForStacked(method.DeclaringType);
+            var returns = method is MethodInfo m ? EscapeForStacked(m.ReturnType) : method.IsStatic || builtin.body == null ? "void" : EscapeForStacked(method.DeclaringType);
             var identifier = Escape(method);
             var prototype = $@"{returns}
 {identifier}({string.Join(",", arguments)}
@@ -848,20 +840,21 @@ struct t__static_{identifier}
             functionDeclarations.WriteLine(';');
             if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
 {returns}
-{identifier}__v({string.Join(",", arguments.Skip(1).Prepend(argument(typeof(object), 0)))}
+{identifier}__v({string.Join(",", arguments.Skip(1).Prepend($"\n\t{Escape(method.DeclaringType)}* a_0"))}
 )
 {{
 {'\t'}{(returns == "void" ? string.Empty : "return ")}{identifier}({
-    string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&static_cast<{Escape(method.DeclaringType)}*>(a_0)->v__value"))
+    string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_0->v__value"))
 });
 }}");
             writer.WriteLine(description);
+            if (builtin.inline) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
             var body = method.GetMethodBody();
             bytes = body?.GetILAsByteArray();
-            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining) || builtin != null || bytes?.Length <= 64) writer.Write("inline ");
-            if (builtin != null)
+            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining) || builtin.inline || bytes?.Length <= 64) writer.Write("inline ");
+            if (builtin.body != null)
             {
-                writer.WriteLine($"{prototype}\n{{\n{builtin}}}");
+                writer.WriteLine($"{prototype}\n{{\n{builtin.body}}}");
                 return;
             }
             var dllimport = method.GetCustomAttribute<DllImportAttribute>();

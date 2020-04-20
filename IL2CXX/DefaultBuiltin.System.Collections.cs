@@ -16,24 +16,24 @@ namespace IL2CXX
                 var identifier = transpiler.Escape(concrete);
                 var constructor = concrete.GetConstructor(Type.EmptyTypes);
                 transpiler.Enqueue(constructor);
-                return $@"{'\t'}auto p = f__new_zerod<{identifier}>();
+                return ($@"{'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}t_static::v_instance->v_{transpiler.Escape(gt)}->v__3cDefault_3ek_5f_5fBackingField = p;
-";
+", true);
             });
         })
         .For(Type.GetType("System.Collections.Generic.ArraySortHelper`1"), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod("CreateArraySortHelper", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => "\treturn {};\n"
+                (transpiler, types) => ("\treturn {};\n", false)
             );
         })
         .For(Type.GetType("System.Collections.Generic.ComparerHelpers"), (type, code) =>
         {
             code.For(
                 type.GetMethod("CreateDefaultComparer", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => "\treturn {};\n"
+                transpiler => ("\treturn {};\n", false)
             );
         });
     }

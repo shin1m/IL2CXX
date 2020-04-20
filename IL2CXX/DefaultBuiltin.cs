@@ -12,19 +12,19 @@ namespace IL2CXX
 
         public static Builtin Create() => new Builtin {
             TypeNameToMethodNameToBody = {
-                ["System.SR"] = new Dictionary<string, Func<Transpiler, MethodBase, string>> {
-                    ["System.String GetResourceString(System.String, System.String)"] = (transpiler, method) => "\treturn a_0;\n"
+                ["System.SR"] = new Dictionary<string, Func<Transpiler, MethodBase, (string body, bool inline)>> {
+                    ["System.String GetResourceString(System.String, System.String)"] = (transpiler, method) => ("\treturn a_0;\n", false)
                 }
             },
             MethodNameToBody = {
-                ["System.String ToString(System.String, System.IFormatProvider)"] = (transpiler, method) => $"\treturn f__new_string(u\"{method.ReflectedType}\"sv);\n",
-                ["Boolean TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)"] = (transpiler, method) => $@"{'\t'}*a_2 = 0;
+                ["System.String ToString(System.String, System.IFormatProvider)"] = (transpiler, method) => ($"\treturn f__new_string(u\"{method.ReflectedType}\"sv);\n", false),
+                ["Boolean TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)"] = (transpiler, method) => ($@"{'\t'}*a_2 = 0;
 {'\t'}return false;
-",
-                ["Boolean System.ISpanFormattable.TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)"] = (transpiler, method) => $@"{'\t'}*a_2 = 0;
+", false),
+                ["Boolean System.ISpanFormattable.TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)"] = (transpiler, method) => ($@"{'\t'}*a_2 = 0;
 {'\t'}return false;
-",
-                ["Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType.Namespace == "System.Runtime.Intrinsics.X86" ? "\treturn false;\n" : null,
+", false),
+                ["Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType.Namespace == "System.Runtime.Intrinsics.X86" ? ("\treturn false;\n", false) : default,
             }
         }
         .SetupSystem()

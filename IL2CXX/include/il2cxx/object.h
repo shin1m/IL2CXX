@@ -17,13 +17,13 @@ struct t__new
 {
 	T* v_p;
 
-	t__new(size_t a_extra);
-	~t__new();
-	operator T*() const
+	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr t__new(size_t a_extra);
+	IL2CXX__PORTABLE__ALWAYS_INLINE ~t__new();
+	constexpr operator T*() const
 	{
 		return v_p;
 	}
-	T* operator->() const
+	constexpr T* operator->() const
 	{
 		return v_p;
 	}

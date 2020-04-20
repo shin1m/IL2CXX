@@ -95,7 +95,7 @@ struct t_thread
 		a_field = std::forward<T_value>(a_value);
 	}
 	template<typename T_field, typename T_value>
-	void IL2CXX__PORTABLE__ALWAYS_INLINE f_store(T_field& a_field, T_value&& a_value)
+	IL2CXX__PORTABLE__ALWAYS_INLINE void f_store(T_field& a_field, T_value&& a_value)
 	{
 		auto p = &a_field;
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
@@ -147,7 +147,7 @@ struct t_thread
 };
 
 template<typename T_field, typename T_value>
-inline void IL2CXX__PORTABLE__ALWAYS_INLINE f__store(T_field& a_field, T_value&& a_value)
+IL2CXX__PORTABLE__ALWAYS_INLINE inline void f__store(T_field& a_field, T_value&& a_value)
 {
 	t_thread::v_current->f_store(a_field, std::forward<T_value>(a_value));
 }

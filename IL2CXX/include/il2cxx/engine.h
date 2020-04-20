@@ -93,7 +93,7 @@ private:
 public:
 	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
 	~t_engine();
-	t_object* f_object__allocate(size_t a_size)
+	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr t_object* f_object__allocate(size_t a_size)
 	{
 		auto p = v_object__heap.f_allocate(a_size);
 		p->v_next = nullptr;
@@ -123,7 +123,7 @@ inline t_engine* f_engine()
 }
 
 template<typename T>
-inline t__new<T>::t__new(size_t a_extra) : v_p(static_cast<T*>(f_engine()->f_object__allocate(sizeof(T) + a_extra)))
+constexpr t__new<T>::t__new(size_t a_extra) : v_p(static_cast<T*>(f_engine()->f_object__allocate(sizeof(T) + a_extra)))
 {
 }
 
@@ -209,7 +209,7 @@ T_array* f__new_array(size_t a_length)
 	return p;
 }
 
-inline t_System_2eString* IL2CXX__PORTABLE__ALWAYS_INLINE f__new_string(size_t a_length)
+IL2CXX__PORTABLE__ALWAYS_INLINE inline t_System_2eString* f__new_string(size_t a_length)
 {
 	t__new<t_System_2eString> p(sizeof(char16_t) * a_length);
 	p->v__5fstringLength = a_length;

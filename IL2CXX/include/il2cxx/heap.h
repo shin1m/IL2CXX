@@ -116,19 +116,17 @@ class t_heap
 	size_t v_freed = 0;
 
 	template<size_t A_rank, size_t A_size>
-	T* f_allocate(t_of<A_rank, A_size>& a_of)
+	T* f_allocate_from(t_of<A_rank, A_size>& a_of);
+	template<size_t A_rank, size_t A_size>
+	IL2CXX__PORTABLE__ALWAYS_INLINE T* f_allocate(t_of<A_rank, A_size>& a_of)
 	{
 		auto p = v_head<A_rank>;
-		if (!p) {
-			p = a_of.f_allocate(nullptr);
-			if (!p) {
-				v_wait();
-				p = a_of.f_allocate(this);
-			}
-		}
+		if (!p) return f_allocate_from(a_of);
 		v_head<A_rank> = p->v_next;
 		return p;
 	}
+	T* f_allocate_large(size_t a_size);
+	constexpr T* f_allocate_medium(size_t a_size);
 
 public:
 	t_heap(T_wait&& a_wait) : v_wait(std::move(a_wait))
@@ -158,35 +156,9 @@ public:
 		a_each(6, v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned);
 		a_each(57, 0, v_allocated, v_freed);
 	}
-	T* f_allocate(size_t a_size)
+	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
 	{
-		size_t n = a_size >> 7;
-		if (n == 0) return f_allocate(v_of0);
-		n >>= 1;
-		if (n == 0) return f_allocate(v_of1);
-		n >>= 1;
-		if (n == 0) return f_allocate(v_of2);
-		n >>= 1;
-		if (n == 0) return f_allocate(v_of3);
-		n >>= 1;
-		if (n == 0) return f_allocate(v_of4);
-		n >>= 1;
-		if (n == 0) return f_allocate(v_of5);
-		n >>= 1;
-		if (n == 0) return f_allocate(v_of6);
-		auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
-		p->v_rank = 57;
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-		pthread_sigmask(SIG_BLOCK, &v_sigusr1, NULL);
-#endif
-		v_mutex.lock();
-		v_blocks.emplace(p, a_size);
-		++v_allocated;
-		v_mutex.unlock();
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-		pthread_sigmask(SIG_UNBLOCK, &v_sigusr1, NULL);
-#endif
-		return p;
+		return a_size >> 7 ? f_allocate_medium(a_size) : f_allocate(v_of0);
 	}
 	void f_return()
 	{
@@ -261,6 +233,55 @@ public:
 template<typename T, typename T_wait>
 template<size_t A_rank>
 IL2CXX__PORTABLE__THREAD T* t_heap<T, T_wait>::v_head;
+
+template<typename T, typename T_wait>
+template<size_t A_rank, size_t A_size>
+T* t_heap<T, T_wait>::f_allocate_from(t_of<A_rank, A_size>& a_of)
+{
+	auto p = a_of.f_allocate(nullptr);
+	if (!p) {
+		v_wait();
+		p = a_of.f_allocate(this);
+	}
+	v_head<A_rank> = p->v_next;
+	return p;
+}
+
+template<typename T, typename T_wait>
+T* t_heap<T, T_wait>::f_allocate_large(size_t a_size)
+{
+	auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
+	p->v_rank = 57;
+#ifdef IL2CXX__STACK_SCAN_DIRECT
+	pthread_sigmask(SIG_BLOCK, &v_sigusr1, NULL);
+#endif
+	v_mutex.lock();
+	v_blocks.emplace(p, a_size);
+	++v_allocated;
+	v_mutex.unlock();
+#ifdef IL2CXX__STACK_SCAN_DIRECT
+	pthread_sigmask(SIG_UNBLOCK, &v_sigusr1, NULL);
+#endif
+	return p;
+}
+
+template<typename T, typename T_wait>
+constexpr T* t_heap<T, T_wait>::f_allocate_medium(size_t a_size)
+{
+	auto n = a_size >> 8;
+	if (n == 0) return f_allocate(v_of1);
+	n >>= 1;
+	if (n == 0) return f_allocate(v_of2);
+	n >>= 1;
+	if (n == 0) return f_allocate(v_of3);
+	n >>= 1;
+	if (n == 0) return f_allocate(v_of4);
+	n >>= 1;
+	if (n == 0) return f_allocate(v_of5);
+	n >>= 1;
+	if (n == 0) return f_allocate(v_of6);
+	return f_allocate_large(a_size);
+}
 
 }
 

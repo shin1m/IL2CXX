@@ -120,7 +120,7 @@ class t_object
 		if (--v_count > 0) {
 			v_color = e_color__PURPLE;
 			if (!v_next) f_append(this);
-		} else {
+		} else if (!v_finalizee || !f_queue_finalize()) {
 			f_push(this);
 		}
 	}

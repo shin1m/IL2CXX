@@ -13,54 +13,54 @@ namespace IL2CXX
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(int).MakeByRefType(), typeof(int), typeof(int) }),
                 transpiler => ($@"{'\t'}reinterpret_cast<std::atomic_int32_t*>(a_0)->compare_exchange_strong(a_2, a_1);
 {'\t'}return a_2;
-", true)
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(long).MakeByRefType(), typeof(long), typeof(long) }),
                 transpiler => ($@"{'\t'}reinterpret_cast<std::atomic_int64_t*>(a_0)->compare_exchange_strong(a_2, a_1);
 {'\t'}return a_2;
-", true)
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr), typeof(IntPtr) }),
                 transpiler => ($@"{'\t'}void* p = a_2;
 {'\t'}reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).compare_exchange_strong(p, a_1);
 {'\t'}return {transpiler.EscapeForValue(typeof(IntPtr))}{{p}};
-", true)
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(object).MakeByRefType(), typeof(object), typeof(object) }),
                 transpiler => ($@"{'\t'}f__compare_exchange(*a_0, a_2, a_1);
 {'\t'}return a_2;
-", true)
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(int).MakeByRefType(), typeof(int) }),
-                transpiler => ("\treturn reinterpret_cast<std::atomic_int32_t*>(a_0)->exchange(a_1);\n", true)
+                transpiler => ("\treturn reinterpret_cast<std::atomic_int32_t*>(a_0)->exchange(a_1);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(long).MakeByRefType(), typeof(long) }),
-                transpiler => ("\treturn reinterpret_cast<std::atomic_int64_t*>(a_0)->exchange(a_1);\n", true)
+                transpiler => ("\treturn reinterpret_cast<std::atomic_int64_t*>(a_0)->exchange(a_1);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr) }),
-                transpiler => ($"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1)}};\n", true)
+                transpiler => ($"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1)}};\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(object).MakeByRefType(), typeof(object) }),
-                transpiler => ("\treturn f__exchange(*a_0, a_1);\n", true)
+                transpiler => ("\treturn f__exchange(*a_0, a_1);\n", 1)
             );
             code.For(
                 type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(int).MakeByRefType(), typeof(int) }, null),
-                transpiler => ("\treturn reinterpret_cast<std::atomic_int32_t*>(a_0)->fetch_add(a_1);\n", true)
+                transpiler => ("\treturn reinterpret_cast<std::atomic_int32_t*>(a_0)->fetch_add(a_1);\n", 1)
             );
             code.For(
                 type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(long).MakeByRefType(), typeof(long) }, null),
-                transpiler => ("\treturn reinterpret_cast<std::atomic_int64_t*>(a_0)->fetch_add(a_1);\n", true)
+                transpiler => ("\treturn reinterpret_cast<std::atomic_int64_t*>(a_0)->fetch_add(a_1);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.MemoryBarrier)),
-                transpiler => ("\tstd::atomic_thread_fence(std::memory_order_seq_cst);\n", true)
+                transpiler => ("\tstd::atomic_thread_fence(std::memory_order_seq_cst);\n", 1)
             );
         })
         .For(typeof(Thread), (type, code) =>
@@ -99,72 +99,72 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}p->v__5fdelegate = a_0;
 {'\t'}return p;
-", false)
+", 0)
             );
             code.For(
                 type.GetConstructor(new[] { typeof(ParameterizedThreadStart) }),
                 transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}p->v__5fdelegate = a_0;
 {'\t'}return p;
-", false)
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(object.GetHashCode)),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", true)
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.Start), Type.EmptyTypes),
-                transpiler => ("\treturn a_0->f__start();\n", true)
+                transpiler => ("\treturn a_0->f__start();\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.Join), Type.EmptyTypes),
-                transpiler => ("\ta_0->f__join();\n", true)
+                transpiler => ("\ta_0->f__join();\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.Sleep), new[] { typeof(int) }),
-                transpiler => ("\tstd::this_thread::sleep_for(std::chrono::milliseconds(a_0));\n", true)
+                transpiler => ("\tstd::this_thread::sleep_for(std::chrono::milliseconds(a_0));\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.SpinWait)),
-                transpiler => ("\tfor (; a_0 > 0; --a_0) std::this_thread::yield();\n", false)
+                transpiler => ("\tfor (; a_0 > 0; --a_0) std::this_thread::yield();\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Thread.IsBackground)).SetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", false)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Thread.IsThreadPoolThread)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", false)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Thread.ManagedThreadId)).GetMethod,
-                transpiler => ("\treturn reinerpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", true)
+                transpiler => ("\treturn reinerpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
             );
             code.For(
                 type.GetMethod("InternalFinalize", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => (string.Empty, false)
+                transpiler => (string.Empty, 0)
             );
             code.For(
                 type.GetMethod("GetCurrentProcessorNumber", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn sched_getcpu();\n", true)
+                transpiler => ("\treturn sched_getcpu();\n", 1)
             );
             code.For(
                 type.GetMethod("GetCurrentThreadNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($"\treturn {transpiler.Escape(typeof(Thread))}::f__current();\n", true)
+                transpiler => ($"\treturn {transpiler.Escape(typeof(Thread))}::f__current();\n", 1)
             );
             code.For(
                 type.GetMethod("GetThreadDeserializationTracker", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto p = {transpiler.Escape(typeof(Thread))}::f__current();
 {'\t'}if (!p->v__deserialization_tracker) p->v__deserialization_tracker = f__new_zerod<{transpiler.Escape(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))}>();
 {'\t'}return p->v__deserialization_tracker;
-", false)
+", 0)
             );
         })
         .For(typeof(ThreadPool), (type, code) =>
         {
             code.For(
                 type.GetMethod("NotifyWorkItemProgressNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", false)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
         .For(typeof(Monitor), (type, code) =>
@@ -173,33 +173,33 @@ namespace IL2CXX
                 type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}a_0->f_extension()->v_mutex.lock();
 {'\t'}*a_1 = true;
-", true)
+", 1)
             );
             code.For(
                 type.GetMethod("ReliableEnterTimeout", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\t*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));\n", true)
+                transpiler => ("\t*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Monitor.Enter), new[] { typeof(object) }),
-                transpiler => ("\ta_0->f_extension()->v_mutex.lock();\n", true)
+                transpiler => ("\ta_0->f_extension()->v_mutex.lock();\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Monitor.Exit)),
-                transpiler => ("\ta_0->f_extension()->v_mutex.unlock();\n", true)
+                transpiler => ("\ta_0->f_extension()->v_mutex.unlock();\n", 1)
             );
             code.For(
                 type.GetMethod("IsEnteredNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto p = a_0->f_extension();
 {'\t'}return p->v_mutex.locked();
-", true)
+", 1)
             );
             code.For(
                 type.GetMethod("ObjPulse", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\ta_0->f_extension()->v_condition.notify_one();\n", true)
+                transpiler => ("\ta_0->f_extension()->v_condition.notify_one();\n", 1)
             );
             code.For(
                 type.GetMethod("ObjPulseAll", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\ta_0->f_extension()->v_condition.notify_all();\n", true)
+                transpiler => ("\ta_0->f_extension()->v_condition.notify_all();\n", 1)
             );
             code.For(
                 type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
@@ -213,7 +213,7 @@ namespace IL2CXX
 {'\t'}if (a_1 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_1)) == std::cv_status::no_timeout;
 {'\t'}p->v_condition.wait(lock);
 {'\t'}return true;
-", false)
+", 0)
             );
         });
     }

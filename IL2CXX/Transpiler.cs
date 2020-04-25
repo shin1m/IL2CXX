@@ -848,14 +848,31 @@ struct t__static_{identifier}
 });
 }}");
             writer.WriteLine(description);
-            if (builtin.inline) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
-            var body = method.GetMethodBody();
-            bytes = body?.GetILAsByteArray();
-            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining) || builtin.inline || bytes?.Length <= 64) writer.Write("inline ");
             if (builtin.body != null)
             {
+                if (builtin.inline < 0)
+                {
+                    writer.Write("IL2CXX__PORTABLE__NOINLINE ");
+                }
+                else
+                {
+                    if (builtin.inline > 1) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
+                    if (builtin.inline > 0) writer.Write("inline ");
+                }
                 writer.WriteLine($"{prototype}\n{{\n{builtin.body}}}");
                 return;
+            }
+            var body = method.GetMethodBody();
+            bytes = body?.GetILAsByteArray();
+            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.NoInlining))
+            {
+                writer.Write("IL2CXX__PORTABLE__NOINLINE ");
+            }
+            else
+            {
+                var aggressive = method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining);
+                if (aggressive) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
+                if (aggressive || bytes?.Length <= 64) writer.Write("inline ");
             }
             var dllimport = method.GetCustomAttribute<DllImportAttribute>();
             if (dllimport != null)

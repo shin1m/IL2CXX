@@ -15,7 +15,7 @@ namespace IL2CXX
                 type.GetConstructor(new[] { typeof(string), typeof(Assembly) }),
                 transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}return p;
-", false)
+", 0)
             );
         })
         .For(typeof(ResourceReader), (type, code) =>
@@ -36,14 +36,14 @@ namespace IL2CXX
 ", true);
             code.For(
                 type.GetMethod("_LoadObjectV1", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", false)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
         .For(Type.GetType("System.Resources.RuntimeResourceSet"), (type, code) =>
         {
             code.For(
                 type.GetMethod("GetString", new[] { typeof(string), typeof(bool) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", false)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         });
     }

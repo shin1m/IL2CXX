@@ -85,12 +85,12 @@ struct t_thread
 		v_reviving = v_increments.v_head;
 	}
 	template<typename T>
-	static void f_assign(T*& a_field, T* a_value)
+	static IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(T*& a_field, T* a_value)
 	{
 		reinterpret_cast<t_slot&>(a_field) = a_value;
 	}
 	template<typename T_field, typename T_value>
-	static void f_assign(T_field& a_field, T_value&& a_value)
+	static IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(T_field& a_field, T_value&& a_value)
 	{
 		a_field = std::forward<T_value>(a_value);
 	}

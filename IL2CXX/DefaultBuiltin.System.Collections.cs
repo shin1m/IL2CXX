@@ -19,21 +19,21 @@ namespace IL2CXX
                 return ($@"{'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}t_static::v_instance->v_{transpiler.Escape(gt)}->v__3cDefault_3ek_5f_5fBackingField = p;
-", true);
+", 1);
             });
         })
         .For(Type.GetType("System.Collections.Generic.ArraySortHelper`1"), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod("CreateArraySortHelper", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => ("\treturn {};\n", false)
+                (transpiler, types) => ("\treturn {};\n", 0)
             );
         })
         .For(Type.GetType("System.Collections.Generic.ComparerHelpers"), (type, code) =>
         {
             code.For(
                 type.GetMethod("CreateDefaultComparer", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn {};\n", false)
+                transpiler => ("\treturn {};\n", 0)
             );
         });
     }

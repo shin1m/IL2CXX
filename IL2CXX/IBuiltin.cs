@@ -7,6 +7,6 @@ namespace IL2CXX
     {
         (string members, bool managed) GetMembers(Transpiler transpiler, Type type);
         string GetInitialize(Transpiler transpiler, Type type);
-        (string body, bool inline) GetBody(Transpiler transpiler, MethodBase method);
+        (string body, int inline) GetBody(Transpiler transpiler, MethodBase method);
     }
 }

@@ -13,18 +13,18 @@ namespace IL2CXX
         {
             public Func<Transpiler, (string, bool)> Members;
             public Func<Transpiler, string> Initialize;
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, bool inline)>> MethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, bool inline)>>();
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string body, bool inline)>> GenericMethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string body, bool inline)>>();
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string body, bool inline)>> MethodTreeToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string body, bool inline)>>();
+            public Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, int inline)>> MethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, (string, int)>>();
+            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string, int)>>();
+            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string, int)>>();
 
-            public void For(MethodBase method, Func<Transpiler, (string body, bool inline)> body) => MethodToBody.Add(method.MethodHandle, body);
-            public void ForGeneric(MethodBase method, Func<Transpiler, Type[], (string body, bool inline)> body) => GenericMethodToBody.Add(method.MethodHandle, body);
-            public void ForTree(MethodInfo method, Func<Transpiler, Type, (string body, bool inline)> body) => MethodTreeToBody.Add(method.MethodHandle, body);
+            public void For(MethodBase method, Func<Transpiler, (string body, int inline)> body) => MethodToBody.Add(method.MethodHandle, body);
+            public void ForGeneric(MethodBase method, Func<Transpiler, Type[], (string body, int inline)> body) => GenericMethodToBody.Add(method.MethodHandle, body);
+            public void ForTree(MethodInfo method, Func<Transpiler, Type, (string body, int inline)> body) => MethodTreeToBody.Add(method.MethodHandle, body);
         }
 
         public Dictionary<Type, Code> TypeToCode = new Dictionary<Type, Code>();
-        public Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string body, bool inline)>>> TypeNameToMethodNameToBody = new Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string body, bool inline)>>>();
-        public Dictionary<string, Func<Transpiler, MethodBase, (string body, bool inline)>> MethodNameToBody = new Dictionary<string, Func<Transpiler, MethodBase, (string body, bool inline)>>();
+        public Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>>> TypeNameToMethodNameToBody = new Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string, int)>>>();
+        public Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>> MethodNameToBody = new Dictionary<string, Func<Transpiler, MethodBase, (string, int)>>();
 
         public Builtin For(Type type, Action<Type, Code> action)
         {
@@ -36,7 +36,7 @@ namespace IL2CXX
 
         public (string members, bool managed) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? (null, false) : (null, false);
         public string GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
-        public (string body, bool inline) GetBody(Transpiler transpiler, MethodBase method)
+        public (string body, int inline) GetBody(Transpiler transpiler, MethodBase method)
         {
             var type = method.DeclaringType;
             var handle = method.MethodHandle;
@@ -68,13 +68,13 @@ namespace IL2CXX
 {'\t'}{'\t'}p->v__5fmethodPtrAux = a_1;
 {'\t'}}}
 {'\t'}return p;
-", true);
+", 1);
                 }
                 else if (handle == invoke.MethodHandle)
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    return ($"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForValue(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForValue(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", true);
+                    return ($"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForValue(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForValue(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
                 }
             }
             if (TypeToCode.TryGetValue(type, out var code))

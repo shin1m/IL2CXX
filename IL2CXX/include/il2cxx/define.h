@@ -7,6 +7,7 @@
 #define IL2CXX__PORTABLE__SUPPORTS_THREAD_EXPORT
 #define IL2CXX__PORTABLE__SUPPORTS_COMPUTED_GOTO
 #define IL2CXX__PORTABLE__ALWAYS_INLINE __attribute__((always_inline))
+#define IL2CXX__PORTABLE__NOINLINE __attribute__((noinline))
 #define IL2CXX__PORTABLE__FORCE_INLINE
 #define IL2CXX__PORTABLE__DEFINE_EXPORT
 #endif
@@ -16,6 +17,7 @@
 #define IL2CXX__PORTABLE__EXPORT __declspec(dllimport)
 #endif
 #define IL2CXX__PORTABLE__ALWAYS_INLINE
+#define IL2CXX__PORTABLE__NOINLINE
 #define IL2CXX__PORTABLE__FORCE_INLINE __forceinline
 #define IL2CXX__PORTABLE__DEFINE_EXPORT __declspec(dllexport)
 #endif

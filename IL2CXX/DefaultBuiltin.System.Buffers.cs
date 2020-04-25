@@ -10,27 +10,27 @@ namespace IL2CXX
         {
             code.For(
                 type.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null),
-                transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", false)
+                transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
             );
             code.For(
                 type.GetMethod("BufferAllocated", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => (string.Empty, false)
+                transpiler => (string.Empty, 0)
             );
             code.For(
                 type.GetMethod("BufferRented", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => (string.Empty, false)
+                transpiler => (string.Empty, 0)
             );
             code.For(
                 type.GetMethod("BufferReturned", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => (string.Empty, false)
+                transpiler => (string.Empty, 0)
             );
             code.For(
                 type.GetMethod("BufferTrimPoll", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => (string.Empty, false)
+                transpiler => (string.Empty, 0)
             );
             code.For(
                 type.GetMethod("BufferTrimmed", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => (string.Empty, false)
+                transpiler => (string.Empty, 0)
             );
         });
     }

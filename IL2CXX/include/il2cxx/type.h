@@ -24,7 +24,8 @@ struct t__type : t__member_info
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
 	{
 		//t_slot::f_increments()->f_push(this);
-		a_p->v_type.store(this, std::memory_order_release);
+		std::atomic_signal_fence(std::memory_order_release);
+		a_p->v_type = this;
 		t_slot::f_decrements()->f_push(a_p);
 	}
 	virtual void f_scan(t_object* a_this, t_scan a_scan);

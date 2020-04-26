@@ -160,7 +160,7 @@ void t_object::f_cyclic_decrement()
 	}
 	f_type()->f_scan(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
 	//f_type()->f_cyclic_decrement_push();
-	v_type.store(nullptr, std::memory_order_relaxed);
+	v_type = nullptr;
 }
 
 t__extension* t_object::f_extension()

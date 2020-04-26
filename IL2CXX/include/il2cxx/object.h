@@ -94,8 +94,8 @@ class t_object
 	size_t v_cyclic;
 	size_t v_rank;
 	t_object* v_next_cycle;
-	std::atomic<t__type*> v_type{nullptr};
-	std::atomic<t__extension*> v_extension{nullptr};
+	t__type* v_type = nullptr;
+	std::atomic<t__extension*> v_extension = nullptr;
 
 	template<void (t_object::*A_push)()>
 	void f_step();
@@ -221,7 +221,7 @@ class t_object
 public:
 	t__type* f_type() const
 	{
-		return v_type.load(std::memory_order_relaxed);
+		return v_type;
 	}
 	t__extension* f_extension();
 	void f__scan(t_scan a_scan)

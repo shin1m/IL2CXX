@@ -73,7 +73,7 @@ private:
 	{
 		if (reinterpret_cast<uintptr_t>(a_p) & 127) return nullptr;
 		auto p = v_object__heap.f_find(a_p);
-		return p && p->v_type.load(std::memory_order_acquire) ? p : nullptr;
+		return p && p->v_type ? p : nullptr;
 	}
 	void f_epoch_suspend()
 	{
@@ -150,7 +150,7 @@ inline void t_object::f_decrement_step()
 	}
 	f_type()->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
 	//f_type()->f_decrement_push();
-	v_type.store(nullptr, std::memory_order_relaxed);
+	v_type = nullptr;
 	v_color = e_color__BLACK;
 	if (v_next) {
 		v_next->v_previous = v_previous;
@@ -180,7 +180,7 @@ inline void t_thread::f_epoch_resume()
 
 inline t__type::t__type(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element, size_t a_rank, void* a_multicast_invoke) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank), v__multicast_invoke(a_multicast_invoke)
 {
-	v_type.store(&t__type_of<t__type>::v__instance, std::memory_order_relaxed);
+	v_type = &t__type_of<t__type>::v__instance;
 }
 
 template<typename T>

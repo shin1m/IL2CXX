@@ -38,7 +38,6 @@ class t_heap
 				q->v_rank = A_rank;
 			}
 			auto q = new(p) T;
-			q->v_next = nullptr;
 			q->v_rank = A_rank;
 			q = reinterpret_cast<T*>(block);
 			q->v_cyclic = A_size;

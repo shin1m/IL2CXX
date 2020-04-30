@@ -236,7 +236,7 @@ t__weak_handle::~t__weak_handle()
 	f_engine()->v_object__reviving__mutex.lock();
 	auto p = f_detach();
 	f_engine()->v_object__reviving__mutex.unlock();
-	if (p) t_slot::f_decrements()->f_push(p);
+	if (p) t_slot::t_decrements::f_push(p);
 }
 
 t_object* t__weak_handle::f_target() const
@@ -257,7 +257,7 @@ void t__weak_handle::f_target__(t_object* a_p)
 	v_target = a_p;
 	f_attach(p);
 	f_engine()->v_object__reviving__mutex.unlock();
-	if (q) t_slot::f_decrements()->f_push(q);
+	if (q) t_slot::t_decrements::f_push(q);
 }
 
 void t__weak_handle::f_scan(t_scan a_scan)

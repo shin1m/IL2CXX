@@ -92,7 +92,7 @@ void t_engine::f_finalizer()
 			}
 			p->f_type()->f_suppress_finalize(p);
 			f_finalize(p);
-			t_slot::f_decrements()->f_push(p);
+			t_slot::t_decrements::f_push(p);
 		}
 		}();
 		}();

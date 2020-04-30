@@ -311,8 +311,12 @@ void t_thread::f_initialize(void* a_bottom)
 	v_stack_dirty = v_stack_limit;
 #endif
 	v_current = this;
-	t_slot::v_increments = &v_increments;
-	t_slot::v_decrements = &v_decrements;
+	t_slot::t_increments::v_instance = &v_increments;
+	t_slot::t_increments::v_head = v_increments.v_objects;
+	t_slot::t_increments::v_next = v_increments.v_objects + t_slot::t_increments::V_SIZE / 8;
+	t_slot::t_decrements::v_instance = &v_decrements;
+	t_slot::t_decrements::v_head = v_decrements.v_objects;
+	t_slot::t_decrements::v_next = v_decrements.v_objects + t_slot::t_decrements::V_SIZE / 8;
 	v_done = 0;
 }
 
@@ -458,7 +462,7 @@ void t_System_2eThreading_2eThread::f__start(T a_main)
 		v__internal->v_next = f_engine()->v_thread__internals;
 		f_engine()->v_thread__internals = v__internal;
 	}
-	t_slot::v_increments->f_push(this);
+	t_slot::t_increments::f_push(this);
 	try {
 		std::thread([this, main = std::move(a_main)]
 		{
@@ -479,7 +483,7 @@ void t_System_2eThreading_2eThread::f__start(T a_main)
 				std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
 				v__internal = nullptr;
 			}
-			t_slot::v_decrements->f_push(this);
+			t_slot::t_decrements::f_push(this);
 			internal->f_epoch_get();
 			std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
 			++internal->v_done;
@@ -491,7 +495,7 @@ void t_System_2eThreading_2eThread::f__start(T a_main)
 			v__internal->v_done = 1;
 			v__internal = nullptr;
 		}
-		t_slot::v_decrements->f_push(this);
+		t_slot::t_decrements::f_push(this);
 		throw;
 	}
 }

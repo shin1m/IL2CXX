@@ -168,21 +168,24 @@ protected:
 	{
 		static const size_t V_SIZE = A_SIZE;
 
-		t_object* volatile* v_head{v_objects};
-		t_object* volatile* v_next = v_objects + V_SIZE / 2;
+		static IL2CXX__PORTABLE__THREAD t_queue* v_instance;
+		static IL2CXX__PORTABLE__THREAD t_object* volatile* v_head;
+		static IL2CXX__PORTABLE__THREAD t_object* volatile* v_next;
+
+		IL2CXX__PORTABLE__ALWAYS_INLINE static void f_push(t_object* a_object)
+		{
+			*v_head = a_object;
+			if (v_head == v_next)
+				v_instance->f_next();
+			else
+				[[likely]] ++v_head;
+		}
+
 		t_object* volatile v_objects[V_SIZE];
 		std::atomic<t_object* volatile*> v_epoch;
 		t_object* volatile* v_tail{v_objects + V_SIZE - 1};
 
 		void f_next() noexcept;
-		IL2CXX__PORTABLE__ALWAYS_INLINE IL2CXX__PORTABLE__FORCE_INLINE void f_push(t_object* a_object)
-		{
-			*v_head = a_object;
-			if (v_head == v_next)
-				f_next();
-			else
-				++v_head;
-		}
 		template<typename T>
 		void f__flush(t_object* volatile* a_epoch, T a_do)
 		{
@@ -240,17 +243,6 @@ protected:
 	};
 
 	static IL2CXX__PORTABLE__THREAD t_collector* v_collector;
-	static IL2CXX__PORTABLE__THREAD t_increments* v_increments;
-	static IL2CXX__PORTABLE__THREAD t_decrements* v_decrements;
-
-	static t_increments* f_increments()
-	{
-		return v_increments;
-	}
-	static t_decrements* f_decrements()
-	{
-		return v_decrements;
-	}
 
 	std::atomic<t_object*> v_p;
 
@@ -258,15 +250,15 @@ public:
 	t_slot() = default;
 	t_slot(t_object* a_p) : v_p(a_p)
 	{
-		if (a_p) f_increments()->f_push(a_p);
+		if (a_p) t_increments::f_push(a_p);
 	}
 	t_slot(const t_slot& a_value) : t_slot(static_cast<t_object*>(a_value))
 	{
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE t_slot& operator=(t_object* a_p)
 	{
-		if (a_p) f_increments()->f_push(a_p);
-		if (auto p = v_p.exchange(a_p, std::memory_order_relaxed)) f_decrements()->f_push(p);
+		if (a_p) t_increments::f_push(a_p);
+		if (auto p = v_p.exchange(a_p, std::memory_order_relaxed)) t_decrements::f_push(p);
 		return *this;
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE t_slot& operator=(const t_slot& a_value)
@@ -275,7 +267,7 @@ public:
 	}
 	void f__destruct()
 	{
-		if (auto p = v_p.load(std::memory_order_relaxed)) f_decrements()->f_push(p);
+		if (auto p = v_p.load(std::memory_order_relaxed)) t_decrements::f_push(p);
 	}
 	operator bool() const
 	{
@@ -320,6 +312,13 @@ struct t_slot_of : t_slot
 		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
 	}
 };
+
+template<size_t A_SIZE>
+IL2CXX__PORTABLE__THREAD t_slot::t_queue<A_SIZE>* t_slot::t_queue<A_SIZE>::v_instance;
+template<size_t A_SIZE>
+IL2CXX__PORTABLE__THREAD t_object* volatile* t_slot::t_queue<A_SIZE>::v_head;
+template<size_t A_SIZE>
+IL2CXX__PORTABLE__THREAD t_object* volatile* t_slot::t_queue<A_SIZE>::v_next;
 
 template<size_t A_SIZE>
 void t_slot::t_queue<A_SIZE>::f_next() noexcept

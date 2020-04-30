@@ -23,10 +23,10 @@ struct t__type : t__member_info
 	t__type(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr);
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
 	{
-		//t_slot::f_increments()->f_push(this);
+		//t_slot::t_increments::f_push(this);
 		std::atomic_signal_fence(std::memory_order_release);
 		a_p->v_type = this;
-		t_slot::f_decrements()->f_push(a_p);
+		t_slot::t_decrements::f_push(a_p);
 	}
 	virtual void f_scan(t_object* a_this, t_scan a_scan);
 	virtual t_object* f_clone(const t_object* a_this);

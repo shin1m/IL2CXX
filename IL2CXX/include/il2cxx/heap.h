@@ -120,7 +120,7 @@ class t_heap
 	IL2CXX__PORTABLE__ALWAYS_INLINE T* f_allocate(t_of<A_rank, A_size>& a_of)
 	{
 		auto p = v_head<A_rank>;
-		if (!p) return f_allocate_from(a_of);
+		if (!p) [[unlikely]] return f_allocate_from(a_of);
 		v_head<A_rank> = p->v_next;
 		return p;
 	}
@@ -157,7 +157,10 @@ public:
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
 	{
-		return a_size >> 7 ? f_allocate_medium(a_size) : f_allocate(v_of0);
+		if (a_size >> 7)
+			return f_allocate_medium(a_size);
+		else
+			[[likely]] return f_allocate(v_of0);
 	}
 	void f_return()
 	{

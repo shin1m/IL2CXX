@@ -528,7 +528,7 @@ struct t__static_{identifier}
 ";
                                 members += $@"{'\t'}t_object* f__clone() const
 {'\t'}{{
-{'\t'}{'\t'}t__new<{identifier}> p(sizeof({identifier}) * v__length);
+{'\t'}{'\t'}t__new<{identifier}> p(sizeof({elementIdentifier}) * v__length);
 {'\t'}{'\t'}p->v__length = v__length;
 {'\t'}{'\t'}std::memcpy(p->v__bounds, v__bounds, sizeof(v__bounds));
 {'\t'}{'\t'}auto p0 = reinterpret_cast<const {elementIdentifier}*>(this + 1);

@@ -29,7 +29,7 @@ public:
 	};
 
 private:
-	t_heap<t_object, void(*)()> v_object__heap;
+	t_heap<t_object> v_object__heap;
 	size_t v_object__lower = 0;
 	bool v_object__reviving = false;
 	std::mutex v_object__reviving__mutex;

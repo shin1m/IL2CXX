@@ -31,7 +31,7 @@ struct t__new
 
 class t_object
 {
-	template<typename T, typename T_wait> friend class t_heap;
+	template<typename T> friend class t_heap;
 	friend class t_slot;
 	friend struct t__type;
 	friend struct t__type_finalizee;

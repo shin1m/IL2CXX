@@ -14,7 +14,7 @@
 namespace il2cxx
 {
 
-template<typename T, typename T_wait>
+template<typename T>
 class t_heap
 {
 	template<size_t A_rank, size_t A_size>
@@ -98,7 +98,7 @@ class t_heap
 	template<size_t A_rank>
 	static IL2CXX__PORTABLE__THREAD T* v_head;
 
-	T_wait v_wait;
+	void(*v_wait)();
 	std::map<T*, size_t> v_blocks;
 #ifdef IL2CXX__STACK_SCAN_DIRECT
 	sigset_t v_sigusr1;
@@ -128,7 +128,7 @@ class t_heap
 	constexpr T* f_allocate_medium(size_t a_size);
 
 public:
-	t_heap(T_wait&& a_wait) : v_wait(std::move(a_wait))
+	t_heap(void(*a_wait)()) : v_wait(a_wait)
 	{
 #ifdef IL2CXX__STACK_SCAN_DIRECT
 		sigemptyset(&v_sigusr1);
@@ -229,13 +229,13 @@ public:
 	}
 };
 
-template<typename T, typename T_wait>
+template<typename T>
 template<size_t A_rank>
-IL2CXX__PORTABLE__THREAD T* t_heap<T, T_wait>::v_head;
+IL2CXX__PORTABLE__THREAD T* t_heap<T>::v_head;
 
-template<typename T, typename T_wait>
+template<typename T>
 template<size_t A_rank, size_t A_size>
-T* t_heap<T, T_wait>::f_allocate_from(t_of<A_rank, A_size>& a_of)
+T* t_heap<T>::f_allocate_from(t_of<A_rank, A_size>& a_of)
 {
 	auto p = a_of.f_allocate(nullptr);
 	if (!p) {
@@ -246,8 +246,8 @@ T* t_heap<T, T_wait>::f_allocate_from(t_of<A_rank, A_size>& a_of)
 	return p;
 }
 
-template<typename T, typename T_wait>
-T* t_heap<T, T_wait>::f_allocate_large(size_t a_size)
+template<typename T>
+T* t_heap<T>::f_allocate_large(size_t a_size)
 {
 	auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
 	p->v_rank = 57;
@@ -264,8 +264,8 @@ T* t_heap<T, T_wait>::f_allocate_large(size_t a_size)
 	return p;
 }
 
-template<typename T, typename T_wait>
-constexpr T* t_heap<T, T_wait>::f_allocate_medium(size_t a_size)
+template<typename T>
+constexpr T* t_heap<T>::f_allocate_medium(size_t a_size)
 {
 	auto n = a_size >> 8;
 	if (n == 0) return f_allocate(v_of1);

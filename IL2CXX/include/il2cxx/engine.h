@@ -45,6 +45,8 @@ private:
 	t_slot_of<t_System_2eThreading_2eThread> v_thread{};
 	t_conductor v_finalizer__conductor;
 	std::deque<t_object*> v_finalizer__queue;
+	bool v_finalizer__sleeping = false;
+	bool v_finalizer__awaken = false;
 	const t_options& v_options;
 	size_t v_collector__threshold;
 	size_t v_collector__full = 0;

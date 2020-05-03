@@ -18,7 +18,10 @@ struct t__new
 	T* v_p;
 
 	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr t__new(size_t a_extra);
-	IL2CXX__PORTABLE__ALWAYS_INLINE ~t__new();
+	IL2CXX__PORTABLE__ALWAYS_INLINE ~t__new()
+	{
+		t__type_of<T>::v__instance.f__finish(v_p);
+	}
 	constexpr operator T*() const
 	{
 		return v_p;

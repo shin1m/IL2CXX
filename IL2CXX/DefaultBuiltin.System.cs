@@ -404,7 +404,7 @@ namespace IL2CXX
 {'\t'}auto p = static_cast<{transpiler.EscapeForValue(typeof(Array))}>(f_engine()->f_object__allocate(sizeof({array}) + sizeof({array}::t__bound) + n));
 {'\t'}p->v__length = a_1;
 {'\t'}p->f__bounds()[0] = {{size_t(a_1), 0}};
-{'\t'}if (!a_2) std::fill_n(reinterpret_cast<char*>(p->f__bounds() + 1), n, '\0');
+{'\t'}if (!a_2) std::memset(p->f__bounds() + 1, 0, n);
 {'\t'}type->f__finish(p);
 {'\t'}return p;
 ", 1);
@@ -475,7 +475,7 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto n = sizeof({transpiler.Escape(typeof(MulticastDelegate))});
 {'\t'}auto p = f_engine()->f_object__allocate(n);
-{'\t'}std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), n - sizeof(t_object), '\0');
+{'\t'}std::memset(static_cast<t_object*>(p) + 1, 0, n - sizeof(t_object));
 {'\t'}type->f__finish(p);
 {'\t'}return static_cast<{transpiler.EscapeForValue(typeof(MulticastDelegate))}>(p);
 ", 1)

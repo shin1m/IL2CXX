@@ -129,12 +129,6 @@ constexpr t__new<T>::t__new(size_t a_extra) : v_p(static_cast<T*>(f_engine()->f_
 {
 }
 
-template<typename T>
-inline t__new<T>::~t__new()
-{
-	t__type_of<T>::v__instance.f__finish(v_p);
-}
-
 template<void (t_object::*A_push)()>
 inline void t_object::f_step()
 {
@@ -189,7 +183,7 @@ template<typename T>
 T* f__new_zerod()
 {
 	t__new<T> p(0);
-	std::fill_n(reinterpret_cast<char*>(static_cast<t_object*>(p) + 1), sizeof(T) - sizeof(t_object), '\0');
+	std::memset(static_cast<t_object*>(p) + 1, 0, sizeof(T) - sizeof(t_object));
 	return p;
 }
 
@@ -207,7 +201,7 @@ T_array* f__new_array(size_t a_length)
 	t__new<T_array> p(sizeof(T_element) * a_length);
 	p->v__length = a_length;
 	p->v__bounds[0] = {a_length, 0};
-	std::fill_n(reinterpret_cast<char*>(p->f__data()), sizeof(T_element) * a_length, '\0');
+	std::memset(p->f__data(), 0, sizeof(T_element) * a_length);
 	return p;
 }
 

@@ -1135,9 +1135,9 @@ t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "null
                     writer.WriteLine($"\t}} v_interface__{ii}__thunks;");
                 }
                 memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
-                writer.WriteLine($@"{'\t'}virtual void f_scan(t_object* a_this, t_scan a_scan);
-{'\t'}virtual t_object* f_clone(const t_object* a_this);");
-                if (type != typeof(void) && type.IsValueType) writer.WriteLine("\tvirtual void f_copy(const char* a_from, size_t a_n, char* a_to);");
+                writer.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
+{'\t'}static t_object* f_do_clone(const t_object* a_this);");
+                if (type != typeof(void) && type.IsValueType) writer.WriteLine("\tstatic void f_do_copy(const char* a_from, size_t a_n, char* a_to);");
             }
             else
             {
@@ -1155,30 +1155,34 @@ t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "null
     td?.MulticastInvoke != null ? $", nullptr, 0, {td.MulticastInvoke}" :
     string.Empty
 )})
-{{
-}}
+{{");
+            if (definition is TypeDefinition)
+            {
+                memberDefinitions.WriteLine($@"{'\t'}f_scan = f_do_scan;
+{'\t'}f_clone = f_do_clone;");
+                if (type != typeof(void) && type.IsValueType) memberDefinitions.WriteLine("\tf_copy = f_do_copy;");
+            }
+            memberDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
             if (definition is TypeDefinition)
             {
-                memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_scan(t_object* a_this, t_scan a_scan)
+                memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_scan(t_object* a_this, t_scan a_scan)
 {{
 {'\t'}static_cast<{identifier}*>(a_this)->f__scan(a_scan);
 }}
-t_object* t__type_of<{identifier}>::f_clone(const t_object* a_this)
+t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
 {{");
                 memberDefinitions.WriteLine(
-                    type == typeof(void) ? $@"{'\t'}return t__new<{identifier}>(0);
-}}"
-                    : type.IsValueType ? $@"{'\t'}t__new<{identifier}> p(0);
+                    type == typeof(void) ? $"\treturn t__new<{identifier}>(0);" :
+                    type.IsValueType ? $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;
 }}
-void t__type_of<{identifier}>::f_copy(const char* a_from, size_t a_n, char* a_to)
+void t__type_of<{identifier}>::f_do_copy(const char* a_from, size_t a_n, char* a_to)
 {{
-{'\t'}f__copy(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));
-}}"
-                    : $@"{'\t'}return static_cast<const {identifier}*>(a_this)->f__clone();
-}}");
+{'\t'}f__copy(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));" :
+                    $"\treturn static_cast<const {identifier}*>(a_this)->f__clone();");
+                memberDefinitions.WriteLine('}');
             }
         }
         public void Do(MethodInfo method, TextWriter writer)

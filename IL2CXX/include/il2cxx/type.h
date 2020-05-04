@@ -28,11 +28,16 @@ struct t__type : t__member_info
 		a_p->v_type = this;
 		t_slot::t_decrements::f_push(a_p);
 	}
-	virtual void f_scan(t_object* a_this, t_scan a_scan);
-	virtual t_object* f_clone(const t_object* a_this);
-	virtual void f_register_finalize(t_object* a_this);
-	virtual void f_suppress_finalize(t_object* a_this);
-	virtual void f_copy(const char* a_from, size_t a_n, char* a_to);
+	static void f_do_scan(t_object* a_this, t_scan a_scan);
+	void (*f_scan)(t_object*, t_scan) = f_do_scan;
+	static t_object* f_do_clone(const t_object* a_this);
+	t_object* (*f_clone)(const t_object*) = f_do_clone;
+	static void f_do_register_finalize(t_object* a_this);
+	void (*f_register_finalize)(t_object*) = f_do_register_finalize;
+	static void f_do_suppress_finalize(t_object* a_this);
+	void (*f_suppress_finalize)(t_object*) = f_do_suppress_finalize;
+	static void f_do_copy(const char* a_from, size_t a_n, char* a_to);
+	void (*f_copy)(const char*, size_t, char*) = f_do_copy;
 	bool f__is(t__type* a_type) const
 	{
 		auto p = this;
@@ -51,14 +56,18 @@ struct t__type : t__member_info
 
 struct t__type_finalizee : t__type
 {
-	using t__type::t__type;
+	t__type_finalizee(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr) : t__type(a_base, std::move(a_interface_to_methods), a_managed, a_size, a_element, a_rank, a_multicast_invoke)
+	{
+		f_register_finalize = f_do_register_finalize;
+		f_suppress_finalize = f_do_suppress_finalize;
+	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
 	{
 		a_p->v_finalizee = true;
 		t__type::f__finish(a_p);
 	}
-	virtual void f_register_finalize(t_object* a_this);
-	virtual void f_suppress_finalize(t_object* a_this);
+	static void f_do_register_finalize(t_object* a_this);
+	static void f_do_suppress_finalize(t_object* a_this);
 };
 
 template<typename T_interface, size_t A_i>

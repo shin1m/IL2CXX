@@ -57,9 +57,10 @@ class t_heap
 		}
 		void f_return(size_t a_n)
 		{
-			v_head<A_rank>->v_cyclic = a_n;
-			v_head<A_rank>->v_previous = v_chunks.load(std::memory_order_relaxed);
-			while (!v_chunks.compare_exchange_weak(v_head<A_rank>->v_previous, v_head<A_rank>, std::memory_order_release));
+			auto p = v_head<A_rank>;
+			p->v_cyclic = a_n;
+			p->v_previous = v_chunks.load(std::memory_order_relaxed);
+			while (!v_chunks.compare_exchange_weak(p->v_previous, p, std::memory_order_release));
 			v_head<A_rank> = nullptr;
 			v_returned += a_n;
 		}

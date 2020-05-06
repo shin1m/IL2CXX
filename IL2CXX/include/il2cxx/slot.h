@@ -174,11 +174,12 @@ protected:
 
 		IL2CXX__PORTABLE__ALWAYS_INLINE static void f_push(t_object* a_object)
 		{
-			*v_head = a_object;
-			if (v_head == v_next)
+			auto p = v_head;
+			*p = a_object;
+			if (p == v_next)
 				v_instance->f_next();
 			else
-				[[likely]] ++v_head;
+				[[likely]] v_head = p + 1;
 		}
 
 		t_object* volatile v_objects[V_SIZE];

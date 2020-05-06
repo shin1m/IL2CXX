@@ -3,6 +3,7 @@
 
 #include "thread.h"
 #include <deque>
+#include <csignal>
 #include <semaphore.h>
 
 namespace il2cxx

@@ -405,16 +405,11 @@ void t_thread::f_epoch()
 		auto bottom = v_stack_bottom;
 #endif
 		auto n = v_stack_bottom - top;
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-		top0 = top;
-		bottom0 = bottom;
-#else
 		top0 = v_stack_copy - n;
 		auto m = bottom - top;
 		std::memcpy(top0, top, m * sizeof(t_object**));
 		bottom0 = top0 + m;
 		f_epoch_resume();
-#endif
 		top1 -= n;
 	}
 	auto decrements = v_stack_last_bottom;
@@ -442,9 +437,6 @@ void t_thread::f_epoch()
 			*top1 = p;
 		}
 	}
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-	if (v_done <= 0) f_epoch_resume();
-#endif
 	v_increments.f_flush();
 	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();

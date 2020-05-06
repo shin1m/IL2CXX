@@ -29,7 +29,4 @@
 #define NOMINMAX
 #endif
 
-#define IL2CXX__STACK_SCAN_PARTIAL
-//#define IL2CXX__STACK_SCAN_DIRECT
-
 #endif

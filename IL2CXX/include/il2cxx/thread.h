@@ -1,8 +1,11 @@
 #ifndef IL2CXX__THREAD_H
 #define IL2CXX__THREAD_H
 
+#define IL2CXX__STACK_SCAN_PARTIAL
+
 #include "object.h"
 #include <thread>
+#include <unistd.h>
 #ifdef IL2CXX__STACK_SCAN_PARTIAL
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>

@@ -6,9 +6,6 @@
 #include <map>
 #include <mutex>
 #include <new>
-#include <csignal>
-#include <cstddef>
-#include <unistd.h>
 #include <sys/mman.h>
 
 namespace il2cxx
@@ -41,15 +38,9 @@ class t_heap
 			q->v_rank = A_rank;
 			q = reinterpret_cast<T*>(block);
 			q->v_cyclic = A_size;
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-			pthread_sigmask(SIG_BLOCK, &a_heap.v_sigusr1, NULL);
-#endif
 			a_heap.v_mutex.lock();
 			a_heap.v_blocks.emplace(q, length);
 			a_heap.v_mutex.unlock();
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-			pthread_sigmask(SIG_UNBLOCK, &a_heap.v_sigusr1, NULL);
-#endif
 			v_grown.fetch_add(A_size, std::memory_order_relaxed);
 			return q;
 		}
@@ -100,9 +91,6 @@ class t_heap
 
 	void(*v_wait)();
 	std::map<T*, size_t> v_blocks;
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-	sigset_t v_sigusr1;
-#endif
 	std::mutex v_mutex;
 	t_of<0, 1024 * 64> v_of0;
 	t_of<1, 1024 * 16> v_of1;
@@ -130,10 +118,6 @@ class t_heap
 public:
 	t_heap(void(*a_wait)()) : v_wait(a_wait)
 	{
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-		sigemptyset(&v_sigusr1);
-		sigaddset(&v_sigusr1, SIGUSR1);
-#endif
 	}
 	~t_heap()
 	{
@@ -254,16 +238,10 @@ T* t_heap<T>::f_allocate_large(size_t a_size)
 {
 	auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
 	p->v_rank = 57;
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-	pthread_sigmask(SIG_BLOCK, &v_sigusr1, NULL);
-#endif
 	v_mutex.lock();
 	v_blocks.emplace(p, a_size);
 	++v_allocated;
 	v_mutex.unlock();
-#ifdef IL2CXX__STACK_SCAN_DIRECT
-	pthread_sigmask(SIG_UNBLOCK, &v_sigusr1, NULL);
-#endif
 	return p;
 }
 

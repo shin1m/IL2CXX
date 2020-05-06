@@ -46,7 +46,7 @@ private:
 	t_conductor v_finalizer__conductor;
 	std::deque<t_object*> v_finalizer__queue;
 	bool v_finalizer__sleeping = false;
-	bool v_finalizer__awaken = false;
+	uint8_t v_finalizer__awaken = 0;
 	const t_options& v_options;
 	size_t v_collector__threshold;
 	size_t v_collector__full = 0;

@@ -27,7 +27,7 @@ void t_engine::f_collector()
 				auto active = q->v_done >= 0;
 				if (active && q->v_next && !q->v_next->v_next) {
 					active = v_finalizer__awaken;
-					if (active && v_finalizer__sleeping) v_finalizer__awaken = false;
+					if (active && v_finalizer__sleeping) --v_finalizer__awaken;
 				}
 				if (active) {
 					auto tail = q->v_increments.v_tail;
@@ -63,18 +63,18 @@ void t_engine::f_finalizer()
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer starting...\n");
 	while (true) {
 		{
+			std::lock_guard<std::mutex> lock(v_thread__mutex);
+			v_finalizer__sleeping = true;
+		}
+		{
 			std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
 			if (v_finalizer__conductor.v_quitting) break;
-			{
-				std::lock_guard<std::mutex> lock(v_thread__mutex);
-				v_finalizer__sleeping = true;
-			}
 			v_finalizer__conductor.f__next(lock);
-			{
-				std::lock_guard<std::mutex> lock(v_thread__mutex);
-				v_finalizer__sleeping = false;
-				v_finalizer__awaken = true;
-			}
+		}
+		{
+			std::lock_guard<std::mutex> lock(v_thread__mutex);
+			v_finalizer__sleeping = false;
+			v_finalizer__awaken = 2;
 		}
 		[this]
 		{

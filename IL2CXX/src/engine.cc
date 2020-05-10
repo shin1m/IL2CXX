@@ -277,4 +277,34 @@ std::string f__string(std::u16string_view a_x)
 	return {cs.begin(), cs.end()};
 }
 
+void f__throw_argument()
+{
+	throw std::runtime_error("ArgumentException");
+}
+
+void f__throw_argument_null()
+{
+	throw std::runtime_error("ArgumentNullException");
+}
+
+void f__throw_index_out_of_range()
+{
+	throw std::runtime_error("IndexOutOfRangeException");
+}
+
+void f__throw_invalid_cast()
+{
+	throw std::runtime_error("InvalidCastException");
+}
+
+void f__throw_null_reference()
+{
+	throw std::runtime_error("NullReferenceException");
+}
+
+void f__throw_overflow()
+{
+	throw std::runtime_error("OverflowException");
+}
+
 }

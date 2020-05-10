@@ -250,6 +250,8 @@ namespace IL2CXX
 
         private readonly IBuiltin builtin;
         private readonly Action<string> log;
+        public readonly bool CheckNull;
+        public readonly bool CheckRange;
         private readonly Instruction[] instructions1 = new Instruction[256];
         private readonly Instruction[] instructions2 = new Instruction[256];
         private readonly StringWriter typeDeclarations = new StringWriter();
@@ -712,6 +714,20 @@ struct t__static_{identifier}
                 default:
                     throw new Exception();
             }
+        }
+        public string GenerateCheckNull(string variable) => CheckNull ? $"\tif (!{variable}) [[unlikely]] f__throw_null_reference();\n" : string.Empty;
+        private void GenerateCheckNull(Stack stack)
+        {
+            if (!stack.Type.IsValueType) writer.Write(GenerateCheckNull(stack.Variable));
+        }
+        public string GenerateCheckArgumentNull(string variable) => CheckNull ? $"\tif (!{variable}) [[unlikely]] f__throw_argument_null();\n" : string.Empty;
+        public string GenerateCheckRange(string index, string length) => CheckRange ? $"\tif (static_cast<size_t>({index}) >= {length}) [[unlikely]] f__throw_index_out_of_range();\n" : string.Empty;
+        private void GenerateArrayAccess(Stack array, Stack index, Func<string, string> access)
+        {
+            GenerateCheckNull(array);
+            writer.WriteLine($"\t{{auto p = static_cast<{Escape(array.Type)}*>({array.Variable});");
+            writer.Write(GenerateCheckRange(index.Variable, "p->v__length"));
+            writer.WriteLine($"\t{access($"p->f__data()[{index.Variable}]")};}}");
         }
         public string CastValue(Type type, string variable) =>
             type == typeof(bool) ? $"{variable} != 0" :

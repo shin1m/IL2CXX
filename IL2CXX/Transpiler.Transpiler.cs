@@ -2,6 +2,7 @@ using System;
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -11,10 +12,12 @@ namespace IL2CXX
 {
     partial class Transpiler
     {
-        public Transpiler(IBuiltin builtin, Action<string> log)
+        public Transpiler(IBuiltin builtin, Action<string> log, bool checkNull = true, bool checkRange = true)
         {
             this.builtin = builtin;
             this.log = log;
+            CheckNull = checkNull;
+            CheckRange = checkRange;
             for (int i = 0; i < 256; ++i)
             {
                 instructions1[i] = new Instruction { OpCode = opcodes1[i] };
@@ -289,7 +292,7 @@ namespace IL2CXX
                         stack = stack.Pop;
                     }
                     writer.WriteLine(";");
-                    if (stack.Pop != null) throw new Exception();
+                    Trace.Assert(stack.Pop == null);
                     return index;
                 };
             });
@@ -588,7 +591,7 @@ namespace IL2CXX
                         else if (@this.Type.IsSealed)
                             generateConcrete(concrete(@this.Type));
                         else
-                            writer.Write(generateVirtual(@this.Variable));
+                            writer.Write(GenerateCheckNull(@this.Variable) + generateVirtual(@this.Variable));
                     }
                     else
                     {
@@ -610,19 +613,20 @@ namespace IL2CXX
                         }
                         else
                         {
-                            var target = $"(*static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({@this.Variable}))";
                             void generate(MethodBase cm)
                             {
                                 Enqueue(cm);
-                                var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append(target));
+                                var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append("p"));
                                 writer.Write($"\t{(GetReturnType(cm) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};\n");
                             }
+                            writer.WriteLine($"\t{{auto p = *static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({@this.Variable});");
                             if (isConcrete)
                                 generate(m);
                             else if (constrained.IsSealed)
                                 generate(concrete(constrained));
                             else
-                                writer.Write(generateVirtual(target));
+                                writer.Write(GenerateCheckNull("p") + generateVirtual("p"));
+                            writer.WriteLine("\t}");
                         }
                         constrained = null;
                     }
@@ -697,7 +701,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) throw std::runtime_error(\"InvalidCastException\");");
+                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) f__throw_invalid_cast();");
                     return index;
                 };
             });
@@ -712,7 +716,7 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     var after = indexToStack[index];
-                    if (after.Variable != stack.Variable) throw new Exception();
+                    Trace.Assert(after.Variable == stack.Variable);
                     writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) {after.Variable} = nullptr;");
                     return index;
                 };
@@ -727,8 +731,11 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    if (!t.IsValueType) throw new Exception(t.ToString());
-                    writer.WriteLine($@" {t}\n\t{indexToStack[index].Variable} = static_cast<{Escape(t)}*>({stack.Variable});");
+                    Trace.Assert(t.IsValueType);
+                    writer.WriteLine($" {t}");
+                    GenerateCheckNull(stack);
+                    writer.WriteLine($"\tif (!{stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();");
+                    writer.WriteLine($"\t{indexToStack[index].Variable} = &static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
                     return index;
                 };
             });
@@ -754,10 +761,11 @@ namespace IL2CXX
                     writer.WriteLine($" {f.DeclaringType}::[{f}]");
                     withVolatile(() =>
                     {
+                        GenerateCheckNull(stack);
                         writer.Write($"\t{indexToStack[index].Variable} = ");
-                        writer.Write(
-                            stack.Type != typeof(NativeInt) && stack.Type.IsValueType ? $"{stack.Variable}." :
-                            $"{(stack.VariableType == "intptr_t" ? "reinterpret_cast" : "static_cast")}<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
+                        writer.Write(stack.Type != typeof(NativeInt) && stack.Type.IsValueType
+                            ? $"{stack.Variable}."
+                            : $"{(stack.VariableType == "intptr_t" ? "reinterpret_cast" : "static_cast")}<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
                         );
                         writer.WriteLine($"{Escape(f)};");
                     });
@@ -774,10 +782,12 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var f = ParseField(ref index);
-                    writer.Write($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = &");
+                    writer.WriteLine($" {f.DeclaringType}::[{f}]");
+                    GenerateCheckNull(stack);
+                    writer.Write($"\t{indexToStack[index].Variable} = &");
                     writer.Write(
-                        stack.Type.IsValueType ? $"{stack.Variable}." :
-                        $"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
+                        stack.Type != typeof(NativeInt) && stack.Type.IsValueType ? $"{stack.Variable}." :
+                        $"{(stack.VariableType == "intptr_t" ? "reinterpret_cast" : "static_cast")}<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
                     );
                     writer.WriteLine($"{Escape(f)};");
                     return index;
@@ -790,13 +800,17 @@ namespace IL2CXX
                 {
                     var f = ParseField(ref index);
                     writer.WriteLine($" {f.DeclaringType}::[{f}]");
-                    withVolatile(() => writer.WriteLine(
-                        f.DeclaringType.IsValueType && Define(f.FieldType).IsManaged
-                            ? "\tf__store({0}, {1});"
-                            : "\t{0} = {1};",
-                        $"{(stack.Pop.VariableType == "intptr_t" ? "reinterpret_cast" : "static_cast")}<{(f.DeclaringType.IsValueType ? EscapeForValue(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)}",
-                        CastValue(f.FieldType, stack.Variable)
-                    ));
+                    withVolatile(() =>
+                    {
+                        GenerateCheckNull(stack.Pop);
+                        writer.WriteLine(
+                            f.DeclaringType.IsValueType && Define(f.FieldType).IsManaged
+                                ? "\tf__store({0}, {1});"
+                                : "\t{0} = {1};",
+                            $"{(stack.Pop.VariableType == "intptr_t" ? "reinterpret_cast" : "static_cast")}<{(f.DeclaringType.IsValueType ? EscapeForValue(f.DeclaringType) : Escape(f.DeclaringType))}*>({stack.Pop.Variable})->{Escape(f)}",
+                            CastValue(f.FieldType, stack.Variable)
+                        );
+                    });
                     return index;
                 };
             });
@@ -904,7 +918,9 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = f__new_array<{Escape(t.MakeArrayType())}, {EscapeForMember(t)}>({stack.Variable});");
+                    writer.WriteLine($" {t}");
+                    if (CheckRange) writer.WriteLine($"\tif ({stack.Variable} < 0) [[unlikely]] f__throw_overflow();");
+                    writer.WriteLine($"\t{indexToStack[index].Variable} = f__new_array<{Escape(t.MakeArrayType())}, {EscapeForMember(t)}>({stack.Variable});");
                     return index;
                 };
             });
@@ -913,7 +929,9 @@ namespace IL2CXX
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(NativeInt)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(stack.Type)}*>({stack.Variable})->v__length;");
+                    writer.WriteLine();
+                    GenerateCheckNull(stack);
+                    writer.WriteLine($"\t{indexToStack[index].Variable} = static_cast<{Escape(stack.Type)}*>({stack.Variable})->v__length;");
                     return index;
                 };
             });
@@ -928,7 +946,9 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     var array = stack.Pop;
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = &static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    Trace.Assert(array.Type == t.MakeArrayType());
+                    writer.WriteLine($" {t}");
+                    GenerateArrayAccess(array, stack, y => $"{indexToStack[index].Variable} = &{y}");
                     return index;
                 };
             });
@@ -942,27 +962,18 @@ namespace IL2CXX
                 (OpCode: OpCodes.Ldelem_I8, Type: typeof(long)),
                 (OpCode: OpCodes.Ldelem_I, Type: typeof(NativeInt)),
                 (OpCode: OpCodes.Ldelem_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Ldelem_R8, Type: typeof(double))
+                (OpCode: OpCodes.Ldelem_R8, Type: typeof(double)),
+                (OpCode: OpCodes.Ldelem_Ref, Type: typeof(object))
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type));
                 x.Generate = (index, stack) =>
                 {
-                    var array = stack.Pop;
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(set.Type.MakeArrayType())}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    writer.WriteLine();
+                    GenerateArrayAccess(stack.Pop, stack, y => $"{indexToStack[index].Variable} = {y}");
                     return index;
                 };
             }));
-            instructions1[OpCodes.Ldelem_Ref.Value].For(x =>
-            {
-                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(object)));
-                x.Generate = (index, stack) =>
-                {
-                    var array = stack.Pop;
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
-                    return index;
-                };
-            });
             new[] {
                 (OpCode: OpCodes.Stelem_I, Type: typeof(IntPtr)),
                 (OpCode: OpCodes.Stelem_I1, Type: typeof(sbyte)),
@@ -976,8 +987,8 @@ namespace IL2CXX
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Pop);
                 x.Generate = (index, stack) =>
                 {
-                    var array = stack.Pop.Pop;
-                    writer.WriteLine($"\n\tstatic_cast<{Escape(set.Type.MakeArrayType())}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = static_cast<{EscapeForValue(set.Type)}>({stack.Variable});");
+                    writer.WriteLine();
+                    GenerateArrayAccess(stack.Pop.Pop, stack.Pop, y => $"{y} = static_cast<{EscapeForValue(set.Type)}>({stack.Variable})");
                     return index;
                 };
             }));
@@ -986,8 +997,9 @@ namespace IL2CXX
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Pop);
                 x.Generate = (index, stack) =>
                 {
+                    writer.WriteLine();
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($"\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {CastValue(GetElementType(array.Type), stack.Variable)};");
+                    GenerateArrayAccess(array, stack.Pop, y => $"{y} = {CastValue(GetElementType(array.Type), stack.Variable)}");
                     return index;
                 };
             });
@@ -1001,7 +1013,9 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     var array = stack.Pop;
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = static_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Variable}];");
+                    Trace.Assert(array.Type == t.MakeArrayType());
+                    writer.WriteLine($" {t}");
+                    GenerateArrayAccess(array, stack, y => $"{indexToStack[index].Variable} = {y}");
                     return index;
                 };
             });
@@ -1012,7 +1026,9 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     var array = stack.Pop.Pop;
-                    writer.WriteLine($" {t}\n\tstatic_cast<{Escape(array.Type)}*>({array.Variable})->f__data()[{stack.Pop.Variable}] = {CastValue(t, stack.Variable)};");
+                    Trace.Assert(array.Type == t.MakeArrayType());
+                    writer.WriteLine($" {t}");
+                    GenerateArrayAccess(array, stack.Pop, y => $"{y} = {CastValue(t, stack.Variable)}");
                     return index;
                 };
             });
@@ -1026,7 +1042,17 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = static_cast<{Escape(t.IsInterface ? typeof(object) : t)}*>({stack.Variable}){(t.IsValueType ? "->v__value" : string.Empty)};");
+                    writer.WriteLine($" {t}");
+                    if (t.IsValueType)
+                    {
+                        GenerateCheckNull(stack);
+                        writer.WriteLine($"\tif (!{stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();");
+                        writer.WriteLine($"\t{indexToStack[index].Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
+                    }
+                    else
+                    {
+                        writer.WriteLine($"\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();");
+                    }
                     return index;
                 };
             });
@@ -1063,7 +1089,8 @@ namespace IL2CXX
                         case Type t:
                             return (index, stack.Push(typeof(RuntimeTypeHandle)));
                         default:
-                            throw new Exception();
+                            Trace.Fail("unknown member");
+                            return default;
                     }
                 };
                 x.Generate = (index, stack) =>

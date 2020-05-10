@@ -222,6 +222,23 @@ inline t_System_2eString* f__new_string(std::u16string_view a_value)
 }
 
 template<typename T>
+struct t__finally
+{
+	T v_f;
+
+	~t__finally()
+	{
+		v_f();
+	}
+};
+
+template<typename T>
+t__finally<T> f__finally(T&& a_f)
+{
+	return {{std::move(a_f)}};
+}
+
+template<typename T>
 class t__lazy
 {
 	std::atomic<T*> v_initialized = nullptr;
@@ -253,6 +270,13 @@ T* t__lazy<T>::f_initialize()
 	v_initialized.store(&v_p, std::memory_order_release);
 	return &v_p;
 }
+
+[[noreturn]] void f__throw_argument();
+[[noreturn]] void f__throw_argument_null();
+[[noreturn]] void f__throw_index_out_of_range();
+[[noreturn]] void f__throw_invalid_cast();
+[[noreturn]] void f__throw_null_reference();
+[[noreturn]] void f__throw_overflow();
 
 }
 

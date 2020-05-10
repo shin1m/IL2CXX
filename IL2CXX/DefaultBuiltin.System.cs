@@ -70,11 +70,11 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => ("\treturn a_0->f_type()->f_clone(a_0);\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->f_clone(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(object.GetType)),
-                transpiler => ("\treturn a_0->f_type();\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type();\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(object.ToString)),
@@ -112,9 +112,8 @@ namespace IL2CXX
                     var compute = marvin.GetMethod("ComputeHash32", new[] { typeof(byte).MakeByRefType(), typeof(uint), typeof(uint), typeof(uint) });
                     transpiler.Enqueue(seed);
                     transpiler.Enqueue(compute);
-                    return ($@"{'\t'}if (!a_0) return 0;
-{'\t'}auto seed = {transpiler.Escape(seed)}();
-{'\t'}return {transpiler.Escape(compute)}(reinterpret_cast<uint8_t*>(static_cast<t_object*>(a_0)), a_0->f_type()->v__size, seed, seed >> 32);
+                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto seed = {transpiler.Escape(seed)}();
+{'\t'}return {transpiler.Escape(compute)}(reinterpret_cast<uint8_t*>(a_0 + 1), a_0->f_type()->v__size, seed, seed >> 32);
 ", 0);
                 }
             );
@@ -246,30 +245,25 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Array.GetLength)),
-                transpiler => ($@"{'\t'}if (a_1 < 0 || a_1 >= a_0->f_type()->v__rank) throw std::out_of_range(""IndexOutOfRangeException"");
-{'\t'}return a_0->f__bounds()[a_1].v_length;
-", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + "\treturn a_0->f__bounds()[a_1].v_length;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Array.GetLowerBound)),
-                transpiler => ($@"{'\t'}if (a_1 < 0 || a_1 >= a_0->f_type()->v__rank) throw std::out_of_range(""IndexOutOfRangeException"");
-{'\t'}return a_0->f__bounds()[a_1].v_lower;
-", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + "\treturn a_0->f__bounds()[a_1].v_lower;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Array.GetUpperBound)),
-                transpiler => ($@"{'\t'}if (a_1 < 0 || a_1 >= a_0->f_type()->v__rank) throw std::out_of_range(""IndexOutOfRangeException"");
-{'\t'}auto& bound = a_0->f__bounds()[a_1];
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + $@"{'\t'}auto& bound = a_0->f__bounds()[a_1];
 {'\t'}return bound.v_lower + bound.v_length - 1;
 ", 1)
             );
             code.For(
                 type.GetProperty(nameof(Array.Length)).GetMethod,
-                transpiler => ("\treturn a_0->v__length;\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__length;\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(Array.Rank)).GetMethod,
-                transpiler => ("\treturn a_0->f_type()->v__rank;\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->v__rank;\n", 1)
             );
             code.For(
                 type.GetMethod("TrySZIndexOf", BindingFlags.Static | BindingFlags.NonPublic),
@@ -313,23 +307,17 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetProperty("Item").GetMethod,
-                (transpiler, types) => ($@"{'\t'}if (a_1 < 0 || a_1 >= a_0->v__length) throw std::out_of_range(""IndexOutOfRangeException"");
-{'\t'}return a_0->f__data()[a_1];
-", 1)
+                (transpiler, types) => (transpiler.GenerateCheckRange("a_1", "a_0->v__length") + "\treturn a_0->f__data()[a_1];\n", 1)
             );
             code.ForGeneric(
                 type.GetProperty("Item").SetMethod,
-                (transpiler, types) => ($@"{'\t'}if (a_1 < 0 || a_1 >= a_0->v__length) throw std::out_of_range(""IndexOutOfRangeException"");
-{'\t'}a_0->f__data()[a_1] = a_2;
-", 1)
+                (transpiler, types) => (transpiler.GenerateCheckRange("a_1", "a_0->v__length") + "\ta_0->f__data()[a_1] = a_2;\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod(nameof(SZArrayHelper<object>.CopyTo)),
-                (transpiler, types) => ($@"{'\t'}if (!a_1) throw std::runtime_error(""ArgumentNullException"");
-{'\t'}if (a_2 < 0) throw std::out_of_range(""IndexOutOfRangeException"");
-{'\t'}if (a_2 + a_0->v__length > a_1->v__length) throw std::out_of_range(""ArgumentException"");
-{'\t'}std::copy_n(a_0->f__data(), a_0->v__length, a_1->f__data() + a_2);
-", 0)
+                (transpiler, types) => (transpiler.GenerateCheckArgumentNull("a_1") + (transpiler.CheckRange ? $@"{'\t'}if (a_2 < 0) [[unlikely]] f__throw_index_out_of_range();
+{'\t'}if (a_2 + a_0->v__length > a_1->v__length) [[unlikely]] f__throw_argument();
+" : string.Empty) + "\tstd::copy_n(a_0->f__data(), a_0->v__length, a_1->f__data() + a_2);\n", 0)
             );
             code.ForGeneric(
                 type.GetMethod(nameof(SZArrayHelper<object>.GetEnumerator)),
@@ -384,11 +372,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(GC.SuppressFinalize)),
-                transpiler => ("\ta_0->f_type()->f_suppress_finalize(a_0);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_type()->f_suppress_finalize(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(GC.ReRegisterForFinalize)),
-                transpiler => ("\ta_0->f_type()->f_register_finalize(a_0);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_type()->f_register_finalize(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(GC.WaitForPendingFinalizers)),
@@ -434,15 +422,15 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.IsAlive)).GetMethod,
-                transpiler => ("\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.Target)).GetMethod,
-                transpiler => ("\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.Target)).SetMethod,
-                transpiler => ("\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n", 1)
             );
         })
         .For(typeof(WeakReference<>), (type, code) =>
@@ -556,11 +544,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetConstructor(new[] { typeof(char[]) }),
-                transpiler => ("\treturn f__new_string(std::u16string_view(a_0->f__data(), a_0->v__length));\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f__data(), a_0->v__length));\n", 1)
             );
             code.For(
                 type.GetConstructor(new[] { typeof(char[]), typeof(int), typeof(int) }),
-                transpiler => ("\treturn f__new_string(std::u16string_view(a_0->f__data() + a_1, a_2));\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f__data() + a_1, a_2));\n", 1)
             );
             code.For(
                 type.GetConstructor(new[] { typeof(ReadOnlySpan<char>) }),
@@ -576,11 +564,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(string.Length)).GetMethod,
-                transpiler => ("\treturn a_0->v__5fstringLength;\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__5fstringLength;\n", 1)
             );
             code.For(
                 type.GetProperty("Chars").GetMethod,
-                transpiler => ("\treturn (&a_0->v__5ffirstChar)[a_1];\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->v__5fstringLength") + "\treturn (&a_0->v__5ffirstChar)[a_1];\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(object.Equals), new[] { typeof(object) }),
@@ -617,7 +605,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(string.ToLowerInvariant), Type.EmptyTypes),
-                transpiler => ($@"{'\t'}auto n = a_0->v__5fstringLength;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto n = a_0->v__5fstringLength;
 {'\t'}auto p = f__new_string(n);
 {'\t'}auto q = &a_0->v__5ffirstChar;
 {'\t'}std::transform(q, q + n, &p->v__5ffirstChar, [](auto x)
@@ -816,7 +804,7 @@ namespace IL2CXX
             var methods = GenericMethods(type);
             code.For(
                 type.GetMethod(nameof(Buffer.BlockCopy)),
-                transpiler => ("\tf__copy(reinterpret_cast<char*>(a_0->f__bounds() + a_0->f_type()->v__rank) + a_1, a_4, reinterpret_cast<char*>(a_2->f__bounds() + a_2->f_type()->v__rank) + a_3);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_2") + "\tf__copy(reinterpret_cast<char*>(a_0->f__bounds() + a_0->f_type()->v__rank) + a_1, a_4, reinterpret_cast<char*>(a_2->f__bounds() + a_2->f_type()->v__rank) + a_3);\n", 1)
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "Memmove" && x.GetGenericArguments().Length == 1),

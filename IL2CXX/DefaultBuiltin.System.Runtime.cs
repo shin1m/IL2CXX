@@ -94,7 +94,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.InitializeArray)),
-                transpiler => ("\tstd::memcpy(a_0->f__bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\tstd::memcpy(a_0->f__bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod("IsReferenceOrContainsReferences"),
@@ -119,7 +119,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(Marshal.Copy), new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) }),
-                transpiler => ("\tstd::memcpy(a_1->f__data() + a_2, a_0, a_3);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_1") + "\tstd::memcpy(a_1->f__data() + a_2, a_0, a_3);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Marshal.GetLastWin32Error)),

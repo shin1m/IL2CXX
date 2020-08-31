@@ -1,7 +1,7 @@
 #ifndef IL2CXX__THREAD_H
 #define IL2CXX__THREAD_H
 
-#define IL2CXX__STACK_SCAN_PARTIAL
+//#define IL2CXX__STACK_SCAN_PARTIAL
 
 #include "object.h"
 #include <thread>
@@ -164,6 +164,25 @@ inline bool f__compare_exchange(t_object*& a_target, t_object*& a_expected, t_ob
 {
 	return t_thread::v_current->f_compare_exchange(a_target, a_expected, a_desired);
 }
+
+struct t__critical_finalizer_object : t_object
+{
+};
+
+struct t__thread : t__critical_finalizer_object
+{
+	static IL2CXX__PORTABLE__THREAD t__thread* v__current;
+
+	static bool f__priority(pthread_t a_handle, int32_t a_priority);
+
+	t_thread* v__internal;
+	int32_t v__priority;
+
+	template<typename T>
+	void f__start(T a_do);
+	void f__join();
+	void f__priority__(int32_t a_priority);
+};
 
 }
 

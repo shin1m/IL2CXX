@@ -9,28 +9,6 @@ namespace il2cxx
 
 struct t__extension;
 struct t__weak_handle;
-template<typename T>
-struct t__type_of;
-
-template<typename T>
-struct t__new
-{
-	T* v_p;
-
-	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr t__new(size_t a_extra);
-	IL2CXX__PORTABLE__ALWAYS_INLINE ~t__new()
-	{
-		t__type_of<T>::v__instance.f__finish(v_p);
-	}
-	constexpr operator T*() const
-	{
-		return v_p;
-	}
-	constexpr T* operator->() const
-	{
-		return v_p;
-	}
-};
 
 class t_object
 {
@@ -232,10 +210,6 @@ public:
 	}
 	void f__construct(t_object* a_p) const
 	{
-	}
-	t_object* f__clone() const
-	{
-		return t__new<t_object>(0);
 	}
 };
 

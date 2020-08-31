@@ -58,7 +58,7 @@ void t_engine::f_collector()
 	v_collector__conductor.f_exit();
 }
 
-void t_engine::f_finalizer()
+void t_engine::f_finalizer(void(*a_finalize)(t_object*))
 {
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer starting...\n");
 	while (true) {
@@ -76,11 +76,11 @@ void t_engine::f_finalizer()
 			v_finalizer__sleeping = false;
 			v_finalizer__awaken = 2;
 		}
-		[this]
+		[this, a_finalize]
 		{
 		char padding[4096];
 		std::memset(padding, 0, sizeof(padding));
-		[this]
+		[this, a_finalize]
 		{
 		while (true) {
 			t_object* p;
@@ -91,7 +91,7 @@ void t_engine::f_finalizer()
 				v_finalizer__queue.pop_front();
 			}
 			p->f_type()->f_suppress_finalize(p);
-			f_finalize(p);
+			a_finalize(p);
 			t_slot::t_decrements::f_push(p);
 		}
 		}();
@@ -123,24 +123,6 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 	};
 	sigaddset(&sa.sa_mask, SIGUSR2);
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
-	v_thread__internals->f_initialize(this);
-	{
-		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
-		std::thread(&t_engine::f_collector, this).detach();
-		v_collector__conductor.f__wait(lock);
-	}
-	v_thread = f__new_zerod<t_System_2eThreading_2eThread>();
-	v_thread->v__internal = v_thread__internals;
-	t_System_2eThreading_2eThread::v__current = v_thread;
-	{
-		auto finalizer = f__new_zerod<t_System_2eThreading_2eThread>();
-		std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
-		finalizer->f__start([this]
-		{
-			f_finalizer();
-		});
-		v_finalizer__conductor.f__wait(lock);
-	}
 }
 
 t_engine::~t_engine()
@@ -228,83 +210,6 @@ void t_engine::f_finalize()
 	std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
 	v_finalizer__conductor.f__wake();
 	v_finalizer__conductor.f__wait(lock);
-}
-
-std::u16string f__u16string(std::string_view a_x)
-{
-	std::vector<char16_t> cs;
-	std::mbstate_t state{};
-	char16_t c;
-	auto p = a_x.data();
-	auto q = p + a_x.size();
-	while (p < q) {
-		auto n = std::mbrtoc16(&c, p, q - p, &state);
-		switch (n) {
-		case size_t(-3):
-			cs.push_back(c);
-			break;
-		case size_t(-2):
-			p = q;
-			break;
-		case size_t(-1):
-			++p;
-			break;
-		case 0:
-			cs.push_back('\0');
-			++p;
-			break;
-		default:
-			cs.push_back(c);
-			p += n;
-			break;
-		}
-	}
-	if (std::mbrtoc16(&c, p, 0, &state) == size_t(-3)) cs.push_back(c);
-	return {cs.begin(), cs.end()};
-}
-
-std::string f__string(std::u16string_view a_x)
-{
-	std::vector<char> cs;
-	std::mbstate_t state{};
-	char mb[MB_LEN_MAX];
-	for (auto c : a_x) {
-		auto n = std::c16rtomb(mb, c, &state);
-		if (n != size_t(-1)) cs.insert(cs.end(), mb, mb + n);
-	}
-	auto n = std::c16rtomb(mb, u'\0', &state);
-	if (n != size_t(-1) && n > 1) cs.insert(cs.end(), mb, mb + n - 1);
-	return {cs.begin(), cs.end()};
-}
-
-void f__throw_argument()
-{
-	throw std::runtime_error("ArgumentException");
-}
-
-void f__throw_argument_null()
-{
-	throw std::runtime_error("ArgumentNullException");
-}
-
-void f__throw_index_out_of_range()
-{
-	throw std::runtime_error("IndexOutOfRangeException");
-}
-
-void f__throw_invalid_cast()
-{
-	throw std::runtime_error("InvalidCastException");
-}
-
-void f__throw_null_reference()
-{
-	throw std::runtime_error("NullReferenceException");
-}
-
-void f__throw_overflow()
-{
-	throw std::runtime_error("OverflowException");
 }
 
 }

@@ -96,10 +96,18 @@ namespace IL2CXX
                 type.GetMethod(nameof(RuntimeHelpers.InitializeArray)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\tstd::memcpy(a_0->f__bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
             );
-            code.ForGeneric(
-                type.GetMethod("IsReferenceOrContainsReferences"),
-                (transpiler, types) => ($"\treturn {(transpiler.Define(types[0]).IsManaged ? "true" : "false")};\n", 1)
-            );
+            {
+                var method = type.GetMethod("IsBitwiseEquatable", BindingFlags.Static | BindingFlags.NonPublic);
+                code.ForGeneric(method,
+                    (transpiler, types) => ($"\treturn {((bool)method.MakeGenericMethod(types).Invoke(null, null) ? "true" : "false")};\n", 1)
+                );
+            }
+            {
+                var method = type.GetMethod("IsReferenceOrContainsReferences");
+                code.ForGeneric(method,
+                    (transpiler, types) => ($"\treturn {((bool)method.MakeGenericMethod(types).Invoke(null, null) ? "true" : "false")};\n", 1)
+                );
+            }
             code.For(
                 type.GetProperty(nameof(RuntimeHelpers.OffsetToStringData)).GetMethod,
                 transpiler => ($"\treturn offsetof({transpiler.Escape(typeof(string))}, v__5ffirstChar);\n", 1)
@@ -122,6 +130,18 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_1") + "\tstd::memcpy(a_1->f__data() + a_2, a_0, a_3);\n", 1)
             );
             code.For(
+                type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto p = static_cast<t__type*>(a_1);
+{'\t'}auto q = static_cast<{transpiler.EscapeForValue(typeof(Delegate))}>(f_engine()->f_object__allocate(sizeof({transpiler.Escape(typeof(MulticastDelegate))})));
+{'\t'}q->v__5ftarget = q;
+{'\t'}q->v__5fmethodPtr = p->v__invoke_unmanaged;
+{'\t'}q->v__5fmethodPtrAux = a_0;
+{'\t'}p->f__finish(q);
+{'\t'}return q;
+", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(Marshal.GetLastWin32Error)),
                 transpiler => ("\treturn errno;\n", 1)
             );
@@ -139,8 +159,10 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}if (a_1 && a_0->v__managed) throw std::runtime_error(""not marshalable"");
-{'\t'}return a_0->v__size;
+                transpiler => ($@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto p = static_cast<t__type*>(a_0);
+{'\t'}if (a_1 && p->v__managed) throw std::runtime_error(""not marshalable"");
+{'\t'}return p->v__size;
 ", 1)
             );
         })
@@ -148,8 +170,12 @@ namespace IL2CXX
         {
             var methods = GenericMethods(type);
             code.ForGeneric(
-                methods.First(x => x.Name == "Add" && x.GetGenericArguments().Length == 1),
+                methods.First(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(int)),
                 (transpiler, types) => ("\treturn a_0 + a_1;\n", 1)
+            );
+            code.ForGeneric(
+                methods.First(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
+                (transpiler, types) => ("\treturn a_0 + static_cast<intptr_t>(a_1);\n", 1)
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(ulong)),
@@ -157,7 +183,7 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
-                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + reinterpret_cast<intptr_t>(a_1.v__5fvalue));\n", 1)
+                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + static_cast<intptr_t>(a_1));\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod("AreSame"),

@@ -65,19 +65,16 @@ namespace IL2CXX
         })
         .For(typeof(Thread), (type, code) =>
         {
-            code.Members = transpiler => ($@"
-{'\t'}static IL2CXX__PORTABLE__THREAD {transpiler.Escape(type)}* v__current;
-
-{'\t'}static {transpiler.Escape(type)}* f__current()
+            code.Base = "t__thread";
+            code.Members = transpiler => ($@"{'\t'}static {transpiler.Escape(type)}* f__current()
 {'\t'}{{
-{'\t'}{'\t'}return v__current;
+{'\t'}{'\t'}return static_cast<{transpiler.Escape(type)}*>(v__current);
 {'\t'}}}
 
 {'\t'}{transpiler.EscapeForMember(typeof(ExecutionContext))} v__5fexecutionContext;
 {'\t'}{transpiler.EscapeForMember(typeof(SynchronizationContext))} v__5fsynchronizationContext;
 {'\t'}{transpiler.EscapeForMember(typeof(Delegate))} v__5fdelegate;
 {'\t'}{transpiler.EscapeForMember(typeof(object))} v__5fthreadStartArg;
-{'\t'}t_thread* v__internal;
 {'\t'}{transpiler.EscapeForMember(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
 
 {'\t'}void f__scan(t_scan a_scan)
@@ -89,15 +86,12 @@ namespace IL2CXX
 {'\t'}{'\t'}a_scan(v__5fthreadStartArg);
 {'\t'}{'\t'}a_scan(v__deserialization_tracker);
 {'\t'}}}
-{'\t'}template<typename T>
-{'\t'}void f__start(T a_do);
-{'\t'}void f__start();
-{'\t'}void f__join();
 ", true);
             code.For(
                 type.GetConstructor(new[] { typeof(ThreadStart) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}p->v__5fdelegate = a_0;
+{'\t'}p->v__priority = 2;
 {'\t'}return p;
 ", 0)
             );
@@ -105,6 +99,7 @@ namespace IL2CXX
                 type.GetConstructor(new[] { typeof(ParameterizedThreadStart) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}p->v__5fdelegate = a_0;
+{'\t'}p->v__priority = 2;
 {'\t'}return p;
 ", 0)
             );
@@ -114,7 +109,15 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Thread.Start), Type.EmptyTypes),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f__start();\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}return a_0->f__start([a_0]
+{'\t'}{{
+{'\t'}{'\t'}t_thread_static ts;
+{'\t'}{'\t'}if (a_0->v__5fdelegate->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(ThreadStart))}>::v__instance))
+{'\t'}{'\t'}{'\t'}{transpiler.Escape(typeof(ThreadStart).GetMethod("Invoke"))}({transpiler.CastValue(typeof(ThreadStart), "a_0->v__5fdelegate")});
+{'\t'}{'\t'}else
+{'\t'}{'\t'}{'\t'}{transpiler.Escape(typeof(ParameterizedThreadStart).GetMethod("Invoke"))}({transpiler.CastValue(typeof(ParameterizedThreadStart), "a_0->v__5fdelegate")}, a_0->v__5fthreadStartArg);
+{'\t'}{'\t'}}});
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.Join), Type.EmptyTypes),
@@ -138,7 +141,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Thread.ManagedThreadId)).GetMethod,
-                transpiler => ("\treturn reinerpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
+            );
+            code.For(
+                type.GetProperty(nameof(Thread.Priority)).SetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->f__priority__(a_1);\n", 1)
             );
             code.For(
                 type.GetMethod("InternalFinalize", BindingFlags.Instance | BindingFlags.NonPublic),

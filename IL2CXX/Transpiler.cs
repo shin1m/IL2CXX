@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -33,14 +34,13 @@ namespace IL2CXX
 
             public readonly TypeDefinition Base;
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new Dictionary<Type, MethodInfo[]>();
-            public readonly string MulticastInvoke;
+            public readonly string Delegate;
 
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
             {
                 if (Type.BaseType != null)
                 {
                     Base = (TypeDefinition)transpiler.Define(Type.BaseType);
-                    transpiler.log($"{type} [{Base}]");
                     Methods.AddRange(Base.Methods);
                 }
                 IsManaged = Type == typeof(object) || Type != typeof(ValueType) && Base.IsManaged;
@@ -66,21 +66,23 @@ namespace IL2CXX
                     transpiler.Enqueue(invoke);
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    MulticastInvoke = $@"reinterpret_cast<void*>(static_cast<{
-    transpiler.EscapeForStacked(@return)
-}(*)({
-    string.Join(",", parameters.Prepend(typeof(MulticastDelegate)).Select(x => $"\n\t\t\t{transpiler.EscapeForStacked(x)}"))
+                    string generate(Type t, string body) => $@"reinterpret_cast<void*>(+[]({
+    string.Join(",", parameters.Prepend(t).Select((x, i) => $"\n\t{transpiler.EscapeForStacked(x)} a_{i}"))
 }
-{'\t'}{'\t'})>([]({
-    string.Join(",", parameters.Prepend(typeof(MulticastDelegate)).Select((_, i) => $"\n\t\t\tauto a_{i}"))
-}
-{'\t'}{'\t'})
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f__data();
-{'\t'}{'\t'}{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
-{'\t'}{'\t'}{'\t'}for (intptr_t i = 0; i < n; ++i) {transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, "xs[i]")))});
-{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((x, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, "xs[n]")))});
-{'\t'}{'\t'}}}))";
+) -> {transpiler.EscapeForStacked(@return)}
+{{
+{body}}});";
+                    using (var writer = new StringWriter())
+                    {
+                        transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);
+                        Delegate = $@"v__multicast_invoke = {generate(typeof(MulticastDelegate), $@"{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f__data();
+{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
+{'\t'}for (intptr_t i = 0; i < n; ++i) {transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, "xs[i]")))});
+{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((x, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, "xs[n]")))});
+")}
+v__invoke_unmanaged = {generate(Type, writer.ToString())}
+";
+                    }
                 }
             }
             protected override int GetIndex(MethodKey method) => MethodToIndex.TryGetValue(method, out var i) ? i : Base?.GetIndex(method) ?? -1;
@@ -189,7 +191,9 @@ namespace IL2CXX
         private static readonly IReadOnlyDictionary<Type, string> builtinTypes = new Dictionary<Type, string> {
             [typeof(object)] = "t_object",
             [typeof(MemberInfo)] = "t__member_info",
-            [typeof(Type)] = "t__type"
+            [typeof(Type)] = "t__abstract_type",
+            [typeof(RuntimeType)] = "t__type",
+            [typeof(CriticalFinalizerObject)] = "t__critical_finalizer_object"
         };
         private static readonly IReadOnlyDictionary<Type, string> primitives = new Dictionary<Type, string> {
             [typeof(bool)] = "bool",
@@ -256,12 +260,12 @@ namespace IL2CXX
         private readonly Instruction[] instructions2 = new Instruction[256];
         private readonly StringWriter typeDeclarations = new StringWriter();
         private readonly StringWriter typeDefinitions = new StringWriter();
-        private readonly StringWriter staticDeclarations = new StringWriter();
-        private readonly StringWriter threadStaticDeclarations = new StringWriter();
-        private readonly StringWriter memberDefinitions = new StringWriter();
+        private readonly StringWriter staticDefinitions = new StringWriter();
+        private readonly StringWriter staticMembers = new StringWriter();
+        private readonly StringWriter threadStaticMembers = new StringWriter();
+        private readonly StringWriter fieldDeclarations = new StringWriter();
         private readonly StringWriter fieldDefinitions = new StringWriter();
         private readonly StringWriter functionDeclarations = new StringWriter();
-        private readonly StringWriter functionDefinitions = new StringWriter();
         private readonly List<RuntimeDefinition> runtimeDefinitions = new List<RuntimeDefinition>();
         private readonly Dictionary<Type, RuntimeDefinition> typeToRuntime = new Dictionary<Type, RuntimeDefinition>();
         private readonly HashSet<string> typeIdentifiers = new HashSet<string>();
@@ -276,9 +280,8 @@ namespace IL2CXX
         private byte[] bytes;
         private SortedDictionary<string, (string Prefix, int Index)> definedIndices;
         private Dictionary<int, Stack> indexToStack;
-        private StringWriter writer;
+        private TextWriter writer;
         private readonly Stack<ExceptionHandlingClause> tries = new Stack<ExceptionHandlingClause>();
-        private readonly Stack<StringWriter> writers = new Stack<StringWriter>();
         private Type constrained;
         private bool @volatile;
         private bool processed;
@@ -435,8 +438,8 @@ struct {Escape(type)}
                 if (!type.IsEnum)
                     foreach (var x in type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
                         (Attribute.IsDefined(x, typeof(ThreadStaticAttribute)) ? threadStaticFields : staticFields).Add(x);
-                var staticMembers = new StringWriter();
                 var staticDefinitions = new StringWriter();
+                var staticMembers = new StringWriter();
                 var initialize = builtin.GetInitialize(this, type);
                 if (type.Name == "<PrivateImplementationDetails>")
                 {
@@ -444,11 +447,12 @@ struct {Escape(type)}
                     {
                         var bytes = new byte[Marshal.SizeOf(x.FieldType)];
                         RuntimeHelpers.InitializeArray(bytes, x.FieldHandle);
-                        fieldDefinitions.WriteLine($@"uint8_t v__field_{identifier}__{Escape(x.Name)}[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};
-void* f__field_{identifier}__{Escape(x.Name)}()
+                        fieldDeclarations.WriteLine($@"extern uint8_t v__field_{identifier}__{Escape(x.Name)}[];
+inline void* f__field_{identifier}__{Escape(x.Name)}()
 {{
 {'\t'}return v__field_{identifier}__{Escape(x.Name)};
 }}");
+                        fieldDefinitions.WriteLine($@"uint8_t v__field_{identifier}__{Escape(x.Name)}[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};");
                     }
                 }
                 else if (staticFields.Count > 0 || initialize != null || type.TypeInitializer != null)
@@ -467,7 +471,7 @@ struct t__static_{identifier}
                     }
                     staticDefinitions.WriteLine($@"{'\t'}}}
 }};");
-                    foreach (var x in staticFields) fieldDefinitions.WriteLine($@"void* f__field_{identifier}__{Escape(x.Name)}()
+                    foreach (var x in staticFields) fieldDeclarations.WriteLine($@"inline void* f__field_{identifier}__{Escape(x.Name)}()
 {{
 {'\t'}return &t_static::v_instance->v_{identifier}->{Escape(x)};
 }}");
@@ -488,7 +492,7 @@ struct t__static_{identifier}
                 else
                 {
                     declaration += $"\nstruct {identifier}";
-                    var @base = type.BaseType == null ? string.Empty : $" : {Escape(type.BaseType)}";
+                    var @base = type.BaseType == null ? string.Empty : $" : {builtin.GetBase(type) ?? Escape(type.BaseType)}";
                     string members;
                     if (type == typeof(void))
                     {
@@ -526,17 +530,6 @@ struct t__static_{identifier}
 {'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
 {'\t'}{'\t'}auto p = f__data();
 {'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) {scan(element, "p[i]")};
-{'\t'}}}
-";
-                                members += $@"{'\t'}t_object* f__clone() const
-{'\t'}{{
-{'\t'}{'\t'}t__new<{identifier}> p(sizeof({elementIdentifier}) * v__length);
-{'\t'}{'\t'}p->v__length = v__length;
-{'\t'}{'\t'}std::memcpy(p->v__bounds, v__bounds, sizeof(v__bounds));
-{'\t'}{'\t'}auto p0 = reinterpret_cast<const {elementIdentifier}*>(this + 1);
-{'\t'}{'\t'}auto p1 = p->f__data();
-{'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) new(p1 + i) {elementIdentifier}(p0[i]);
-{'\t'}{'\t'}return p;
 {'\t'}}}
 ";
                             }
@@ -618,12 +611,6 @@ struct t__static_{identifier}
 {'\t'}void f__construct({identifier}* a_p) const
 {'\t'}{{
 {(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__construct(a_p);\n")}{string.Join(string.Empty, fields.Select(x => $"{'\t'}{'\t'}new(&a_p->{Escape(x)}) decltype({Escape(x)})({Escape(x)});\n"))}{'\t'}}}
-{'\t'}t_object* f__clone() const
-{'\t'}{{
-{'\t'}{'\t'}t__new<{identifier}> p(0);
-{'\t'}{'\t'}f__construct(p);
-{'\t'}{'\t'}return p;
-{'\t'}}}
 ";
                             }
                         }
@@ -652,14 +639,14 @@ struct t__static_{identifier}
 {{
 {members}}};");
                 }
-                staticDeclarations.Write(staticMembers);
-                memberDefinitions.Write(staticDefinitions);
-                threadStaticDeclarations.Write(threadStaticMembers);
+                this.staticDefinitions.Write(staticDefinitions);
+                this.staticMembers.Write(staticMembers);
+                this.threadStaticMembers.Write(threadStaticMembers);
             }
             runtimeDefinitions.Add(definition);
             return definition;
         }
-        private string EscapeType(Type type)
+        public string EscapeType(Type type)
         {
             if (typeToIdentifier.TryGetValue(type, out var name)) return name;
             var escaped = name = $"t_{Escape(type.ToString())}";
@@ -777,7 +764,7 @@ struct t__static_{identifier}
             if (method.IsVirtual)
             {
                 string at(int i) => $"reinterpret_cast<void**>({target}->f_type() + 1)[{i}]";
-                var concretes = runtimeDefinitions.Where(y => y is TypeDefinition && y.Type.IsSubclassOf(method.DeclaringType)).Select(y => y.Methods);
+                var concretes = runtimeDefinitions.Where(x => x is TypeDefinition && x.Type.IsSubclassOf(method.DeclaringType)).Select(x => x.Methods);
                 if (method.IsGenericMethod)
                 {
                     var (i, j) = EnqueueGenericIndexOf(method, concretes);
@@ -827,7 +814,87 @@ struct t__static_{identifier}
                 return construct(GenerateCall(method, GetVirtualFunction(method, target), variables.Append(target)));
             }
         }
-        private void ProcessNextMethod()
+        private void GenerateInvokeUnmanaged(Type @return, IEnumerable<(ParameterInfo Parameter, int Index)> parameters, string function, TextWriter writer, CharSet charset = CharSet.Auto)
+        {
+            foreach (var (x, i) in parameters)
+                if (x.ParameterType == typeof(StringBuilder))
+                {
+                    writer.WriteLine($"\tauto cs{i} = {(charset == CharSet.Unicode ? "f__to_cs16" : "f__to_cs")}(a_{i});");
+                }
+                else if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType.IsByRef)
+                {
+                    var e = GetElementType(x.ParameterType);
+                    writer.WriteLine($"\t*a_{i} = ({EscapeForValue(e)}){{}};");
+                    if (typeof(SafeHandle).IsAssignableFrom(e)) writer.WriteLine($"\tvoid* p{i};");
+                }
+            writer.Write($"\t{(@return == typeof(void) ? string.Empty : "auto result = ")}reinterpret_cast<{(typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : EscapeForValue(@return))}(*)(");
+            writer.WriteLine(string.Join(",", parameters.Select(x => x.Parameter.ParameterType).Select(x =>
+            {
+                if (x == typeof(string)) return charset == CharSet.Unicode ? "const char16_t*" : "const char*";
+                if (x == typeof(StringBuilder)) return charset == CharSet.Unicode ? "char16_t*" : "char*";
+                if (x.IsByRef)
+                {
+                    var e = GetElementType(x);
+                    if (e == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(e)) return "void**";
+                }
+                if (x == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(x)) return "void*";
+                if (IsComposite(x))
+                {
+                    if (x.IsValueType) return EscapeForValue(x);
+                    if (x.IsArray) return $"{EscapeForValue(GetElementType(x))}*";
+                }
+                return EscapeForValue(x);
+            }).Select(x => $"\n\t\t{x}")));
+            writer.Write($"\t)>({function})(");
+            writer.WriteLine(string.Join(",", parameters.Select(xi =>
+            {
+                var x = xi.Parameter.ParameterType;
+                var i = xi.Index;
+                if (x == typeof(string))
+                {
+                    var s = $"&a_{i}->v__5ffirstChar";
+                    return charset == CharSet.Unicode ? s : $"f__string({{{s}, static_cast<size_t>(a_{i}->v__5fstringLength)}}).c_str()";
+                }
+                if (x == typeof(StringBuilder)) return $"cs{i}.data()";
+                if (x.IsByRef)
+                {
+                    var e = GetElementType(x);
+                    if (e == typeof(IntPtr)) return $"&a_{i}->v__5fvalue";
+                    if (typeof(SafeHandle).IsAssignableFrom(e)) return $"&p{i}";
+                }
+                if (typeof(SafeHandle).IsAssignableFrom(x)) return $"a_{i}->v_handle";
+                if (IsComposite(x))
+                {
+                    if (x.IsValueType) return $"a_{i}";
+                    if (x.IsArray) return $"a_{i} ? a_{i}->f__data() : nullptr";
+                }
+                return $"a_{i}";
+            }).Select(x => $"\n\t\t{x}")));
+            writer.WriteLine("\t);");
+            foreach (var (x, i) in parameters)
+                if (x.ParameterType == typeof(StringBuilder))
+                {
+                    writer.WriteLine($"\tf__from(a_{i}, cs{i}.data());");
+                }
+                else if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType.IsByRef)
+                {
+                    if (typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) writer.WriteLine($"\t(*a_{i})->v_handle = p{i};");
+                }
+            if (typeof(SafeHandle).IsAssignableFrom(@return))
+            {
+                ConstructorInfo getCI(Type type) => type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(bool) }, null);
+                var ci = getCI(@return) ?? getCI(typeof(SafeHandle));
+                writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
+{'\t'}{Escape(ci)}(p, result, true);
+{'\t'}return p;");
+                Enqueue(ci);
+            }
+            else if (@return != typeof(void))
+            {
+                writer.WriteLine("\treturn result;");
+            }
+        }
+        private void ProcessNextMethod(Func<Type, bool, TextWriter> writerForType)
         {
             method = queuedMethods.Dequeue();
             var key = ToKey(method);
@@ -855,7 +922,7 @@ struct t__static_{identifier}
             functionDeclarations.Write(prototype);
             functionDeclarations.WriteLine(';');
             if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
-{returns}
+inline {returns}
 {identifier}__v({string.Join(",", arguments.Skip(1).Prepend($"\n\t{Escape(method.DeclaringType)}* a_0"))}
 )
 {{
@@ -863,9 +930,10 @@ struct t__static_{identifier}
     string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_0->v__value"))
 });
 }}");
-            writer.WriteLine(description);
             if (builtin.body != null)
             {
+                writer = writerForType(method.DeclaringType, builtin.inline > 0);
+                writer.WriteLine(description);
                 if (builtin.inline < 0)
                 {
                     writer.Write("IL2CXX__PORTABLE__NOINLINE ");
@@ -882,13 +950,18 @@ struct t__static_{identifier}
             bytes = body?.GetILAsByteArray();
             if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.NoInlining))
             {
+                writer = writerForType(method.DeclaringType, false);
+                writer.WriteLine(description);
                 writer.Write("IL2CXX__PORTABLE__NOINLINE ");
             }
             else
             {
                 var aggressive = method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining);
+                var inline = aggressive || bytes?.Length <= 64;
+                writer = writerForType(method.DeclaringType, inline);
+                writer.WriteLine(description);
                 if (aggressive) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
-                if (aggressive || bytes?.Length <= 64) writer.Write("inline ");
+                if (inline) writer.Write("inline ");
             }
             var dllimport = method.GetCustomAttribute<DllImportAttribute>();
             if (dllimport != null)
@@ -899,74 +972,8 @@ struct t__static_{identifier}
                 functionDeclarations.WriteLine($"//\tSetLastError: {dllimport.SetLastError}");
                 writer.WriteLine(prototype);
                 writer.WriteLine('{');
-                foreach (var (x, i) in method.GetParameters().Select((x, i) => (Parameter: x, i)).Where(x => Attribute.IsDefined(x.Parameter, typeof(OutAttribute))))
-                {
-                    if (x.ParameterType == typeof(StringBuilder)) continue;
-                    var e = GetElementType(x.ParameterType);
-                    writer.WriteLine($"\t*static_cast<{EscapeForMember(e)}*>(a_{i}) = {EscapeForValue(e)}{{}};");
-                    if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(e)) writer.WriteLine($"\tvoid* p{i};");
-                }
                 writer.WriteLine($"\tstatic t_library library(\"{dllimport.Value}\"s, \"{dllimport.EntryPoint ?? method.Name}\");");
-                var @return = GetReturnType(method);
-                writer.Write($"\t{(@return == typeof(void) ? string.Empty : "auto result = ")}library.f_as<{(typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : returns)}(*)(");
-                writer.WriteLine(string.Join(",", method.GetParameters().Select(x =>
-                {
-                    if (x.ParameterType == typeof(string)) return dllimport.CharSet == CharSet.Unicode ? "const char16_t*" : "const char*";
-                    if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType == typeof(StringBuilder)) return dllimport.CharSet == CharSet.Unicode ? "char16_t*" : "char*";
-                    if (x.ParameterType.IsByRef)
-                    {
-                        var e = GetElementType(x.ParameterType);
-                        if (e == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(e)) return "void**";
-                    }
-                    if (x.ParameterType == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(x.ParameterType)) return "void*";
-                    if (IsComposite(x.ParameterType))
-                    {
-                        if (x.ParameterType.IsValueType) return EscapeForStacked(x.ParameterType);
-                        if (x.ParameterType.IsArray) return $"{EscapeForValue(GetElementType(x.ParameterType))}*";
-                    }
-                    return EscapeForStacked(x.ParameterType);
-                }).Select(x => $"\n\t\t{x}")));
-                writer.Write("\t)>()(");
-                writer.WriteLine(string.Join(",", method.GetParameters().Select((x, i) =>
-                {
-                    if (x.ParameterType == typeof(string))
-                    {
-                        var s = $"&a_{i}->v__5ffirstChar";
-                        return dllimport.CharSet == CharSet.Unicode ? s : $"f__string({{{s}, static_cast<size_t>(a_{i}->v__5fstringLength)}}).c_str()";
-                    }
-                    if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType == typeof(StringBuilder)) return $"a_{i}->v_m_5fChunkChars->f__data()";
-                    if (x.ParameterType.IsByRef)
-                    {
-                        var e = GetElementType(x.ParameterType);
-                        if (e == typeof(IntPtr)) return $"&a_{i}->v__5fvalue";
-                        if (typeof(SafeHandle).IsAssignableFrom(e)) return $"&p{i}";
-                    }
-                    if (typeof(SafeHandle).IsAssignableFrom(x.ParameterType)) return $"a_{i}->v_handle";
-                    if (IsComposite(x.ParameterType))
-                    {
-                        if (x.ParameterType.IsValueType) return $"a_{i}";
-                        if (x.ParameterType.IsArray) return $"a_{i} ? a_{i}->f__data() : nullptr";
-                    }
-                    return $"a_{i}";
-                }).Select(x => $"\n\t\t{x}")));
-                writer.WriteLine("\t);");
-                foreach (var (x, i) in method.GetParameters().Select((x, i) => (Parameter: x, i)).Where(x => Attribute.IsDefined(x.Parameter, typeof(OutAttribute))))
-                {
-                    if (x.ParameterType.IsByRef && typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) writer.WriteLine($"\t(*a_{i})->v_handle = p{i};");
-                }
-                if (typeof(SafeHandle).IsAssignableFrom(@return))
-                {
-                    ConstructorInfo getCI(Type type) => type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(bool) }, null);
-                    var ci = getCI(@return) ?? getCI(typeof(SafeHandle));
-                    writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
-{'\t'}{Escape(ci)}(p, result, true);
-{'\t'}return p;");
-                    Enqueue(ci);
-                }
-                else if (@return != typeof(void))
-                {
-                    writer.WriteLine("\treturn result;");
-                }
+                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "library.f_symbol()", writer, dllimport.CharSet);
                 writer.WriteLine('}');
                 return;
             }
@@ -1017,6 +1024,7 @@ struct t__static_{identifier}
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
+            var writers = new Stack<TextWriter>();
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
             var index = 0;
             while (index < bytes.Length)
@@ -1096,29 +1104,29 @@ struct t__static_{identifier}
             writer.WriteLine('}');
         }
 
-        private void WriteRuntimeDefinition(RuntimeDefinition definition, TextWriter writer)
+        private void WriteRuntimeDefinition(RuntimeDefinition definition, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
         {
             var type = definition.Type;
             var @base = definition is TypeDefinition && FinalizeOf(type).MethodHandle != finalizeOfObject.MethodHandle ? "t__type_finalizee" : "t__type";
             var identifier = Escape(type);
-            writer.WriteLine($@"
+            writerForDeclarations.WriteLine($@"
 template<>
 struct t__type_of<{identifier}> : {@base}
 {{");
-            memberDefinitions.Write($@"
-t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
+            writerForDefinitions.Write($@"
+t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<{Escape(typeof(RuntimeType))}>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
             if (definition is TypeDefinition td)
             {
                 void writeMethods(IEnumerable<MethodInfo> methods, Func<int, MethodInfo, string, string> pointer, Func<int, int, MethodInfo, string, string> genericPointer, Func<MethodInfo, MethodInfo> origin, string indent)
                 {
-                    foreach (var (m, i) in methods.Select((x, i) => (x, i))) writer.WriteLine($@"{indent}// {m}
+                    foreach (var (m, i) in methods.Select((x, i) => (x, i))) writerForDeclarations.WriteLine($@"{indent}// {m}
 {indent}void* v_method{i} = {(
     m.IsAbstract ? "nullptr" :
     m.IsGenericMethod ? $"&v_generic__{Escape(m)}" :
     methodToIdentifier.ContainsKey(ToKey(m)) ? $"reinterpret_cast<void*>({pointer(i, m, $"{Escape(m)}{(m.DeclaringType.IsValueType ? "__v" : string.Empty)}")})" :
     "nullptr"
 )};");
-                    foreach (var (m, i) in methods.Where(x => !x.IsAbstract && x.IsGenericMethod).Select((x, i) => (x, i))) writer.WriteLine($@"{indent}struct
+                    foreach (var (m, i) in methods.Where(x => !x.IsAbstract && x.IsGenericMethod).Select((x, i) => (x, i))) writerForDeclarations.WriteLine($@"{indent}struct
 {indent}{{
 {
     string.Join(string.Empty, genericMethodToTypesToIndex[ToKey(origin(m))].OrderBy(x => x.Value).Select(p =>
@@ -1136,10 +1144,10 @@ t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "null
                     string types(MethodInfo m) => string.Join(", ", m.GetParameters().Select(x => x.ParameterType).Prepend(GetReturnType(m)).Select(EscapeForStacked));
                     var ii = Escape(p.Key);
                     var ms = typeToRuntime[p.Key].Methods;
-                    writer.WriteLine($@"{'\t'}struct
+                    writerForDeclarations.WriteLine($@"{'\t'}struct
 {'\t'}{{");
                     writeMethods(p.Value, (i, m, name) => name, (i, j, m, name) => name, x => ms[Array.IndexOf(p.Value, x)], "\t\t");
-                    writer.WriteLine($@"{'\t'}}} v_interface__{ii}__methods;
+                    writerForDeclarations.WriteLine($@"{'\t'}}} v_interface__{ii}__methods;
 {'\t'}struct
 {'\t'}{{");
                     writeMethods(p.Value,
@@ -1148,99 +1156,114 @@ t__type_of<{identifier}>::t__type_of() : {@base}({(type.BaseType == null ? "null
                         x => ms[Array.IndexOf(p.Value, x)],
                         "\t\t"
                     );
-                    writer.WriteLine($"\t}} v_interface__{ii}__thunks;");
+                    writerForDeclarations.WriteLine($"\t}} v_interface__{ii}__thunks;");
                 }
-                memberDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
-                writer.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
+                writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
+                writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
 {'\t'}static t_object* f_do_clone(const t_object* a_this);");
-                if (type != typeof(void) && type.IsValueType) writer.WriteLine("\tstatic void f_do_copy(const char* a_from, size_t a_n, char* a_to);");
+                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine("\tstatic void f_do_copy(const char* a_from, size_t a_n, char* a_to);");
             }
             else
             {
                 td = null;
             }
-            writer.WriteLine($@"{'\t'}t__type_of();
+            writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            memberDefinitions.WriteLine($@"}}, {(
+            writerForDefinitions.WriteLine($@"}}, {(
     definition.IsManaged ? "true" : "false"
 )}, {(
     type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"
-)}{(
-    type.IsArray ? $", &t__type_of<{Escape(GetElementType(type))}>::v__instance, {type.GetArrayRank()}" :
-    td?.MulticastInvoke != null ? $", nullptr, 0, {td.MulticastInvoke}" :
-    string.Empty
 )})
 {{");
+            if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
+{'\t'}v__rank = {type.GetArrayRank()};");
+            writerForDefinitions.Write(td?.Delegate);
+            var nv = Nullable.GetUnderlyingType(type);
+            if (nv != null) writerForDefinitions.WriteLine($"\tv__nullable_value = &t__type_of<{Escape(nv)}>::v__instance;");
             if (definition is TypeDefinition)
             {
-                memberDefinitions.WriteLine($@"{'\t'}f_scan = f_do_scan;
+                writerForDefinitions.WriteLine($@"{'\t'}f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
-                if (type != typeof(void) && type.IsValueType) memberDefinitions.WriteLine("\tf_copy = f_do_copy;");
+                if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine("\tf_copy = f_do_copy;");
             }
-            memberDefinitions.WriteLine($@"}}
+            writerForDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
             if (definition is TypeDefinition)
             {
-                memberDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_scan(t_object* a_this, t_scan a_scan)
+                writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_scan(t_object* a_this, t_scan a_scan)
 {{
 {'\t'}static_cast<{identifier}*>(a_this)->f__scan(a_scan);
 }}
 t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
 {{");
-                memberDefinitions.WriteLine(
-                    type == typeof(void) ? $"\treturn t__new<{identifier}>(0);" :
-                    type.IsValueType ? $@"{'\t'}t__new<{identifier}> p(0);
+                if (type.IsArray)
+                {
+                    var element = EscapeForMember(GetElementType(type));
+                    writerForDefinitions.WriteLine($@"
+{'\t'}auto p = static_cast<const {identifier}*>(a_this);
+{'\t'}t__new<{identifier}> q(sizeof({element}) * p->v__length);
+{'\t'}q->v__length = p->v__length;
+{'\t'}std::memcpy(q->v__bounds, p->v__bounds, sizeof(p->v__bounds));
+{'\t'}auto p0 = reinterpret_cast<const {element}*>(p + 1);
+{'\t'}auto p1 = q->f__data();
+{'\t'}for (size_t i = 0; i < p->v__length; ++i) new(p1 + i) {element}(p0[i]);
+{'\t'}return q;
+");
+                }
+                else
+                {
+                    writerForDefinitions.WriteLine(
+                        type == typeof(void) ? $"\treturn t__new<{identifier}>(0);" :
+                        type.IsValueType ? $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;
 }}
 void t__type_of<{identifier}>::f_do_copy(const char* a_from, size_t a_n, char* a_to)
 {{
 {'\t'}f__copy(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));" :
-                    $"\treturn static_cast<const {identifier}*>(a_this)->f__clone();");
-                memberDefinitions.WriteLine('}');
+                    $@"{'\t'}t__new<{identifier}> p(0);
+{'\t'}static_cast<const {identifier}*>(a_this)->f__construct(p);
+{'\t'}return p;
+");
+                }
+                writerForDefinitions.WriteLine('}');
             }
         }
-        public void Do(MethodInfo method, TextWriter writer)
+        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType)
         {
-            Define(typeof(Type));
+            Define(typeof(RuntimeType));
             Escape(finalizeOfObject);
             Define(typeof(Thread));
             Enqueue(typeof(ThreadStart).GetMethod("Invoke"));
             Enqueue(typeof(ParameterizedThreadStart).GetMethod("Invoke"));
             Define(typeof(void));
             Define(typeof(string));
+            Define(typeof(StringBuilder));
             Enqueue(method);
             do
             {
-                ProcessNextMethod();
+                ProcessNextMethod(writerForType);
                 while (queuedTypes.Count > 0) Define(queuedTypes.Dequeue());
             }
             while (queuedMethods.Count > 0);
             processed = true;
-            writer.WriteLine(@"#include <il2cxx/base.h>
+            writerForDeclarations.WriteLine(@"#include <il2cxx/base.h>
 
 namespace il2cxx
 {
 ");
-            writer.Write(typeDeclarations);
-            writer.Write(typeDefinitions);
-            writer.Write(functionDeclarations);
-            foreach (var x in runtimeDefinitions) WriteRuntimeDefinition(x, writer);
-            writer.WriteLine(@"
-}
-
-#include <il2cxx/engine.h>
-#include <il2cxx/library.h>
-
-namespace il2cxx
-{");
-            writer.Write(memberDefinitions);
-            writer.WriteLine(@"
+            writerForDeclarations.Write(typeDeclarations);
+            writerForDeclarations.Write(typeDefinitions);
+            writerForDeclarations.Write(functionDeclarations);
+            foreach (var x in runtimeDefinitions) WriteRuntimeDefinition(x, writerForDeclarations, writerForType(x.Type, false));
+            writerForDeclarations.WriteLine("\n#include \"utilities.h\"");
+            writerForDeclarations.Write(staticDefinitions);
+            writerForDeclarations.WriteLine(@"
 struct t_static
 {");
-            writer.Write(staticDeclarations);
-            writer.WriteLine($@"
+            writerForDeclarations.Write(staticMembers);
+            writerForDeclarations.WriteLine($@"
 {'\t'}static t_static* v_instance;
 {'\t'}t_static()
 {'\t'}{{
@@ -1252,12 +1275,10 @@ struct t_static
 {'\t'}}}
 }};
 
-t_static* t_static::v_instance;
-
 struct t_thread_static
 {{");
-            writer.Write(threadStaticDeclarations);
-            writer.WriteLine($@"
+            writerForDeclarations.Write(threadStaticMembers);
+            writerForDeclarations.WriteLine($@"
 {'\t'}static IL2CXX__PORTABLE__THREAD t_thread_static* v_instance;
 {'\t'}t_thread_static()
 {'\t'}{{
@@ -1268,24 +1289,21 @@ struct t_thread_static
 {'\t'}{'\t'}v_instance = nullptr;
 {'\t'}}}
 }};
+");
+            writerForDeclarations.WriteLine(fieldDeclarations);
+            writerForDeclarations.WriteLine('}');
+            writerForDefinitions.WriteLine(@"namespace il2cxx
+{
+
+#include ""utilities.cc""
+");
+            writerForDefinitions.Write(fieldDefinitions);
+            writerForDefinitions.WriteLine($@"
+t_static* t_static::v_instance;
 
 IL2CXX__PORTABLE__THREAD t_thread_static* t_thread_static::v_instance;
-");
-            writer.WriteLine(fieldDefinitions);
-            writer.Write(functionDefinitions);
-            writer.WriteLine($@"
-void t_engine::f_finalize(t_object* a_p)
-{{
-{'\t'}reinterpret_cast<void(*)(t_object*)>(reinterpret_cast<void**>(a_p->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
-}}
 
 }}
-
-#include ""slot.cc""
-#include ""object.cc""
-#include ""type.cc""
-#include ""thread.cc""
-#include ""engine.cc""
 
 int main(int argc, char* argv[])
 {{
@@ -1294,11 +1312,13 @@ int main(int argc, char* argv[])
 {'\t'}t_engine::t_options options;
 {'\t'}options.v_verbose = true;
 {'\t'}t_engine engine(options, argc, argv);
-{'\t'}auto s = std::make_unique<t_static>();
-{'\t'}auto ts = std::make_unique<t_thread_static>();
-{'\t'}auto n = {Escape(method)}();
-{'\t'}engine.f_shutdown();
-{'\t'}return n;
+{'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
+{'\t'}{{
+{'\t'}{'\t'}reinterpret_cast<void(*)(t_object*)>(reinterpret_cast<void**>(a_p->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
+{'\t'}}}, []
+{'\t'}{{
+{'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}();\n\t\treturn 0" : $"return {Escape(method)}()")};
+{'\t'}}});
 }}");
         }
     }

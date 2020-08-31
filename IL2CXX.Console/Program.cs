@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Reflection;
-using System.Threading;
 
 namespace IL2CXX.Console
 {
@@ -9,98 +8,134 @@ namespace IL2CXX.Console
 
     class Program
     {
-        static Func<string, string> Corrector(IReadOnlyDictionary<string, int> word2count)
+        static int Main(string[] args)
         {
-            void edits1(string word, Action<string> action)
+            if (args.Length < 1) return 1;
+            var assembly = Assembly.LoadFrom(args[0]);
+            var entry = assembly.EntryPoint ?? throw new InvalidOperationException();
+            var @out = "out";
+            Directory.Delete(@out, true);
+            Directory.CreateDirectory(@out);
+            var transpiler = new Transpiler(DefaultBuiltin.Create(), Console.Error.WriteLine);
+            var names = new SortedSet<string>();
+            var type2path = new Dictionary<Type, string>();
+            var definition = TextWriter.Null;
+            try
             {
-                void edit(string left, string right0, string right1)
+                using (var declarations = File.CreateText(Path.Combine(@out, "declarations.h")))
+                using (var inlines = new StringWriter())
+                using (var others = new StringWriter())
+                using (var main = File.CreateText(Path.Combine(@out, "main.cc")))
                 {
-                    for (var i = 0; i < 26; ++i)
+                    main.WriteLine("#include \"declarations.h\"\n");
+                    transpiler.Do(entry, declarations, main, (type, inline) =>
                     {
-                        var s = left + (char)('a' + i);
-                        action(s + right0);
-                        action(s + right1);
-                    }
-                    action(left + right1);
-                }
-                edit(string.Empty, word, word.Substring(1));
-                for (var i = 1; i < word.Length; ++i)
-                {
-                    var right1 = word.Substring(i + 1);
-                    edit(word.Substring(0, i), word.Substring(i), right1);
-                    action(word.Substring(0, i - 1) + word[i] + word[i - 1] + right1);
-                }
-                for (var i = 0; i < 26; ++i) action(word + (char)('a' + i));
-            }
-            return word =>
-            {
-                if (word2count.ContainsKey(word)) return word;
-                var top = (Count: 0, Word: word);
-                void subscribe(string x)
-                {
-                    if (word2count.TryGetValue(x, out var p) && p > top.Count) top = (p, x);
-                }
-                var e1 = new HashSet<string>();
-                edits1(word, x =>
-                {
-                    subscribe(x);
-                    e1.Add(x);
-                });
-                if (top.Count <= 0) foreach (var x in e1) edits1(x, subscribe);
-                return top.Word;
-            };
-        }
-        static IEnumerable<string> EnumerateWords(IEnumerable<string> lines)
-        {
-            var isWords = Enumerable.Range(0, 128).Select(c => c >= 48 && c < 58 || c >= 65 && c < 91 || c == 95 || c >= 97 && c < 123).ToArray();
-            bool isWord(char c) => c < 128 && isWords[c];
-            IEnumerable<string> matches(string line)
-            {
-                for (var i = 0; i < line.Length;)
-                {
-                    while (!isWord(line[i])) if (++i >= line.Length) yield break;
-                    var j = i;
-                    do ++j; while (j < line.Length && isWord(line[j]));
-                    yield return line.Substring(i, j - i).ToLowerInvariant();
-                    i = j;
+                        if (inline) return inlines;
+                        if (type.IsInterface || type.IsSubclassOf(typeof(MulticastDelegate))) return others;
+                        definition.Dispose();
+                        if (type2path.TryGetValue(type, out var path)) return definition = new StreamWriter(path, true);
+                        var escaped = transpiler.EscapeType(type);
+                        if (escaped.Length > 240) escaped = escaped.Substring(0, 240);
+                        var name = $"{escaped}.cc";
+                        for (var i = 0; !names.Add(name); ++i) name = $"{escaped}__{i}.cc";
+                        path = Path.Combine(@out, name);
+                        type2path.Add(type, path);
+                        definition = new StreamWriter(path);
+                        definition.WriteLine(@"#include ""declarations.h""
+
+namespace il2cxx
+{");
+                        return definition;
+                    });
+                    declarations.WriteLine("\nnamespace il2cxx\n{");
+                    declarations.Write(inlines);
+                    declarations.WriteLine("\n}");
+                    main.WriteLine("\nnamespace il2cxx\n{");
+                    main.Write(others);
+                    main.WriteLine("\n}");
                 }
             }
-            return lines.SelectMany(matches);
-        }
-        static int Test()
-        {
-            string[] lines = {
-                "Hello, World!",
-                "Hello, this is shin!",
-                "Good bye, World!",
-                "Bye bye."
-            };
-            var correct = Corrector(EnumerateWords(lines).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count()));
-            var log = string.Empty;
-            void test(string word)
+            finally
             {
-                var corrected = correct(word);
-                log += $"corrected: {word}: {corrected}\n";
-                Console.WriteLine($"{word}: {corrected}");
+                definition.Dispose();
             }
-            var ts = new[] {
-                "hell",
-                "shin1",
-                "work",
-                "wide",
-                "wild"
-            }.Select(x => new Thread(() =>
-            {
-                for (var i = 0; i < 10; ++i) test(x);
-            })).ToList();
-            foreach (var x in ts) x.Start();
-            foreach (var x in ts) x.Join();
-            Console.WriteLine(log);
+            foreach (var path in type2path.Values) File.AppendAllText(path, "\n}\n");
+            var name = Path.GetFileNameWithoutExtension(args[0]);
+            File.WriteAllText(Path.Combine(@out, "configure.ac"), $@"AC_INIT([{name}], [{DateTime.Today:yyyyMMdd}])
+AM_INIT_AUTOMAKE([foreign nostdinc dist-bzip2 no-dist-gzip subdir-objects])
+AC_CONFIG_SRCDIR([main.cc])
+
+PKG_CHECK_MODULES([LIBUNWIND], [libunwind >= 1.3])
+
+if test ""${{CXXFLAGS+set}}"" != set; then
+	CXXFLAGS=
+fi
+AC_PROG_CXX
+
+AC_C_INLINE
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+
+AC_ARG_ENABLE(
+	[debug],
+	AS_HELP_STRING([--enable-debug], [turn on debugging]),
+	[case ""${{enableval}}"" in
+	  yes) debug=true ;;
+	  no) debug=false ;;
+	  *) AC_MSG_ERROR([bad value ${{enableval}} for --enable-debug]) ;;
+	 esac],
+	[debug=false]
+)
+AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+AC_ARG_ENABLE(
+	[profile],
+	AS_HELP_STRING([--enable-profile], [turn on profiling]),
+	[case ""${{enableval}}"" in
+	  yes) profile=true ;;
+	  no) profile=false ;;
+	  *) AC_MSG_ERROR([bad value ${{enableval}} for --enable-profile]) ;;
+	 esac],
+	[profile=false]
+)
+AM_CONDITIONAL([PROFILE], [test x$profile = xtrue])
+
+AC_CONFIG_HEADERS([configure.h])
+AC_CONFIG_FILES([
+	Makefile
+])
+AC_OUTPUT
+");
+            File.WriteAllText(Path.Combine(@out, "Makefile.am"), $@"bin_PROGRAMS = {name}
+AM_CPPFLAGS = $(LIBUNWIND_CFLAGS) -I../../IL2CXX/include -I../../IL2CXX/src
+AM_CXXFLAGS = -std=c++17
+AM_LDFLAGS =
+LDADD = -lpthread -ldl $(LIBUNWIND_LIBS) -lunwind-x86_64
+if DEBUG
+AM_CXXFLAGS += -O0 -g
+else
+AM_CPPFLAGS += -DNDEBUG
+AM_CXXFLAGS += -O3
+endif
+if PROFILE
+AM_CXXFLAGS += -pg
+AM_LDFLAGS += -pg
+endif
+declarations.h.gch: declarations.h
+MOSTLYCLEANFILES = declarations.h.gch
+{'\t'}$(CXXCOMPILE) -c -o $@ $<
+GENERATEDSOURCES = \
+{'\t'}{string.Join(" \\\n\t", names)} \
+{'\t'}main.cc
+$(GENERATEDSOURCES:.cc=.$(OBJEXT)): declarations.h.gch
+{name}_SOURCES = \
+{'\t'}../../IL2CXX/src/slot.cc \
+{'\t'}../../IL2CXX/src/object.cc \
+{'\t'}../../IL2CXX/src/type.cc \
+{'\t'}../../IL2CXX/src/thread.cc \
+{'\t'}../../IL2CXX/src/engine.cc \
+{'\t'}$(GENERATEDSOURCES)
+");
             return 0;
-        }
-        static void Main(string[] args)
-        {
-            new Transpiler(DefaultBuiltin.Create(), Console.Error.WriteLine).Do(typeof(Program).GetMethod(nameof(Test), BindingFlags.Static | BindingFlags.NonPublic), Console.Out);
         }
     }
 }

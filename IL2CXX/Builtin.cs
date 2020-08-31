@@ -11,6 +11,7 @@ namespace IL2CXX
 
         public class Code
         {
+            public string Base;
             public Func<Transpiler, (string, bool)> Members;
             public Func<Transpiler, string> Initialize;
             public Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, int inline)>> MethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, (string, int)>>();
@@ -34,12 +35,36 @@ namespace IL2CXX
             return this;
         }
 
-        public (string members, bool managed) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? (null, false) : (null, false);
+        public string GetBase(Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Base : null;
+        public (string members, bool managed) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? default : default;
         public string GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
         public (string body, int inline) GetBody(Transpiler transpiler, MethodBase method)
         {
             var type = method.DeclaringType;
             var handle = method.MethodHandle;
+            if (type.IsArray)
+            {
+                var rank = type.GetArrayRank();
+                if (handle == type.GetConstructor(Enumerable.Repeat(typeof(int), rank).ToArray()).MethodHandle) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] f__throw_index_out_of_range();\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
+{'\t'}auto extra = sizeof({transpiler.Escape(type.GetElementType())}) * n;
+{'\t'}t__new<{transpiler.Escape(type)}> p(extra);
+{'\t'}p->v__length = n;
+{string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tp->v__bounds[{i}] = {{static_cast<size_t>(a_{i}), 0}};\n"))
+}{'\t'}std::memset(p->f__data(), 0, extra);
+{'\t'}return p;
+", 1);
+                string prepare() => transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t i = 0;
+{'\t'}auto bounds = a_0->f__bounds();
+{string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $@"{'\t'}{{
+{'\t'}{'\t'}int j = a_{i + 1} - bounds[{i}].v_lower;
+{'\t'}{transpiler.GenerateCheckRange($"j", $"bounds[{i}].v_length")
+}{'\t'}{'\t'}i = i * bounds[{i}].v_length + j;
+{'\t'}}}
+"))}";
+                if (handle == type.GetMethod("Get").MethodHandle) return (prepare() + "\treturn a_0->f__data()[i];\n", 1);
+                if (handle == type.GetMethod("Set").MethodHandle) return (prepare() + $"\ta_0->f__data()[i] = a_{rank + 1};\n", 1);
+                if (handle == type.GetMethod("Address").MethodHandle) return (prepare() + "\treturn a_0->f__data() + i;\n", 1);
+            }
             if (type.IsSubclassOf(typeof(Delegate)) && type != typeof(MulticastDelegate))
             {
                 var invoke = type.GetMethod("Invoke");
@@ -48,23 +73,18 @@ namespace IL2CXX
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                     return ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
-{'\t'}p->v__5ftarget = a_0;
-{'\t'}if (p->v__5ftarget) {{
+{'\t'}if (a_0) {{
+{'\t'}{'\t'}p->v__5ftarget = a_0;
 {'\t'}{'\t'}p->v__5fmethodPtr = a_1;
 {'\t'}}} else {{
 {'\t'}{'\t'}p->v__5ftarget = p;
-{'\t'}{'\t'}p->v__5fmethodPtr = reinterpret_cast<void*>(static_cast<{
-    transpiler.EscapeForValue(@return)
-}(*)({
-    string.Join(",", parameters.Prepend(type).Select(x => $"\n\t\t\t{transpiler.EscapeForValue(x)}"))
+{'\t'}{'\t'}p->v__5fmethodPtr = reinterpret_cast<void*>(+[]({
+    string.Join(",", parameters.Prepend(type).Select((x, i) => $"\n\t\t\t{transpiler.EscapeForStacked(x)} a_{i}"))
 }
-{'\t'}{'\t'})>([]({
-    string.Join(",", parameters.Prepend(type).Select((_, i) => $"\n\t\t\tauto a_{i}"))
-}
-{'\t'}{'\t'})
+{'\t'}{'\t'}) -> {transpiler.EscapeForStacked(@return)}
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForValue(@return))}(*)({string.Join(", ", parameters.Select(x => transpiler.EscapeForValue(x)))})>(a_0->v__5fmethodPtrAux.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")))});
-{'\t'}{'\t'}}}));
+{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForStacked(@return))}(*)({string.Join(", ", parameters.Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtrAux.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")))});
+{'\t'}{'\t'}}});
 {'\t'}{'\t'}p->v__5fmethodPtrAux = a_1;
 {'\t'}}}
 {'\t'}return p;
@@ -74,7 +94,7 @@ namespace IL2CXX
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    return ($"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForValue(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForValue(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
+                    return ($"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForStacked(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
                 }
             }
             if (TypeToCode.TryGetValue(type, out var code))

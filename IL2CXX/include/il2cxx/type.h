@@ -10,17 +10,36 @@ struct t__member_info : t_object
 {
 };
 
-struct t__type : t__member_info
+struct t__abstract_type : t__member_info
+{
+};
+
+struct t__type : t__abstract_type
 {
 	t__type* v__base;
 	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
 	bool v__managed;
 	size_t v__size;
-	t__type* v__element;
-	size_t v__rank;
-	void* v__multicast_invoke;
+	union
+	{
+		struct
+		{
+			t__type* v__element;
+			size_t v__rank;
+		};
+		struct
+		{
+			void* v__multicast_invoke;
+			void* v__invoke_unmanaged;
+		};
+	};
+	t__type* v__nullable_value = nullptr;
 
-	t__type(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr);
+//	t__type(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr, void* a_invoke_unmanaged = nullptr) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank), v__multicast_invoke(a_multicast_invoke), v__invoke_unmanaged(a_invoke_unmanaged)
+	t__type(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size)
+	{
+		v_type = a_type;
+	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
 	{
 		//t_slot::t_increments::f_push(this);
@@ -56,7 +75,8 @@ struct t__type : t__member_info
 
 struct t__type_finalizee : t__type
 {
-	t__type_finalizee(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr) : t__type(a_base, std::move(a_interface_to_methods), a_managed, a_size, a_element, a_rank, a_multicast_invoke)
+	template<typename... T_n>
+	t__type_finalizee(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, T_n&&... a_n) : t__type(a_type, a_base, std::move(a_interface_to_methods), std::forward<T_n>(a_n)...)
 	{
 		f_register_finalize = f_do_register_finalize;
 		f_suppress_finalize = f_do_suppress_finalize;
@@ -69,6 +89,9 @@ struct t__type_finalizee : t__type
 	static void f_do_register_finalize(t_object* a_this);
 	static void f_do_suppress_finalize(t_object* a_this);
 };
+
+template<typename T>
+struct t__type_of;
 
 template<typename T_interface, size_t A_i>
 void* f__resolve(t_object* a_this)

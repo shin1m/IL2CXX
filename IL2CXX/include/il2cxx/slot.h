@@ -19,7 +19,7 @@ struct t__type_finalizee;
 class t_engine;
 class t_object;
 struct t_thread;
-struct t_System_2eThreading_2eThread;
+struct t__thread;
 t_engine* f_engine();
 
 struct t_conductor
@@ -123,7 +123,7 @@ class t_slot
 	friend class t_object;
 	friend struct t__weak_handle;
 	friend struct t_thread;
-	friend struct t_System_2eThreading_2eThread;
+	friend struct t__thread;
 	friend t_engine* f_engine();
 
 public:

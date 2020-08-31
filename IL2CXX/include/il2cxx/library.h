@@ -3,6 +3,7 @@
 
 #ifdef __unix__
 #include <dlfcn.h>
+#include <gnu/lib-names.h>
 #endif
 #ifdef _WIN32
 #include <windows.h>
@@ -20,19 +21,21 @@ class t_library
 	void* v_symbol;
 
 public:
-	t_library(const std::string& a_path, const char* a_name) : v_handle(dlopen((a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/))
+	t_library(const std::string& a_path, const char* a_name) : v_handle(dlopen(a_path.c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/))
 	{
-		if (v_handle == NULL) throw std::runtime_error("unable to dlopen: " + a_path);
+		if (v_handle == NULL) {
+			v_handle = dlopen(a_path == "libc" ? LIBC_SO : (a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
+			if (v_handle == NULL) throw std::runtime_error("unable to dlopen " + a_path + ": " + dlerror());
+		}
 		v_symbol = dlsym(v_handle, a_name);
 	}
 	~t_library()
 	{
 		dlclose(v_handle);
 	}
-	template<typename T>
-	T f_as() const
+	void* f_symbol() const
 	{
-		return reinterpret_cast<T>(v_symbol);
+		return v_symbol;
 	}
 };
 #endif
@@ -53,10 +56,9 @@ public:
 	{
 		FreeLibrary(v_handle);
 	}
-	template<typename T>
-	T f_as() const
+	void* f_symbol() const
 	{
-		return reinterpret_cast<T>(v_symbol);
+		return v_symbol;
 	}
 };
 #endif

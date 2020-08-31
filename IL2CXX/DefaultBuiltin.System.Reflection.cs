@@ -6,6 +6,25 @@ namespace IL2CXX
     partial class DefaultBuiltin
     {
         private static Builtin SetupSystemReflection(this Builtin @this) => @this
+        .For(typeof(Assembly), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(Assembly.GetEntryAssembly)),
+                transpiler => ("\treturn {};\n", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(Assembly.GetExecutingAssembly)),
+                transpiler => ("\treturn {};\n", 0)
+            );
+            code.For(
+                type.GetProperty(nameof(Assembly.Location)).GetMethod,
+                transpiler => ($@"{'\t'}char cs[PATH_MAX];
+{'\t'}auto r = readlink(""/proc/self/exe"", cs, sizeof(cs));
+{'\t'}if (r == -1) throw std::system_error(errno, std::generic_category());
+{'\t'}return f__new_string(f__u16string({{cs, static_cast<size_t>(r)}}));
+", 0)
+            );
+        })
         .For(typeof(LocalVariableInfo), (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(Type))} v_m_5ftype;

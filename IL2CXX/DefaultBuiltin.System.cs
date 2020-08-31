@@ -139,6 +139,10 @@ namespace IL2CXX
                 transpiler => (string.Empty, 1)
             );
             code.For(
+                type.GetMethod(nameof(Type.GetType), new[] { typeof(string) }),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(Type.GetTypeFromHandle)),
                 transpiler => ("\treturn a_0.v__type;\n", 1)
             );
@@ -270,6 +274,10 @@ namespace IL2CXX
                 transpiler => ("\treturn false;\n", 0)
             );
             code.For(
+                type.GetMethod("TrySZReverse", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn false;\n", 0)
+            );
+            code.For(
                 type.GetMethod("TrySZSort", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 0)
             );
@@ -283,6 +291,10 @@ namespace IL2CXX
 {'\t'}p->v_Type = {transpiler.EscapeForValue(typeof(IntPtr))}{{type->v__element}};
 {'\t'}p->v_Value = {transpiler.EscapeForValue(typeof(IntPtr))}{{reinterpret_cast<char*>(bounds + type->v__rank) + n * type->v__element->v__size}};
 ", 0)
+            );
+            code.For(
+                type.GetMethod("InternalSetValue", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\t*static_cast<t_slot*>(a_0) = a_1;\n", 1)
             );
             code.For(
                 type.GetMethod("GetRawArrayData", BindingFlags.Instance | BindingFlags.NonPublic),
@@ -331,7 +343,8 @@ namespace IL2CXX
                 type.GetMethod(nameof(SZArrayHelper<object>.IndexOf)),
                 (transpiler, types) =>
                 {
-                    var method = typeof(Array).GetMethod(nameof(Array.IndexOf), new[] { types[0].MakeArrayType(), types[0] });
+                    var t = Type.MakeGenericMethodParameter(0);
+                    var method = typeof(Array).GetMethod(nameof(Array.IndexOf), 1, new[] { t.MakeArrayType(), t }).MakeGenericMethod(types[0]);
                     transpiler.Enqueue(method);
                     return ($"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 1);
                 }
@@ -463,7 +476,7 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto n = sizeof({transpiler.Escape(typeof(MulticastDelegate))});
 {'\t'}auto p = f_engine()->f_object__allocate(n);
-{'\t'}std::memset(static_cast<t_object*>(p) + 1, 0, n - sizeof(t_object));
+{'\t'}std::memset(p + 1, 0, n - sizeof(t_object));
 {'\t'}type->f__finish(p);
 {'\t'}return static_cast<{transpiler.EscapeForValue(typeof(MulticastDelegate))}>(p);
 ", 1)
@@ -700,6 +713,10 @@ namespace IL2CXX
                 transpiler => ($"\treturn reinterpret_cast<intptr_t>({transpiler.Escape(typeof(Thread))}::f__current());\n", 1)
             );
             code.For(
+                type.GetProperty(nameof(Environment.ProcessorCount)).GetMethod,
+                transpiler => ("\treturn std::thread::hardware_concurrency();\n", 1)
+            );
+            code.For(
                 type.GetProperty(nameof(Environment.HasShutdownStarted)).GetMethod,
                 transpiler => ("\treturn f_engine()->f_shuttingdown();\n", 1)
             );
@@ -753,17 +770,34 @@ namespace IL2CXX
         })
         .For(typeof(Math), (type, code) =>
         {
+            foreach (var t in new[] { typeof(double), typeof(float) })
+                code.For(
+                    type.GetMethod(nameof(Math.Abs), new[] { t }),
+                    transpiler => ("\treturn std::abs(a_0);\n", 1)
+                );
             code.For(
-                type.GetMethod(nameof(Math.Abs), new[] { typeof(double) }),
-                transpiler => ("\treturn std::abs(a_0);\n", 1)
+                type.GetMethod(nameof(Math.Atan)),
+                transpiler => ("\treturn std::atan(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Math.Ceiling), new[] { typeof(double) }),
                 transpiler => ("\treturn std::ceil(a_0);\n", 1)
             );
             code.For(
+                type.GetMethod(nameof(Math.Cos)),
+                transpiler => ("\treturn std::cos(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Math.Exp)),
+                transpiler => ("\treturn std::exp(a_0);\n", 1)
+            );
+            code.For(
                 type.GetMethod(nameof(Math.Floor), new[] { typeof(double) }),
                 transpiler => ("\treturn std::floor(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Math.Log), new[] { typeof(double) }),
+                transpiler => ("\treturn std::log(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Math.Log10)),
@@ -776,6 +810,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Math.Pow)),
                 transpiler => ("\treturn std::pow(a_0, a_1);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Math.Sin)),
+                transpiler => ("\treturn std::sin(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Math.Sqrt)),

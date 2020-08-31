@@ -1,4 +1,4 @@
-#include <il2cxx/thread.h>
+#include <il2cxx/engine.h>
 #include <sys/resource.h>
 
 #ifdef IL2CXX__STACK_SCAN_PARTIAL
@@ -442,73 +442,37 @@ void t_thread::f_epoch()
 	v_decrements.f_flush();
 }
 
-IL2CXX__PORTABLE__THREAD t_System_2eThreading_2eThread* t_System_2eThreading_2eThread::v__current;
+IL2CXX__PORTABLE__THREAD t__thread* t__thread::v__current;
 
-template<typename T>
-void t_System_2eThreading_2eThread::f__start(T a_main)
+bool t__thread::f__priority(pthread_t a_handle, int32_t a_priority)
 {
-	{
-		std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
-		if (v__internal) throw std::runtime_error("already started.");
-		v__internal = new t_thread();
-		v__internal->v_next = f_engine()->v_thread__internals;
-		f_engine()->v_thread__internals = v__internal;
-	}
-	t_slot::t_increments::f_push(this);
-	try {
-		std::thread([this, main = std::move(a_main)]
-		{
-			auto internal = v__internal;
-			t_slot::v_collector = internal->v_collector;
-			{
-				std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
-				internal->f_initialize(&internal);
-			}
-			v__current = this;
-			try {
-				t_thread_static ts;
-				main();
-			} catch (...) {
-			}
-			f_engine()->f_object__return();
-			{
-				std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
-				v__internal = nullptr;
-			}
-			t_slot::t_decrements::f_push(this);
-			internal->f_epoch_get();
-			std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
-			++internal->v_done;
-			f_engine()->v_thread__condition.notify_all();
-		}).detach();
-	} catch (...) {
-		{
-			std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
-			v__internal->v_done = 1;
-			v__internal = nullptr;
-		}
-		t_slot::t_decrements::f_push(this);
-		throw;
-	}
+	int policy;
+	sched_param sp;
+	if (pthread_getschedparam(a_handle, &policy, &sp)) return false;
+	int max = sched_get_priority_max(policy);
+	if (max == -1) return false;
+	int min = sched_get_priority_min(policy);
+	if (min == -1) return false;
+	sp.sched_priority = a_priority * (max - min) / 4 + min;
+	return !pthread_setschedparam(a_handle, policy, &sp);
 }
 
-void t_System_2eThreading_2eThread::f__start()
-{
-	f__start([this]
-	{
-		if (v__5fdelegate->f_type()->f__is(&t__type_of<t_System_2eThreading_2eThreadStart>::v__instance))
-			f_t_System_2eThreading_2eThreadStart__Invoke(static_cast<t_System_2eThreading_2eThreadStart*>(v__5fdelegate));
-		else
-			f_t_System_2eThreading_2eParameterizedThreadStart__Invoke(static_cast<t_System_2eThreading_2eParameterizedThreadStart*>(v__5fdelegate), v__5fthreadStartArg);
-	});
-}
-
-void t_System_2eThreading_2eThread::f__join()
+void t__thread::f__join()
 {
 	if (this == v__current) throw std::runtime_error("current thread can not be joined.");
 	if (this == f_engine()->v_thread) throw std::runtime_error("engine thread can not be joined.");
 	std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
 	while (v__internal) f_engine()->v_thread__condition.wait(lock);
+}
+
+void t__thread::f__priority__(int32_t a_priority)
+{
+	if (a_priority < 0 || a_priority > 4) throw std::runtime_error("invalid priority.");
+	std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+	v__priority = a_priority;
+	if (!v__internal || v__internal->v_done < 0) return;
+	if (v__internal->v_done > 0) throw std::runtime_error("already done.");
+	if (!f__priority(v__internal->v_handle, v__priority)) throw std::system_error(errno, std::generic_category());
 }
 
 }

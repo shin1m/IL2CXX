@@ -2,6 +2,8 @@
 #define IL2CXX__ENGINE_H
 
 #include "thread.h"
+#include "type.h"
+#include <algorithm>
 #include <deque>
 #include <csignal>
 #include <semaphore.h>
@@ -9,14 +11,12 @@
 namespace il2cxx
 {
 
-struct t_safe_region;
-
 class t_engine : public t_slot::t_collector
 {
 	friend class t_object;
 	friend class t__weak_handle;
 	friend class t_thread;
-	friend struct t_System_2eThreading_2eThread;
+	friend struct t__thread;
 
 public:
 	struct t_options
@@ -43,7 +43,7 @@ private:
 	t_thread* v_thread__internals = new t_thread();
 	std::mutex v_thread__mutex;
 	std::condition_variable v_thread__condition;
-	t_slot_of<t_System_2eThreading_2eThread> v_thread{};
+	t_slot_of<t__thread> v_thread{};
 	t_conductor v_finalizer__conductor;
 	std::deque<t_object*> v_finalizer__queue;
 	bool v_finalizer__sleeping = false;
@@ -90,12 +90,13 @@ private:
 		while (sem_wait(&v_epoch__received) == -1) if (errno != EINTR) throw std::system_error(errno, std::generic_category());
 	}
 	void f_collector();
-	static void f_finalize(t_object* a_p);
-	void f_finalizer();
+	void f_finalizer(void(*a_finalize)(t_object*));
 
 public:
 	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
 	~t_engine();
+	template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
+	int f_run(void(*a_finalize)(t_object*), T_main a_main);
 	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr t_object* f_object__allocate(size_t a_size)
 	{
 		auto p = v_object__heap.f_allocate(a_size);
@@ -123,11 +124,6 @@ public:
 inline t_engine* f_engine()
 {
 	return static_cast<t_engine*>(t_slot::v_collector);
-}
-
-template<typename T>
-constexpr t__new<T>::t__new(size_t a_extra) : v_p(static_cast<T*>(f_engine()->f_object__allocate(sizeof(T) + a_extra)))
-{
 }
 
 template<void (t_object::*A_push)()>
@@ -175,10 +171,75 @@ inline void t_thread::f_epoch_resume()
 #endif
 }
 
-inline t__type::t__type(t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element, size_t a_rank, void* a_multicast_invoke) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank), v__multicast_invoke(a_multicast_invoke)
+template<typename T>
+void t__thread::f__start(T a_main)
 {
-	v_type = &t__type_of<t__type>::v__instance;
+	{
+		std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
+		if (v__internal) throw std::runtime_error("already started.");
+		v__internal = new t_thread();
+		v__internal->v_next = f_engine()->v_thread__internals;
+		f_engine()->v_thread__internals = v__internal;
+	}
+	t_slot::t_increments::f_push(this);
+	try {
+		std::thread([this, main = std::move(a_main)]
+		{
+			auto internal = v__internal;
+			t_slot::v_collector = internal->v_collector;
+			{
+				std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
+				internal->f_initialize(&internal);
+				f__priority(internal->v_handle, v__priority);
+			}
+			v__current = this;
+			try {
+				main();
+			} catch (...) {
+			}
+			f_engine()->f_object__return();
+			{
+				std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+				v__internal = nullptr;
+			}
+			t_slot::t_decrements::f_push(this);
+			internal->f_epoch_get();
+			std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+			++internal->v_done;
+			f_engine()->v_thread__condition.notify_all();
+		}).detach();
+	} catch (...) {
+		{
+			std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
+			v__internal->v_done = 1;
+			v__internal = nullptr;
+		}
+		t_slot::t_decrements::f_push(this);
+		throw;
+	}
 }
+
+template<typename T>
+struct t__new
+{
+	T* v_p;
+
+	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr t__new(size_t a_extra) : v_p(static_cast<T*>(f_engine()->f_object__allocate(sizeof(T) + a_extra)))
+	{
+	}
+	IL2CXX__PORTABLE__ALWAYS_INLINE ~t__new()
+	{
+		t__type_of<T>::v__instance.f__finish(v_p);
+	}
+	constexpr operator T*() const
+	{
+		return v_p;
+	}
+	constexpr T* operator->() const
+	{
+		return v_p;
+	}
+};
 
 template<typename T>
 T* f__new_zerod()
@@ -206,77 +267,46 @@ T_array* f__new_array(size_t a_length)
 	return p;
 }
 
-IL2CXX__PORTABLE__ALWAYS_INLINE inline t_System_2eString* f__new_string(size_t a_length)
+template<typename T0, typename T1>
+inline T1 f__copy(T0 a_in, size_t a_n, T1 a_out)
 {
-	t__new<t_System_2eString> p(sizeof(char16_t) * a_length);
-	p->v__5fstringLength = a_length;
-	(&p->v__5ffirstChar)[a_length] = u'\0';
-	return p;
+	return a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
 }
 
-inline t_System_2eString* f__new_string(std::u16string_view a_value)
+template<typename T0, typename T1>
+inline T1 f__move(T0 a_in, size_t a_n, T1 a_out)
 {
-	auto p = f__new_string(a_value.size());
-	std::memcpy(&p->v__5ffirstChar, a_value.data(), a_value.size() * sizeof(char16_t));
-	return p;
+	return a_in < a_out ? std::move_backward(a_in, a_in + a_n, a_out + a_n) : std::move(a_in, a_in + a_n, a_out);
 }
 
-template<typename T>
-struct t__finally
+template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
+int t_engine::f_run(void(*a_finalize)(t_object*), T_main a_main)
 {
-	T v_f;
-
-	~t__finally()
+	v_thread__internals->f_initialize(this);
 	{
-		v_f();
+		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+		std::thread(&t_engine::f_collector, this).detach();
+		v_collector__conductor.f__wait(lock);
 	}
-};
-
-template<typename T>
-t__finally<T> f__finally(T&& a_f)
-{
-	return {{std::move(a_f)}};
-}
-
-template<typename T>
-class t__lazy
-{
-	std::atomic<T*> v_initialized = nullptr;
-	std::recursive_mutex v_mutex;
-	T v_p;
-	bool v_initializing = false;
-
-	T* f_initialize();
-
-public:
-	T* f_get()
+	v_thread = f__new_zerod<T_thread>();
+	v_thread->v__internal = v_thread__internals;
+	t__thread::v__current = v_thread;
 	{
-		auto p = v_initialized.load(std::memory_order_consume);
-		return p ? p : f_initialize();
+		auto finalizer = f__new_zerod<T_thread>();
+		std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
+		finalizer->f__start([this, a_finalize]
+		{
+			T_thread_static ts;
+			f_finalizer(a_finalize);
+		});
+		v_finalizer__conductor.f__wait(lock);
 	}
-	T* operator->()
-	{
-		return f_get();
-	}
-};
-
-template<typename T>
-T* t__lazy<T>::f_initialize()
-{
-	std::lock_guard<std::recursive_mutex> lock(v_mutex);
-	if (v_initializing) return &v_p;
-	v_initializing = true;
-	v_p.f_initialize();
-	v_initialized.store(&v_p, std::memory_order_release);
-	return &v_p;
+	auto s = std::make_unique<T_static>();
+	auto ts = std::make_unique<T_thread_static>();
+	auto n = a_main();
+	f_shutdown();
+	return n;
 }
-
-[[noreturn]] void f__throw_argument();
-[[noreturn]] void f__throw_argument_null();
-[[noreturn]] void f__throw_index_out_of_range();
-[[noreturn]] void f__throw_invalid_cast();
-[[noreturn]] void f__throw_null_reference();
-[[noreturn]] void f__throw_overflow();
 
 }
 

@@ -46,8 +46,23 @@ namespace IL2CXX.Tests
             var src = File.ReadLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CXXSourcePath")).First();
             if (Directory.Exists(build)) Directory.Delete(build, true);
             Directory.CreateDirectory(build);
-            using (var writer = File.CreateText(Path.Combine(build, "run.cc")))
-                new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, writer);
+            using (var header = File.CreateText(Path.Combine(build, "run.h")))
+            using (var main = File.CreateText(Path.Combine(build, "run.cc")))
+            using (var body = new StringWriter())
+            {
+                main.WriteLine("#include \"run.h\"\n");
+                new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, header, main, (_, __) => body);
+                main.WriteLine("\nnamespace il2cxx\n{");
+                main.Write(body);
+                main.WriteLine(@"
+}
+
+#include ""slot.cc""
+#include ""object.cc""
+#include ""type.cc""
+#include ""thread.cc""
+#include ""engine.cc""");
+            }
             Assert.AreEqual(0, Spawn("make", "run", build, new[] {
                 ("CXXFLAGS", $"'-I{include}' '-I{src}' -std=c++17 -g"),
                 ("LDFLAGS", $"-lpthread -ldl -lunwind -lunwind-x86_64")

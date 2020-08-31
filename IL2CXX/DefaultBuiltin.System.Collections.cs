@@ -14,7 +14,7 @@ namespace IL2CXX
                 var gt = type.MakeGenericType(types);
                 var concrete = gt.GetProperty(nameof(EqualityComparer<object>.Default)).GetValue(null).GetType();
                 var identifier = transpiler.Escape(concrete);
-                var constructor = concrete.GetConstructor(Type.EmptyTypes);
+                var constructor = concrete.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
                 transpiler.Enqueue(constructor);
                 return ($@"{'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);

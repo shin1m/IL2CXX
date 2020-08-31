@@ -27,6 +27,7 @@ namespace IL2CXX
                 ["Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType.Namespace == "System.Runtime.Intrinsics.X86" ? ("\treturn false;\n", 0) : default,
             }
         }
+        .SetupInterop()
         .SetupSystem()
         .SetupSystemBuffers()
         .SetupSystemCollections()
@@ -35,6 +36,7 @@ namespace IL2CXX
         .SetupSystemResources()
         .SetupSystemRuntime()
         .SetupSystemText()
-        .SetupSystemThreading();
+        .SetupSystemThreading()
+        .SetupRuntime();
     }
 }

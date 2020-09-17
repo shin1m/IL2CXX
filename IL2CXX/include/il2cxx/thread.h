@@ -56,6 +56,7 @@ struct t_thread
 	t_object** v_stack_top;
 #endif
 	t_object* volatile* v_reviving = nullptr;
+	t_object* v_background = nullptr;
 
 	t_thread();
 #ifdef IL2CXX__STACK_SCAN_PARTIAL
@@ -176,12 +177,14 @@ struct t__thread : t__critical_finalizer_object
 	static bool f__priority(pthread_t a_handle, int32_t a_priority);
 
 	t_thread* v__internal;
+	bool v__background;
 	int32_t v__priority;
 
 	template<typename T>
 	void f__start(T a_do);
 	void f__join();
-	void f__priority__(int32_t a_priority);
+	void f__background__(bool a_value);
+	void f__priority__(int32_t a_value);
 };
 
 }

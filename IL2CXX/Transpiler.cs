@@ -34,6 +34,7 @@ namespace IL2CXX
 
             public readonly TypeDefinition Base;
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new Dictionary<Type, MethodInfo[]>();
+            public readonly string DefaultConstructor;
             public readonly string Delegate;
 
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
@@ -59,6 +60,20 @@ namespace IL2CXX
                     var map = (Type.IsArray && x.IsGenericType ? typeof(SZArrayHelper<>).MakeGenericType(GetElementType(Type)) : Type).GetInterfaceMap(x);
                     foreach (var (i, t) in map.InterfaceMethods.Zip(map.TargetMethods, (i, t) => (i, t))) methods[definition.GetIndex(i)] = t;
                     InterfaceToMethods.Add(x, methods);
+                }
+                var constructor = type.GetConstructor(Type.EmptyTypes);
+                if (constructor != null)
+                {
+                    var identifier = transpiler.Escape(Type);
+                    DefaultConstructor = $@"
+t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, [](t_object*) -> t_object*
+{{
+{'\t'}auto p = f__new_zerod<{identifier}>();
+{'\t'}{transpiler.Escape(constructor)}(p);
+{'\t'}return p;
+}}}};
+";
+                    transpiler.Enqueue(constructor);
                 }
                 if (Type.IsSubclassOf(typeof(Delegate)) && Type != typeof(MulticastDelegate))
                 {
@@ -190,7 +205,14 @@ v__invoke_unmanaged = {generate(Type, writer.ToString())}
         private static string Escape(string name) => unsafeCharacters.Replace(name, m => string.Join(string.Empty, m.Value.Select(x => $"_{(int)x:x}")));
         private static readonly IReadOnlyDictionary<Type, string> builtinTypes = new Dictionary<Type, string> {
             [typeof(object)] = "t_object",
+            [typeof(Assembly)] = "t__assembly",
+            [typeof(RuntimeAssembly)] = "t__runtime_assembly",
             [typeof(MemberInfo)] = "t__member_info",
+            [typeof(MethodBase)] = "t__method_base",
+            [typeof(ConstructorInfo)] = "t__constructor_info",
+            [typeof(RuntimeConstructorInfo)] = "t__runtime_constructor_info",
+            [typeof(MethodInfo)] = "t__method_info",
+            [typeof(RuntimeMethodInfo)] = "t__runtime_method_info",
             [typeof(Type)] = "t__abstract_type",
             [typeof(RuntimeType)] = "t__type",
             [typeof(CriticalFinalizerObject)] = "t__critical_finalizer_object"
@@ -1104,7 +1126,7 @@ inline {returns}
             writer.WriteLine('}');
         }
 
-        private void WriteRuntimeDefinition(RuntimeDefinition definition, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
+        private void WriteRuntimeDefinition(RuntimeDefinition definition, string assembly, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
         {
             var type = definition.Type;
             var @base = definition is TypeDefinition && FinalizeOf(type).MethodHandle != finalizeOfObject.MethodHandle ? "t__type_finalizee" : "t__type";
@@ -1113,8 +1135,8 @@ inline {returns}
 template<>
 struct t__type_of<{identifier}> : {@base}
 {{");
-            writerForDefinitions.Write($@"
-t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<{Escape(typeof(RuntimeType))}>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
+            writerForDefinitions.Write($@"{(definition as TypeDefinition)?.DefaultConstructor}
+t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
             if (definition is TypeDefinition td)
             {
                 void writeMethods(IEnumerable<MethodInfo> methods, Func<int, MethodInfo, string, string> pointer, Func<int, int, MethodInfo, string, string> genericPointer, Func<MethodInfo, MethodInfo> origin, string indent)
@@ -1170,7 +1192,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<{Escape(typeof(Runt
             writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            writerForDefinitions.WriteLine($@"}}, {(
+            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, {(
     definition.IsManaged ? "true" : "false"
 )}, {(
     type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"
@@ -1178,6 +1200,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<{Escape(typeof(Runt
 {{");
             if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
 {'\t'}v__rank = {type.GetArrayRank()};");
+            if (td?.DefaultConstructor != null) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
             writerForDefinitions.Write(td?.Delegate);
             var nv = Nullable.GetUnderlyingType(type);
             if (nv != null) writerForDefinitions.WriteLine($"\tv__nullable_value = &t__type_of<{Escape(nv)}>::v__instance;");
@@ -1230,8 +1253,11 @@ void t__type_of<{identifier}>::f_do_copy(const char* a_from, size_t a_n, char* a
                 writerForDefinitions.WriteLine('}');
             }
         }
-        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType)
+        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType, string resources)
         {
+            Define(typeof(RuntimeAssembly));
+            Define(typeof(RuntimeConstructorInfo));
+            Define(typeof(RuntimeMethodInfo));
             Define(typeof(RuntimeType));
             Escape(finalizeOfObject);
             Define(typeof(Thread));
@@ -1240,6 +1266,7 @@ void t__type_of<{identifier}>::f_do_copy(const char* a_from, size_t a_n, char* a
             Define(typeof(void));
             Define(typeof(string));
             Define(typeof(StringBuilder));
+            Define(method.DeclaringType);
             Enqueue(method);
             do
             {
@@ -1255,8 +1282,43 @@ namespace il2cxx
 ");
             writerForDeclarations.Write(typeDeclarations);
             writerForDeclarations.Write(typeDefinitions);
+            writerForDeclarations.WriteLine(@"
+extern t__runtime_assembly* const v__entry_assembly;
+
+extern std::map<std::string_view, t__type*> v__name_to_type;");
             writerForDeclarations.Write(functionDeclarations);
-            foreach (var x in runtimeDefinitions) WriteRuntimeDefinition(x, writerForDeclarations, writerForType(x.Type, false));
+            var assemblyIdentifiers = new HashSet<string>();
+            var assemblyToIdentifier = new Dictionary<Assembly, string>();
+            foreach (var definition in runtimeDefinitions)
+            {
+                var writer = writerForType(definition.Type, false);
+                var assembly = definition.Type.Assembly;
+                if (!assemblyToIdentifier.TryGetValue(assembly, out var name))
+                {
+                    var escaped = name = Escape(assembly.GetName().Name);
+                    for (var i = 0; !assemblyIdentifiers.Add(name); ++i) name = $"{escaped}__{i}";
+                    assemblyToIdentifier.Add(assembly, name);
+                    var entry = assembly.EntryPoint;
+                    if (entry == method)
+                    {
+                        writerForDeclarations.WriteLine($"\nextern t__runtime_method_info v__assembly_{name}__entry_point;");
+                        writer.WriteLine($"\nt__runtime_method_info v__assembly_{name}__entry_point{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(entry.DeclaringType)}>::v__instance}};");
+                    }
+                    writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
+                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(entry == method ? $"&v__assembly_{name}__entry_point" : "nullptr")}}};");
+                    var names = assembly.GetManifestResourceNames();
+                    if (names.Length > 0)
+                    {
+                        var path = Path.Combine(resources, name);
+                        Directory.CreateDirectory(path);
+                        foreach (var x in names)
+                            using (var source = assembly.GetManifestResourceStream(x))
+                            using (var destination = File.Create(Path.Combine(path, x)))
+                                source.CopyTo(destination);
+                    }
+                }
+                WriteRuntimeDefinition(definition, $"v__assembly_{name}", writerForDeclarations, writer);
+            }
             writerForDeclarations.WriteLine("\n#include \"utilities.h\"");
             writerForDeclarations.Write(staticDefinitions);
             writerForDeclarations.WriteLine(@"
@@ -1292,10 +1354,16 @@ struct t_thread_static
 ");
             writerForDeclarations.WriteLine(fieldDeclarations);
             writerForDeclarations.WriteLine('}');
-            writerForDefinitions.WriteLine(@"namespace il2cxx
-{
+            writerForDefinitions.WriteLine($@"namespace il2cxx
+{{
 
 #include ""utilities.cc""
+
+t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
+
+std::map<std::string_view, t__type*> v__name_to_type{{
+{string.Join(",\n", runtimeDefinitions.Select(x => $"\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))}
+}};
 ");
             writerForDefinitions.Write(fieldDefinitions);
             writerForDefinitions.WriteLine($@"

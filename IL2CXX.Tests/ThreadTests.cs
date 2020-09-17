@@ -5,6 +5,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Parallelizable]
     class ThreadTests
     {
         static int Run()

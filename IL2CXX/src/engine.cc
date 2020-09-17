@@ -122,6 +122,7 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 		f_engine()->f_epoch_suspend();
 	};
 	sigaddset(&sa.sa_mask, SIGUSR2);
+	sa.sa_flags |= SA_NODEFER;
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
 }
 
@@ -166,12 +167,18 @@ void t_engine::f_shutdown()
 		auto internal = v_thread->v__internal;
 		while (true) {
 			auto p = v_thread__internals;
-			while (p && (p->v_done > 0 || p == internal || p->v_next == internal)) p = p->v_next;
-			if (!p) break;
+			while (p->v_next != internal || p->v_done > 0 || p->v_background) p = p->v_next;
+			if (p->v_next == internal) break;
 			v_thread__condition.wait(lock);
 		}
+		v_shuttingdown = true;
+		for (auto p = v_thread__internals; p->v_next != internal; p = p->v_next) {
+			if (!p->v_background) continue;
+			p->f_epoch_suspend();
+			++p->v_done;
+			t_slot::t_decrements::f_push(p->v_background);
+		}
 	}
-	v_shuttingdown = true;
 	f_object__return();
 	{
 		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);

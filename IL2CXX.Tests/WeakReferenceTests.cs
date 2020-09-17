@@ -5,6 +5,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
+    [Parallelizable]
     class WeakReferenceTests
     {
         class Foo

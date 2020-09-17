@@ -84,10 +84,6 @@ namespace IL2CXX
                 type.GetMethod(nameof(object.Equals), new[] { type }),
                 (transpiler, actual) => ("\treturn a_0 == a_1;\n", 0)
             );
-            /*code.ForTree(
-                type.GetMethod(nameof(object.GetHashCode)),
-                (transpiler, actual) => ("\treturn reinterpret_cast<intptr_t>(a_0);\n", 0)
-            );*/
             code.ForTree(
                 type.GetMethod(nameof(object.ToString)),
                 (transpiler, actual) => ($"\treturn f__new_string(u\"{actual}\"sv);\n", 0)
@@ -140,7 +136,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetType), new[] { typeof(string) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__find_type(v__name_to_type, {&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)});\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Type.GetTypeFromHandle)),
@@ -527,6 +523,13 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { typeof(Type), typeof(BindingFlags), typeof(Binder), typeof(object[]), typeof(CultureInfo), typeof(object[]) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+        })
+        .For(typeof(Span<>), (type, code) =>
+        {
+            code.ForGeneric(
+                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                (transpiler, types) => default
             );
         })
         .For(typeof(string), (type, code) =>

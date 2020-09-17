@@ -13,20 +13,28 @@ namespace IL2CXX
             {
                 var gt = type.MakeGenericType(types);
                 var concrete = gt.GetProperty(nameof(EqualityComparer<object>.Default)).GetValue(null).GetType();
-                var identifier = transpiler.Escape(concrete);
                 var constructor = concrete.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
                 transpiler.Enqueue(constructor);
-                return ($@"{'\t'}auto p = f__new_zerod<{identifier}>();
+                return ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(concrete)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}t_static::v_instance->v_{transpiler.Escape(gt)}->v__3cDefault_3ek_5f_5fBackingField = p;
-", 1);
+", 0);
             });
         })
         .For(Type.GetType("System.Collections.Generic.ArraySortHelper`1"), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod("CreateArraySortHelper", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => ("\treturn {};\n", 0)
+                (transpiler, types) =>
+                {
+                    var concrete = (typeof(IComparable<>).MakeGenericType(types).IsAssignableFrom(types[0]) ? Type.GetType("System.Collections.Generic.GenericArraySortHelper`1") : type).MakeGenericType(types);
+                    var constructor = concrete.GetConstructor(Type.EmptyTypes);
+                    transpiler.Enqueue(constructor);
+                    return ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(concrete)}>();
+{'\t'}{transpiler.Escape(constructor)}(p);
+{'\t'}return p;
+", 0);
+                }
             );
         })
         .For(Type.GetType("System.Collections.Generic.ComparerHelpers"), (type, code) =>

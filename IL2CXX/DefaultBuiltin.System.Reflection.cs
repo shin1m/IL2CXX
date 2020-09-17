@@ -10,7 +10,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(Assembly.GetEntryAssembly)),
-                transpiler => ("\treturn {};\n", 0)
+                transpiler => ("\treturn v__entry_assembly;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Assembly.GetExecutingAssembly)),

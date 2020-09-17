@@ -24,3 +24,5 @@ void f__from(t_System_2eText_2eStringBuilder* a_p, const char* a_cs);
 [[noreturn]] void f__throw_invalid_cast();
 [[noreturn]] void f__throw_null_reference();
 [[noreturn]] void f__throw_overflow();
+
+t__type* f__find_type(const std::map<std::string_view, t__type*>& a_name_to_type, std::u16string_view a_name);

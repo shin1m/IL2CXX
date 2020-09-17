@@ -190,16 +190,18 @@ void t__thread::f__start(T a_main)
 			{
 				std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 				internal->f_initialize(&internal);
+				if (v__background) internal->v_background = this;
 				f__priority(internal->v_handle, v__priority);
 			}
 			v__current = this;
 			try {
 				main();
-			} catch (...) {
+			} catch (t_object*) {
 			}
 			f_engine()->f_object__return();
 			{
 				std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+				internal->v_background = nullptr;
 				v__internal = nullptr;
 			}
 			t_slot::t_decrements::f_push(this);

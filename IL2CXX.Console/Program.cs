@@ -16,7 +16,8 @@ namespace IL2CXX.Console
             var @out = "out";
             Directory.Delete(@out, true);
             Directory.CreateDirectory(@out);
-            var transpiler = new Transpiler(DefaultBuiltin.Create(), Console.Error.WriteLine);
+            //var transpiler = new Transpiler(DefaultBuiltin.Create(), Console.Error.WriteLine);
+            var transpiler = new Transpiler(DefaultBuiltin.Create(), _ => { });
             var names = new SortedSet<string>();
             var type2path = new Dictionary<Type, string>();
             var definition = TextWriter.Null;
@@ -46,7 +47,7 @@ namespace IL2CXX.Console
 namespace il2cxx
 {");
                         return definition;
-                    });
+                    }, Path.Combine(@out, "resources"));
                     declarations.WriteLine("\nnamespace il2cxx\n{");
                     declarations.Write(inlines);
                     declarations.WriteLine("\n}");

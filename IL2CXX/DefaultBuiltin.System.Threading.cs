@@ -132,8 +132,12 @@ namespace IL2CXX
                 transpiler => ("\tfor (; a_0 > 0; --a_0) std::this_thread::yield();\n", 0)
             );
             code.For(
+                type.GetProperty(nameof(Thread.IsBackground)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__background;\n", 1)
+            );
+            code.For(
                 type.GetProperty(nameof(Thread.IsBackground)).SetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->f__background__(a_1);\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(Thread.IsThreadPoolThread)).GetMethod,
@@ -142,6 +146,10 @@ namespace IL2CXX
             code.For(
                 type.GetProperty(nameof(Thread.ManagedThreadId)).GetMethod,
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
+            );
+            code.For(
+                type.GetProperty(nameof(Thread.Priority)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->v__priority;\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(Thread.Priority)).SetMethod,

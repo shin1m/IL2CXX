@@ -531,11 +531,34 @@ namespace IL2CXX
                 (OpCode: OpCodes.Conv_I8, Type: typeof(long)),
                 (OpCode: OpCodes.Conv_R4, Type: typeof(float)),
                 (OpCode: OpCodes.Conv_R8, Type: typeof(double)),
+                (OpCode: OpCodes.Conv_I, Type: typeof(NativeInt))
+            }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
+            {
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
+                x.Generate = (index, stack) =>
+                {
+                    writer.Write($"\n\t{indexToStack[index].Variable} = ");
+                    var type = primitives[set.Type];
+                    switch (stack.VariableType)
+                    {
+                        case "int32_t":
+                        case "int64_t":
+                        case "intptr_t":
+                        case "double":
+                            writer.WriteLine($"static_cast<{type}>({stack.Variable});");
+                            break;
+                        default:
+                            writer.WriteLine($"static_cast<{type}>(reinterpret_cast<uintptr_t>(static_cast<void*>({stack.Variable})));");
+                            break;
+                    }
+                    return index;
+                };
+            }));
+            new[] {
                 (OpCode: OpCodes.Conv_U4, Type: typeof(uint)),
                 (OpCode: OpCodes.Conv_U8, Type: typeof(ulong)),
                 (OpCode: OpCodes.Conv_U2, Type: typeof(ushort)),
                 (OpCode: OpCodes.Conv_U1, Type: typeof(byte)),
-                (OpCode: OpCodes.Conv_I, Type: typeof(NativeInt)),
                 (OpCode: OpCodes.Conv_U, Type: typeof(NativeInt)),
                 (OpCode: OpCodes.Conv_R_Un, Type: typeof(double))
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
@@ -545,12 +568,20 @@ namespace IL2CXX
                 {
                     writer.Write($"\n\t{indexToStack[index].Variable} = ");
                     var type = primitives[set.Type];
-                    if (stack.IsPointer)
-                        writer.WriteLine($"static_cast<{type}>(reinterpret_cast<uintptr_t>({stack.Variable}));");
-                    else if (stack.Type.IsValueType)
-                        writer.WriteLine($"static_cast<{type}>({stack.Variable});");
-                    else
-                        writer.WriteLine($"reinterpret_cast<{type}>(static_cast<t_object*>({stack.Variable}));");
+                    switch (stack.VariableType)
+                    {
+                        case "int32_t":
+                        case "int64_t":
+                        case "intptr_t":
+                            writer.WriteLine($"static_cast<{type}>(static_cast<u{stack.VariableType}>({stack.Variable}));");
+                            break;
+                        case "double":
+                            writer.WriteLine($"static_cast<{type}>({stack.Variable});");
+                            break;
+                        default:
+                            writer.WriteLine($"static_cast<{type}>(reinterpret_cast<uintptr_t>(static_cast<void*>({stack.Variable})));");
+                            break;
+                    }
                     return index;
                 };
             }));

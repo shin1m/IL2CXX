@@ -3,6 +3,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Parallelizable]
     class StringTests
     {
         static int AssertEquals(string x, string y)

@@ -51,7 +51,7 @@ namespace IL2CXX.Tests
             using (var body = new StringWriter())
             {
                 main.WriteLine("#include \"run.h\"\n");
-                new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, header, main, (_, __) => body);
+                new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, header, main, (_, __) => body, Path.Combine(build, "resources"));
                 main.WriteLine("\nnamespace il2cxx\n{");
                 main.Write(body);
                 main.WriteLine(@"

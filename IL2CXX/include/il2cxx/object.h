@@ -14,6 +14,8 @@ class t_object
 {
 	template<typename T> friend class t_heap;
 	friend class t_slot;
+	friend struct t__runtime_assembly;
+	friend struct t__member_info;
 	friend struct t__type;
 	friend struct t__type_finalizee;
 	friend class t_thread;

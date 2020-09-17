@@ -8,16 +8,70 @@ namespace il2cxx
 
 struct t__member_info : t_object
 {
+	t__type* v__declaring_type;
+
+	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr) : v__declaring_type(a_declaring_type)
+	{
+		v_type = a_type;
+	}
+};
+
+struct t__method_base : t__member_info
+{
+	using t__member_info::t__member_info;
+};
+
+struct t__constructor_info : t__method_base
+{
+	using t__method_base::t__method_base;
+};
+
+struct t__runtime_constructor_info : t__constructor_info
+{
+	t_object*(*v__invoke)(t_object*);
+
+	t__runtime_constructor_info(t__type* a_type, t_object*(*a_invoke)(t_object*)) : t__constructor_info(a_type), v__invoke(a_invoke)
+	{
+	}
+};
+
+struct t__method_info : t__method_base
+{
+	using t__method_base::t__method_base;
+};
+
+struct t__runtime_method_info : t__method_info
+{
+	using t__method_info::t__method_info;
+};
+
+struct t__assembly : t_object
+{
+};
+
+struct t__runtime_assembly : t__assembly
+{
+	std::u16string v__full_name;
+	std::u16string v__name;
+	t__runtime_method_info* v__entry_point;
+
+	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point)
+	{
+		v_type = a_type;
+	}
 };
 
 struct t__abstract_type : t__member_info
 {
+	using t__member_info::t__member_info;
 };
 
 struct t__type : t__abstract_type
 {
 	t__type* v__base;
 	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
+	t__runtime_assembly* v__assembly;
+	std::u16string v__namespace;
 	bool v__managed;
 	size_t v__size;
 	union
@@ -33,12 +87,11 @@ struct t__type : t__abstract_type
 			void* v__invoke_unmanaged;
 		};
 	};
+	t__runtime_constructor_info* v__default_constructor = nullptr;
 	t__type* v__nullable_value = nullptr;
 
-//	t__type(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size, t__type* a_element = nullptr, size_t a_rank = 0, void* a_multicast_invoke = nullptr, void* a_invoke_unmanaged = nullptr) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size), v__element(a_element), v__rank(a_rank), v__multicast_invoke(a_multicast_invoke), v__invoke_unmanaged(a_invoke_unmanaged)
-	t__type(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, bool a_managed, size_t a_size) : v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__managed(a_managed), v__size(a_size)
+	t__type(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, t__runtime_assembly* a_assembly, std::u16string_view a_namespace, bool a_managed, size_t a_size) : t__abstract_type(a_type), v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__assembly(a_assembly), v__namespace(a_namespace), v__managed(a_managed), v__size(a_size)
 	{
-		v_type = a_type;
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
 	{

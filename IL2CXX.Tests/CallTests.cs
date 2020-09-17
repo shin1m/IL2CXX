@@ -3,6 +3,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Parallelizable]
     class CallTests
     {
         class Foo

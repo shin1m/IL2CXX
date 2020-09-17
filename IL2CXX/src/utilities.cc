@@ -165,3 +165,62 @@ void f__throw_overflow()
 {
 	throw std::runtime_error("OverflowException");
 }
+
+namespace
+{
+
+std::regex v__type_prefix{"^(:?[^,\\[\\\\\\]`]|\\\\.)+(:?(`\\d+)|\\[[^\\]]*\\])?"};
+
+inline std::string_view f__sv(std::string_view::const_iterator a_first, std::string_view::const_iterator a_last)
+{
+	return {&*a_first, static_cast<size_t>(a_last - a_first)};
+}
+
+std::pair<std::string_view::const_iterator, std::string_view::const_iterator> f__match_type(std::string_view a_x, std::string_view a_y)
+{
+	auto fail = [&]
+	{
+		return std::make_pair(a_x.end(), a_y.begin());
+	};
+	std::match_results<std::string_view::const_iterator> match;
+	if (!std::regex_search(a_x.begin(), a_x.end(), match, v__type_prefix)) return fail();
+	auto n = match.length(0);
+	if (a_x.substr(0, n) != a_y.substr(0, n)) return fail();
+	auto i = a_x.begin() + n;
+	auto j = a_y.begin() + n;
+	if (match.length(1) > 0 && i != a_x.end() && *i == u'[') {
+		if (j == a_y.end() || *j != u'[') return fail();
+		auto equals = [&](auto i, auto j, char16_t c)
+		{
+			return i != a_x.end() && *i == c && j != a_y.end() && *j == c;
+		};
+		do {
+			if (!equals(++i, ++j, u'[')) return fail();
+			auto x = f__match_type(f__sv(++i, a_x.end()), f__sv(++j, a_y.end()));
+			i = x.first;
+			j = x.second;
+			if (!equals(i, j, u']')) return fail();
+		} while (equals(++i, ++j, u','));
+		if (!equals(i, j, u']')) return fail();
+		++i;
+		++j;
+	}
+	for (; j != a_y.end() && *j != u']'; ++i, ++j) if (i == a_x.end() || *i != *j) return fail();
+	return {std::find(i, a_x.end(), u']'), j};
+}
+
+}
+
+t__type* f__find_type(const std::map<std::string_view, t__type*>& a_name_to_type, std::u16string_view a_name)
+{
+	auto s = f__string(a_name);
+	std::string_view name = s;
+	std::match_results<std::string_view::const_iterator> match;
+	if (!std::regex_search(name.begin(), name.end(), match, v__type_prefix)) return nullptr;
+	auto prefix = f__sv(match[0].first, match[0].second);
+	for (auto i = a_name_to_type.lower_bound(prefix); i != a_name_to_type.end(); ++i) {
+		if (i->first.substr(0, prefix.size()) != prefix) break;
+		if (f__match_type(i->first, name).second == name.end()) return i->second;
+	}
+	return nullptr;
+}

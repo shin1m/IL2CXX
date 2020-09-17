@@ -3,6 +3,7 @@
 #include <iostream>
 #include <limits>
 #include <random>
+#include <regex>
 #include <stdexcept>
 #include <utility>
 #include <climits>

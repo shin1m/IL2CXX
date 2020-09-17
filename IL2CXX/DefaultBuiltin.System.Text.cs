@@ -8,13 +8,6 @@ namespace IL2CXX
     partial class DefaultBuiltin
     {
         private static Builtin SetupSystemText(this Builtin @this) => @this
-        .For(typeof(StringBuilder), (type, code) =>
-        {
-            code.For(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => default
-            );
-        })
         .For(typeof(Regex), (type, code) =>
         {
             code.For(
@@ -24,6 +17,27 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("Compile", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+        })
+        .For(typeof(StringBuilder), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                transpiler => default
+            );
+        })
+        .For(Type.GetType("System.Text.ValueStringBuilder, System.Private.CoreLib"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                transpiler => default
+            );
+        })
+        .For(Type.GetType("System.Text.ValueStringBuilder, System.Text.RegularExpressions"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                transpiler => default
             );
         });
     }

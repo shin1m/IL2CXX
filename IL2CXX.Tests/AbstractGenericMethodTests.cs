@@ -3,6 +3,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Parallelizable]
     class AbstractGenericMethodTests
     {
         abstract class Foo

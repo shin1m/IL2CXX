@@ -123,6 +123,13 @@ namespace IL2CXX
 ", 1)
             );
         })
+        .For(Type.GetType("System.Runtime.RuntimeImports"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("RhZeroMemory", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(void*), typeof(ulong) }, null),
+                transpiler => ("\tstd::memset(a_0, 0, a_1);\n", 1)
+            );
+        })
         .For(typeof(Marshal), (type, code) =>
         {
             code.For(
@@ -170,19 +177,23 @@ namespace IL2CXX
         {
             var methods = GenericMethods(type);
             code.ForGeneric(
-                methods.First(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(int)),
+                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeof(void*), typeof(int) })),
                 (transpiler, types) => ("\treturn a_0 + a_1;\n", 1)
             );
             code.ForGeneric(
-                methods.First(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
+                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { x.GetGenericArguments()[0].MakeByRefType(), typeof(int) })),
+                (transpiler, types) => ("\treturn a_0 + a_1;\n", 1)
+            );
+            code.ForGeneric(
+                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
                 (transpiler, types) => ("\treturn a_0 + static_cast<intptr_t>(a_1);\n", 1)
             );
             code.ForGeneric(
-                methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(ulong)),
+                methods.Single(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(ulong)),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + a_1);\n", 1)
             );
             code.ForGeneric(
-                methods.First(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
+                methods.Single(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + static_cast<intptr_t>(a_1));\n", 1)
             );
             code.ForGeneric(
@@ -190,17 +201,19 @@ namespace IL2CXX
                 (transpiler, types) => ("\treturn a_0 == a_1;\n", 1)
             );
             code.ForGeneric(
-                methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 1),
+                methods.Single(x => x.Name == "As" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(types[0])}>(a_0);\n", 1)
             );
             code.ForGeneric(
-                methods.First(x => x.Name == "As" && x.GetGenericArguments().Length == 2),
+                methods.Single(x => x.Name == "As" && x.GetGenericArguments().Length == 2),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[1])}*>(a_0);\n", 1)
             );
             code.ForGeneric(
-                methods.First(x => x.Name == "AsPointer" && x.GetGenericArguments().Length == 1),
+                methods.Single(x => x.Name == "AsPointer" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => ("\treturn a_0;\n", 1)
             );
+            foreach (var m in methods.Where(x => x.Name == "AsRef" && x.GetGenericArguments().Length == 1))
+                code.ForGeneric(m, (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(((MethodInfo)m).MakeGenericMethod(types).ReturnType)}>(a_0);\n", 1));
             foreach (var m in methods.Where(x => x.Name == "ReadUnaligned" && x.GetGenericArguments().Length == 1))
                 code.ForGeneric(m,
                     (transpiler, types) => ($"\treturn *reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0);\n", 1)
@@ -210,7 +223,7 @@ namespace IL2CXX
                     (transpiler, types) => ($"\t*reinterpret_cast<{transpiler.EscapeForMember(types[0])}*>(a_0) = a_1;\n", 1)
                 );
             code.ForGeneric(
-                methods.First(x => x.Name == "SizeOf" && x.GetGenericArguments().Length == 1),
+                methods.Single(x => x.Name == "SizeOf" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => ($"\treturn sizeof({transpiler.EscapeForValue(types[0])});\n", 1)
             );
         });

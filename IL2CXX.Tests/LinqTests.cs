@@ -5,6 +5,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Parallelizable]
     class LinqTests
     {
         static IEnumerable<string> EnumerateWords(IEnumerable<string> lines)

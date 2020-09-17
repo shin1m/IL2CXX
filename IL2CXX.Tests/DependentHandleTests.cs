@@ -4,6 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Parallelizable]
     class DependentHandleTests
     {
         static Func<int> Default()

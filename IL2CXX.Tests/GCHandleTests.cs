@@ -6,6 +6,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
+    [Parallelizable]
     class GCHandleTests
     {
         class Foo

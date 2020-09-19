@@ -562,30 +562,37 @@ struct t__static_{identifier}
                                 string variables(string indent)
                                 {
                                     var sb = new StringBuilder();
-                                    var i = 0;
-                                    void variable(FieldInfo x)
-                                    {
-                                        sb.AppendLine($"{indent}{EscapeForMember(x.FieldType)} {Escape(x)};");
-                                        try
-                                        {
-                                            i += Marshal.SizeOf(x.FieldType);
-                                        } catch { }
-                                    }
-                                    void padding(int j)
-                                    {
-                                        if (j > i) sb.AppendLine($"{indent}char v__padding{i}[{j - i}];");
-                                        i = j;
-                                    }
+                                    string variable(FieldInfo x) => $"{EscapeForMember(x.FieldType)} {Escape(x)};";
                                     var layout = type.StructLayoutAttribute;
                                     if (layout?.Value == LayoutKind.Explicit)
+                                    {
+                                        sb.AppendLine($"{indent}union\n{indent}{{");
+                                        if (layout.Size > 0) sb.AppendLine($"{indent}\tchar v__size[{layout.Size}];");
+                                        var i = 0;
                                         foreach (var x in fields)
                                         {
-                                            padding(x.GetCustomAttribute<FieldOffsetAttribute>().Value);
-                                            variable(x);
+                                            var offset = x.GetCustomAttribute<FieldOffsetAttribute>().Value;
+                                            sb.AppendLine(offset > 0 ? $@"{indent}{'\t'}struct
+{indent}{'\t'}{{
+{indent}{'\t'}{'\t'}char v__offset{i++}[{offset}];
+{indent}{'\t'}{'\t'}{variable(x)}
+{indent}{'\t'}}};" : $"{indent}\t{variable(x)}");
                                         }
+                                        sb.AppendLine($"{indent}}};");
+                                    }
                                     else
-                                        foreach (var x in fields) variable(x);
-                                    if (layout != null) padding(layout.Size);
+                                    {
+                                        var i = 0;
+                                        foreach (var x in fields)
+                                        {
+                                            sb.AppendLine($"{indent}{variable(x)}");
+                                            try
+                                            {
+                                                i += Marshal.SizeOf(x.FieldType);
+                                            } catch { }
+                                        }
+                                        if (layout?.Size > i) sb.AppendLine($"{indent}char v__padding[{layout.Size - i}];");
+                                    }
                                     return sb.ToString();
                                 }
                                 string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));

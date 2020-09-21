@@ -125,7 +125,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Thread.Sleep), new[] { typeof(int) }),
-                transpiler => ("\tstd::this_thread::sleep_for(std::chrono::milliseconds(a_0));\n", 1)
+                transpiler => ("\tstd::this_thread::sleep_for(a_0 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_0));\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.SpinWait)),

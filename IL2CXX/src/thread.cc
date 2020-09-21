@@ -467,7 +467,7 @@ void t__thread::f__join()
 
 void t__thread::f__background__(bool a_value)
 {
-	std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+	std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 	if (a_value == v__background) return;
 	v__background = a_value;
 	if (!v__internal || v__internal->v_done < 0) return;
@@ -478,7 +478,7 @@ void t__thread::f__background__(bool a_value)
 void t__thread::f__priority__(int32_t a_value)
 {
 	if (a_value < 0 || a_value > 4) throw std::runtime_error("invalid priority.");
-	std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+	std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 	v__priority = a_value;
 	if (!v__internal || v__internal->v_done < 0) return;
 	if (v__internal->v_done > 0) throw std::runtime_error("already done.");

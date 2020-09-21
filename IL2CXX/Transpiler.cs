@@ -1385,7 +1385,9 @@ int main(int argc, char* argv[])
 {'\t'}using namespace il2cxx;
 {'\t'}std::setlocale(LC_ALL, """");
 {'\t'}t_engine::t_options options;
-{'\t'}options.v_verbose = true;
+{'\t'}options.v_verbose = std::getenv(""IL2CXX_VERBOSE"");
+{'\t'}options.v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
+{'\t'}options.v_name_to_type = std::getenv(""IL2CXX_DUMP_LEAKS"") ? &v__name_to_type : nullptr;
 {'\t'}t_engine engine(options, argc, argv);
 {'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
 {'\t'}{{

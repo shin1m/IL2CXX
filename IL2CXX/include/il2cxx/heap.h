@@ -201,6 +201,10 @@ public:
 			++v_freed;
 		}
 	}
+	const std::map<T*, size_t>& f_blocks() const
+	{
+		return v_blocks;
+	}
 	std::mutex& f_mutex()
 	{
 		return v_mutex;

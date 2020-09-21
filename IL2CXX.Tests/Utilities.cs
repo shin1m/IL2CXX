@@ -38,7 +38,7 @@ namespace IL2CXX.Tests
             }
         }
 
-        public static void Test(MethodInfo method)
+        public static void Test(MethodInfo method, bool verify = true)
         {
             Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
@@ -67,9 +67,16 @@ namespace IL2CXX.Tests
                 ("CXXFLAGS", $"'-I{include}' '-I{src}' -std=c++17 -g"),
                 ("LDFLAGS", $"-lpthread -ldl -lunwind -lunwind-x86_64")
             }, Console.Error.WriteLine, Console.Error.WriteLine));
-            Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
+            IEnumerable<(string, string)> environment = new[] {
+                ("IL2CXX_VERBOSE", string.Empty),
+            };
+            if (verify) environment = environment.Concat(new[] {
+                ("IL2CXX_VERIFY_LEAKS", string.Empty),
+                ("IL2CXX_DUMP_LEAKS", string.Empty)
+            });
+            Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
         }
-        public static void Test(Func<int> method) => Test(method.Method);
+        public static void Test(Func<int> method, bool verify = true) => Test(method.Method, verify);
 
         [StructLayout(LayoutKind.Sequential, Size = 4096)]
         struct Padding

@@ -27,6 +27,8 @@ public:
 		size_t v_collector__threshold = 64;
 #endif
 		bool v_verbose = false;
+		bool v_verify = false;
+		const std::map<std::string_view, t__type*>* v_name_to_type = nullptr;
 	};
 
 private:
@@ -91,6 +93,7 @@ private:
 	}
 	void f_collector();
 	void f_finalizer(void(*a_finalize)(t_object*));
+	void f_shutdown();
 
 public:
 	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
@@ -107,7 +110,6 @@ public:
 	{
 		return v_shuttingdown;
 	}
-	void f_shutdown();
 	void f_collect();
 	void f_finalize();
 	size_t f_load_count() const
@@ -190,7 +192,10 @@ void t__thread::f__start(T a_main)
 			{
 				std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 				internal->f_initialize(&internal);
-				if (v__background) internal->v_background = this;
+				if (v__background) {
+					internal->v_background = this;
+					f_engine()->v_thread__condition.notify_all();
+				}
 				f__priority(internal->v_handle, v__priority);
 			}
 			v__current = this;
@@ -200,13 +205,13 @@ void t__thread::f__start(T a_main)
 			}
 			f_engine()->f_object__return();
 			{
-				std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+				std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 				internal->v_background = nullptr;
 				v__internal = nullptr;
 			}
 			t_slot::t_decrements::f_push(this);
 			internal->f_epoch_get();
-			std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
+			std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 			++internal->v_done;
 			f_engine()->v_thread__condition.notify_all();
 		}).detach();
@@ -215,6 +220,7 @@ void t__thread::f__start(T a_main)
 			std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 			v__internal->v_done = 1;
 			v__internal = nullptr;
+			f_engine()->v_thread__condition.notify_all();
 		}
 		t_slot::t_decrements::f_push(this);
 		throw;

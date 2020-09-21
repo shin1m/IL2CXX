@@ -85,7 +85,7 @@ void t_engine::f_finalizer(void(*a_finalize)(t_object*))
 		while (true) {
 			t_object* p;
 			{
-				std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
+				std::lock_guard<std::mutex> lock(v_finalizer__conductor.v_mutex);
 				if (v_finalizer__queue.empty()) break;
 				p = v_finalizer__queue.front();
 				v_finalizer__queue.pop_front();
@@ -99,6 +99,36 @@ void t_engine::f_finalizer(void(*a_finalize)(t_object*))
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer quitting...\n");
 	v_finalizer__conductor.f_exit();
+}
+
+void t_engine::f_shutdown()
+{
+	{
+		std::unique_lock<std::mutex> lock(v_thread__mutex);
+		auto internal = v_thread->v__internal;
+		while (true) {
+			auto p = v_thread__internals;
+			while (p->v_next != internal && (p->v_done > 0 || p->v_background)) p = p->v_next;
+			if (p->v_next == internal) break;
+			v_thread__condition.wait(lock);
+		}
+	}
+	v_shuttingdown = true;
+	f_object__return();
+	{
+		std::lock_guard<std::mutex> lock(v_collector__conductor.v_mutex);
+		if (v_collector__full++ <= 0) v_collector__threshold = 0;
+	}
+	f_wait();
+	f_wait();
+	f_wait();
+	f_wait();
+	if (v_options.v_verify) assert(!v_thread__internals->v_next->v_next);
+	v_finalizer__conductor.f_quit();
+	if (v_options.v_verify) {
+		std::unique_lock<std::mutex> lock(v_thread__mutex);
+		while (v_thread__internals->v_next && v_thread__internals->v_done <= 0) v_thread__condition.wait(lock);
+	}
 }
 
 t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_object__heap([]
@@ -140,66 +170,52 @@ t_engine::~t_engine()
 	f_wait();
 	f_wait();
 	v_collector__conductor.f_quit();
-	assert(!v_thread__internals);
+	if (v_options.v_verify) assert(!v_thread__internals);
 	if (sem_destroy(&v_epoch__received) == -1) std::exit(errno);
 	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
 	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
-	if (v_options.v_verbose) {
-		std::fprintf(stderr, "statistics:\n\tt_object:\n");
-		size_t allocated = 0;
-		size_t freed = 0;
-		v_object__heap.f_statistics([&](auto a_rank, auto a_grown, auto a_allocated, auto a_freed)
-		{
-			std::fprintf(stderr, "\t\trank%zu: %zu: %zu - %zu = %zu\n", a_rank, a_grown, a_allocated, a_freed, a_allocated - a_freed);
-			allocated += a_allocated;
-			freed += a_freed;
-		});
-		std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
-		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
-		if (allocated != freed) std::terminate();
-	}
-}
-
-void t_engine::f_shutdown()
-{
+	if (!v_options.v_verify) return;
+	std::fprintf(stderr, "statistics:\n\tt_object:\n");
+	size_t allocated = 0;
+	size_t freed = 0;
+	v_object__heap.f_statistics([&](auto a_rank, auto a_grown, auto a_allocated, auto a_freed)
 	{
-		std::unique_lock<std::mutex> lock(v_thread__mutex);
-		auto internal = v_thread->v__internal;
-		while (true) {
-			auto p = v_thread__internals;
-			while (p->v_next != internal || p->v_done > 0 || p->v_background) p = p->v_next;
-			if (p->v_next == internal) break;
-			v_thread__condition.wait(lock);
+		std::fprintf(stderr, "\t\trank%zu: %zu: %zu - %zu = %zu\n", a_rank, a_grown, a_allocated, a_freed, a_allocated - a_freed);
+		allocated += a_allocated;
+		freed += a_freed;
+	});
+	std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
+	std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
+	if (allocated == freed) return;
+	if (auto n2t = v_options.v_name_to_type) {
+		std::map<t__type*, size_t> leaks;
+		for (auto& x : v_object__heap.f_blocks())
+			if (x.first->v_rank < 7) {
+				auto p0 = reinterpret_cast<char*>(x.first);
+				auto p1 = p0 + x.second;
+				auto unit = 128 << x.first->v_rank;
+				for (; p0 < p1; p0 += unit) {
+					auto p = reinterpret_cast<t_object*>(p0);
+					if (p->v_type) ++leaks[p->v_type];
+				}
+			} else {
+				++leaks[x.first->v_type];
+			}
+		for (const auto& x : leaks) {
+			auto i = std::find_if(n2t->begin(), n2t->end(), [&](auto& y)
+			{
+				return y.second == x.first;
+			});
+			std::fprintf(stderr, "%s: %zu\n", std::string(i->first).c_str(), x.second);
 		}
-		v_shuttingdown = true;
-		for (auto p = v_thread__internals; p->v_next != internal; p = p->v_next) {
-			if (!p->v_background) continue;
-			p->f_epoch_suspend();
-			++p->v_done;
-			t_slot::t_decrements::f_push(p->v_background);
-		}
 	}
-	f_object__return();
-	{
-		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
-		if (v_collector__full++ <= 0) v_collector__threshold = 0;
-	}
-	f_wait();
-	f_wait();
-	f_wait();
-	f_wait();
-	assert(!v_thread__internals->v_next->v_next);
-	{
-		v_finalizer__conductor.f_quit();
-		std::unique_lock<std::mutex> lock(v_thread__mutex);
-		while (v_thread__internals->v_next && v_thread__internals->v_done <= 0) v_thread__condition.wait(lock);
-	}
+	std::terminate();
 }
 
 void t_engine::f_collect()
 {
 	{
-		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+		std::lock_guard<std::mutex> lock(v_collector__conductor.v_mutex);
 		if (v_collector__full++ <= 0) v_collector__threshold = 0;
 	}
 	f_wait();
@@ -207,7 +223,7 @@ void t_engine::f_collect()
 	f_wait();
 	f_wait();
 	{
-		std::unique_lock<std::mutex> lock(v_collector__conductor.v_mutex);
+		std::lock_guard<std::mutex> lock(v_collector__conductor.v_mutex);
 		if (--v_collector__full <= 0) v_collector__threshold = v_options.v_collector__threshold;
 	}
 }

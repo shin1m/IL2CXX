@@ -139,6 +139,7 @@ namespace IL2CXX
                 type.GetProperty(nameof(Thread.IsBackground)).SetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->f__background__(a_1);\n", 1)
             );
+            // TODO
             code.For(
                 type.GetProperty(nameof(Thread.IsThreadPoolThread)).GetMethod,
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -177,6 +178,7 @@ namespace IL2CXX
         })
         .For(typeof(ThreadPool), (type, code) =>
         {
+            // TODO
             code.For(
                 type.GetMethod("NotifyWorkItemProgressNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)

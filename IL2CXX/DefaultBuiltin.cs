@@ -32,6 +32,7 @@ namespace IL2CXX
         .SetupSystemBuffers()
         .SetupSystemCollections()
         .SetupSystemDiagnostics()
+        .SetupSystemNumerics()
         .SetupSystemReflection()
         .SetupSystemResources()
         .SetupSystemRuntime()

@@ -8,6 +8,22 @@ namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
+        private static void SetupPrimitive(Type type, Builtin.Code code)
+        {
+            code.For(
+                type.GetMethod(nameof(object.GetHashCode)),
+                transpiler => ("\treturn static_cast<int32_t>(*a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(object.ToString), new[] { typeof(string), typeof(IFormatProvider) }),
+                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
+            );
+        }
         private static Action<Type, Builtin.Code> ForIntPtr(string native) => (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__5fvalue;
@@ -38,20 +54,13 @@ namespace IL2CXX
 {'\t'}{'\t'}{'\t'}return reinterpret_cast<{native}>(v__5fvalue);
 {'\t'}{'\t'}}}
 ", false);
+            code.For(
+                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
+            );
         };
 
         private static Builtin SetupSystem(this Builtin @this) => @this
-        .For(Type.GetType("System.Numerics.BitOperations"), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("RotateLeft", new[] { typeof(uint), typeof(int) }),
-                transpiler => ("\treturn (a_0 << (a_1 & 31)) | (a_0 >> ((32 - a_1) & 31));\n", 2)
-            );
-            code.For(
-                type.GetMethod("RotateRight", new[] { typeof(uint), typeof(int) }),
-                transpiler => ("\treturn (a_0 >> (a_1 & 31)) | (a_0 << ((32 - a_1) & 31));\n", 2)
-            );
-        })
         .For(Type.GetType("System.Marvin"), (type, code) =>
         {
             code.For(
@@ -76,18 +85,24 @@ namespace IL2CXX
                 type.GetMethod(nameof(object.GetType)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type();\n", 1)
             );
-            code.For(
-                type.GetMethod(nameof(object.ToString)),
-                transpiler => ("\treturn f__new_string(u\"object\"sv);\n", 0)
-            );
             code.ForTree(
                 type.GetMethod(nameof(object.Equals), new[] { type }),
                 (transpiler, actual) => ("\treturn a_0 == a_1;\n", 0)
             );
-            code.ForTree(
+            // TODO
+            code.For(
                 type.GetMethod(nameof(object.ToString)),
-                (transpiler, actual) => ($"\treturn f__new_string(u\"{actual}\"sv);\n", 0)
+                transpiler => ("\treturn f__new_string(u\"object\"sv);\n", 0)
             );
+            // TODO
+            /*code.ForTree(
+                type.GetMethod(nameof(object.ToString)),
+                (transpiler, actual) =>
+                {
+                    Console.Error.WriteLine($"ToString: {actual}");
+                    return ($"\treturn f__new_string(u\"{actual}\"sv);\n", 0);
+                }
+            );*/
         })
         .For(typeof(ValueType), (type, code) =>
         {
@@ -113,6 +128,7 @@ namespace IL2CXX
 ", 0);
                 }
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(object.ToString)),
                 transpiler => ("\treturn f__new_string(u\"struct\"sv);\n", 0)
@@ -150,6 +166,7 @@ namespace IL2CXX
                 type.GetMethod("op_Inequality"),
                 transpiler => ("\treturn a_0 != a_1;\n", 1)
             );
+            // TODO
             code.For(
                 type.GetProperty(nameof(Type.IsInterface)).GetMethod,
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -265,14 +282,17 @@ namespace IL2CXX
                 type.GetProperty(nameof(Array.Rank)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->v__rank;\n", 1)
             );
+            // TODO
             code.For(
                 type.GetMethod("TrySZIndexOf", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("TrySZReverse", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("TrySZSort", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 0)
@@ -348,14 +368,17 @@ namespace IL2CXX
         })
         .For(typeof(Exception), (type, code) =>
         {
+            // TODO
             code.ForTree(
                 type.GetMethod(nameof(object.ToString)),
                 (transpiler, actual) => ($"\treturn f__new_string(u\"{actual}\"sv);\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { type.GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic) }, null),
                 transpiler => ("\treturn f__new_string(u\"message from native resources\"sv);\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("RestoreDispatchState", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -485,6 +508,7 @@ namespace IL2CXX
                 type.GetMethod("GetMulticastInvoke", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\treturn a_0->f_type()->v__multicast_invoke;\n", 1)
             );
+            // TODO
             code.For(
                 type.GetMethod("GetMethodImpl", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -492,10 +516,12 @@ namespace IL2CXX
         })
         .For(typeof(MulticastDelegate), (type, code) =>
         {
+            // TODO
             code.For(
                 type.GetMethod("GetTarget", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("GetMethodImpl", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -504,32 +530,30 @@ namespace IL2CXX
         .For(typeof(Activator), (type, code) =>
         {
             var methods = GenericMethods(type);
+            // TODO
             code.ForGeneric(
                 methods.First(x => x.Name == nameof(Activator.CreateInstance)),
                 (transpiler, types) => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { typeof(Type) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { typeof(Type), typeof(bool) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { typeof(Type), typeof(object[]) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { typeof(Type), typeof(BindingFlags), typeof(Binder), typeof(object[]), typeof(CultureInfo), typeof(object[]) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
-            );
-        })
-        .For(typeof(Span<>), (type, code) =>
-        {
-            code.ForGeneric(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                (transpiler, types) => default
             );
         })
         .For(typeof(string), (type, code) =>
@@ -586,10 +610,12 @@ namespace IL2CXX
                 type.GetProperty("Chars").GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->v__5fstringLength") + "\treturn (&a_0->v__5ffirstChar)[a_1];\n", 1)
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(object.Equals), new[] { typeof(object) }),
                 transpiler => default
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(StringComparison) }),
                 transpiler =>
@@ -599,22 +625,22 @@ namespace IL2CXX
                     return ($"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 1);
                 }
             );
+            // TODO
             code.For(
                 type.GetMethod("IsAscii", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 1)
             );
+            // TODO
             code.For(
                 type.GetMethod("IsFastSort", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 1)
             );
-            code.For(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => default
-            );
+            // TODO
             code.For(
                 type.GetMethod(nameof(string.Join), new[] { typeof(string), typeof(object[]) }),
                 transpiler => ("\treturn f__new_string(u\"join\"sv);\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod(nameof(string.Split), new[] { typeof(char), typeof(StringSplitOptions) }),
                 transpiler => ($"\treturn f__new_array<{transpiler.Escape(typeof(string[]))}, {transpiler.EscapeForMember(typeof(string))}>(0);\n", 0)
@@ -632,38 +658,16 @@ namespace IL2CXX
 ", 0)
             );
         })
-        .For(typeof(char), (type, code) =>
-        {
-            code.For(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => default
-            );
-        })
-        .For(typeof(int), (type, code) =>
-        {
-            code.For(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
-            );
-            code.For(
-                type.GetMethod(nameof(object.ToString), new[] { typeof(string), typeof(IFormatProvider) }),
-                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
-            );
-        })
-        .For(typeof(float), (type, code) =>
-        {
-            code.For(
-                type.GetMethod(nameof(object.GetHashCode)),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0);\n", 1)
-            );
-        })
-        .For(typeof(double), (type, code) =>
-        {
-            code.For(
-                type.GetMethod(nameof(object.GetHashCode)),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0);\n", 1)
-            );
-        })
+        .For(typeof(sbyte), SetupPrimitive)
+        .For(typeof(short), SetupPrimitive)
+        .For(typeof(byte), SetupPrimitive)
+        .For(typeof(ushort), SetupPrimitive)
+        .For(typeof(int), SetupPrimitive)
+        .For(typeof(uint), SetupPrimitive)
+        .For(typeof(long), SetupPrimitive)
+        .For(typeof(ulong), SetupPrimitive)
+        .For(typeof(float), SetupPrimitive)
+        .For(typeof(double), SetupPrimitive)
         .For(typeof(Enum), (type, code) =>
         {
             code.For(
@@ -672,20 +676,36 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(object.GetHashCode)),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}union
+{'\t'}{{
+{'\t'}{'\t'}intptr_t i = 0;
+{'\t'}{'\t'}char cs[8];
+{'\t'}}};
+{'\t'}std::memcpy(cs, a_0 + 1, a_0->f_type()->v__size);
+{'\t'}return i;
+", 1)
             );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                transpiler => ("\treturn f__new_string(u\"enum\"sv);\n", 0)
+            );
+            // TODO
             code.For(
                 type.GetMethod(nameof(Enum.ToString), new[] { typeof(string) }),
                 transpiler => ("\treturn f__new_string(u\"enum\"sv);\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("InternalCompareTo", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("InternalGetCorElementType", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(Type), typeof(string), typeof(bool), typeof(bool), typeof(object).MakeByRefType() }, null),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -822,6 +842,10 @@ namespace IL2CXX
                 type.GetMethod(nameof(Math.Sqrt)),
                 transpiler => ("\treturn std::sqrt(a_0);\n", 1)
             );
+            code.For(
+                type.GetMethod(nameof(Math.Tan)),
+                transpiler => ("\treturn std::tan(a_0);\n", 1)
+            );
         })
         .For(typeof(Random), (type, code) =>
         {
@@ -872,6 +896,7 @@ namespace IL2CXX
         })
         .For(typeof(MissingMemberException), (type, code) =>
         {
+            // TODO
             code.For(
                 type.GetMethod("FormatSignature", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)

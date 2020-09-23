@@ -69,21 +69,21 @@ namespace IL2CXX.Tests
             {
                 WithPadding(() =>
                 {
-                    Console.WriteLine($"h: {h.Target}");
+                    Console.WriteLine($"x: {x}, h: {h.Target}");
                     x = null;
                 });
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 if (WithPadding(() =>
                 {
-                    Console.WriteLine($"h: {h.Target}");
+                    Console.WriteLine($"x: {x}, h: {h.Target}");
                     return h.Target == null;
                 })) return 1;
                 WithPadding(() => Foo.Resurrected = null);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
-                Console.WriteLine($"h: {h.Target}");
+                Console.WriteLine($"x: {x}, h: {h.Target}");
                 return h.Target == null ? 0 : 2;
             }
             finally

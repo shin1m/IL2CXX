@@ -4,6 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Category("Heavy")]
     class EncodingTests
     {
         static int GetBytes()

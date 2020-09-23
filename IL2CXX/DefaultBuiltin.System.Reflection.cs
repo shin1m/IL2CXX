@@ -25,12 +25,13 @@ namespace IL2CXX
 ", 0)
             );
         })
-        .For(typeof(LocalVariableInfo), (type, code) =>
+        .For(typeof(AssemblyName), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(Type))} v_m_5ftype;
-{'\t'}int32_t v_m_5fisPinned;
-{'\t'}int32_t v_m_5flocalIndex;
-", true);
+            // TODO
+            code.For(
+                type.GetMethod("ComputePublicKeyToken", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
         })
         .For(typeof(CustomAttributeData), (type, code) =>
         {
@@ -42,14 +43,23 @@ namespace IL2CXX
 {'\t'}{transpiler.EscapeForMember(typeof(object))} v_m_5ftypedCtorArgs;
 {'\t'}{transpiler.EscapeForMember(typeof(object))} v_m_5fnamedArgs;
 ", true);
+            // TODO
             code.For(
                 type.GetProperty(nameof(CustomAttributeData.ConstructorArguments)).GetMethod,
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
                 type.GetProperty(nameof(CustomAttributeData.NamedArguments)).GetMethod,
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+        })
+        .For(typeof(LocalVariableInfo), (type, code) =>
+        {
+            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(Type))} v_m_5ftype;
+{'\t'}int32_t v_m_5fisPinned;
+{'\t'}int32_t v_m_5flocalIndex;
+", true);
         });
     }
 }

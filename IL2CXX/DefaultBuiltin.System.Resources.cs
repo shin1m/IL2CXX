@@ -18,6 +18,7 @@ namespace IL2CXX
 ", 0)
             );
         })
+        // TODO
         .For(typeof(ResourceReader), (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(BinaryReader))} v__5fstore;
@@ -39,6 +40,7 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
+        // TODO
         .For(Type.GetType("System.Resources.RuntimeResourceSet"), (type, code) =>
         {
             code.For(

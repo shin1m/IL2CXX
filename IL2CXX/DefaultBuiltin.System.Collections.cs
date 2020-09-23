@@ -39,6 +39,7 @@ namespace IL2CXX
         })
         .For(Type.GetType("System.Collections.Generic.ComparerHelpers"), (type, code) =>
         {
+            // TODO
             code.For(
                 type.GetMethod("CreateDefaultComparer", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn {};\n", 0)

@@ -4,6 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    [Category("Heavy")]
     class StreamTests
     {
         const string FileName = nameof(StreamTests) + "-file";

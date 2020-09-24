@@ -5,7 +5,9 @@
 #include "type.h"
 #include <algorithm>
 #include <deque>
+#include <climits>
 #include <csignal>
+#include <cuchar>
 #include <semaphore.h>
 
 namespace il2cxx
@@ -28,7 +30,6 @@ public:
 #endif
 		bool v_verbose = false;
 		bool v_verify = false;
-		const std::map<std::string_view, t__type*>* v_name_to_type = nullptr;
 	};
 
 private:
@@ -315,6 +316,39 @@ int t_engine::f_run(void(*a_finalize)(t_object*), T_main a_main)
 	f_shutdown();
 	return n;
 }
+
+template<typename T_push>
+void f__to_u16(const char* a_first, const char* a_last, T_push a_push)
+{
+	std::mbstate_t state{};
+	char16_t c;
+	while (a_first < a_last) {
+		auto n = std::mbrtoc16(&c, a_first, a_last - a_first, &state);
+		switch (n) {
+		case size_t(-3):
+			a_push(c);
+			break;
+		case size_t(-2):
+			a_first = a_last;
+			break;
+		case size_t(-1):
+			++a_first;
+			break;
+		case 0:
+			a_push(u'\0');
+			++a_first;
+			break;
+		default:
+			a_push(c);
+			a_first += n;
+			break;
+		}
+	}
+	if (std::mbrtoc16(&c, a_first, 0, &state) == size_t(-3)) a_push(c);
+}
+
+std::u16string f__u16string(std::string_view a_x);
+std::string f__string(std::u16string_view a_x);
 
 }
 

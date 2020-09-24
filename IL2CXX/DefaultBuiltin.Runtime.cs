@@ -25,14 +25,14 @@ namespace IL2CXX
         .For(typeof(RuntimeConstructorInfo), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(ConstructorInfo.Invoke), new[] { typeof(BindingFlags), typeof(Binder), typeof(object[]), typeof(CultureInfo) }),
+                type.GetMethod(nameof(MethodBase.Invoke), new[] { typeof(BindingFlags), typeof(Binder), typeof(object[]), typeof(CultureInfo) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__invoke(a_3);\n", 0)
             );
         })
         .For(typeof(RuntimeMethodInfo), (type, code) =>
         {
             code.For(
-                type.GetProperty(nameof(Type.DeclaringType)).GetMethod,
+                type.GetProperty(nameof(MemberInfo.DeclaringType)).GetMethod,
                 transpiler => ("\treturn a_0->v__declaring_type;\n", 0)
             );
         })
@@ -69,6 +69,14 @@ namespace IL2CXX
             code.For(
                 type.GetProperty(nameof(Type.Namespace)).GetMethod,
                 transpiler => ("\treturn f__new_string(a_0->v__namespace);\n", 0)
+            );
+            code.For(
+                type.GetProperty(nameof(MemberInfo.Name)).GetMethod,
+                transpiler => ("\treturn f__new_string(a_0->v__name);\n", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(object.ToString)),
+                transpiler => ("\treturn f__new_string(a_0->v__display_name);\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.TypeHandle)).GetMethod,

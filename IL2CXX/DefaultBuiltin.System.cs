@@ -89,10 +89,9 @@ namespace IL2CXX
                 type.GetMethod(nameof(object.Equals), new[] { type }),
                 (transpiler, actual) => ("\treturn a_0 == a_1;\n", 0)
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(object.ToString)),
-                transpiler => ("\treturn f__new_string(u\"object\"sv);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->f_type()->v__display_name);\n", 0)
             );
             // TODO
             /*code.ForTree(
@@ -128,10 +127,9 @@ namespace IL2CXX
 ", 0);
                 }
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(object.ToString)),
-                transpiler => ("\treturn f__new_string(u\"struct\"sv);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->f_type()->v__display_name);\n", 0)
             );
             code.ForTree(
                 type.GetMethod(nameof(object.Equals)),
@@ -371,7 +369,10 @@ namespace IL2CXX
             // TODO
             code.ForTree(
                 type.GetMethod(nameof(object.ToString)),
-                (transpiler, actual) => ($"\treturn f__new_string(u\"{actual}\"sv);\n", 0)
+                (transpiler, actual) => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}std::u16string s{{a_0->f_type()->v__display_name}};
+{'\t'}if (a_0->v__5fmessage) s = s + u"": "" + &a_0->v__5fmessage->v__5ffirstChar;
+{'\t'}return f__new_string(s);
+", 0)
             );
             // TODO
             code.For(

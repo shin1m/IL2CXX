@@ -40,6 +40,8 @@ namespace IL2CXX
         protected override bool IsArrayImpl() => throw new NotImplementedException();
         public override bool IsAssignableFrom(Type c) => throw new NotImplementedException();
         public override string Namespace => throw new NotImplementedException();
+        public override string Name => throw new NotImplementedException();
+        public override string ToString() => throw new NotImplementedException();
         public override RuntimeTypeHandle TypeHandle => throw new NotImplementedException();
         public override Type UnderlyingSystemType => this;
     }

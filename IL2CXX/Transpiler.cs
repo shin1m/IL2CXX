@@ -1199,7 +1199,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, {(
+            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, u""{type.Name}""sv, u""{type}""sv, {(
     definition.IsManaged ? "true" : "false"
 )}, {(
     type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"
@@ -1387,7 +1387,6 @@ int main(int argc, char* argv[])
 {'\t'}t_engine::t_options options;
 {'\t'}options.v_verbose = std::getenv(""IL2CXX_VERBOSE"");
 {'\t'}options.v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
-{'\t'}options.v_name_to_type = std::getenv(""IL2CXX_DUMP_LEAKS"") ? &v__name_to_type : nullptr;
 {'\t'}t_engine engine(options, argc, argv);
 {'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
 {'\t'}{{

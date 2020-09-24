@@ -9,8 +9,9 @@ namespace il2cxx
 struct t__member_info : t_object
 {
 	t__type* v__declaring_type;
+	std::u16string_view v__name;
 
-	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr) : v__declaring_type(a_declaring_type)
+	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr, std::u16string_view a_name = {}) : v__declaring_type(a_declaring_type), v__name(a_name)
 	{
 		v_type = a_type;
 	}
@@ -51,8 +52,8 @@ struct t__assembly : t_object
 
 struct t__runtime_assembly : t__assembly
 {
-	std::u16string v__full_name;
-	std::u16string v__name;
+	std::u16string_view v__full_name;
+	std::u16string_view v__name;
 	t__runtime_method_info* v__entry_point;
 
 	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point)
@@ -71,7 +72,8 @@ struct t__type : t__abstract_type
 	t__type* v__base;
 	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
 	t__runtime_assembly* v__assembly;
-	std::u16string v__namespace;
+	std::u16string_view v__namespace;
+	std::u16string_view v__display_name;
 	bool v__managed;
 	size_t v__size;
 	union
@@ -90,7 +92,17 @@ struct t__type : t__abstract_type
 	t__runtime_constructor_info* v__default_constructor = nullptr;
 	t__type* v__nullable_value = nullptr;
 
-	t__type(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, t__runtime_assembly* a_assembly, std::u16string_view a_namespace, bool a_managed, size_t a_size) : t__abstract_type(a_type), v__base(a_base), v__interface_to_methods(std::move(a_interface_to_methods)), v__assembly(a_assembly), v__namespace(a_namespace), v__managed(a_managed), v__size(a_size)
+	t__type(
+		t__type* a_type, t__type* a_base,
+		std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods,
+		t__runtime_assembly* a_assembly,
+		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_display_name,
+		bool a_managed, size_t a_size
+	) : t__abstract_type(a_type, nullptr, a_name), v__base(a_base),
+	v__interface_to_methods(std::move(a_interface_to_methods)),
+	v__assembly(a_assembly),
+	v__namespace(a_namespace), v__display_name(a_display_name),
+	v__managed(a_managed), v__size(a_size)
 	{
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)

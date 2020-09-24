@@ -6,18 +6,13 @@
 #include <regex>
 #include <stdexcept>
 #include <utility>
-#include <climits>
 #include <cstdint>
 #include <cstring>
-#include <cuchar>
 
 namespace il2cxx
 {
 
 using namespace std::literals;
-
-std::u16string f__u16string(std::string_view a_x);
-std::string f__string(std::u16string_view a_x);
 
 template<typename T>
 struct t__finally

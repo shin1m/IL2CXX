@@ -70,10 +70,7 @@ namespace IL2CXX.Tests
             IEnumerable<(string, string)> environment = new[] {
                 ("IL2CXX_VERBOSE", string.Empty),
             };
-            if (verify) environment = environment.Concat(new[] {
-                ("IL2CXX_VERIFY_LEAKS", string.Empty),
-                ("IL2CXX_DUMP_LEAKS", string.Empty)
-            });
+            if (verify) environment = environment.Append(("IL2CXX_VERIFY_LEAKS", string.Empty));
             Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), "", build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
         }
         public static void Test(Func<int> method, bool verify = true) => Test(method.Method, verify);

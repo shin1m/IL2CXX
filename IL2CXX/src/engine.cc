@@ -187,7 +187,7 @@ t_engine::~t_engine()
 	std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
 	std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
 	if (allocated == freed) return;
-	if (auto n2t = v_options.v_name_to_type) {
+	if (v_options.v_verbose) {
 		std::map<t__type*, size_t> leaks;
 		for (auto& x : v_object__heap.f_blocks())
 			if (x.first->v_rank < 7) {
@@ -201,13 +201,7 @@ t_engine::~t_engine()
 			} else {
 				++leaks[x.first->v_type];
 			}
-		for (const auto& x : leaks) {
-			auto i = std::find_if(n2t->begin(), n2t->end(), [&](auto& y)
-			{
-				return y.second == x.first;
-			});
-			std::fprintf(stderr, "%s: %zu\n", std::string(i->first).c_str(), x.second);
-		}
+		for (const auto& x : leaks) std::fprintf(stderr, "%s: %zu\n", f__string(x.first->v__display_name).c_str(), x.second);
 	}
 	std::terminate();
 }
@@ -233,6 +227,30 @@ void t_engine::f_finalize()
 	std::unique_lock<std::mutex> lock(v_finalizer__conductor.v_mutex);
 	v_finalizer__conductor.f__wake();
 	v_finalizer__conductor.f__wait(lock);
+}
+
+std::u16string f__u16string(std::string_view a_x)
+{
+	std::vector<char16_t> cs;
+	f__to_u16(a_x.data(), a_x.data() + a_x.size(), [&](auto c)
+	{
+		cs.push_back(c);
+	});
+	return {cs.begin(), cs.end()};
+}
+
+std::string f__string(std::u16string_view a_x)
+{
+	std::vector<char> cs;
+	std::mbstate_t state{};
+	char mb[MB_LEN_MAX];
+	for (auto c : a_x) {
+		auto n = std::c16rtomb(mb, c, &state);
+		if (n != size_t(-1)) cs.insert(cs.end(), mb, mb + n);
+	}
+	auto n = std::c16rtomb(mb, u'\0', &state);
+	if (n != size_t(-1) && n > 1) cs.insert(cs.end(), mb, mb + n - 1);
+	return {cs.begin(), cs.end()};
 }
 
 }

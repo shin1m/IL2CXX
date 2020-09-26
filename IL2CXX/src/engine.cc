@@ -101,18 +101,20 @@ void t_engine::f_finalizer(void(*a_finalize)(t_object*))
 	v_finalizer__conductor.f_exit();
 }
 
+void t_engine::f_wait_foreground_threads()
+{
+	std::unique_lock<std::mutex> lock(v_thread__mutex);
+	auto internal = v_thread->v__internal;
+	while (true) {
+		auto p = v_thread__internals;
+		while (p->v_next != internal && (p->v_done > 0 || p->v_background)) p = p->v_next;
+		if (p->v_next == internal) break;
+		v_thread__condition.wait(lock);
+	}
+}
+
 void t_engine::f_shutdown()
 {
-	{
-		std::unique_lock<std::mutex> lock(v_thread__mutex);
-		auto internal = v_thread->v__internal;
-		while (true) {
-			auto p = v_thread__internals;
-			while (p->v_next != internal && (p->v_done > 0 || p->v_background)) p = p->v_next;
-			if (p->v_next == internal) break;
-			v_thread__condition.wait(lock);
-		}
-	}
 	v_shuttingdown = true;
 	f_object__return();
 	{
@@ -123,9 +125,9 @@ void t_engine::f_shutdown()
 	f_wait();
 	f_wait();
 	f_wait();
-	if (v_options.v_verify) assert(!v_thread__internals->v_next->v_next);
-	v_finalizer__conductor.f_quit();
-	if (v_options.v_verify) {
+	assert(!v_thread__internals->v_next->v_next);
+	{
+		v_finalizer__conductor.f_quit();
 		std::unique_lock<std::mutex> lock(v_thread__mutex);
 		while (v_thread__internals->v_next && v_thread__internals->v_done <= 0) v_thread__condition.wait(lock);
 	}
@@ -152,7 +154,6 @@ t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_argument
 		f_engine()->f_epoch_suspend();
 	};
 	sigaddset(&sa.sa_mask, SIGUSR2);
-	sa.sa_flags |= SA_NODEFER;
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
 }
 
@@ -170,11 +171,10 @@ t_engine::~t_engine()
 	f_wait();
 	f_wait();
 	v_collector__conductor.f_quit();
-	if (v_options.v_verify) assert(!v_thread__internals);
+	assert(!v_thread__internals);
 	if (sem_destroy(&v_epoch__received) == -1) std::exit(errno);
 	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
 	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
-	if (!v_options.v_verify) return;
 	std::fprintf(stderr, "statistics:\n\tt_object:\n");
 	size_t allocated = 0;
 	size_t freed = 0;

@@ -56,7 +56,7 @@ struct t_thread
 	t_object** v_stack_top;
 #endif
 	t_object* volatile* v_reviving = nullptr;
-	t_object* v_background = nullptr;
+	bool v_background = false;
 
 	t_thread();
 #ifdef IL2CXX__STACK_SCAN_PARTIAL

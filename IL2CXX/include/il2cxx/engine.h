@@ -94,6 +94,7 @@ private:
 	}
 	void f_collector();
 	void f_finalizer(void(*a_finalize)(t_object*));
+	void f_wait_foreground_threads();
 	void f_shutdown();
 
 public:
@@ -194,7 +195,7 @@ void t__thread::f__start(T a_main)
 				std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
 				internal->f_initialize(&internal);
 				if (v__background) {
-					internal->v_background = this;
+					internal->v_background = true;
 					f_engine()->v_thread__condition.notify_all();
 				}
 				f__priority(internal->v_handle, v__priority);
@@ -207,7 +208,7 @@ void t__thread::f__start(T a_main)
 			f_engine()->f_object__return();
 			{
 				std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
-				internal->v_background = nullptr;
+				internal->v_background = false;
 				v__internal = nullptr;
 			}
 			t_slot::t_decrements::f_push(this);
@@ -313,6 +314,8 @@ int t_engine::f_run(void(*a_finalize)(t_object*), T_main a_main)
 	auto s = std::make_unique<T_static>();
 	auto ts = std::make_unique<T_thread_static>();
 	auto n = a_main();
+	f_wait_foreground_threads();
+	if (!v_options.v_verify) std::exit(n);
 	f_shutdown();
 	return n;
 }

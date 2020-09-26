@@ -472,7 +472,7 @@ void t__thread::f__background__(bool a_value)
 	v__background = a_value;
 	if (!v__internal || v__internal->v_done < 0) return;
 	if (v__internal->v_done > 0) throw std::runtime_error("already done.");
-	v__internal->v_background = v__background ? this : nullptr;
+	v__internal->v_background = v__background;
 }
 
 void t__thread::f__priority__(int32_t a_value)

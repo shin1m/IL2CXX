@@ -133,6 +133,24 @@ void t_engine::f_shutdown()
 	}
 }
 
+size_t t_engine::f_statistics()
+{
+	if (v_options.v_verbose) std::fprintf(stderr, "statistics:\n\tt_object:\n");
+	size_t allocated = 0;
+	size_t freed = 0;
+	v_object__heap.f_statistics([&](auto a_rank, auto a_grown, auto a_allocated, auto a_freed)
+	{
+		if (v_options.v_verbose) std::fprintf(stderr, "\t\trank%zu: %zu: %zu - %zu = %zu\n", a_rank, a_grown, a_allocated, a_freed, a_allocated - a_freed);
+		allocated += a_allocated;
+		freed += a_freed;
+	});
+	if (v_options.v_verbose) {
+		std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
+		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
+	}
+	return allocated - freed;
+}
+
 t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_object__heap([]
 {
 	f_engine()->f_wait();
@@ -175,18 +193,7 @@ t_engine::~t_engine()
 	if (sem_destroy(&v_epoch__received) == -1) std::exit(errno);
 	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
 	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
-	std::fprintf(stderr, "statistics:\n\tt_object:\n");
-	size_t allocated = 0;
-	size_t freed = 0;
-	v_object__heap.f_statistics([&](auto a_rank, auto a_grown, auto a_allocated, auto a_freed)
-	{
-		std::fprintf(stderr, "\t\trank%zu: %zu: %zu - %zu = %zu\n", a_rank, a_grown, a_allocated, a_freed, a_allocated - a_freed);
-		allocated += a_allocated;
-		freed += a_freed;
-	});
-	std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
-	std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
-	if (allocated == freed) return;
+	if (f_statistics() <= 0) return;
 	if (v_options.v_verbose) {
 		std::map<t__type*, size_t> leaks;
 		for (auto& x : v_object__heap.f_blocks())

@@ -96,6 +96,7 @@ private:
 	void f_finalizer(void(*a_finalize)(t_object*));
 	void f_wait_foreground_threads();
 	void f_shutdown();
+	size_t f_statistics();
 
 public:
 	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
@@ -315,9 +316,13 @@ int t_engine::f_run(void(*a_finalize)(t_object*), T_main a_main)
 	auto ts = std::make_unique<T_thread_static>();
 	auto n = a_main();
 	f_wait_foreground_threads();
-	if (!v_options.v_verify) std::exit(n);
-	f_shutdown();
-	return n;
+	if (v_options.v_verify) {
+		f_shutdown();
+		return n;
+	} else {
+		if (v_options.v_verbose) f_statistics();
+		std::exit(n);
+	}
 }
 
 template<typename T_push>

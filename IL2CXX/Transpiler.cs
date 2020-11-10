@@ -16,7 +16,6 @@ namespace IL2CXX
 
     public partial class Transpiler
     {
-        struct NativeInt { }
         struct TypedReferenceTag { }
         class Stack : IEnumerable<Stack>
         {
@@ -55,11 +54,6 @@ namespace IL2CXX
                     {
                         VariableType = "double";
                         prefix = "f";
-                    }
-                    else if (Type == typeof(NativeInt))
-                    {
-                        VariableType = "intptr_t";
-                        prefix = "q";
                     }
                     else
                     {
@@ -104,7 +98,17 @@ namespace IL2CXX
                 for (var x = this; x != null; x = x.Pop) yield return x;
             }
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-            public bool IsPointer => VariableType == "void*";
+            public string AsSigned => VariableType.EndsWith("*")
+                ? $"reinterpret_cast<intptr_t>({Variable})"
+                : Variable;
+            public string AsUnsigned => VariableType switch
+            {
+                "int32_t" => $"static_cast<u{VariableType}>({Variable})",
+                "int64_t" => $"static_cast<u{VariableType}>({Variable})",
+                "double" => Variable,
+                _ => $"reinterpret_cast<uintptr_t>({Variable})"
+            };
+            public string Assign(string value) => $"{Variable} = {(VariableType.EndsWith("*") ? $"reinterpret_cast<{VariableType}>({value})" : value)}";
         }
         class Instruction
         {
@@ -141,7 +145,7 @@ namespace IL2CXX
             [typeof(uint)] = "uint32_t",
             [typeof(long)] = "int64_t",
             [typeof(ulong)] = "uint64_t",
-            [typeof(NativeInt)] = "intptr_t",
+            [typeof(void*)] = "void*",
             [typeof(char)] = "char16_t",
             [typeof(double)] = "double",
             [typeof(float)] = "float",
@@ -150,31 +154,26 @@ namespace IL2CXX
         private static readonly Type typedReferenceByRefType = typeof(TypedReferenceTag).MakeByRefType();
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfAdd = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
-            [("int32_t", "intptr_t")] = typeof(NativeInt),
             [("int32_t", "void*")] = typeof(void*),
             [("int64_t", "int64_t")] = typeof(long),
-            [("intptr_t", "int32_t")] = typeof(NativeInt),
-            [("intptr_t", "intptr_t")] = typeof(NativeInt),
-            [("intptr_t", "void*")] = typeof(void*),
-            [("double", "double")] = typeof(double),
             [("void*", "int32_t")] = typeof(void*),
-            [("void*", "intptr_t")] = typeof(void*),
-            [("void*", "void*")] = typeof(NativeInt)
+            [("void*", "void*")] = typeof(void*),
+            [("double", "double")] = typeof(double)
         };
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
-            [("int32_t", "intptr_t")] = typeof(NativeInt),
+            [("int32_t", "void*")] = typeof(void*),
             [("int64_t", "int64_t")] = typeof(long),
-            [("intptr_t", "int32_t")] = typeof(NativeInt),
-            [("intptr_t", "intptr_t")] = typeof(NativeInt)
+            [("void*", "int32_t")] = typeof(void*),
+            [("void*", "void*")] = typeof(void*)
         };
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfShl = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
-            [("int32_t", "intptr_t")] = typeof(NativeInt),
+            [("int32_t", "void*")] = typeof(int),
             [("int64_t", "int32_t")] = typeof(long),
-            [("int64_t", "intptr_t")] = typeof(long),
-            [("intptr_t", "int32_t")] = typeof(NativeInt),
-            [("intptr_t", "intptr_t")] = typeof(NativeInt)
+            [("int64_t", "void*")] = typeof(long),
+            [("void*", "int32_t")] = typeof(void*),
+            [("void*", "void*")] = typeof(void*)
         };
         private static MethodInfo FinalizeOf(Type x) => x.GetMethod(nameof(Finalize), BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly MethodInfo finalizeOfObject = FinalizeOf(typeof(object));
@@ -206,10 +205,11 @@ namespace IL2CXX
             var t = type.GetElementType();
             return t == typeof(TypedReferenceTag) ? typeof(TypedReference) : t;
         }
+        private byte ParseU1(ref int index) => bytes[index++];
         private sbyte ParseI1(ref int index) => (sbyte)bytes[index++];
-        private short ParseI2(ref int index)
+        private ushort ParseU2(ref int index)
         {
-            var x = BitConverter.ToInt16(bytes, index);
+            var x = BitConverter.ToUInt16(bytes, index);
             index += 2;
             return x;
         }
@@ -265,6 +265,68 @@ namespace IL2CXX
             method.Module.ResolveField(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
         private MethodBase ParseMethod(ref int index) =>
             method.Module.ResolveMethod(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
+        private (CallingConventions, Type, Type[]) ParseSignature(ref int index)
+        {
+            var bytes = method.Module.ResolveSignature(ParseI4(ref index));
+            var cc = (CallingConventions)bytes[0];
+            var i = 1;
+            int next()
+            {
+                int c = bytes[i++];
+                if ((c & 0x80) == 0) return c;
+                if ((c & 0x40) == 0) return (c & 0x3f) << 8 | bytes[i++];
+                c = (c & 0x3f) << 8 | bytes[i++];
+                c = c << 8 | bytes[i++];
+                return c << 8 | bytes[i++];
+            }
+            Type type()
+            {
+                var t = next();
+                if (t == 0x41) t = next();
+                Type other()
+                {
+                    var token = next();
+                    return method.Module.ResolveType((token & 3) switch
+                    {
+                        0 => 0x02,
+                        1 => 0x01,
+                        2 => 0x1B,
+                        _ => throw new Exception()
+                    } << 24 | token >> 2, method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
+                }
+                return t switch
+                {
+                    0x01 => typeof(void),
+                    0x02 => typeof(bool),
+                    0x03 => typeof(char),
+                    0x04 => typeof(sbyte),
+                    0x05 => typeof(byte),
+                    0x06 => typeof(short),
+                    0x07 => typeof(ushort),
+                    0x08 => typeof(int),
+                    0x09 => typeof(uint),
+                    0x0A => typeof(long),
+                    0x0B => typeof(ulong),
+                    0x0C => typeof(float),
+                    0x0D => typeof(double),
+                    0x0E => typeof(string),
+                    0x0F => MakePointerType(type()),
+                    0x10 => MakeByRefType(type()),
+                    0x11 => other(),
+                    0x12 => other(),
+                    0x16 => typeof(TypedReference),
+                    0x18 => typeof(IntPtr),
+                    0x19 => typeof(UIntPtr),
+                    0x1C => typeof(object),
+                    _ => throw new Exception()
+                };
+            }
+            var n = next();
+            var @return = type();
+            var parameters = new Type[n];
+            for (var j = 0; j < n; ++j) parameters[j] = type();
+            return (cc, @return, parameters);
+        }
         private static Type GetVirtualThisType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SZArrayHelper<>) ? type.GetGenericArguments()[0].MakeArrayType() : type;
         private static Type GetThisType(MethodBase method)
         {
@@ -306,7 +368,7 @@ namespace IL2CXX
             log("exit");
         }
         public void Enqueue(MethodBase method) => queuedMethods.Enqueue(method);
-        private bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum || x == typeof(NativeInt));
+        private bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
         public string EscapeType(Type type)
         {
             if (typeToIdentifier.TryGetValue(type, out var name)) return name;
@@ -351,18 +413,12 @@ namespace IL2CXX
             methodToIdentifier.Add(key, name);
             return name;
         }
-        private string Escape(MemberInfo member)
+        private string Escape(MemberInfo member) => member switch
         {
-            switch (member)
-            {
-                case FieldInfo field:
-                    return Escape(field);
-                case MethodBase method:
-                    return Escape(method);
-                default:
-                    throw new Exception();
-            }
-        }
+            FieldInfo field => Escape(field),
+            MethodBase method => Escape(method),
+            _ => throw new Exception()
+        };
         public string GenerateCheckNull(string variable) => CheckNull ? $"\tif (!{variable}) [[unlikely]] f__throw_null_reference();\n" : string.Empty;
         private void GenerateCheckNull(Stack stack)
         {
@@ -374,8 +430,8 @@ namespace IL2CXX
         {
             GenerateCheckNull(array);
             writer.WriteLine($"\t{{auto p = static_cast<{Escape(array.Type)}*>({array.Variable});");
-            writer.Write(GenerateCheckRange(index.Variable, "p->v__length"));
-            writer.WriteLine($"\t{access($"p->f__data()[{index.Variable}]")};}}");
+            writer.Write(GenerateCheckRange(index.AsUnsigned, "p->v__length"));
+            writer.WriteLine($"\t{access($"p->f__data()[{index.AsUnsigned}]")};}}");
         }
         public string CastValue(Type type, string variable) =>
             type == typeof(bool) ? $"{variable} != 0" :

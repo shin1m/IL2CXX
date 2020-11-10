@@ -99,7 +99,7 @@ private:
 	size_t f_statistics();
 
 public:
-	t_engine(const t_options& a_options, size_t a_count, char** a_arguments);
+	t_engine(const t_options& a_options);
 	~t_engine();
 	template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
 	int f_run(void(*a_finalize)(t_object*), T_main a_main);

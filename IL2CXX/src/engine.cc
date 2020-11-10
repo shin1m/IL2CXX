@@ -151,7 +151,7 @@ size_t t_engine::f_statistics()
 	return allocated - freed;
 }
 
-t_engine::t_engine(const t_options& a_options, size_t a_count, char** a_arguments) : v_object__heap([]
+t_engine::t_engine(const t_options& a_options) : v_object__heap([]
 {
 	f_engine()->f_wait();
 }), v_options(a_options), v_collector__threshold(v_options.v_collector__threshold)

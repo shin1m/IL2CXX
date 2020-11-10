@@ -140,6 +140,7 @@ v__invoke_unmanaged = {generate(Type, writer.ToString())}
             {
                 definition = new RuntimeDefinition(type);
                 typeToRuntime.Add(type, definition);
+                queuedTypes.Enqueue(GetElementType(type));
             }
             else if (type.IsInterface)
             {
@@ -313,41 +314,13 @@ struct t__static_{identifier}
                                 }
                                 string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
                                 members = type.IsValueType
-                                    ? td.IsManaged
-                                        ? $@"{variables("\t\t")}
-{'\t'}{'\t'}t_value() = default;
-{'\t'}{'\t'}t_value(const t_value& a_value){(fields.Length > 0 ? $@" :
-{string.Join(",\n", fields.Select(x => $"\t\t\t{Escape(x)}(a_value.{Escape(x)})"))}
-" : string.Empty)}{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}IL2CXX__PORTABLE__ALWAYS_INLINE t_value& operator=(const t_value& a_value)
-{'\t'}{'\t'}{{
-{string.Join(string.Empty, fields.Select(x => $"\t\t\t{Escape(x)} = a_value.{Escape(x)};\n"))}{'\t'}{'\t'}{'\t'}return *this;
-{'\t'}{'\t'}}}
+                                    ? $@"{variables("\t\t")}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
 {string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"\t\t\t{Escape(x)}.f__destruct();\n"))}{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {scanSlots("\t\t\t")}{'\t'}{'\t'}}}
-"
-                                        : $@"{variables("\t\t")}
-{'\t'}{'\t'}t_value() = default;
-{'\t'}{'\t'}t_value(const t_value& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}std::memcpy(this, &a_value, sizeof(t_value));
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}std::memcpy(this, &a_value, sizeof(t_value));
-{'\t'}{'\t'}{'\t'}return *this;
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__destruct()
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__scan(t_scan a_scan)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
 "
                                     : $@"{variables("\t")}
 {'\t'}void f__scan(t_scan a_scan)
@@ -496,8 +469,7 @@ t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
 {'\t'}auto p0 = reinterpret_cast<const {element}*>(p + 1);
 {'\t'}auto p1 = q->f__data();
 {'\t'}for (size_t i = 0; i < p->v__length; ++i) new(p1 + i) {element}(p0[i]);
-{'\t'}return q;
-");
+{'\t'}return q;");
                 }
                 else
                 {
@@ -512,8 +484,7 @@ void t__type_of<{identifier}>::f_do_copy(const char* a_from, size_t a_n, char* a
 {'\t'}f__copy(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));" :
                     $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}static_cast<const {identifier}*>(a_this)->f__construct(p);
-{'\t'}return p;
-");
+{'\t'}return p;");
                 }
                 writerForDefinitions.WriteLine('}');
             }

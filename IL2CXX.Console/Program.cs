@@ -14,7 +14,7 @@ namespace IL2CXX.Console
             var assembly = Assembly.LoadFrom(args[0]);
             var entry = assembly.EntryPoint ?? throw new InvalidOperationException();
             var @out = "out";
-            Directory.Delete(@out, true);
+            if (Directory.Exists(@out)) Directory.Delete(@out, true);
             Directory.CreateDirectory(@out);
             //var transpiler = new Transpiler(DefaultBuiltin.Create(), Console.Error.WriteLine);
             var transpiler = new Transpiler(DefaultBuiltin.Create(), _ => { });

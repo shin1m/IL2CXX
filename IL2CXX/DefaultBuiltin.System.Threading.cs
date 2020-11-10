@@ -63,6 +63,55 @@ namespace IL2CXX
                 transpiler => ("\tstd::atomic_thread_fence(std::memory_order_seq_cst);\n", 1)
             );
         })
+        .For(typeof(Monitor), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}a_0->f_extension()->v_mutex.lock();
+{'\t'}*a_1 = true;
+", 1)
+            );
+            code.For(
+                type.GetMethod("ReliableEnterTimeout", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\t*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Monitor.Enter), new[] { typeof(object) }),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.lock();\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Monitor.Exit)),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.unlock();\n", 1)
+            );
+            code.For(
+                type.GetMethod("IsEnteredNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}auto p = a_0->f_extension();
+{'\t'}return p->v_mutex.locked();
+", 1)
+            );
+            code.For(
+                type.GetMethod("ObjPulse", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\ta_0->f_extension()->v_condition.notify_one();\n", 1)
+            );
+            code.For(
+                type.GetMethod("ObjPulseAll", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\ta_0->f_extension()->v_condition.notify_all();\n", 1)
+            );
+            code.For(
+                type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}if (a_0) throw std::runtime_error(""NotSupportedException"");
+{'\t'}auto p = a_2->f_extension();
+{'\t'}std::unique_lock<std::recursive_timed_mutex> lock(p->v_mutex, std::adopt_lock);
+{'\t'}auto finally = f__finally([&]
+{'\t'}{{
+{'\t'}{'\t'}lock.release();
+{'\t'}}});
+{'\t'}if (a_1 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_1)) == std::cv_status::no_timeout;
+{'\t'}p->v_condition.wait(lock);
+{'\t'}return true;
+", 0)
+            );
+        })
         .For(typeof(Thread), (type, code) =>
         {
             code.Base = "t__thread";
@@ -184,53 +233,17 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(typeof(Monitor), (type, code) =>
+        .For(typeof(WaitHandle), (type, code) =>
         {
+            // TODO
             code.For(
-                type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}a_0->f_extension()->v_mutex.lock();
-{'\t'}*a_1 = true;
-", 1)
+                type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
             code.For(
-                type.GetMethod("ReliableEnterTimeout", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\t*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));\n", 1)
-            );
-            code.For(
-                type.GetMethod(nameof(Monitor.Enter), new[] { typeof(object) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.lock();\n", 1)
-            );
-            code.For(
-                type.GetMethod(nameof(Monitor.Exit)),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.unlock();\n", 1)
-            );
-            code.For(
-                type.GetMethod("IsEnteredNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = a_0->f_extension();
-{'\t'}return p->v_mutex.locked();
-", 1)
-            );
-            code.For(
-                type.GetMethod("ObjPulse", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\ta_0->f_extension()->v_condition.notify_one();\n", 1)
-            );
-            code.For(
-                type.GetMethod("ObjPulseAll", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\ta_0->f_extension()->v_condition.notify_all();\n", 1)
-            );
-            code.For(
-                type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}if (a_0) throw std::runtime_error(""NotSupportedException"");
-{'\t'}auto p = a_2->f_extension();
-{'\t'}std::unique_lock<std::recursive_timed_mutex> lock(p->v_mutex, std::adopt_lock);
-{'\t'}auto finally = f__finally([&]
-{'\t'}{{
-{'\t'}{'\t'}lock.release();
-{'\t'}}});
-{'\t'}if (a_1 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_1)) == std::cv_status::no_timeout;
-{'\t'}p->v_condition.wait(lock);
-{'\t'}return true;
-", 0)
+                type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         });
     }

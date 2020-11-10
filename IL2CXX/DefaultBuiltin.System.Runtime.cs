@@ -52,6 +52,10 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
+                type.GetMethod("GetFunctionPointerForDelegateInternal", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn a_0->v__5fmethodPtrAux;\n", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(Marshal.GetLastWin32Error)),
                 transpiler => ("\treturn errno;\n", 1)
             );
@@ -67,6 +71,11 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("IsPinnable", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn true;\n", 1)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(Type) }, null),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             code.For(
                 type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic),

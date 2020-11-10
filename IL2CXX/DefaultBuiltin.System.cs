@@ -34,11 +34,6 @@ namespace IL2CXX
 {'\t'}{'\t'}t_value({native} a_value) : v__5fvalue(reinterpret_cast<void*>(a_value))
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__5fvalue = a_value.v__5fvalue;
-{'\t'}{'\t'}{'\t'}return *this;
-{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
@@ -107,7 +102,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("GetHashCodeOfPtr", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0.v__5fvalue);\n", 1)
+                transpiler => ("\treturn static_cast<intptr_t>(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(object.Equals)),
@@ -258,6 +253,24 @@ namespace IL2CXX
 {'\t'}}}
 ", 0)
             );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(Array.CreateInstance), new[] { typeof(Type), typeof(int) }),
+                transpiler =>
+                {
+                    var array = transpiler.Escape(typeof(Array));
+                    return (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] f__throw_argument_out_of_range();\n" : string.Empty) + $@"{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
+{'\t'}auto element = static_cast<t__type*>(a_0);
+{'\t'}auto n = element->v__size * a_1;
+{'\t'}auto p = static_cast<{array}*>(f_engine()->f_object__allocate(a + n));
+{'\t'}p->v__length = a_1;
+{'\t'}p->f__bounds()[0] = {{a_1, 0}};
+{'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
+{'\t'}element->f__array()->f__finish(p);
+{'\t'}return p;
+", 0);
+                }
+            );
             code.For(
                 type.GetMethod(nameof(Array.GetLength)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + "\treturn a_0->f__bounds()[a_1].v_length;\n", 1)
@@ -362,6 +375,14 @@ namespace IL2CXX
                     transpiler.Enqueue(method);
                     return ($"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 1);
                 }
+            );
+        })
+        .For(typeof(Attribute), (type, code) =>
+        {
+            // TODO
+            code.For(
+                type.GetMethod(nameof(Attribute.GetCustomAttributes), new[] { typeof(MemberInfo), typeof(Type), typeof(bool) }),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
         .For(typeof(Exception), (type, code) =>
@@ -800,8 +821,20 @@ namespace IL2CXX
                     transpiler => ("\treturn std::abs(a_0);\n", 1)
                 );
             code.For(
+                type.GetMethod(nameof(Math.Acos)),
+                transpiler => ("\treturn std::acos(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Math.Asin)),
+                transpiler => ("\treturn std::asin(a_0);\n", 1)
+            );
+            code.For(
                 type.GetMethod(nameof(Math.Atan)),
                 transpiler => ("\treturn std::atan(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Math.Atan2)),
+                transpiler => ("\treturn std::atan2(a_0, a_1);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Math.Ceiling), new[] { typeof(double) }),
@@ -848,6 +881,73 @@ namespace IL2CXX
                 transpiler => ("\treturn std::tan(a_0);\n", 1)
             );
         })
+        .For(typeof(MathF), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(MathF.Abs)),
+                transpiler => ("\treturn std::abs(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Acos)),
+                transpiler => ("\treturn std::acos(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Asin)),
+                transpiler => ("\treturn std::asin(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Atan)),
+                transpiler => ("\treturn std::atan(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Atan2)),
+                transpiler => ("\treturn std::atan2(a_0, a_1);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Ceiling)),
+                transpiler => ("\treturn std::ceil(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Cos)),
+                transpiler => ("\treturn std::cos(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Exp)),
+                transpiler => ("\treturn std::exp(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Floor)),
+                transpiler => ("\treturn std::floor(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Log), new[] { typeof(float) }),
+                transpiler => ("\treturn std::log(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Log10)),
+                transpiler => ("\treturn std::log10(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod("ModF", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn std::modf(a_0, a_1);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Pow)),
+                transpiler => ("\treturn std::pow(a_0, a_1);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Sin)),
+                transpiler => ("\treturn std::sin(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Sqrt)),
+                transpiler => ("\treturn std::sqrt(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Tan)),
+                transpiler => ("\treturn std::tan(a_0);\n", 1)
+            );
+        })
         .For(typeof(Random), (type, code) =>
         {
             code.For(
@@ -889,11 +989,6 @@ namespace IL2CXX
 {'\t'}std::cout << std::endl;
 ", 0)
             );
-        })
-        .For(typeof(ModuleHandle), (type, code) =>
-        {
-            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(Module))} v_m_5fptr;
-", true);
         })
         .For(typeof(MissingMemberException), (type, code) =>
         {

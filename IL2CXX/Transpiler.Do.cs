@@ -51,9 +51,7 @@ namespace IL2CXX
             var prototype = $@"{returns}
 {identifier}({string.Join(",", arguments)}
 )";
-            functionDeclarations.WriteLine(description);
-            functionDeclarations.Write(prototype);
-            functionDeclarations.WriteLine(';');
+            functionDeclarations.WriteLine($"{description}\n{prototype};");
             if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
 inline {returns}
 {identifier}__v({string.Join(",", arguments.Skip(1).Prepend($"\n\t{Escape(method.DeclaringType)}* a_0"))}
@@ -93,19 +91,19 @@ inline {returns}
                 var inline = aggressive || bytes?.Length <= 64;
                 writer = writerForType(method.DeclaringType, inline);
                 writer.WriteLine(description);
-                if (aggressive) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
+                if (aggressive && bytes?.Length <= 128) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
                 if (inline) writer.Write("inline ");
             }
             var dllimport = method.GetCustomAttribute<DllImportAttribute>();
             if (dllimport != null)
             {
-                functionDeclarations.WriteLine("// DLL import:");
-                functionDeclarations.WriteLine($"//\tValue: {dllimport.Value}");
-                functionDeclarations.WriteLine($"//\tEntryPoint: {dllimport.EntryPoint}");
-                functionDeclarations.WriteLine($"//\tSetLastError: {dllimport.SetLastError}");
-                writer.WriteLine(prototype);
-                writer.WriteLine('{');
-                writer.WriteLine($"\tstatic t_library library(\"{dllimport.Value}\"s, \"{dllimport.EntryPoint ?? method.Name}\");");
+                functionDeclarations.WriteLine($@"// DLL import:
+//{'\t'}Value: {dllimport.Value}
+//{'\t'}EntryPoint: {dllimport.EntryPoint}
+//{'\t'}SetLastError: {dllimport.SetLastError}");
+                writer.WriteLine($@"{prototype}
+{{
+{'\t'}static t_library library(""{dllimport.Value}""s, ""{dllimport.EntryPoint ?? method.Name}"");");
                 GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "library.f_symbol()", writer, dllimport.CharSet);
                 writer.WriteLine('}');
                 return;
@@ -115,27 +113,19 @@ inline {returns}
                 functionDeclarations.WriteLine("// TO BE PROVIDED");
                 return;
             }
-            writer.Write(prototype);
-            writer.WriteLine($@"
+            writer.WriteLine($@"{prototype}
 {{{string.Join(string.Empty, body.ExceptionHandlingClauses.Select(x => $"\n\t// {x}"))}");
             definedIndices = new SortedDictionary<string, (string, int)>();
             indexToStack = new Dictionary<int, Stack>();
             log($"{method.DeclaringType}::[{method}]");
-            foreach (var x in body.ExceptionHandlingClauses)
-            {
-                log($"{x.Flags}");
-                log($"\ttry: {x.TryOffset:x04} to {x.TryOffset + x.TryLength:x04}");
-                log($"\thandler: {x.HandlerOffset:x04} to {x.HandlerOffset + x.HandlerLength:x04}");
-                switch (x.Flags)
-                {
-                    case ExceptionHandlingClauseOptions.Clause:
-                        log($"\tcatch: {x.CatchType}");
-                        break;
-                    case ExceptionHandlingClauseOptions.Filter:
-                        log($"\tfilter: {x.FilterOffset:x04}");
-                        break;
-                }
-            }
+            foreach (var x in body.ExceptionHandlingClauses) log($@"{x.Flags}
+{'\t'}try: {x.TryOffset:x04} to {x.TryOffset + x.TryLength:x04}
+{'\t'}handler: {x.HandlerOffset:x04} to {x.HandlerOffset + x.HandlerLength:x04}{ x.Flags switch
+{
+    ExceptionHandlingClauseOptions.Clause => $"\n\tcatch: {x.CatchType}",
+    ExceptionHandlingClauseOptions.Filter => $"\n\tfilter: {x.FilterOffset:x04}",
+    _ => string.Empty
+}}");
             Estimate(0, new Stack(this));
             foreach (var x in body.ExceptionHandlingClauses)
                 switch (x.Flags)
@@ -248,7 +238,7 @@ inline {returns}
             Enqueue(typeof(ThreadStart).GetMethod("Invoke"));
             Enqueue(typeof(ParameterizedThreadStart).GetMethod("Invoke"));
             Define(typeof(void));
-            Define(typeof(string));
+            Define(typeof(string[]));
             Define(typeof(StringBuilder));
             Define(method.DeclaringType);
             Enqueue(method);
@@ -350,6 +340,15 @@ std::map<std::string_view, t__type*> v__name_to_type{{
 }};
 ");
             writerForDefinitions.Write(fieldDefinitions);
+            var arguments0 = string.Empty;
+            var arguments1 = string.Empty;
+            if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeof(string[]) }))
+            {
+                arguments0 = $@"
+{'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeof(string[]))}, {EscapeForMember(typeof(string))}>(argc);
+{'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f__data()[i] = f__new_string(f__u16string(argv[i]));";
+                arguments1 = "arguments";
+            }
             writerForDefinitions.WriteLine($@"
 t_static* t_static::v_instance;
 
@@ -364,13 +363,13 @@ int main(int argc, char* argv[])
 {'\t'}t_engine::t_options options;
 {'\t'}options.v_verbose = std::getenv(""IL2CXX_VERBOSE"");
 {'\t'}options.v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
-{'\t'}t_engine engine(options, argc, argv);
+{'\t'}t_engine engine(options);
 {'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
 {'\t'}{{
 {'\t'}{'\t'}reinterpret_cast<void(*)(t_object*)>(reinterpret_cast<void**>(a_p->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
-{'\t'}}}, []
-{'\t'}{{
-{'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}();\n\t\treturn 0" : $"return {Escape(method)}()")};
+{'\t'}}}, [&]
+{'\t'}{{{arguments0}
+{'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}({arguments1});\n\t\treturn 0" : $"return {Escape(method)}({arguments1})")};
 {'\t'}}});
 }}");
         }

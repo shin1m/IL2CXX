@@ -21,7 +21,8 @@ namespace IL2CXX
             int IEqualityComparer<Type[]>.GetHashCode(Type[] x) => x.Select(y => y.GetHashCode()).Aggregate((y, z) => y % z);
 
             public readonly Type Type;
-            public bool IsManaged = false;
+            public bool IsManaged;
+            public bool HasUnmanaged;
             public readonly List<MethodInfo> Methods = new List<MethodInfo>();
             public readonly Dictionary<MethodKey, int> MethodToIndex = new Dictionary<MethodKey, int>();
 
@@ -56,12 +57,12 @@ namespace IL2CXX
 
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
             {
+                IsManaged = !Type.IsValueType;
                 if (Type.BaseType != null)
                 {
                     Base = (TypeDefinition)transpiler.Define(Type.BaseType);
                     Methods.AddRange(Base.Methods);
                 }
-                IsManaged = Type == typeof(object) || Type != typeof(ValueType) && Base.IsManaged;
                 foreach (var x in Type.GetMethods(declaredAndInstance).Where(x => x.IsVirtual))
                 {
                     var i = GetIndex(x.GetBaseDefinition());
@@ -251,6 +252,7 @@ struct t__static_{identifier}
                     {
                         var mm = builtin.GetMembers(this, type);
                         members = mm.members;
+                        var unmanaged = mm.unmanaged;
                         if (members == null)
                         {
                             string scan(Type x, string y) => x.IsValueType ? $"{y}.f__scan(a_scan)" : $"a_scan({y})";
@@ -275,40 +277,140 @@ struct t__static_{identifier}
                             else
                             {
                                 var fields = type.GetFields(declaredAndInstance);
-                                td.IsManaged |= fields.Select(x => x.FieldType).Any(x => IsComposite(x) && (!x.IsValueType || Define(x).IsManaged));
+                                if (type.IsValueType) td.IsManaged = fields.Select(x => x.FieldType).Any(x => IsComposite(x) && (!x.IsValueType || Define(x).IsManaged));
+                                var blittable = false;
+                                var layout = type.StructLayoutAttribute;
+                                if (layout?.Value == LayoutKind.Sequential)
+                                    try
+                                    {
+                                        GCHandle.Alloc(Activator.CreateInstance(type), GCHandleType.Pinned).Free();
+                                        Marshal.SizeOf(type);
+                                        foreach (var x in fields) Marshal.SizeOf(x.FieldType);
+                                        blittable = true;
+                                    }
+                                    catch
+                                    {
+                                        try
+                                        {
+                                            var n = Marshal.SizeOf(type);
+                                            var sb = new StringBuilder($@"
+#pragma pack(push, 1)
+struct {Escape(type)}__unmanaged
+{{
+");
+                                            var i = 0;
+                                            foreach (var x in fields)
+                                            {
+                                                var j = (int)Marshal.OffsetOf(type, x.Name);
+                                                if (j > i) sb.AppendLine($"\tchar v__padding{i}[{j - i}];");
+                                                var f = Escape(x);
+                                                var marshalAs = x.GetCustomAttribute<MarshalAsAttribute>();
+                                                if (x.FieldType == typeof(string))
+                                                {
+                                                    var unicode = layout.CharSet == CharSet.Unicode;
+                                                    if (marshalAs?.Value == UnmanagedType.ByValTStr)
+                                                    {
+                                                        sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {f}[{marshalAs.SizeConst}];");
+                                                        i = j + marshalAs.SizeConst * (unicode ? 2 : 1);
+                                                    }
+                                                    else
+                                                    {
+                                                        switch (marshalAs?.Value)
+                                                        {
+                                                            case null:
+                                                            case UnmanagedType.LPStr:
+                                                                unicode = false;
+                                                                break;
+                                                            case UnmanagedType.LPWStr:
+                                                                unicode = true;
+                                                                break;
+                                                        }
+                                                        sb.AppendLine($"\t{(unicode ? "char16_t" : "char")}* {f};");
+                                                        i = j + Marshal.SizeOf<IntPtr>();
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    sb.AppendLine(Define(x.FieldType).HasUnmanaged
+                                                        ? $"\t{Escape(x.FieldType)}__unmanaged {f};"
+                                                        : $"\t{EscapeForValue(x.FieldType)} {f};"
+                                                    );
+                                                    i = j + Marshal.SizeOf(x.FieldType);
+                                                }
+                                            }
+                                            if (n > i) sb.AppendLine($"\tchar v__padding{i}[{n - i}];");
+                                            var at = $"{Escape(type)}{(type.IsValueType ? "::t_value" : string.Empty)}*";
+                                            var fs = fields.Select(Escape);
+                                            unmanaged = sb.AppendLine($@"{'\t'}void f_in(const {at} a_p)
+{'\t'}{{
+{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_in({x}, a_p->{x});\n"))}{'\t'}}}
+{'\t'}void f_out({at} a_p) const
+{'\t'}{{
+{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_out({x}, a_p->{x});\n"))}{'\t'}}}
+{'\t'}void f_destroy()
+{'\t'}{{
+{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_destroy({x});\n"))}{'\t'}}}
+}};
+#pragma pack(pop)").ToString();
+                                        } catch { }
+                                    }
                                 string variables(string indent)
                                 {
                                     var sb = new StringBuilder();
                                     string variable(FieldInfo x) => $"{EscapeForMember(x.FieldType)} {Escape(x)};";
-                                    var layout = type.StructLayoutAttribute;
                                     if (layout?.Value == LayoutKind.Explicit)
                                     {
-                                        sb.AppendLine($"{indent}union\n{indent}{{");
-                                        if (layout.Size > 0) sb.AppendLine($"{indent}\tchar v__size[{layout.Size}];");
+                                        int n;
+                                        try
+                                        {
+                                            n = Marshal.SizeOf(type);
+                                        }
+                                        catch
+                                        {
+                                            n = layout.Size;
+                                        }
+                                        sb.AppendLine($@"#pragma pack(push, 1)
+{indent}union
+{indent}{{
+{indent}{'\t'}char v__size[{n}];");
                                         var i = 0;
                                         foreach (var x in fields)
                                         {
-                                            var offset = x.GetCustomAttribute<FieldOffsetAttribute>().Value;
-                                            sb.AppendLine(offset > 0 ? $@"{indent}{'\t'}struct
+                                            int j;
+                                            try
+                                            {
+                                                j = (int)Marshal.OffsetOf(type, x.Name);
+                                            }
+                                            catch
+                                            {
+                                                j = x.GetCustomAttribute<FieldOffsetAttribute>().Value;
+                                            }
+                                            sb.AppendLine(j > 0 ? $@"{indent}{'\t'}struct
 {indent}{'\t'}{{
-{indent}{'\t'}{'\t'}char v__offset{i++}[{offset}];
+{indent}{'\t'}{'\t'}char v__offset{i++}[{j}];
 {indent}{'\t'}{'\t'}{variable(x)}
 {indent}{'\t'}}};" : $"{indent}\t{variable(x)}");
                                         }
-                                        sb.AppendLine($"{indent}}};");
+                                        sb.AppendLine($"{indent}}};\n#pragma pack(pop)");
                                     }
-                                    else
+                                    else if (blittable)
                                     {
+                                        sb.AppendLine("#pragma pack(push, 1)");
                                         var i = 0;
                                         foreach (var x in fields)
                                         {
+                                            var j = (int)Marshal.OffsetOf(type, x.Name);
+                                            if (j > i) sb.AppendLine($"{indent}char v__padding{i}[{j - i}];");
                                             sb.AppendLine($"{indent}{variable(x)}");
-                                            try
-                                            {
-                                                i += Marshal.SizeOf(x.FieldType);
-                                            } catch { }
+                                            i = j + Marshal.SizeOf(x.FieldType);
                                         }
-                                        if (layout?.Size > i) sb.AppendLine($"{indent}char v__padding[{layout.Size - i}];");
+                                        var n = Marshal.SizeOf(type);
+                                        if (n > i) sb.AppendLine($"{indent}char v__padding{i}[{n - i}];");
+                                        sb.AppendLine("#pragma pack(pop)");
+                                    }
+                                    else
+                                    {
+                                        foreach (var x in fields) sb.AppendLine($"{indent}{variable(x)}");
                                     }
                                     return sb.ToString();
                                 }
@@ -334,7 +436,7 @@ struct t__static_{identifier}
                         }
                         else
                         {
-                            td.IsManaged |= mm.managed;
+                            if (type.IsValueType) td.IsManaged = mm.managed;
                         }
                         if (type.IsValueType) members = $@"{'\t'}struct t_value
 {'\t'}{{
@@ -350,6 +452,8 @@ struct t__static_{identifier}
 {'\t'}{'\t'}v__value.f__scan(a_scan);
 {'\t'}}}
 ";
+                        staticDefinitions.Write(unmanaged);
+                        td.HasUnmanaged = unmanaged?.Length > 0;
                     }
                     typeDeclarations.WriteLine($"{declaration};");
                     typeDefinitions.WriteLine($@"
@@ -422,6 +526,10 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
 {'\t'}static t_object* f_do_clone(const t_object* a_this);");
                 if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine("\tstatic void f_do_copy(const char* a_from, size_t a_n, char* a_to);");
+                if (definition.HasUnmanaged)
+                    writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t_object* a_this, void* a_p);
+{'\t'}static void f_do_from_unmanaged(t_object* a_this, const void* a_p);
+{'\t'}static void f_do_destroy_unmanaged(void* a_p);");
             }
             else
             {
@@ -436,6 +544,20 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
     type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"
 )})
 {{");
+            if (definition is TypeDefinition) writerForDefinitions.WriteLine($"\tv__managed_size = sizeof({Escape(type)});");
+            if (definition.HasUnmanaged)
+                writerForDefinitions.WriteLine($@"{'\t'}v__unmanaged_size = sizeof({Escape(type)}__unmanaged);
+{'\t'}f_to_unmanaged = f_do_to_unmanaged;
+{'\t'}f_from_unmanaged = f_do_from_unmanaged;
+{'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged;");
+            else
+                try
+                {
+                    writerForDefinitions.WriteLine($@"{'\t'}v__unmanaged_size = {Marshal.SizeOf(type)};
+{'\t'}f_to_unmanaged = f_do_to_unmanaged_blittable;
+{'\t'}f_from_unmanaged = f_do_from_unmanaged_blittable;
+{'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged_blittable;");
+                } catch { }
             if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
 {'\t'}v__rank = {type.GetArrayRank()};");
             if (td?.DefaultConstructor != null) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
@@ -487,6 +609,25 @@ void t__type_of<{identifier}>::f_do_copy(const char* a_from, size_t a_n, char* a
 {'\t'}return p;");
                 }
                 writerForDefinitions.WriteLine('}');
+                if (definition.HasUnmanaged)
+                {
+                    string @this(string qualifier) => type.IsValueType
+                        ? $"reinterpret_cast<{qualifier} {identifier}::t_value*>(a_this + 1)"
+                        : $"static_cast<{qualifier} {identifier}*>(a_this)";
+                    var at = $"{identifier}{(type.IsValueType ? "::t_value" : string.Empty)}*";
+                    writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_to_unmanaged(const t_object* a_this, void* a_p)
+{{
+{'\t'}static_cast<{identifier}__unmanaged*>(a_p)->f_in({@this("const ")});
+}}
+void t__type_of<{identifier}>::f_do_from_unmanaged(t_object* a_this, const void* a_p)
+{{
+{'\t'}static_cast<const {identifier}__unmanaged*>(a_p)->f_out({@this(string.Empty)});
+}}
+void t__type_of<{identifier}>::f_do_destroy_unmanaged(void* a_p)
+{{
+{'\t'}static_cast<{identifier}__unmanaged*>(a_p)->f_destroy();
+}}");
+                }
             }
         }
     }

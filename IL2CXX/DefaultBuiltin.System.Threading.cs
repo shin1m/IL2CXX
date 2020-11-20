@@ -135,7 +135,7 @@ namespace IL2CXX
 {'\t'}{'\t'}a_scan(v__5fthreadStartArg);
 {'\t'}{'\t'}a_scan(v__deserialization_tracker);
 {'\t'}}}
-", true);
+", true, null);
             code.For(
                 type.GetConstructor(new[] { typeof(ThreadStart) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();

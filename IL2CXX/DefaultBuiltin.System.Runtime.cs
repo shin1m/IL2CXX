@@ -40,6 +40,12 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_1") + "\tstd::memcpy(a_1->f__data() + a_2, a_0, a_3);\n", 1)
             );
             code.For(
+                type.GetMethod(nameof(Marshal.DestroyStructure), new[] { typeof(IntPtr), typeof(Type) }),
+                transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}static_cast<t__type*>(a_1)->f_destroy_unmanaged(a_0);
+", 1)
+            );
+            code.For(
                 type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto p = static_cast<t__type*>(a_1);
@@ -72,17 +78,28 @@ namespace IL2CXX
                 type.GetMethod("IsPinnable", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn true;\n", 1)
             );
-            // TODO
             code.For(
                 type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(Type) }, null),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_1);
+{'\t'}auto p = f_engine()->f_object__allocate(type->v__managed_size);
+{'\t'}type->f_from_unmanaged(p, a_0);
+{'\t'}type->f__finish(p);
+{'\t'}return p;
+", 1)
             );
             code.For(
                 type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto p = static_cast<t__type*>(a_0);
-{'\t'}if (a_1 && p->v__managed) throw std::runtime_error(""not marshalable"");
-{'\t'}return p->v__size;
+{'\t'}if (a_1 && p->v__unmanaged_size <= 0) throw std::runtime_error(""not marshalable"");
+{'\t'}return p->v__unmanaged_size;
+", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Marshal.StructureToPtr), new[] { typeof(object), typeof(IntPtr), typeof(bool) }),
+                transpiler => ($@"{'\t'}if (a_2) a_0->f_type()->f_destroy_unmanaged(a_1);
+{'\t'}return a_0->f_type()->f_to_unmanaged(a_0, a_1);
 ", 1)
             );
         })

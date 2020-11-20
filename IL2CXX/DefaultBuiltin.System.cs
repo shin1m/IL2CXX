@@ -16,12 +16,12 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
+                transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
             );
             // TODO
             code.For(
                 type.GetMethod(nameof(object.ToString), new[] { typeof(string), typeof(IFormatProvider) }),
-                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
+                transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
             );
         }
         private static Action<Type, Builtin.Code> ForIntPtr(string native) => (type, code) =>
@@ -48,10 +48,10 @@ namespace IL2CXX
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}return reinterpret_cast<{native}>(v__5fvalue);
 {'\t'}{'\t'}}}
-", false);
+", false, null);
             code.For(
                 type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => ("\treturn f__new_string(f__u16string(std::to_string(*a_0)));\n", 0)
+                transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
             );
         };
 
@@ -187,7 +187,7 @@ namespace IL2CXX
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-", false);
+", false, null);
             code.For(
                 type.GetProperty(nameof(RuntimeFieldHandle.Value)).GetMethod,
                 transpiler => ($"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{a_0->v__field}};\n", 1)
@@ -218,7 +218,7 @@ namespace IL2CXX
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-", true);
+", true, null);
             code.For(
                 type.GetMethod(nameof(object.GetHashCode)),
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0->v__type);\n", 1)
@@ -240,7 +240,7 @@ namespace IL2CXX
 {'\t'}{{
 {'\t'}{'\t'}return reinterpret_cast<t__bound*>(this + 1);
 {'\t'}}}
-", true);
+", true, null);
             code.For(
                 type.GetMethod(nameof(Array.Copy), BindingFlags.Static | BindingFlags.NonPublic, null, new[] { type, typeof(int), type, typeof(int), typeof(int), typeof(bool) }, null),
                 transpiler => ($@"{'\t'}if (a_5) throw std::runtime_error(""NotImplementedException"");
@@ -618,11 +618,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetConstructor(new[] { typeof(sbyte*) }),
-                transpiler => ("\treturn f__new_string(f__u16string(reinterpret_cast<char*>(a_0)));\n", 1)
+                transpiler => ("\treturn f__new_string(reinterpret_cast<char*>(a_0));\n", 1)
             );
             code.For(
                 type.GetConstructor(new[] { typeof(sbyte*), typeof(int), typeof(int) }),
-                transpiler => ("\treturn f__new_string(f__u16string({reinterpret_cast<char*>(a_0) + a_1, a_2}));\n", 1)
+                transpiler => ("\treturn f__new_string(std::string_view(reinterpret_cast<char*>(a_0) + a_1, a_2));\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(string.Length)).GetMethod,
@@ -788,7 +788,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Environment.GetEnvironmentVariable), new[] { typeof(string) }),
                 transpiler => ($@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
-{'\t'}return p ? f__new_string(f__u16string(p)) : nullptr;
+{'\t'}return p ? f__new_string(p) : nullptr;
 ", 0)
             );
         })

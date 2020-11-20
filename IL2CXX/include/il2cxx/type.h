@@ -76,6 +76,8 @@ struct t__type : t__abstract_type
 	std::u16string_view v__display_name;
 	bool v__managed;
 	size_t v__size;
+	size_t v__managed_size = 0;
+	size_t v__unmanaged_size = 0;
 	union
 	{
 		struct
@@ -122,6 +124,15 @@ struct t__type : t__abstract_type
 	void (*f_suppress_finalize)(t_object*) = f_do_suppress_finalize;
 	static void f_do_copy(const char* a_from, size_t a_n, char* a_to);
 	void (*f_copy)(const char*, size_t, char*) = f_do_copy;
+	static void f_do_to_unmanaged(const t_object* a_this, void* a_p);
+	static void f_do_to_unmanaged_blittable(const t_object* a_this, void* a_p);
+	void (*f_to_unmanaged)(const t_object*, void*) = f_do_to_unmanaged;
+	static void f_do_from_unmanaged(t_object* a_this, const void* a_p);
+	static void f_do_from_unmanaged_blittable(t_object* a_this, const void* a_p);
+	void (*f_from_unmanaged)(t_object*, const void*) = f_do_from_unmanaged;
+	static void f_do_destroy_unmanaged(void* a_p);
+	static void f_do_destroy_unmanaged_blittable(void* a_p);
+	void (*f_destroy_unmanaged)(void*) = f_do_destroy_unmanaged;
 	bool f__is(t__type* a_type) const
 	{
 		auto p = this;

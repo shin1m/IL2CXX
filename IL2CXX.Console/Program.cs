@@ -13,7 +13,7 @@ namespace IL2CXX.Console
             if (args.Length < 1) return 1;
             var assembly = Assembly.LoadFrom(args[0]);
             var entry = assembly.EntryPoint ?? throw new InvalidOperationException();
-            var @out = "out";
+            var @out = args.Length < 2 ? "out" : args[1];
             if (Directory.Exists(@out)) Directory.Delete(@out, true);
             Directory.CreateDirectory(@out);
             //var transpiler = new Transpiler(DefaultBuiltin.Create(), Console.Error.WriteLine);

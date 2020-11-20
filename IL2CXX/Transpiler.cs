@@ -450,7 +450,7 @@ namespace IL2CXX
         private void GenerateCall(MethodBase method, string function, Stack stack, Stack after)
         {
             var call = GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable));
-            writer.Write($"\t{(GetReturnType(method) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};\n");
+            writer.WriteLine($"\t{(GetReturnType(method) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};");
         }
         private int EnqueueIndexOf(MethodBase method, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
         {
@@ -538,11 +538,21 @@ namespace IL2CXX
                 {
                     writer.WriteLine($"\tauto cs{i} = {(charset == CharSet.Unicode ? "f__to_cs16" : "f__to_cs")}(a_{i});");
                 }
-                else if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType.IsByRef)
+                else if (x.ParameterType.IsByRef)
                 {
                     var e = GetElementType(x.ParameterType);
-                    writer.WriteLine($"\t*a_{i} = ({EscapeForValue(e)}){{}};");
-                    if (typeof(SafeHandle).IsAssignableFrom(e)) writer.WriteLine($"\tvoid* p{i};");
+                    var @out = Attribute.IsDefined(x, typeof(OutAttribute));
+                    if (@out) writer.WriteLine($"\tf__store(*a_{i}, ({EscapeForValue(e)}){{}});");
+                    if (typeof(SafeHandle).IsAssignableFrom(e))
+                    {
+                        writer.WriteLine($"\tvoid* p{i};");
+                        if (!@out) writer.WriteLine($"\tp{i} = *a_{i};");
+                    }
+                    else if (Define(e).HasUnmanaged)
+                    {
+                        writer.WriteLine($"\t{Escape(e)}__unmanaged p{i};");
+                        if (!@out) writer.WriteLine($"\tp{i}.f_in(a_{i});");
+                    }
                 }
             writer.Write($"\t{(@return == typeof(void) ? string.Empty : "auto result = ")}reinterpret_cast<{(typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : EscapeForValue(@return))}(*)(");
             writer.WriteLine(string.Join(",", parameters.Select(x => x.Parameter.ParameterType).Select(x =>
@@ -553,6 +563,7 @@ namespace IL2CXX
                 {
                     var e = GetElementType(x);
                     if (e == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(e)) return "void**";
+                    if (Define(e).HasUnmanaged) return $"{Escape(e)}__unmanaged*";
                 }
                 if (x == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(x)) return "void*";
                 if (IsComposite(x))
@@ -577,7 +588,7 @@ namespace IL2CXX
                 {
                     var e = GetElementType(x);
                     if (e == typeof(IntPtr)) return $"&a_{i}->v__5fvalue";
-                    if (typeof(SafeHandle).IsAssignableFrom(e)) return $"&p{i}";
+                    if (typeof(SafeHandle).IsAssignableFrom(e) || Define(e).HasUnmanaged) return $"&p{i}";
                 }
                 if (typeof(SafeHandle).IsAssignableFrom(x)) return $"a_{i}->v_handle";
                 if (IsComposite(x))
@@ -593,9 +604,13 @@ namespace IL2CXX
                 {
                     writer.WriteLine($"\tf__from(a_{i}, cs{i}.data());");
                 }
-                else if (Attribute.IsDefined(x, typeof(OutAttribute)) && x.ParameterType.IsByRef)
+                else if (x.ParameterType.IsByRef)
                 {
-                    if (typeof(SafeHandle).IsAssignableFrom(GetElementType(x.ParameterType))) writer.WriteLine($"\t(*a_{i})->v_handle = p{i};");
+                    var e = GetElementType(x.ParameterType);
+                    if (typeof(SafeHandle).IsAssignableFrom(e))
+                        writer.WriteLine($"\t(*a_{i})->v_handle = p{i};");
+                    else if (Define(e).HasUnmanaged)
+                        writer.WriteLine($"\tp{i}.f_out(a_{i});");
                 }
             if (typeof(SafeHandle).IsAssignableFrom(@return))
             {

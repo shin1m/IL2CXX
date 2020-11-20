@@ -34,7 +34,7 @@ namespace IL2CXX
 {'\t'}int32_t v__5fnumResources;
 {'\t'}{transpiler.EscapeForMember(typeof(UnmanagedMemoryStream))} v__5fums;
 {'\t'}int32_t v__5fversion;
-", true);
+", true, null);
             code.For(
                 type.GetMethod("_LoadObjectV1", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)

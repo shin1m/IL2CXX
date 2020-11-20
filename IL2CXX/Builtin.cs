@@ -12,7 +12,7 @@ namespace IL2CXX
         public class Code
         {
             public string Base;
-            public Func<Transpiler, (string, bool)> Members;
+            public Func<Transpiler, (string, bool, string)> Members;
             public Func<Transpiler, string> Initialize;
             public Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, int inline)>> MethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, (string, int)>>();
             public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string, int)>>();
@@ -36,7 +36,7 @@ namespace IL2CXX
         }
 
         public string GetBase(Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Base : null;
-        public (string members, bool managed) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? default : default;
+        public (string members, bool managed, string unmanaged) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? default : default;
         public string GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
         public (string body, int inline) GetBody(Transpiler transpiler, MethodBase method)
         {

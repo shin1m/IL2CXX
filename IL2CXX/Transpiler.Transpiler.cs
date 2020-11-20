@@ -635,38 +635,29 @@ namespace IL2CXX
                     }
                     else
                     {
+                        string generate(MethodBase cm)
+                        {
+                            Enqueue(cm);
+                            var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append("p"));
+                            return $"\t{(GetReturnType(cm) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};\n";
+                        }
                         if (constrained.IsValueType)
                         {
-                            if (isConcrete)
-                            {
-                                generateConcrete(m);
-                            }
+                            var cm = isConcrete ? m : concrete(constrained);
+                            if (cm.DeclaringType == constrained)
+                                generateConcrete(cm);
                             else
-                            {
-                                var cm = concrete(constrained);
-                                if (cm.DeclaringType == constrained)
-                                    generateConcrete(cm);
-                                else
-                                    writer.WriteLine($@"{'\t'}{{auto p = f__new_constructed<{Escape(constrained)}>(*{CastValue(MakePointerType(constrained), @this.Variable)});
-{generateVirtual("p")}{'\t'}}}");
-                            }
+                                writer.WriteLine($@"{'\t'}{{auto p = f__new_constructed<{Escape(constrained)}>(*{CastValue(MakePointerType(constrained), @this.Variable)});
+{(isConcrete ? generate(m) : generateVirtual("p"))}{'\t'}}}");
                         }
                         else
                         {
-                            void generate(MethodBase cm)
-                            {
-                                Enqueue(cm);
-                                var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append("p"));
-                                writer.Write($"\t{(GetReturnType(cm) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};\n");
-                            }
-                            writer.WriteLine($"\t{{auto p = *static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({@this.Variable});");
-                            if (isConcrete)
-                                generate(m);
-                            else if (constrained.IsSealed)
-                                generate(concrete(constrained));
-                            else
-                                writer.Write(GenerateCheckNull("p") + generateVirtual("p"));
-                            writer.WriteLine("\t}");
+                            writer.WriteLine($@"{'\t'}{{auto p = *static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({@this.Variable});
+{(
+    isConcrete ? generate(m) :
+    constrained.IsSealed ? generate(concrete(constrained)) :
+    GenerateCheckNull("p") + generateVirtual("p")
+)}{'\t'}}}");
                         }
                         constrained = null;
                     }

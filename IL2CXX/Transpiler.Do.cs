@@ -346,7 +346,7 @@ std::map<std::string_view, t__type*> v__name_to_type{{
             {
                 arguments0 = $@"
 {'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeof(string[]))}, {EscapeForMember(typeof(string))}>(argc);
-{'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f__data()[i] = f__new_string(f__u16string(argv[i]));";
+{'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f__data()[i] = f__new_string(argv[i]);";
                 arguments1 = "arguments";
             }
             writerForDefinitions.WriteLine($@"

@@ -1,3 +1,30 @@
+t_System_2eString* f__new_string(std::string_view a_x)
+{
+	auto p = f__new_string(a_x.size());
+	auto q = &p->v__5ffirstChar;
+	f__to_u16(a_x.data(), a_x.data() + a_x.size(), [&](auto c)
+	{
+		*q++ = c;
+	});
+	return p;
+}
+
+char* f__copy_to(const t_System_2eString* a_x, char* a_p, char* a_q)
+{
+	std::mbstate_t state{};
+	char mb[MB_LEN_MAX];
+	for (auto c : std::u16string_view{&a_x->v__5ffirstChar, static_cast<size_t>(a_x->v__5fstringLength + 1)}) {
+		auto n = std::c16rtomb(mb, c, &state);
+		if (n == size_t(-1)) continue;
+		if (a_p + n >= a_q) {
+			*a_p = '\0';
+			return a_p;
+		}
+		a_p = std::copy_n(mb, n, a_p);
+	}
+	return a_p;
+}
+
 std::vector<char16_t> f__to_cs16(t_System_2eText_2eStringBuilder* a_p)
 {
 	std::vector<char16_t> cs(a_p->v_m_5fChunkOffset + a_p->v_m_5fChunkChars->v__length + 1);

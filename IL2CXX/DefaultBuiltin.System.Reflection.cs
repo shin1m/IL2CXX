@@ -21,7 +21,7 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}char cs[PATH_MAX];
 {'\t'}auto r = readlink(""/proc/self/exe"", cs, sizeof(cs));
 {'\t'}if (r == -1) throw std::system_error(errno, std::generic_category());
-{'\t'}return f__new_string(f__u16string({{cs, static_cast<size_t>(r)}}));
+{'\t'}return f__new_string(std::string_view(cs, static_cast<size_t>(r)));
 ", 0)
             );
         })
@@ -42,7 +42,7 @@ namespace IL2CXX
 {'\t'}//{transpiler.EscapeForMember(Type.GetType("System.Reflection.CustomAttributeNamedParameter[]"))} v_m_5fnamedParams;
 {'\t'}{transpiler.EscapeForMember(typeof(object))} v_m_5ftypedCtorArgs;
 {'\t'}{transpiler.EscapeForMember(typeof(object))} v_m_5fnamedArgs;
-", true);
+", true, null);
             // TODO
             code.For(
                 type.GetProperty(nameof(CustomAttributeData.ConstructorArguments)).GetMethod,
@@ -59,7 +59,7 @@ namespace IL2CXX
             code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(Type))} v_m_5ftype;
 {'\t'}int32_t v_m_5fisPinned;
 {'\t'}int32_t v_m_5flocalIndex;
-", true);
+", true, null);
         });
     }
 }

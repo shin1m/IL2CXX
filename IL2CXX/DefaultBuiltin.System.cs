@@ -810,7 +810,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("GetSystemTimeAsFileTime", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ($"\treturn std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch() + std::chrono::seconds(11644473600l)).count() / 100;\n", 0)
             );
         })
         .For(typeof(Math), (type, code) =>

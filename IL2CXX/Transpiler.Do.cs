@@ -259,7 +259,8 @@ namespace il2cxx
             writerForDeclarations.WriteLine(@"
 extern t__runtime_assembly* const v__entry_assembly;
 
-extern std::map<std::string_view, t__type*> v__name_to_type;");
+extern const std::map<std::string_view, t__type*> v__name_to_type;
+extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
             writerForDeclarations.Write(functionDeclarations);
             var assemblyIdentifiers = new HashSet<string>();
             var assemblyToIdentifier = new Dictionary<Assembly, string>();
@@ -335,8 +336,44 @@ struct t_thread_static
 
 t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
 
-std::map<std::string_view, t__type*> v__name_to_type{{
-{string.Join(",\n", runtimeDefinitions.Select(x => $"\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))}
+const std::map<std::string_view, t__type*> v__name_to_type{{{
+    string.Join(",", runtimeDefinitions.Select(x => $"\n\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))
+}
+}};
+
+const std::map<void*, void*> v__managed_method_to_unmanaged{{{
+    string.Join(",", ldftnMethods.OfType<MethodInfo>().Where(m =>
+    {
+        if (!m.IsStatic) return false;
+        var types = m.GetParameters().Select(x => x.ParameterType);
+        var @return = m.ReturnType;
+        if (@return != typeof(void)) types = types.Prepend(@return);
+        try
+        {
+            foreach (var x in types)
+                if (IsComposite(x) && x != typeof(string)) Marshal.SizeOf(x);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }).Select(m => $@"
+{'\t'}{{reinterpret_cast<void*>({Escape(m)}), reinterpret_cast<void*>(+[]({
+        string.Join(",", UnmanagedSignature(m.GetParameters(), CharSet.Auto).Select((x, i) => $"\n\t\t{x} a_{i}"))
+}
+{'\t'}) -> {UnmanagedReturn(m.ReturnType)}
+{'\t'}{{
+{'\t'}{'\t'}return {Escape(m)}({string.Join(",", m.GetParameters().Select((x, i) =>
+        {
+            if (x.ParameterType.IsByRef) return $"reinterpret_cast<{EscapeForStacked(x.ParameterType)}>(a_{i})";
+            if (x.ParameterType == typeof(string)) return $"f__new_string(a_{i})";
+            return $"a_{i}";
+        }).Select(x => $"\n\t\t\t{x}"))
+}
+{'\t'}{'\t'});
+{'\t'}}})}}"))
+}
 }};
 ");
             writerForDefinitions.Write(fieldDefinitions);

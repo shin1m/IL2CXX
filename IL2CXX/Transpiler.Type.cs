@@ -100,22 +100,28 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                     string generate(Type t, string body) => $@"reinterpret_cast<void*>(+[]({
-    string.Join(",", parameters.Prepend(t).Select((x, i) => $"\n\t{transpiler.EscapeForStacked(x)} a_{i}"))
+    string.Join(",", parameters.Prepend(t).Select((x, i) => $"\n\t\t{transpiler.EscapeForStacked(x)} a_{i}"))
 }
-) -> {transpiler.EscapeForStacked(@return)}
-{{
-{body}}});";
-                    using (var writer = new StringWriter())
-                    {
-                        transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);
-                        Delegate = $@"v__multicast_invoke = {generate(typeof(MulticastDelegate), $@"{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f__data();
-{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
-{'\t'}for (intptr_t i = 0; i < n; ++i) {transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, "xs[i]")))});
-{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((x, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, "xs[n]")))});
-")}
-v__invoke_unmanaged = {generate(Type, writer.ToString())}
+{'\t'}) -> {transpiler.EscapeForStacked(@return)}
+{'\t'}{{
+{body}{'\t'}}})";
+                    string call(string @this) => $"{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, @this)))});";
+                    Delegate = $@"{'\t'}v__multicast_invoke = {generate(typeof(MulticastDelegate), $@"{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f__data();
+{'\t'}{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
+{'\t'}{'\t'}for (intptr_t i = 0; i < n; ++i) {call("xs[i]")};
+{'\t'}{'\t'}return {call("xs[n]")};
+")};
 ";
-                    }
+                    try
+                    {
+                        foreach (var x in @return == typeof(void) ? parameters : parameters.Prepend(@return))
+                            if (transpiler.IsComposite(x) && x != typeof(string) && x != typeof(StringBuilder) && !typeof(SafeHandle).IsAssignableFrom(x) && !x.IsArray) Marshal.SizeOf(x);
+                        using (var writer = new StringWriter())
+                        {
+                            transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);
+                            Delegate += $"{'\t'}v__invoke_unmanaged = {generate(Type, writer.ToString())};\n";
+                        }
+                    } catch { }
                 }
             }
             protected override int GetIndex(MethodKey method) => MethodToIndex.TryGetValue(method, out var i) ? i : Base?.GetIndex(method) ?? -1;
@@ -538,7 +544,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, u""{type.Name}""sv, u""{type}""sv, {(
+            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, u""{type.Name}""sv, u""{type.FullName}""sv, u""{type}""sv, {(
     definition.IsManaged ? "true" : "false"
 )}, {(
     type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"

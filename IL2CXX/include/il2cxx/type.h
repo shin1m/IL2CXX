@@ -73,6 +73,7 @@ struct t__type : t__abstract_type
 	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
 	t__runtime_assembly* v__assembly;
 	std::u16string_view v__namespace;
+	std::u16string_view v__full_name;
 	std::u16string_view v__display_name;
 	bool v__managed;
 	size_t v__size;
@@ -98,12 +99,12 @@ struct t__type : t__abstract_type
 		t__type* a_type, t__type* a_base,
 		std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods,
 		t__runtime_assembly* a_assembly,
-		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_display_name,
+		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
 		bool a_managed, size_t a_size
 	) : t__abstract_type(a_type, nullptr, a_name), v__base(a_base),
 	v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
-	v__namespace(a_namespace), v__display_name(a_display_name),
+	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
 	v__managed(a_managed), v__size(a_size)
 	{
 	}

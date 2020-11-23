@@ -83,7 +83,13 @@ namespace IL2CXX
 }
 {'\t'}{'\t'}) -> {transpiler.EscapeForStacked(@return)}
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForStacked(@return))}(*)({string.Join(", ", parameters.Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtrAux.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")))});
+{'\t'}{'\t'}{'\t'}return reinterpret_cast<{
+    transpiler.EscapeForStacked(@return)
+}(*)({
+    string.Join(", ", parameters.Select(x => transpiler.EscapeForStacked(x)))
+})>(a_0->v__5fmethodPtrAux.v__5fvalue)({
+    string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")))
+});
 {'\t'}{'\t'}}});
 {'\t'}{'\t'}p->v__5fmethodPtrAux = a_1;
 {'\t'}}}
@@ -94,7 +100,7 @@ namespace IL2CXX
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    return ($"\t{(@return == typeof(void) ? string.Empty : "return ")}reinterpret_cast<{(@return == typeof(void) ? "void" : transpiler.EscapeForStacked(@return))}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
+                    return ($"\treturn reinterpret_cast<{transpiler.EscapeForStacked(@return)}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
                 }
             }
             if (TypeToCode.TryGetValue(type, out var code))

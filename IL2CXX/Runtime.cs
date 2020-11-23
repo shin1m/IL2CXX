@@ -36,6 +36,7 @@ namespace IL2CXX
     {
         public override Assembly Assembly => throw new NotImplementedException();
         public override Type BaseType => throw new NotImplementedException();
+        public override string FullName => throw new NotImplementedException();
         protected override ConstructorInfo GetConstructorImpl(BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
         protected override bool IsArrayImpl() => throw new NotImplementedException();
         public override bool IsAssignableFrom(Type c) => throw new NotImplementedException();

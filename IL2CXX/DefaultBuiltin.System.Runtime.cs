@@ -59,7 +59,9 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("GetFunctionPointerForDelegateInternal", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn a_0->v__5fmethodPtrAux;\n", 0)
+                transpiler => ($@"{'\t'}if (a_0->v__5fmethodPtr == a_0->f_type()->v__invoke_unmanaged) return a_0->v__5fmethodPtrAux;
+{'\t'}return v__managed_method_to_unmanaged.at(a_0->v__5fmethodPtrAux);
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(Marshal.GetLastWin32Error)),

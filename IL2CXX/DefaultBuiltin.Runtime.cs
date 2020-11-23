@@ -11,15 +11,15 @@ namespace IL2CXX
         {
             code.For(
                 type.GetProperty(nameof(Assembly.EntryPoint)).GetMethod,
-                transpiler => ("\treturn a_0->v__entry_point;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__entry_point;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Assembly.FullName)).GetMethod,
-                transpiler => ("\treturn f__new_string(a_0->v__full_name);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__full_name);\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(RuntimeAssembly.Name)).GetMethod,
-                transpiler => ("\treturn f__new_string(a_0->v__name);\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 1)
             );
         })
         .For(typeof(RuntimeConstructorInfo), (type, code) =>
@@ -33,18 +33,22 @@ namespace IL2CXX
         {
             code.For(
                 type.GetProperty(nameof(MemberInfo.DeclaringType)).GetMethod,
-                transpiler => ("\treturn a_0->v__declaring_type;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__declaring_type;\n", 0)
             );
         })
         .For(typeof(RuntimeType), (type, code) =>
         {
             code.For(
                 type.GetProperty(nameof(Type.Assembly)).GetMethod,
-                transpiler => ("\treturn a_0->v__assembly;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__assembly;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.BaseType)).GetMethod,
-                transpiler => ("\treturn a_0->v__base;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__base;\n", 0)
+            );
+            code.For(
+                type.GetProperty(nameof(Type.FullName)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__full_name);\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.IsAssignableFrom)),
@@ -68,15 +72,15 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Type.Namespace)).GetMethod,
-                transpiler => ("\treturn f__new_string(a_0->v__namespace);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__namespace);\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(MemberInfo.Name)).GetMethod,
-                transpiler => ("\treturn f__new_string(a_0->v__name);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(object.ToString)),
-                transpiler => ("\treturn f__new_string(a_0->v__display_name);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__display_name);\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.TypeHandle)).GetMethod,

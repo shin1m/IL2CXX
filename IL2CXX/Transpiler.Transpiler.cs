@@ -1275,6 +1275,7 @@ namespace IL2CXX
                     var m = ParseMethod(ref index);
                     writer.WriteLine($" {m.DeclaringType}::[{m}]\n\t{indexToStack[index].Variable} = reinterpret_cast<void*>(&{Escape(m)});");
                     Enqueue(m);
+                    ldftnMethods.Add(m);
                     return index;
                 };
             });

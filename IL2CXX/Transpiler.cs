@@ -197,6 +197,7 @@ namespace IL2CXX
         private readonly Dictionary<Type, string> typeToIdentifier = new Dictionary<Type, string>();
         private readonly HashSet<(Type, string)> methodIdentifiers = new HashSet<(Type, string)>();
         private readonly Dictionary<MethodKey, string> methodToIdentifier = new Dictionary<MethodKey, string>();
+        private readonly HashSet<MethodBase> ldftnMethods = new HashSet<MethodBase>();
 
         private static Type MakeByRefType(Type type) => type == typeof(TypedReference) ? typedReferenceByRefType : type.MakeByRefType();
         private static Type MakePointerType(Type type) => type == typeof(TypedReference) ? typeof(TypedReferenceTag*) : type.MakePointerType();
@@ -531,6 +532,25 @@ namespace IL2CXX
                 return construct(GenerateCall(method, GetVirtualFunction(method, target), variables.Append(target)));
             }
         }
+        private string UnmanagedReturn(Type type) => type == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(type) ? "void*" : EscapeForValue(type);
+        private IEnumerable<string> UnmanagedSignature(IEnumerable<ParameterInfo> parameters, CharSet charset) => parameters.Select(x => x.ParameterType).Select(x =>
+        {
+            if (x == typeof(string)) return charset == CharSet.Unicode ? "const char16_t*" : "const char*";
+            if (x == typeof(StringBuilder)) return charset == CharSet.Unicode ? "char16_t*" : "char*";
+            if (x.IsByRef)
+            {
+                var e = GetElementType(x);
+                if (e == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(e)) return "void**";
+                if (Define(e).HasUnmanaged) return $"{Escape(e)}__unmanaged*";
+            }
+            if (x == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(x)) return "void*";
+            if (IsComposite(x))
+            {
+                if (x.IsValueType) return EscapeForValue(x);
+                if (x.IsArray) return $"{EscapeForValue(GetElementType(x))}*";
+            }
+            return EscapeForValue(x);
+        });
         private void GenerateInvokeUnmanaged(Type @return, IEnumerable<(ParameterInfo Parameter, int Index)> parameters, string function, TextWriter writer, CharSet charset = CharSet.Auto)
         {
             foreach (var (x, i) in parameters)
@@ -554,26 +574,12 @@ namespace IL2CXX
                         if (!@out) writer.WriteLine($"\tp{i}.f_in(a_{i});");
                     }
                 }
-            writer.Write($"\t{(@return == typeof(void) ? string.Empty : "auto result = ")}reinterpret_cast<{(typeof(SafeHandle).IsAssignableFrom(@return) ? "void*" : EscapeForValue(@return))}(*)(");
-            writer.WriteLine(string.Join(",", parameters.Select(x => x.Parameter.ParameterType).Select(x =>
-            {
-                if (x == typeof(string)) return charset == CharSet.Unicode ? "const char16_t*" : "const char*";
-                if (x == typeof(StringBuilder)) return charset == CharSet.Unicode ? "char16_t*" : "char*";
-                if (x.IsByRef)
-                {
-                    var e = GetElementType(x);
-                    if (e == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(e)) return "void**";
-                    if (Define(e).HasUnmanaged) return $"{Escape(e)}__unmanaged*";
-                }
-                if (x == typeof(IntPtr) || typeof(SafeHandle).IsAssignableFrom(x)) return "void*";
-                if (IsComposite(x))
-                {
-                    if (x.IsValueType) return EscapeForValue(x);
-                    if (x.IsArray) return $"{EscapeForValue(GetElementType(x))}*";
-                }
-                return EscapeForValue(x);
-            }).Select(x => $"\n\t\t{x}")));
-            writer.Write($"\t)>({function})(");
+            writer.Write($@"{'\t'}{(
+    @return == typeof(void) ? string.Empty : "auto result = "
+)}reinterpret_cast<{UnmanagedReturn(@return)}(*)({
+    string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charset).Select(x => $"\n\t\t{x}"))
+}
+{'\t'})>({function})(");
             writer.WriteLine(string.Join(",", parameters.Select(xi =>
             {
                 var x = xi.Parameter.ParameterType;

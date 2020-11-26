@@ -29,9 +29,9 @@ struct t__constructor_info : t__method_base
 
 struct t__runtime_constructor_info : t__constructor_info
 {
-	t_object*(*v__invoke)(t_object*);
+	t_object*(*v__invoke)();
 
-	t__runtime_constructor_info(t__type* a_type, t_object*(*a_invoke)(t_object*)) : t__constructor_info(a_type), v__invoke(a_invoke)
+	t__runtime_constructor_info(t__type* a_type, t_object*(*a_invoke)()) : t__constructor_info(a_type), v__invoke(a_invoke)
 	{
 	}
 };
@@ -76,6 +76,7 @@ struct t__type : t__abstract_type
 	std::u16string_view v__full_name;
 	std::u16string_view v__display_name;
 	bool v__managed;
+	bool v__value_type;
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
@@ -100,12 +101,12 @@ struct t__type : t__abstract_type
 		std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods,
 		t__runtime_assembly* a_assembly,
 		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
-		bool a_managed, size_t a_size
+		bool a_managed, bool a_value_type, size_t a_size
 	) : t__abstract_type(a_type, nullptr, a_name), v__base(a_base),
 	v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
-	v__managed(a_managed), v__size(a_size)
+	v__managed(a_managed), v__value_type(a_value_type), v__size(a_size)
 	{
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)

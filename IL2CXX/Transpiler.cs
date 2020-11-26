@@ -78,7 +78,7 @@ namespace IL2CXX
                 else if (Type.IsValueType)
                 {
                     var t = transpiler.Escape(Type);
-                    VariableType = $"t_stacked<{t}::t_value>";
+                    VariableType = $"{t}::t_stacked";
                     prefix = $"v{t}__";
                 }
                 else
@@ -403,7 +403,7 @@ namespace IL2CXX
             string.Format(tag, Escape(type));
         public string EscapeForMember(Type type) => EscapeForValue(type, "t_slot_of<{0}>");
         public string EscapeForRoot(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"t_root<{EscapeForValue(type)}>" : EscapeForValue(type, "t_root<t_slot_of<{0}>>");
-        public string EscapeForStacked(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"t_stacked<{EscapeForValue(type)}>" : EscapeForValue(type);
+        public string EscapeForStacked(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"{Escape(type)}::t_stacked" : EscapeForValue(type);
         public string Escape(FieldInfo field) => $"v_{Escape(field.Name)}";
         public string Escape(MethodBase method)
         {

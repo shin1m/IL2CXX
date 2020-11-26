@@ -26,7 +26,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(MethodBase.Invoke), new[] { typeof(BindingFlags), typeof(Binder), typeof(object[]), typeof(CultureInfo) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__invoke(a_3);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__invoke();\n", 0)
             );
         })
         .For(typeof(RuntimeMethodInfo), (type, code) =>

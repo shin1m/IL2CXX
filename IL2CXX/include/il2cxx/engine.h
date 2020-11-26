@@ -134,8 +134,8 @@ inline t_engine* f_engine()
 template<void (t_object::*A_push)()>
 inline void t_object::f_step()
 {
-	f_type()->f_scan(this, f_push<A_push>);
-	//(f_type()->*A_push)();
+	v_type->f_scan(this, f_push<A_push>);
+	//(v_type->*A_push)();
 	if (auto p = v_extension.load(std::memory_order_consume)) p->f_scan(f_push<A_push>);
 }
 
@@ -146,8 +146,8 @@ inline void t_object::f_decrement_step()
 		v_extension.store(nullptr, std::memory_order_relaxed);
 		delete p;
 	}
-	f_type()->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
-	//f_type()->f_decrement_push();
+	v_type->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
+	//v_type->f_decrement_push();
 	v_type = nullptr;
 	v_color = e_color__BLACK;
 	if (v_next) {

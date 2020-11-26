@@ -84,7 +84,7 @@ namespace IL2CXX
                 {
                     var identifier = transpiler.Escape(Type);
                     DefaultConstructor = $@"
-t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, [](t_object*) -> t_object*
+t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, []() -> t_object*
 {{
 {'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
@@ -447,6 +447,7 @@ struct {Escape(type)}__unmanaged
                         if (type.IsValueType) members = $@"{'\t'}struct t_value
 {'\t'}{{
 {members}{'\t'}}};
+{'\t'}using t_stacked = {(td.IsManaged ? "il2cxx::t_stacked<t_value>" : "t_value")};
 {'\t'}t_value v__value;
 {'\t'}template<typename T>
 {'\t'}void f__construct(T&& a_value)
@@ -546,6 +547,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 }};");
             writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, u""{type.Name}""sv, u""{type.FullName}""sv, u""{type}""sv, {(
     definition.IsManaged ? "true" : "false"
+)}, {(
+    type.IsValueType ? "true" : "false"
 )}, {(
     type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"
 )})

@@ -173,13 +173,8 @@ namespace IL2CXX
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__field;
 {'\t'}{'\t'}t_value() = default;
-{'\t'}{'\t'}t_value(const t_value& a_value) : v__field(a_value.v__field)
+{'\t'}{'\t'}t_value(void* a_field) : v__field(a_field)
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__field = a_value.v__field;
-{'\t'}{'\t'}{'\t'}return *this;
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
@@ -200,25 +195,13 @@ namespace IL2CXX
 {'\t'}{'\t'}t_value(t__type* a_type) : v__type(a_type)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value(const t_value& a_value) : t_value(a_value.v__type)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value& operator=(t__type* a_type)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}v__type = a_type;
-{'\t'}{'\t'}{'\t'}return *this;
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}t_value& operator=(const t_value& a_value)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}return *this = a_value.v__type;
-{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-", true, null);
+", false, null);
             code.For(
                 type.GetMethod(nameof(object.GetHashCode)),
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0->v__type);\n", 1)
@@ -552,15 +535,34 @@ namespace IL2CXX
         .For(typeof(Activator), (type, code) =>
         {
             var methods = GenericMethods(type);
-            // TODO
             code.ForGeneric(
                 methods.First(x => x.Name == nameof(Activator.CreateInstance)),
-                (transpiler, types) => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                (transpiler, types) =>
+                {
+                    var t = types[0];
+                    if (t.IsValueType) return ("\treturn {};\n", 1);
+                    var constructor = t.GetConstructor(Type.EmptyTypes);
+                    return (constructor == null
+                        ? "\tthrow std::runtime_error(\"no parameterless constructor\");\n"
+                        : $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(t)}>();
+{'\t'}{transpiler.Escape(constructor)}(p);
+{'\t'}return p;
+", 0);
+                }
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { typeof(Type) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (type->v__value_type) {{
+{'\t'}{'\t'}auto p = f_engine()->f_object__allocate(type->v__managed_size);
+{'\t'}{'\t'}std::memset(p + 1, 0, type->v__managed_size - sizeof(t_object));
+{'\t'}{'\t'}type->f__finish(p);
+{'\t'}{'\t'}return p;
+{'\t'}}}
+{'\t'}if (!type->v__default_constructor) throw std::runtime_error(""no parameterless constructor"");
+{'\t'}return type->v__default_constructor->v__invoke();
+", 0)
             );
             // TODO
             code.For(
@@ -740,7 +742,7 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}auto p = static_cast<{transpiler.EscapeForValue(type)}*>(a_0);
 {'\t'}auto type = static_cast<t__type*>(p->v_Type.v__5fvalue);
 {'\t'}auto value = p->v_Value.v__5fvalue;
-{'\t'}if (type->f__is(&t__type_of<{transpiler.Escape(typeof(ValueType))}>::v__instance)) {{
+{'\t'}if (type->v__value_type) {{
 {'\t'}{'\t'}auto p = f_engine()->f_object__allocate(sizeof(t_object) + type->v__size);
 {'\t'}{'\t'}type->f_copy(reinterpret_cast<char*>(value), 1, reinterpret_cast<char*>(p + 1));
 {'\t'}{'\t'}type->f__finish(p);

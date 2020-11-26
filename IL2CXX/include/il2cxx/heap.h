@@ -142,10 +142,8 @@ public:
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
 	{
-		if (a_size >> 7)
-			return f_allocate_medium(a_size);
-		else
-			[[likely]] return f_allocate(v_of0);
+		if (a_size <= 1 << 7) [[likely]] return f_allocate(v_of0);
+		return f_allocate_medium(a_size);
 	}
 	void f_return()
 	{
@@ -253,18 +251,12 @@ T* t_heap<T>::f_allocate_large(size_t a_size)
 template<typename T>
 constexpr T* t_heap<T>::f_allocate_medium(size_t a_size)
 {
-	auto n = a_size >> 8;
-	if (n == 0) return f_allocate(v_of1);
-	n >>= 1;
-	if (n == 0) return f_allocate(v_of2);
-	n >>= 1;
-	if (n == 0) return f_allocate(v_of3);
-	n >>= 1;
-	if (n == 0) return f_allocate(v_of4);
-	n >>= 1;
-	if (n == 0) return f_allocate(v_of5);
-	n >>= 1;
-	if (n == 0) return f_allocate(v_of6);
+	if (a_size <= 1 << 8) return f_allocate(v_of1);
+	if (a_size <= 1 << 9) return f_allocate(v_of2);
+	if (a_size <= 1 << 10) return f_allocate(v_of3);
+	if (a_size <= 1 << 11) return f_allocate(v_of4);
+	if (a_size <= 1 << 12) return f_allocate(v_of5);
+	if (a_size <= 1 << 13) return f_allocate(v_of6);
 	return f_allocate_large(a_size);
 }
 

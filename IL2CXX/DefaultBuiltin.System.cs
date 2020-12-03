@@ -978,10 +978,10 @@ namespace IL2CXX
                 methods.First(x => x.Name == "Memmove" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => ("\tf__move(a_1, a_2, a_0);\n", 1)
             );
-            /*code.For(
+            code.For(
                 type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(byte*), typeof(byte*), typeof(ulong) }, null),
                 transpiler => ("\tstd::memmove(a_0, a_1, a_2);\n", -1)
-            );*/
+            );
         })
         .For(typeof(Console), (type, code) =>
         {

@@ -294,7 +294,9 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                 }
                 WriteRuntimeDefinition(definition, $"v__assembly_{name}", writerForDeclarations, writer);
             }
-            writerForDeclarations.WriteLine("\n#include \"utilities.h\"");
+            writerForDeclarations.WriteLine(@"
+#include ""utilities.h""
+#include ""waitable.h""");
             writerForDeclarations.Write(staticDefinitions);
             writerForDeclarations.WriteLine(@"
 struct t_static
@@ -333,6 +335,7 @@ struct t_thread_static
 {{
 
 #include ""utilities.cc""
+#include ""waitable.cc""
 
 t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
 

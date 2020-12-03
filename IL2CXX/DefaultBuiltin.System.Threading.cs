@@ -181,6 +181,10 @@ namespace IL2CXX
                 transpiler => ("\tfor (; a_0 > 0; --a_0) std::this_thread::yield();\n", 0)
             );
             code.For(
+                type.GetMethod(nameof(Thread.Yield)),
+                transpiler => ("\tstd::this_thread::yield();\n", 0)
+            );
+            code.For(
                 type.GetProperty(nameof(Thread.IsBackground)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__background;\n", 1)
             );
@@ -235,15 +239,25 @@ namespace IL2CXX
         })
         .For(typeof(WaitHandle), (type, code) =>
         {
-            // TODO
+            code.For(
+                type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}static_cast<t__waitable*>(a_0.v__5fvalue)->f_signal();
+{'\t'}return static_cast<t__waitable*>(a_1.v__5fvalue)->f_wait(a_2 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_2)) ? 0 : 0x102;
+", 0)
+            );
             code.For(
                 type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\treturn static_cast<t__waitable*>(a_0.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
             );
-            // TODO
             code.For(
                 type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ($@"{'\t'}if (a_2) {{
+{'\t'}{'\t'}return t__waitable::f_wait_all(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3)) ? 0 : 0x102;
+{'\t'}}} else {{
+{'\t'}{'\t'}auto i = t__waitable::f_wait_any(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3));
+{'\t'}{'\t'}return i < a_1 ? i : 0x102;
+{'\t'}}}
+", 0)
             );
         });
     }

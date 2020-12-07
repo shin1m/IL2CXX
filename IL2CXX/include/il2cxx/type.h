@@ -77,9 +77,11 @@ struct t__type : t__abstract_type
 	std::u16string_view v__display_name;
 	bool v__managed;
 	bool v__value_type;
+	bool v__enum;
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
+	t__type* v__szarray;
 	union
 	{
 		struct
@@ -92,6 +94,11 @@ struct t__type : t__abstract_type
 			void* v__multicast_invoke;
 			void* v__invoke_unmanaged;
 		};
+		struct
+		{
+			const std::pair<uint64_t, std::u16string_view>* v__enum_pairs;
+			size_t v__enum_count;
+		};
 	};
 	t__runtime_constructor_info* v__default_constructor = nullptr;
 	t__type* v__nullable_value = nullptr;
@@ -101,12 +108,14 @@ struct t__type : t__abstract_type
 		std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods,
 		t__runtime_assembly* a_assembly,
 		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
-		bool a_managed, bool a_value_type, size_t a_size
+		bool a_managed, bool a_value_type, bool a_enum, size_t a_size,
+		t__type* a_szarray
 	) : t__abstract_type(a_type, nullptr, a_name), v__base(a_base),
 	v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
-	v__managed(a_managed), v__value_type(a_value_type), v__size(a_size)
+	v__managed(a_managed), v__value_type(a_value_type), v__enum(a_enum), v__size(a_size),
+	v__szarray(a_szarray)
 	{
 	}
 	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
@@ -174,13 +183,13 @@ struct t__type_of;
 template<typename T_interface, size_t A_i>
 void* f__resolve(t_object* a_this)
 {
-	return a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].second[A_i];
+	return a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).second[A_i];
 }
 
 template<typename T_interface, size_t A_i, typename T_r, typename... T_an>
 T_r f__invoke(t_object* a_this, T_an... a_n, void** a_site)
 {
-	auto p = a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].first[A_i];
+	auto p = a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).first[A_i];
 	*a_site = p;
 	return reinterpret_cast<T_r(*)(t_object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
 }
@@ -194,13 +203,13 @@ T_r f__method(t_object* a_this, T_an... a_n, void** a_site)
 template<typename T_interface, size_t A_i, size_t A_j>
 void* f__generic_resolve(t_object* a_this)
 {
-	return reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].second[A_i])[A_j];
+	return reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).second[A_i])[A_j];
 }
 
 template<typename T_interface, size_t A_i, size_t A_j, typename T_r, typename... T_an>
 T_r f__generic_invoke(t_object* a_this, T_an... a_n, void** a_site)
 {
-	auto p = reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods[&t__type_of<T_interface>::v__instance].first[A_i])[A_j];
+	auto p = reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).first[A_i])[A_j];
 	*a_site = p;
 	return reinterpret_cast<T_r(*)(t_object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
 }

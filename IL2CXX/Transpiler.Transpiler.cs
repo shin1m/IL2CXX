@@ -780,8 +780,8 @@ namespace IL2CXX
                     Trace.Assert(t.IsValueType);
                     writer.WriteLine($" {t}");
                     GenerateCheckNull(stack);
-                    writer.WriteLine($"\tif (!{stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();");
-                    writer.WriteLine($"\t{indexToStack[index].Variable} = &static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
+                    writer.WriteLine($@"{'\t'}if (!{stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();
+{'\t'}{indexToStack[index].Variable} = &static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
                     return index;
                 };
             });
@@ -1120,8 +1120,26 @@ namespace IL2CXX
                     if (t.IsValueType)
                     {
                         GenerateCheckNull(stack);
-                        writer.WriteLine($"\tif (!{stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();");
-                        writer.WriteLine($"\t{indexToStack[index].Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
+                        var after = indexToStack[index];
+                        writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance))
+{'\t'}{'\t'}{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
+                        if (t.IsPrimitive && t != typeof(float) && t != typeof(double))
+                            writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->f__is(&t__type_of<{Escape(typeof(Enum))}>::v__instance))
+{'\t'}{'\t'}switch ({stack.Variable}->f_type()->v__size) {{
+{'\t'}{'\t'}case 1:
+{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int8_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}case 2:
+{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int16_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}case 4:
+{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int32_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}default:
+{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int64_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}}}");
+                        writer.WriteLine($@"{'\t'}else
+{'\t'}{'\t'}[[unlikely]] f__throw_invalid_cast();");
                     }
                     else
                     {

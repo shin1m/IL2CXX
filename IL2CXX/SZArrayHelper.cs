@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace IL2CXX
 {
-    class SZArrayHelper<T> : IList<T>, ICollection<T>, IEnumerable<T>, IReadOnlyList<T>, IReadOnlyCollection<T>
+    class SZArrayHelper<T> : IList<T>, IReadOnlyList<T>
     {
         public class Enumerator : IEnumerator<T>
         {

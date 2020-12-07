@@ -51,6 +51,49 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__full_name);\n", 0)
             );
             code.For(
+                type.GetMethod(nameof(Type.GetEnumNames)),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__enum) throw std::runtime_error(""not enum"");
+{'\t'}auto p = f__new_array<{transpiler.Escape(typeof(string[]))}, {transpiler.Escape(typeof(string))}>(type->v__enum_count);
+{'\t'}for (size_t i = 0; i < type->v__enum_count; ++i) p->f__data()[i] = f__new_string(type->v__enum_pairs[i].second);
+{'\t'}return p;
+", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(Type.GetEnumValues)),
+                transpiler =>
+                {
+                    var array = transpiler.Escape(typeof(Array));
+                    return (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__enum) throw std::runtime_error(""not enum"");
+{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
+{'\t'}auto n = type->v__enum_count;
+{'\t'}auto p = static_cast<{array}*>(f_engine()->f_object__allocate(a + type->v__size * n));
+{'\t'}p->v__length = n;
+{'\t'}p->f__bounds()[0] = {{n, 0}};
+{'\t'}auto copy = [&](auto q)
+{'\t'}{{
+{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) q[i] = type->v__enum_pairs[i].first;
+{'\t'}}};
+{'\t'}switch (type->v__size) {{
+{'\t'}case 1:
+{'\t'}{'\t'}copy(reinterpret_cast<uint8_t*>(reinterpret_cast<char*>(p) + a));
+{'\t'}{'\t'}break;
+{'\t'}case 2:
+{'\t'}{'\t'}copy(reinterpret_cast<uint16_t*>(reinterpret_cast<char*>(p) + a));
+{'\t'}{'\t'}break;
+{'\t'}case 4:
+{'\t'}{'\t'}copy(reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(p) + a));
+{'\t'}{'\t'}break;
+{'\t'}default:
+{'\t'}{'\t'}copy(reinterpret_cast<uint64_t*>(reinterpret_cast<char*>(p) + a));
+{'\t'}}}
+{'\t'}type->v__szarray->f__finish(p);
+{'\t'}return p;
+", 0);
+                }
+            );
+            code.For(
                 type.GetMethod(nameof(Type.IsAssignableFrom)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_1) return false;
 {'\t'}auto p = static_cast<t__type*>(a_0);

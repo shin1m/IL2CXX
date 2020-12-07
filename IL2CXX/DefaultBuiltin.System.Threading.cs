@@ -182,7 +182,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Thread.Yield)),
-                transpiler => ("\tstd::this_thread::yield();\n", 0)
+                transpiler => ("\tstd::this_thread::yield();\nreturn true;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Thread.IsBackground)).GetMethod,
@@ -220,6 +220,11 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetCurrentThreadNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($"\treturn {transpiler.Escape(typeof(Thread))}::f__current();\n", 1)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("GetOptimalMaxSpinWaitsPerSpinIterationInternal", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn 7;\n", 1)
             );
             code.For(
                 type.GetMethod("GetThreadDeserializationTracker", BindingFlags.Static | BindingFlags.NonPublic),

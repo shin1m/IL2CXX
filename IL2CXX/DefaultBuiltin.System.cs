@@ -249,7 +249,7 @@ namespace IL2CXX
 {'\t'}p->v__length = a_1;
 {'\t'}p->f__bounds()[0] = {{a_1, 0}};
 {'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
-{'\t'}element->f__array()->f__finish(p);
+{'\t'}element->v__szarray->f__finish(p);
 {'\t'}return p;
 ", 0);
                 }
@@ -696,28 +696,71 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(object.Equals)),
-                transpiler => ("\treturn a_0 == a_1;\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_1 || a_0->f_type() != a_1->f_type()) return false;
+{'\t'}switch (a_0->f_type()->v__size) {{
+{'\t'}case 1:
+{'\t'}{'\t'}return *reinterpret_cast<uint8_t*>(a_0 + 1) == *reinterpret_cast<uint8_t*>(a_1 + 1);
+{'\t'}case 2:
+{'\t'}{'\t'}return *reinterpret_cast<uint16_t*>(a_0 + 1) == *reinterpret_cast<uint16_t*>(a_1 + 1);
+{'\t'}case 4:
+{'\t'}{'\t'}return *reinterpret_cast<uint32_t*>(a_0 + 1) == *reinterpret_cast<uint32_t*>(a_1 + 1);
+{'\t'}default:
+{'\t'}{'\t'}return *reinterpret_cast<uint64_t*>(a_0 + 1) == *reinterpret_cast<uint64_t*>(a_1 + 1);
+{'\t'}}}
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(object.GetHashCode)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}union
-{'\t'}{{
-{'\t'}{'\t'}intptr_t i = 0;
-{'\t'}{'\t'}char cs[8];
-{'\t'}}};
-{'\t'}std::memcpy(cs, a_0 + 1, a_0->f_type()->v__size);
-{'\t'}return i;
-", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}switch (a_0->f_type()->v__size) {{
+{'\t'}case 1:
+{'\t'}{'\t'}return *reinterpret_cast<uint8_t*>(a_0 + 1);
+{'\t'}case 2:
+{'\t'}{'\t'}return *reinterpret_cast<uint16_t*>(a_0 + 1);
+{'\t'}case 4:
+{'\t'}{'\t'}return *reinterpret_cast<uint32_t*>(a_0 + 1);
+{'\t'}default:
+{'\t'}{'\t'}return *reinterpret_cast<uint64_t*>(a_0 + 1);
+{'\t'}}}
+", 0)
             );
             // TODO
             code.For(
                 type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
-                transpiler => ("\treturn f__new_string(u\"enum\"sv);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}uint64_t i;
+{'\t'}switch (a_0->f_type()->v__size) {{
+{'\t'}case 1:
+{'\t'}{'\t'}i = *reinterpret_cast<uint8_t*>(a_0 + 1);
+{'\t'}{'\t'}break;
+{'\t'}case 2:
+{'\t'}{'\t'}i = *reinterpret_cast<uint16_t*>(a_0 + 1);
+{'\t'}{'\t'}break;
+{'\t'}case 4:
+{'\t'}{'\t'}i = *reinterpret_cast<uint32_t*>(a_0 + 1);
+{'\t'}{'\t'}break;
+{'\t'}default:
+{'\t'}{'\t'}i = *reinterpret_cast<uint64_t*>(a_0 + 1);
+{'\t'}}}
+{'\t'}auto p = a_0->f_type()->v__enum_pairs;
+{'\t'}auto q = p + a_0->f_type()->v__enum_count;
+{'\t'}auto j = std::lower_bound(p, q, i, [](auto x, auto y)
+{'\t'}{{
+{'\t'}{'\t'}return x.first < y;
+{'\t'}}});
+{'\t'}return j != q && j->first == i ? f__new_string(j->second) : f__new_string(std::to_string(i));
+", 0)
             );
             // TODO
             code.For(
                 type.GetMethod(nameof(Enum.ToString), new[] { typeof(string) }),
-                transpiler => ("\treturn f__new_string(u\"enum\"sv);\n", 0)
+                transpiler => ($@"{'\t'}if (a_1->v__5fstringLength != 1) throw std::runtime_error(""FormatException"");
+{'\t'}switch (a_1->v__5ffirstChar) {{
+{'\t'}case u'G':
+{'\t'}case u'g':
+{'\t'}{'\t'}return {transpiler.Escape(type.GetMethod(nameof(object.ToString), Type.EmptyTypes))}(a_0);
+{'\t'}default:
+{'\t'}{'\t'}throw std::runtime_error(""FormatException"");
+{'\t'}}}
+", 0)
             );
             // TODO
             code.For(
@@ -757,7 +800,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetProperty(nameof(Environment.CurrentManagedThreadId)).GetMethod,
-                transpiler => ($"\treturn reinterpret_cast<intptr_t>({transpiler.Escape(typeof(Thread))}::f__current());\n", 1)
+                transpiler => ($"\treturn gettid();\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(Environment.ProcessorCount)).GetMethod,

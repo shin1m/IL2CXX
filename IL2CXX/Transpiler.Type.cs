@@ -473,6 +473,13 @@ struct {Escape(type)}__unmanaged
                 this.threadStaticMembers.Write(threadStaticMembers);
             }
             runtimeDefinitions.Add(definition);
+            // TODO
+            //if (!type.IsArray && !type.IsByRef && !type.IsPointer && type != typeof(void))
+            if (type.IsEnum)
+                try
+                {
+                    queuedTypes.Enqueue(type.MakeArrayType());
+                } catch { }
             return definition;
         }
         private void WriteRuntimeDefinition(RuntimeDefinition definition, string assembly, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
@@ -480,6 +487,11 @@ struct {Escape(type)}__unmanaged
             var type = definition.Type;
             var @base = definition is TypeDefinition && FinalizeOf(type).MethodHandle != finalizeOfObject.MethodHandle ? "t__type_finalizee" : "t__type";
             var identifier = Escape(type);
+            if (type.IsEnum) writerForDefinitions.Write($@"
+std::pair<uint64_t, std::u16string_view> v__enum_pairs_{identifier}[] = {{{
+    string.Join(",", Enum.GetValues(type).Cast<object>().Select(x => $"\n\t{{{(ulong)Convert.ToInt64(x)}ul, u\"{Enum.GetName(type, x)}\"sv}}"))
+}
+}};");
             writerForDeclarations.WriteLine($@"
 template<>
 struct t__type_of<{identifier}> : {@base}
@@ -542,6 +554,13 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             {
                 td = null;
             }
+            var szarray = "nullptr";
+            if (!type.IsArray)
+                try
+                {
+                    var sza = type.MakeArrayType();
+                    if (typeToRuntime.ContainsKey(sza)) szarray = $"&t__type_of<{Escape(sza)}>::v__instance";
+                } catch { }
             writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
@@ -550,8 +569,10 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 )}, {(
     type.IsValueType ? "true" : "false"
 )}, {(
+    type.IsEnum ? "true" : "false"
+)}, {(
     type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"
-)})
+)}, {szarray})
 {{");
             if (definition is TypeDefinition) writerForDefinitions.WriteLine($"\tv__managed_size = sizeof({Escape(type)});");
             if (definition.HasUnmanaged)
@@ -578,6 +599,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 writerForDefinitions.WriteLine($@"{'\t'}f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
                 if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine("\tf_copy = f_do_copy;");
+                if (type.IsEnum) writerForDefinitions.WriteLine($@"{'\t'}v__enum_pairs = v__enum_pairs_{identifier};
+{'\t'}v__enum_count = std::size(v__enum_pairs_{identifier});");
             }
             writerForDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
@@ -592,8 +615,7 @@ t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
                 if (type.IsArray)
                 {
                     var element = EscapeForMember(GetElementType(type));
-                    writerForDefinitions.WriteLine($@"
-{'\t'}auto p = static_cast<const {identifier}*>(a_this);
+                    writerForDefinitions.WriteLine($@"{'\t'}auto p = static_cast<const {identifier}*>(a_this);
 {'\t'}t__new<{identifier}> q(sizeof({element}) * p->v__length);
 {'\t'}q->v__length = p->v__length;
 {'\t'}std::memcpy(q->v__bounds, p->v__bounds, sizeof(p->v__bounds));

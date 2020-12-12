@@ -318,9 +318,9 @@ namespace IL2CXX
                     return index;
                 };
             });
-            string condition_Un(Stack stack, string integer, string @float) => stack.VariableType == "double"
-                ? string.Format(@float, stack.Pop.Variable, stack.Variable)
-                : $"{stack.Pop.AsUnsigned} {integer} {stack.AsUnsigned}";
+            string condition_Un(Stack stack, string @operator) => stack.VariableType == "double"
+                ? string.Format("{0} {1} {2} || std::isunordered({0}, {2})", stack.Pop.Variable, @operator, stack.Variable)
+                : $"{stack.Pop.AsUnsigned} {@operator} {stack.AsUnsigned}";
             new[] {
                 (OpCode: OpCodes.Br_S, Target: (ParseBranchTarget)ParseBranchTargetI1),
                 (OpCode: OpCodes.Br, Target: (ParseBranchTarget)ParseBranchTargetI4)
@@ -378,11 +378,11 @@ namespace IL2CXX
                     };
                 }));
                 new[] {
-                    (OpCode: OpCodes.Bne_Un_S, Integer: "!=", Float: "std::isunordered({0}, {1}) || {0} != {1}"),
-                    (OpCode: OpCodes.Bge_Un_S, Integer: ">=", Float: "std::isgreaterequal({0}, {1})"),
-                    (OpCode: OpCodes.Bgt_Un_S, Integer: ">", Float: "std::isgreater({0}, {1})"),
-                    (OpCode: OpCodes.Ble_Un_S, Integer: "<=", Float: "std::islessequal({0}, {1})"),
-                    (OpCode: OpCodes.Blt_Un_S, Integer: "<", Float: "std::isless({0}, {1})")
+                    (OpCode: OpCodes.Bne_Un_S, Operator: "!="),
+                    (OpCode: OpCodes.Bge_Un_S, Operator: ">="),
+                    (OpCode: OpCodes.Bgt_Un_S, Operator: ">"),
+                    (OpCode: OpCodes.Ble_Un_S, Operator: "<="),
+                    (OpCode: OpCodes.Blt_Un_S, Operator: "<")
                 }.ForEach(set => instructions1[set.OpCode.Value - OpCodes.Br_S.Value + baseSet.OpCode.Value].For(x =>
                 {
                     x.Estimate = (index, stack) =>
@@ -393,7 +393,7 @@ namespace IL2CXX
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Integer, set.Float)}) goto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Operator)}) goto L_{target:x04};");
                         return index;
                     };
                 }));
@@ -1270,14 +1270,14 @@ namespace IL2CXX
                 };
             }));
             new[] {
-                (OpCode: OpCodes.Cgt_Un, Integer: ">", Float: "std::isgreater({0}, {1})"),
-                (OpCode: OpCodes.Clt_Un, Integer: "<", Float: "std::isless({0}, {1})")
+                (OpCode: OpCodes.Cgt_Un, Operator: ">"),
+                (OpCode: OpCodes.Clt_Un, Operator: "<")
             }.ForEach(set => instructions2[set.OpCode.Value & 0xff].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(int)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {condition_Un(stack, set.Integer, set.Float)} ? 1 : 0;");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {condition_Un(stack, set.Operator)} ? 1 : 0;");
                     return index;
                 };
             }));

@@ -5,11 +5,28 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices;
 
 namespace IL2CXX
 {
     partial class Transpiler
     {
+        [StructLayout(LayoutKind.Explicit)]
+        private class SingleUnion
+        {
+            [FieldOffset(0)]
+            public float Single;
+            [FieldOffset(0)]
+            public int Int32;
+        }
+        [StructLayout(LayoutKind.Explicit)]
+        private class DoubleUnion
+        {
+            [FieldOffset(0)]
+            public double Double;
+            [FieldOffset(0)]
+            public long Int64;
+        }
         public Transpiler(IBuiltin builtin, Action<string> log, bool checkNull = true, bool checkRange = true)
         {
             this.builtin = builtin;
@@ -213,7 +230,9 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var r = ParseR4(ref index);
-                    writer.Write($" {r:G9}\n\t{indexToStack[index].Variable} = ");
+                    var i = new SingleUnion { Single = r }.Int32;
+                    var literal = i == 0 ? "0.0f" : $"{(i < 0 ? "-" : string.Empty)}0x1.{(i & 0x7fffff) << 1:x6}p{(i >> 23 & 0xff) - 127}f";
+                    writer.Write($" {literal}\n\t{indexToStack[index].Variable} = ");
                     if (float.IsPositiveInfinity(r))
                         writer.WriteLine("std::numeric_limits<float>::infinity();");
                     else if (float.IsNegativeInfinity(r))
@@ -221,7 +240,7 @@ namespace IL2CXX
                     else if (float.IsNaN(r))
                         writer.WriteLine("std::numeric_limits<float>::quiet_NaN();");
                     else
-                        writer.WriteLine($"{r:G9};");
+                        writer.WriteLine($"{literal};");
                     return index;
                 };
             });
@@ -231,7 +250,9 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var r = ParseR8(ref index);
-                    writer.Write($" {r:G17}\n\t{indexToStack[index].Variable} = ");
+                    var i = new DoubleUnion { Double = r }.Int64;
+                    var literal = i == 0 ? "0.0" : $"{(i < 0 ? "-" : string.Empty)}0x1.{i & 0xfffffffffffff:x13}p{(i >> 52 & 0x7ff) - 1023}";
+                    writer.Write($" {literal}\n\t{indexToStack[index].Variable} = ");
                     if (double.IsPositiveInfinity(r))
                         writer.WriteLine("std::numeric_limits<double>::infinity();");
                     else if (double.IsNegativeInfinity(r))
@@ -239,7 +260,7 @@ namespace IL2CXX
                     else if (double.IsNaN(r))
                         writer.WriteLine("std::numeric_limits<double>::quiet_NaN();");
                     else
-                        writer.WriteLine($"{r:G17};");
+                        writer.WriteLine($"{literal};");
                     return index;
                 };
             });

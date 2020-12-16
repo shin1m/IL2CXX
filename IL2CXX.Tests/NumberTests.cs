@@ -10,6 +10,18 @@ namespace IL2CXX.Tests
             if (!float.IsPositiveInfinity(float.PositiveInfinity)) return 1;
             if (!float.IsNegativeInfinity(float.NegativeInfinity)) return 2;
             if (!float.IsNaN(float.NaN)) return 3;
+            {
+                var x = float.MinValue;
+                if (x != float.MinValue) return 4;
+            }
+            {
+                var x = float.MaxValue;
+                if (x != float.MaxValue) return 5;
+            }
+            {
+                var x = 257;
+                if (x != 257.0f) return 6;
+            }
             return 0;
         }
         [Test]
@@ -19,6 +31,18 @@ namespace IL2CXX.Tests
             if (!double.IsPositiveInfinity(double.PositiveInfinity)) return 1;
             if (!double.IsNegativeInfinity(double.NegativeInfinity)) return 2;
             if (!double.IsNaN(double.NaN)) return 3;
+            {
+                var x = double.MinValue;
+                if (x != double.MinValue) return 4;
+            }
+            {
+                var x = double.MaxValue;
+                if (x != double.MaxValue) return 5;
+            }
+            {
+                var x = 257;
+                if (x != 257.0) return 6;
+            }
             return 0;
         }
         [Test]

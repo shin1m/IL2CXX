@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
-
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -19,8 +18,4 @@
     <ProjectReference Include="..\IL2CXX\IL2CXX.csproj" />
   </ItemGroup>
 
-  <Target Name="WriteCXXPath" AfterTargets="AfterBuild">
-    <WriteLinesToFile File="$(OutputPath)CXXIncludePath" Overwrite="true" Lines="$(MSBuildProjectDirectory)/../IL2CXX/include" />
-    <WriteLinesToFile File="$(OutputPath)CXXSourcePath" Overwrite="true" Lines="$(MSBuildProjectDirectory)/../IL2CXX/src" />
-  </Target>
 </Project>

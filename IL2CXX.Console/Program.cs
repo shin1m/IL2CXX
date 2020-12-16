@@ -61,6 +61,16 @@ namespace il2cxx
                 definition.Dispose();
             }
             foreach (var path in type2path.Values) File.AppendAllText(path, "\n}\n");
+            void copy(string path)
+            {
+                var destination = Path.Combine(@out, path);
+                Directory.CreateDirectory(destination);
+                var source = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path);
+                foreach (var x in Directory.EnumerateDirectories(source)) copy(Path.Combine(path, Path.GetFileName(x)));
+                foreach (var x in Directory.EnumerateFiles(source)) File.Copy(x, Path.Combine(destination, Path.GetFileName(x)));
+            }
+            copy("include");
+            copy("src");
             var name = Path.GetFileNameWithoutExtension(args[0]);
             File.WriteAllText(Path.Combine(@out, "configure.ac"), $@"AC_INIT([{name}], [{DateTime.Today:yyyyMMdd}])
 AM_INIT_AUTOMAKE([foreign nostdinc dist-bzip2 no-dist-gzip subdir-objects])
@@ -107,7 +117,7 @@ AC_CONFIG_FILES([
 AC_OUTPUT
 ");
             File.WriteAllText(Path.Combine(@out, "Makefile.am"), $@"bin_PROGRAMS = {name}
-AM_CPPFLAGS = $(LIBUNWIND_CFLAGS) -I../../IL2CXX/include -I../../IL2CXX/src
+AM_CPPFLAGS = $(LIBUNWIND_CFLAGS) -Iinclude -Isrc
 AM_CXXFLAGS = -std=c++17
 AM_LDFLAGS =
 LDADD = -lpthread -ldl $(LIBUNWIND_LIBS) -lunwind-x86_64
@@ -129,11 +139,11 @@ GENERATEDSOURCES = \
 {'\t'}main.cc
 $(GENERATEDSOURCES:.cc=.$(OBJEXT)): declarations.h.gch
 {name}_SOURCES = \
-{'\t'}../../IL2CXX/src/slot.cc \
-{'\t'}../../IL2CXX/src/object.cc \
-{'\t'}../../IL2CXX/src/type.cc \
-{'\t'}../../IL2CXX/src/thread.cc \
-{'\t'}../../IL2CXX/src/engine.cc \
+{'\t'}src/slot.cc \
+{'\t'}src/object.cc \
+{'\t'}src/type.cc \
+{'\t'}src/thread.cc \
+{'\t'}src/engine.cc \
 {'\t'}$(GENERATEDSOURCES)
 ");
             return 0;

@@ -42,8 +42,6 @@ namespace IL2CXX.Tests
         {
             Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
-            var include = File.ReadLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CXXIncludePath")).First();
-            var src = File.ReadLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CXXSourcePath")).First();
             if (Directory.Exists(build)) Directory.Delete(build, true);
             Directory.CreateDirectory(build);
             using (var header = File.CreateText(Path.Combine(build, "run.h")))
@@ -64,8 +62,8 @@ namespace IL2CXX.Tests
 #include ""engine.cc""");
             }
             Assert.AreEqual(0, Spawn("make", "run", build, new[] {
-                ("CXXFLAGS", $"'-I{include}' '-I{src}' -std=c++17 -g"),
-                ("LDFLAGS", $"-lpthread -ldl -lunwind -lunwind-x86_64")
+                ("CXXFLAGS", "'-I../include' '-I../src' -std=c++17 -g"),
+                ("LDFLAGS", "-lpthread -ldl -lunwind -lunwind-x86_64")
             }, Console.Error.WriteLine, Console.Error.WriteLine));
             IEnumerable<(string, string)> environment = new[] {
                 ("IL2CXX_VERBOSE", string.Empty),

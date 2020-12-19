@@ -1,9 +1,11 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using System.Reflection;
 
 namespace IL2CXX
 {
+    // TODO
     partial class DefaultBuiltin
     {
         private static Builtin SetupSystemDiagnostics(this Builtin @this) => @this
@@ -41,6 +43,21 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("SendCommand", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );
+        })
+        .For(typeof(EventSource), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(EventSource.GetGuid)),
+                transpiler => ("\treturn {};\n", 0)
+            );
+            code.For(
+                type.GetMethod("GetCustomAttributeHelper", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn {};\n", 0)
+            );
+            code.For(
+                type.GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => (string.Empty, 0)
             );
         })

@@ -423,7 +423,7 @@ namespace IL2CXX
         public string GenerateCheckNull(string variable) => CheckNull ? $"\tif (!{variable}) [[unlikely]] f__throw_null_reference();\n" : string.Empty;
         private void GenerateCheckNull(Stack stack)
         {
-            if (!stack.Type.IsValueType) writer.Write(GenerateCheckNull(stack.Variable));
+            if (!stack.Type.IsByRef && !stack.Type.IsPointer && !stack.Type.IsValueType) writer.Write(GenerateCheckNull(stack.Variable));
         }
         public string GenerateCheckArgumentNull(string variable) => CheckNull ? $"\tif (!{variable}) [[unlikely]] f__throw_argument_null();\n" : string.Empty;
         public string GenerateCheckRange(string index, string length) => CheckRange ? $"\tif (static_cast<size_t>({index}) >= {length}) [[unlikely]] f__throw_index_out_of_range();\n" : string.Empty;

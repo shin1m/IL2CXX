@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Parallelizable]
+    //[Parallelizable]
     class MonitorTests
     {
         static int Default()

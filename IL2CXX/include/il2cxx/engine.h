@@ -284,12 +284,6 @@ inline T1 f__copy(T0 a_in, size_t a_n, T1 a_out)
 	return a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
 }
 
-template<typename T0, typename T1>
-inline T1 f__move(T0 a_in, size_t a_n, T1 a_out)
-{
-	return a_in < a_out ? std::move_backward(a_in, a_in + a_n, a_out + a_n) : std::move(a_in, a_in + a_n, a_out);
-}
-
 template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
 int t_engine::f_run(void(*a_finalize)(t_object*), T_main a_main)
 {

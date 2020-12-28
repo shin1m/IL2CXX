@@ -17,6 +17,10 @@ namespace IL2CXX
                 transpiler => ("\treturn {};\n", 0)
             );
             code.For(
+                type.GetMethod("IsRuntimeImplemented", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ($"\treturn a_0 && !a_0->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(RuntimeAssembly))}>::v__instance);\n", 1)
+            );
+            code.For(
                 type.GetProperty(nameof(Assembly.Location)).GetMethod,
                 transpiler => ($@"{'\t'}char cs[PATH_MAX];
 {'\t'}auto r = readlink(""/proc/self/exe"", cs, sizeof(cs));

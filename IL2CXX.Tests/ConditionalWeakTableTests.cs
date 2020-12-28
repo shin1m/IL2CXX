@@ -6,7 +6,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
-    [Parallelizable]
+    //[Parallelizable]
     class ConditionalWeakTableTests
     {
         static int Default()

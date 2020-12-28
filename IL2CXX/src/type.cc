@@ -20,9 +20,9 @@ void t__type::f_do_suppress_finalize(t_object* a_this)
 {
 }
 
-void t__type::f_do_copy(const char* a_from, size_t a_n, char* a_to)
+void t__type::f_do_copy(const void* a_from, size_t a_n, void* a_to)
 {
-	f__copy(reinterpret_cast<const t_slot*>(a_from), a_n, reinterpret_cast<t_slot*>(a_to));
+	f__copy(static_cast<const t_slot*>(a_from), a_n, static_cast<t_slot*>(a_to));
 }
 
 void t__type::f_do_to_unmanaged(const t_object* a_this, void* a_p)

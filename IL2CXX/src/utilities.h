@@ -1,3 +1,6 @@
+using t_intptr = t_System_2eIntPtr::t_stacked;
+using t_uintptr = t_System_2eUIntPtr::t_stacked;
+
 IL2CXX__PORTABLE__ALWAYS_INLINE inline t_System_2eString* f__new_string(size_t a_length)
 {
 	t__new<t_System_2eString> p(sizeof(char16_t) * a_length);
@@ -22,6 +25,11 @@ inline t_System_2eString* f__new_string(const char16_t* a_x)
 }
 char* f__copy_to(const t_System_2eString* a_x, char* a_p, char* a_q);
 
+template<typename T, typename = void>
+struct t_has_destroy : std::false_type {};
+template<typename T>
+struct t_has_destroy<T, std::void_t<decltype(std::declval<T>().f_destroy())>> : std::true_type {};
+
 template<typename T>
 inline void f__marshal_in(T& a_x, const T& a_y)
 {
@@ -33,12 +41,12 @@ inline void f__marshal_out(const T& a_x, T& a_y)
 	a_y = a_x;
 }
 template<typename T>
-inline void f__marshal_destroy(T)
+inline std::enable_if_t<std::negation_v<t_has_destroy<T>>> f__marshal_destroy(T)
 {
 }
 
-template<typename T>
-inline auto f__marshal_in(T& a_x, const T& a_y) -> decltype(a_x.f_in(a_y))
+template<typename T, typename U>
+inline auto f__marshal_in(T& a_x, const U& a_y) -> decltype(a_x.f_in(a_y))
 {
 	a_x.f_in(a_y);
 }
@@ -51,6 +59,14 @@ template<typename T>
 inline auto f__marshal_destroy(T& a_x) -> decltype(a_x.f_destroy())
 {
 	a_x.f_destroy();
+}
+
+template<typename T, typename U>
+inline auto f__marshal_out(const T& a_x, t_slot_of<U>& a_y) -> decltype(a_x.f_out(a_y))
+{
+	auto p = f__new_zerod<U>();
+	a_x.f_out(p);
+	f__store(a_y, p);
 }
 
 inline void f__marshal_in(char*& a_x, const t_slot_of<t_System_2eString>& a_y)
@@ -79,6 +95,9 @@ template<typename T>
 inline void f__marshal_out(const T* a_x, t_slot_of<t_System_2eString>& a_y)
 {
 	f__store(a_y, f__new_string(a_x));
+}
+inline void f__marshal_destroy(void*)
+{
 }
 template<typename T>
 inline void f__marshal_destroy(T*& a_x)

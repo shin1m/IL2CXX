@@ -133,8 +133,8 @@ struct t__type : t__abstract_type
 	void (*f_register_finalize)(t_object*) = f_do_register_finalize;
 	static void f_do_suppress_finalize(t_object* a_this);
 	void (*f_suppress_finalize)(t_object*) = f_do_suppress_finalize;
-	static void f_do_copy(const char* a_from, size_t a_n, char* a_to);
-	void (*f_copy)(const char*, size_t, char*) = f_do_copy;
+	static void f_do_copy(const void* a_from, size_t a_n, void* a_to);
+	void (*f_copy)(const void*, size_t, void*) = f_do_copy;
 	static void f_do_to_unmanaged(const t_object* a_this, void* a_p);
 	static void f_do_to_unmanaged_blittable(const t_object* a_this, void* a_p);
 	void (*f_to_unmanaged)(const t_object*, void*) = f_do_to_unmanaged;

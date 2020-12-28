@@ -2,7 +2,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Parallelizable]
+    //[Parallelizable]
     class NumberTests
     {
         static int Single()

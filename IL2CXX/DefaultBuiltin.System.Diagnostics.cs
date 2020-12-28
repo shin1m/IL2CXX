@@ -60,6 +60,30 @@ namespace IL2CXX
                 type.GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => (string.Empty, 0)
             );
+            code.For(
+                type.GetMethod("ReportOutOfBandMessage", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );
+            code.For(
+                type.GetMethod("SendCommand", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );
+            code.For(
+                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { typeof(Guid) }),
+                transpiler => (string.Empty, 0)
+            );
+            code.For(
+                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { typeof(Guid), typeof(Guid).MakeByRefType() }),
+                transpiler => ("\t*a_1 = {};\n", 0)
+            );
+            code.For(
+                type.GetMethod("WriteEventCore", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );
+            code.For(
+                type.GetMethod("WriteEventWithRelatedActivityIdCore", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );
         })
         .For(Type.GetType("System.Diagnostics.Tracing.FrameworkEventSource"), (type, code) =>
         {

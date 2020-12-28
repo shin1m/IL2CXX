@@ -15,7 +15,7 @@ namespace IL2CXX
     {
         private const BindingFlags declaredAndInstance = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-        class RuntimeDefinition : IEqualityComparer<Type[]>
+        private class RuntimeDefinition : IEqualityComparer<Type[]>
         {
             bool IEqualityComparer<Type[]>.Equals(Type[] x, Type[] y) => x.SequenceEqual(y);
             int IEqualityComparer<Type[]>.GetHashCode(Type[] x) => x.Select(y => y.GetHashCode()).Aggregate((y, z) => y % z);
@@ -544,7 +544,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
 {'\t'}static t_object* f_do_clone(const t_object* a_this);");
-                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine("\tstatic void f_do_copy(const char* a_from, size_t a_n, char* a_to);");
+                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine("\tstatic void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
                 if (definition.HasUnmanaged)
                     writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t_object* a_this, void* a_p);
 {'\t'}static void f_do_from_unmanaged(t_object* a_this, const void* a_p);
@@ -580,7 +580,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}f_to_unmanaged = f_do_to_unmanaged;
 {'\t'}f_from_unmanaged = f_do_from_unmanaged;
 {'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged;");
-            else
+            else if (!type.IsArray)
                 try
                 {
                     writerForDefinitions.WriteLine($@"{'\t'}v__unmanaged_size = {Marshal.SizeOf(type)};
@@ -632,9 +632,9 @@ t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;
 }}
-void t__type_of<{identifier}>::f_do_copy(const char* a_from, size_t a_n, char* a_to)
+void t__type_of<{identifier}>::f_do_copy(const void* a_from, size_t a_n, void* a_to)
 {{
-{'\t'}f__copy(reinterpret_cast<const decltype({identifier}::v__value)*>(a_from), a_n, reinterpret_cast<decltype({identifier}::v__value)*>(a_to));" :
+{'\t'}f__copy(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));" :
                     $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}static_cast<const {identifier}*>(a_this)->f__construct(p);
 {'\t'}return p;");

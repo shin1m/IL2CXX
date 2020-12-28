@@ -234,13 +234,25 @@ namespace IL2CXX
 ", 0)
             );
         })
+        // TODO
         .For(typeof(ThreadPool), (type, code) =>
         {
-            // TODO
+            /*code.For(
+                type.GetMethod("InitializeVMTp", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );*/
+            code.For(
+                type.GetMethod("GetEnableWorkerTracking", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn false;\n", 0)
+            );
             code.For(
                 type.GetMethod("NotifyWorkItemProgressNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            /*code.For(
+                type.GetMethod("RequestWorkerThread", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn 0;\n", 0)
+            );*/
         })
         .For(typeof(WaitHandle), (type, code) =>
         {

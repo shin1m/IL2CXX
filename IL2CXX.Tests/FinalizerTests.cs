@@ -5,7 +5,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
-    [Parallelizable]
+    //[Parallelizable]
     class FinalizerTests
     {
         class Foo : IDisposable

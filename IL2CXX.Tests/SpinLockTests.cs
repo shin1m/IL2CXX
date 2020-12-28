@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Parallelizable]
+    //[Parallelizable]
     class SpinLockTests
     {
         static int Enter()

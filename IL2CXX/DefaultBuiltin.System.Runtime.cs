@@ -105,6 +105,20 @@ namespace IL2CXX
 ", 1)
             );
         })
+        .For(typeof(MemoryMarshal), (type, code) =>
+        {
+            code.ForGeneric(
+                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference)),
+                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0->f__data());\n", 1)
+            );
+        })
+        .For(typeof(NativeLibrary), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("LoadLibraryByName", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+        })
         .For(typeof(RuntimeHelpers), (type, code) =>
         {
             code.For(
@@ -183,20 +197,6 @@ namespace IL2CXX
 ", 1)
             );
         })
-        .For(Type.GetType("System.Runtime.CompilerServices.JitHelpers"), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("GetRawSzArrayData", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f__bounds() + 1);\n", 1)
-            );
-        })
-        .For(Type.GetType("System.Runtime.RuntimeImports"), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("RhZeroMemory", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(void*), typeof(ulong) }, null),
-                transpiler => ("\tstd::memset(a_0, 0, a_1);\n", 1)
-            );
-        })
         .For(Type.GetType("System.Runtime.Intrinsics.Vector128`1"), (type, code) =>
         {
             // TODO
@@ -235,10 +235,6 @@ namespace IL2CXX
             code.ForGeneric(
                 methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
                 (transpiler, types) => ("\treturn a_0 + static_cast<intptr_t>(a_1);\n", 1)
-            );
-            code.ForGeneric(
-                methods.Single(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(ulong)),
-                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + a_1);\n", 1)
             );
             code.ForGeneric(
                 methods.Single(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),

@@ -5,15 +5,15 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Parallelizable]
+    //[Parallelizable]
     class ArrayTests
     {
         static int AssertEquals(string[] xs, string[] ys)
         {
-            foreach (var x in xs) Console.WriteLine(x);
+            foreach (var x in xs) Console.WriteLine(x ?? "(null)");
             var n = xs.Length;
             if (n != ys.Length) return 1;
-            for (var i = 0; i < n; ++i) if (xs[i] != ys[i]) return 1;
+            for (var i = 0; i < n; ++i) if (xs[i] != ys[i]) return 2;
             return 0;
         }
         static int IsReadOnly()

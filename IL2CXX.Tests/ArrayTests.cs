@@ -23,6 +23,14 @@ namespace IL2CXX.Tests
         }
         [Test]
         public void TestIsReadOnly() => Utilities.Test(IsReadOnly);
+        static int Clear()
+        {
+            string[] xs = { "Hello", "World", "Good", "Bye" };
+            Array.Clear(xs, 1, 2);
+            return AssertEquals(xs, new[] { "Hello", null, null, "Bye" });
+        }
+        [Test]
+        public void TestClear() => Utilities.Test(Clear);
         static int Copy()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
@@ -117,5 +125,21 @@ namespace IL2CXX.Tests
         }
         [Test]
         public void TestClone() => Utilities.Test(Clone);
+        static int Reverse()
+        {
+            string[] xs = { "foo", "bar" };
+            Array.Reverse((Array)xs);
+            return AssertEquals(xs, new[] { "bar", "foo" });
+        }
+        [Test]
+        public void TestReverse() => Utilities.Test(Reverse);
+        static int ReverseOfT()
+        {
+            string[] xs = { "foo", "bar" };
+            Array.Reverse(xs);
+            return AssertEquals(xs, new[] { "bar", "foo" });
+        }
+        [Test]
+        public void TestReverseOfT() => Utilities.Test(ReverseOfT);
     }
 }

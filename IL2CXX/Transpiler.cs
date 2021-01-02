@@ -38,7 +38,7 @@ namespace IL2CXX
                 Indices = new Dictionary<string, int>(Pop.Indices);
                 Type = type;
                 string prefix;
-                if (Type.IsByRef || Type.IsPointer)
+                if (Type.IsByRef || Type.IsPointer || Type == typeof(IntPtr) || Type == typeof(UIntPtr))
                 {
                     VariableType = "void*";
                     prefix = "p";
@@ -80,16 +80,6 @@ namespace IL2CXX
                     VariableType = "t_object*";
                     prefix = "o";
                 }
-                else if (Type == typeof(IntPtr))
-                {
-                    VariableType = "t_intptr";
-                    prefix = "ip__";
-                }
-                else if (Type == typeof(UIntPtr))
-                {
-                    VariableType = "t_uintptr";
-                    prefix = "up__";
-                }
                 else
                 {
                     var t = transpiler.Escape(Type);
@@ -108,21 +98,12 @@ namespace IL2CXX
                 for (var x = this; x != null; x = x.Pop) yield return x;
             }
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-            public string AsSigned => VariableType switch
-            {
-                "t_intptr" => $"static_cast<intptr_t>({Variable})",
-                "t_uintptr" => $"static_cast<intptr_t>(static_cast<uintptr_t>({Variable}))",
-                "void*" => $"reinterpret_cast<intptr_t>({Variable})",
-                _ => Variable
-            };
+            public string AsSigned => VariableType.EndsWith("*") ? $"reinterpret_cast<intptr_t>({Variable})" : Variable;
             public string AsUnsigned => VariableType switch
             {
                 "int32_t" => $"static_cast<uint32_t>({Variable})",
                 "int64_t" => $"static_cast<uint64_t>({Variable})",
-                "t_intptr" => $"static_cast<uintptr_t>(static_cast<intptr_t>({Variable}))",
-                "t_uintptr" => $"static_cast<uintptr_t>({Variable})",
-                "void*" => $"reinterpret_cast<uintptr_t>({Variable})",
-                _ => Variable
+                _ => VariableType.EndsWith("*") ? $"reinterpret_cast<uintptr_t>({Variable})" : Variable
             };
             public string Assign(string value) => $"{Variable} = {(VariableType.EndsWith("*") ? $"reinterpret_cast<{VariableType}>({value})" : value)}";
         }
@@ -170,63 +151,25 @@ namespace IL2CXX
         private static readonly Type typedReferenceByRefType = typeof(TypedReferenceTag).MakeByRefType();
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfAdd = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
-            [("int32_t", "t_intptr")] = typeof(IntPtr),
-            [("int32_t", "t_uintptr")] = typeof(UIntPtr),
             [("int32_t", "void*")] = typeof(void*),
             [("int64_t", "int64_t")] = typeof(long),
-            [("t_intptr", "int32_t")] = typeof(IntPtr),
-            [("t_intptr", "t_intptr")] = typeof(IntPtr),
-            [("t_intptr", "t_uintptr")] = typeof(UIntPtr),
-            [("t_intptr", "void*")] = typeof(void*),
-            [("t_uintptr", "int32_t")] = typeof(UIntPtr),
-            [("t_uintptr", "t_intptr")] = typeof(UIntPtr),
-            [("t_uintptr", "t_uintptr")] = typeof(UIntPtr),
-            [("t_uintptr", "void*")] = typeof(void*),
             [("void*", "int32_t")] = typeof(void*),
-            [("void*", "t_intptr")] = typeof(void*),
-            [("void*", "t_uintptr")] = typeof(void*),
             [("void*", "void*")] = typeof(void*),
             [("double", "double")] = typeof(double)
         };
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
-            [("int32_t", "t_intptr")] = typeof(IntPtr),
-            [("int32_t", "t_uintptr")] = typeof(UIntPtr),
             [("int32_t", "void*")] = typeof(void*),
             [("int64_t", "int64_t")] = typeof(long),
-            [("t_intptr", "int32_t")] = typeof(IntPtr),
-            [("t_intptr", "t_intptr")] = typeof(IntPtr),
-            [("t_intptr", "t_uintptr")] = typeof(UIntPtr),
-            [("t_intptr", "void*")] = typeof(void*),
-            [("t_uintptr", "int32_t")] = typeof(UIntPtr),
-            [("t_uintptr", "t_intptr")] = typeof(UIntPtr),
-            [("t_uintptr", "t_uintptr")] = typeof(UIntPtr),
-            [("t_uintptr", "void*")] = typeof(void*),
             [("void*", "int32_t")] = typeof(void*),
-            [("void*", "t_intptr")] = typeof(void*),
-            [("void*", "t_uintptr")] = typeof(void*),
             [("void*", "void*")] = typeof(void*)
         };
         private static readonly IReadOnlyDictionary<(string, string), Type> typeOfShl = new Dictionary<(string, string), Type> {
             [("int32_t", "int32_t")] = typeof(int),
-            [("int32_t", "t_intptr")] = typeof(int),
-            [("int32_t", "t_uintptr")] = typeof(int),
             [("int32_t", "void*")] = typeof(int),
             [("int64_t", "int32_t")] = typeof(long),
-            [("int64_t", "t_intptr")] = typeof(long),
-            [("int64_t", "t_uintptr")] = typeof(long),
             [("int64_t", "void*")] = typeof(long),
-            [("t_intptr", "int32_t")] = typeof(IntPtr),
-            [("t_intptr", "t_intptr")] = typeof(IntPtr),
-            [("t_intptr", "t_uintptr")] = typeof(IntPtr),
-            [("t_intptr", "void*")] = typeof(IntPtr),
-            [("t_uintptr", "int32_t")] = typeof(UIntPtr),
-            [("t_uintptr", "t_intptr")] = typeof(UIntPtr),
-            [("t_uintptr", "t_uintptr")] = typeof(UIntPtr),
-            [("t_uintptr", "void*")] = typeof(UIntPtr),
             [("void*", "int32_t")] = typeof(void*),
-            [("void*", "t_intptr")] = typeof(void*),
-            [("void*", "t_uintptr")] = typeof(void*),
             [("void*", "void*")] = typeof(void*)
         };
         private static MethodInfo FinalizeOf(Type x) => x.GetMethod(nameof(Finalize), BindingFlags.Instance | BindingFlags.NonPublic);

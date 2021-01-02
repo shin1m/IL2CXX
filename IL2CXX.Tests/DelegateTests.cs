@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Parallelizable]
+    //[Parallelizable]
     class DelegateTests
     {
         static event Action<string> Log;

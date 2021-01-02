@@ -99,21 +99,28 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}if (a_0) throw std::runtime_error(""NotSupportedException"");
-{'\t'}auto p = a_2->f_extension();
+                transpiler => ($@"{'\t'}auto p = a_1->f_extension();
 {'\t'}std::unique_lock<std::recursive_timed_mutex> lock(p->v_mutex, std::adopt_lock);
 {'\t'}auto finally = f__finally([&]
 {'\t'}{{
 {'\t'}{'\t'}lock.release();
 {'\t'}}});
-{'\t'}if (a_1 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_1)) == std::cv_status::no_timeout;
+{'\t'}if (a_0 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_0)) == std::cv_status::no_timeout;
 {'\t'}p->v_condition.wait(lock);
 {'\t'}return true;
 ", 0)
             );
         })
+        .For(typeof(RegisteredWaitHandle), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("WaitHandleCleanupNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+        })
         .For(typeof(Thread), (type, code) =>
         {
+            var helper = type.GetNestedType("StartHelper", BindingFlags.NonPublic);
             code.Base = "t__thread";
             code.Members = transpiler => ($@"{'\t'}static {transpiler.Escape(type)}* f__current()
 {'\t'}{{
@@ -122,8 +129,10 @@ namespace IL2CXX
 
 {'\t'}{transpiler.EscapeForMember(typeof(ExecutionContext))} v__5fexecutionContext;
 {'\t'}{transpiler.EscapeForMember(typeof(SynchronizationContext))} v__5fsynchronizationContext;
-{'\t'}{transpiler.EscapeForMember(typeof(Delegate))} v__5fdelegate;
-{'\t'}{transpiler.EscapeForMember(typeof(object))} v__5fthreadStartArg;
+{'\t'}{transpiler.EscapeForMember(typeof(string))} v__5fname;
+{'\t'}{transpiler.EscapeForMember(helper)} v__5fstartHelper;
+{'\t'}{transpiler.EscapeForMember(typeof(bool))} v__5fmayNeedResetForThreadPool;
+{'\t'}{transpiler.EscapeForMember(typeof(bool))} v__pool;
 {'\t'}{transpiler.EscapeForMember(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
 
 {'\t'}void f__scan(t_scan a_scan)
@@ -131,42 +140,33 @@ namespace IL2CXX
 {'\t'}{'\t'}t_System_2eObject::f__scan(a_scan);
 {'\t'}{'\t'}a_scan(v__5fexecutionContext);
 {'\t'}{'\t'}a_scan(v__5fsynchronizationContext);
-{'\t'}{'\t'}a_scan(v__5fdelegate);
-{'\t'}{'\t'}a_scan(v__5fthreadStartArg);
+{'\t'}{'\t'}a_scan(v__5fname);
+{'\t'}{'\t'}a_scan(v__5fstartHelper);
 {'\t'}{'\t'}a_scan(v__deserialization_tracker);
 {'\t'}}}
 ", true, null);
             code.For(
-                type.GetConstructor(new[] { typeof(ThreadStart) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
-{'\t'}p->v__5fdelegate = a_0;
-{'\t'}p->v__priority = 2;
-{'\t'}return p;
-", 0)
+                type.GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\ta_0->v__priority == 2;\n", 1)
             );
             code.For(
-                type.GetConstructor(new[] { typeof(ParameterizedThreadStart) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
-{'\t'}p->v__5fdelegate = a_0;
-{'\t'}p->v__priority = 2;
-{'\t'}return p;
-", 0)
+                type.GetMethod("InternalFinalize", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 1)
             );
             code.For(
-                type.GetMethod(nameof(object.GetHashCode)),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
-            );
-            code.For(
-                type.GetMethod(nameof(Thread.Start), Type.EmptyTypes),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}return a_0->f__start([a_0]
+                type.GetMethod("StartCore", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler =>
+                {
+                    var run = helper.GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic);
+                    transpiler.Enqueue(run);
+                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}a_0->f__start([a_0]
 {'\t'}{{
+{'\t'}{'\t'}{transpiler.EscapeForRoot(helper)} p = std::move(a_0->v__5fstartHelper);
 {'\t'}{'\t'}t_thread_static ts;
-{'\t'}{'\t'}if (a_0->v__5fdelegate->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(ThreadStart))}>::v__instance))
-{'\t'}{'\t'}{'\t'}{transpiler.Escape(typeof(ThreadStart).GetMethod("Invoke"))}({transpiler.CastValue(typeof(ThreadStart), "a_0->v__5fdelegate")});
-{'\t'}{'\t'}else
-{'\t'}{'\t'}{'\t'}{transpiler.Escape(typeof(ParameterizedThreadStart).GetMethod("Invoke"))}({transpiler.CastValue(typeof(ParameterizedThreadStart), "a_0->v__5fdelegate")}, a_0->v__5fthreadStartArg);
-{'\t'}{'\t'}}});
-", 1)
+{'\t'}{'\t'}{transpiler.Escape(run)}(p);
+{'\t'}}});
+", 0);
+                }
             );
             code.For(
                 type.GetMethod(nameof(Thread.Join), Type.EmptyTypes),
@@ -182,36 +182,37 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Thread.Yield)),
-                transpiler => ("\tstd::this_thread::yield();\nreturn true;\n", 0)
+                transpiler => ("\tstd::this_thread::yield();\nreturn true;\n", 1)
             );
             code.For(
-                type.GetProperty(nameof(Thread.IsBackground)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__background;\n", 1)
+                type.GetMethod("IsBackgroundNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\treturn a_0->v__background;\n", 1)
             );
             code.For(
-                type.GetProperty(nameof(Thread.IsBackground)).SetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->f__background__(a_1);\n", 1)
+                type.GetMethod("SetBackgroundNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\ta_0->f__background__(a_1);\n", 1)
             );
             // TODO
             code.For(
                 type.GetProperty(nameof(Thread.IsThreadPoolThread)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__pool;\n", 1)
+            );
+            // TODO
+            code.For(
+                type.GetProperty(nameof(Thread.IsThreadPoolThread)).SetMethod,
+                transpiler => ("\ta_0->v__pool = a_1;\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(Thread.ManagedThreadId)).GetMethod,
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
             );
             code.For(
-                type.GetProperty(nameof(Thread.Priority)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->v__priority;\n", 1)
+                type.GetMethod("GetPriorityNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\treturn a_0->v__priority;\n", 1)
             );
             code.For(
-                type.GetProperty(nameof(Thread.Priority)).SetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->f__priority__(a_1);\n", 1)
-            );
-            code.For(
-                type.GetMethod("InternalFinalize", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => (string.Empty, 0)
+                type.GetMethod("SetPriorityNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\ta_0->f__priority__(a_1);\n", 1)
             );
             code.For(
                 type.GetMethod("GetCurrentProcessorNumber", BindingFlags.Static | BindingFlags.NonPublic),
@@ -233,26 +234,38 @@ namespace IL2CXX
 {'\t'}return p->v__deserialization_tracker;
 ", 0)
             );
+            code.For(
+                type.GetMethod("ThreadNameChanged", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 1)
+            );
+            code.For(
+                type.GetMethod("UninterruptibleSleep0", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tstd::this_thread::yield();\n", 1)
+            );
         })
         // TODO
         .For(typeof(ThreadPool), (type, code) =>
         {
-            /*code.For(
-                type.GetMethod("InitializeVMTp", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => (string.Empty, 0)
-            );*/
             code.For(
                 type.GetMethod("GetEnableWorkerTracking", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 0)
             );
             code.For(
+                type.GetMethod("InitializeConfigAndDetermineUsePortableThreadPool", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn true;\n", 1)
+            );
+            code.For(
+                type.GetMethod("NotifyWorkItemCompleteNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
                 type.GetMethod("NotifyWorkItemProgressNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
-            /*code.For(
-                type.GetMethod("RequestWorkerThread", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn 0;\n", 0)
-            );*/
+            code.For(
+                type.GetMethod("ReportThreadStatusNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
         })
         .For(typeof(WaitHandle), (type, code) =>
         {
@@ -275,6 +288,13 @@ namespace IL2CXX
 {'\t'}{'\t'}return i < a_1 ? i : 0x102;
 {'\t'}}}
 ", 0)
+            );
+        })
+        .For(Type.GetType("System.Threading.LowLevelLifoSemaphore"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("WaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn static_cast<t__waitable*>(a_0->v_handle.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1));\n", 0)
             );
         });
     }

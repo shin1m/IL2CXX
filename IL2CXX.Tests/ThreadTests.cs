@@ -25,7 +25,7 @@ namespace IL2CXX.Tests
             return 0;
         }
         [Test]
-        public void Test() => Utilities.Test(Run);
+        public void TestRun() => Utilities.Test(Run);
         static int Background()
         {
             new Thread(() => Thread.Sleep(Timeout.Infinite)) {

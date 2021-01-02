@@ -1,6 +1,3 @@
-using t_intptr = t_System_2eIntPtr::t_stacked;
-using t_uintptr = t_System_2eUIntPtr::t_stacked;
-
 IL2CXX__PORTABLE__ALWAYS_INLINE inline t_System_2eString* f__new_string(size_t a_length)
 {
 	t__new<t_System_2eString> p(sizeof(char16_t) * a_length);

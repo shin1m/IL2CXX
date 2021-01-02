@@ -126,6 +126,10 @@ namespace IL2CXX
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
             );
             code.For(
+                type.GetMethod("GetRawArrayData", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f__bounds() + a_0->f_type()->v__rank);\n", 1)
+            );
+            code.For(
                 type.GetMethod(nameof(RuntimeHelpers.InitializeArray)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\tstd::memcpy(a_0->f__bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
             );
@@ -147,7 +151,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod("TryEnsureSufficientExecutionStack"),
+                type.GetMethod(nameof(RuntimeHelpers.TryEnsureSufficientExecutionStack)),
                 transpiler => ("\treturn true;\n", 1)
             );
             code.For(
@@ -258,6 +262,14 @@ namespace IL2CXX
             );
             foreach (var m in methods.Where(x => x.Name == "AsRef" && x.GetGenericArguments().Length == 1))
                 code.ForGeneric(m, (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(((MethodInfo)m).MakeGenericMethod(types).ReturnType)}>(a_0);\n", 1));
+            code.ForGeneric(
+                methods.Single(x => x.Name == "ByteOffset" && x.GetGenericArguments().Length == 1),
+                (transpiler, types) => ("\treturn reinterpret_cast<char*>(a_1) - reinterpret_cast<char*>(a_0);\n", 1)
+            );
+            code.ForGeneric(
+                methods.Single(x => x.Name == "IsAddressLessThan" && x.GetGenericArguments().Length == 1),
+                (transpiler, types) => ("\treturn reinterpret_cast<uintptr_t>(a_0) < reinterpret_cast<uintptr_t>(a_1);\n", 1)
+            );
             foreach (var m in methods.Where(x => x.Name == "ReadUnaligned" && x.GetGenericArguments().Length == 1))
                 code.ForGeneric(m,
                     (transpiler, types) => ($"\treturn *reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0);\n", 1)
@@ -269,6 +281,10 @@ namespace IL2CXX
             code.ForGeneric(
                 methods.Single(x => x.Name == "SizeOf" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => ($"\treturn sizeof({transpiler.EscapeForValue(types[0])});\n", 1)
+            );
+            code.ForGeneric(
+                methods.Single(x => x.Name == "SkipInit" && x.GetGenericArguments().Length == 1),
+                (transpiler, types) => (string.Empty, 1)
             );
         });
     }

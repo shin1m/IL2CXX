@@ -19,16 +19,20 @@ namespace IL2CXX
         .For(typeof(Debugger), (type, code) =>
         {
             code.For(
+                type.GetMethod(nameof(Debugger.Break)),
+                transpiler => (string.Empty, 1)
+            );
+            code.For(
                 type.GetProperty(nameof(Debugger.IsAttached)).GetMethod,
                 transpiler => ("\treturn false;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Debugger.Log)),
-                transpiler => (string.Empty, 0)
+                transpiler => (string.Empty, 1)
             );
             code.For(
                 type.GetMethod(nameof(Debugger.NotifyOfCrossThreadDependency)),
-                transpiler => (string.Empty, 0)
+                transpiler => (string.Empty, 1)
             );
         })
         .For(Type.GetType("System.Diagnostics.Tracing.EventPipeEventDispatcher"), (type, code) =>
@@ -55,6 +59,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetCustomAttributeHelper", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn {};\n", 0)
+            );
+            code.For(
+                type.GetProperty("IsSupported", BindingFlags.Static | BindingFlags.NonPublic).GetMethod,
+                transpiler => ("\treturn false;\n", 0)
             );
             code.For(
                 type.GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic),

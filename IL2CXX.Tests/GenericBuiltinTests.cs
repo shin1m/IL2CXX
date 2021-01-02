@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Parallelizable]
+    //[Parallelizable]
     class GenericBuiltinTests
     {
         static int Count()

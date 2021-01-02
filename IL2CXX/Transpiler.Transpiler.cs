@@ -580,15 +580,18 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            instructions1[OpCodes.Conv_I.Value].For(x =>
+            new[] {
+                (OpCode: OpCodes.Conv_I, Type: "intptr_t"),
+                (OpCode: OpCodes.Conv_U, Type: "uintptr_t")
+            }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(void*)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<intptr_t>({stack.AsSigned})")};");
+                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<{set.Type}>({stack.AsSigned})")};");
                     return index;
                 };
-            });
+            }));
             new[] {
                 (OpCode: OpCodes.Conv_U4, Type: typeof(uint)),
                 (OpCode: OpCodes.Conv_U8, Type: typeof(ulong)),
@@ -604,15 +607,6 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            instructions1[OpCodes.Conv_U.Value].For(x =>
-            {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(void*)));
-                x.Generate = (index, stack) =>
-                {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<uintptr_t>({stack.AsUnsigned})")};");
-                    return index;
-                };
-            });
             instructions1[OpCodes.Callvirt.Value].For(x =>
             {
                 x.Estimate = (index, stack) =>
@@ -741,7 +735,8 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
-                    writer.WriteLine($@" {m.DeclaringType}::[{m}]");
+                    var t = m.DeclaringType;
+                    writer.WriteLine($@" {t}::[{m}]");
                     var after = indexToStack[index];
                     Enqueue(m);
                     string call(IEnumerable<string> xs) => $"{Escape(m)}({string.Join(",", xs)}\n\t)";
@@ -749,10 +744,15 @@ namespace IL2CXX
                     var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{CastValue(p.ParameterType, s.Variable)}");
                     if (builtin.GetBody(this, m).body != null)
                         writer.WriteLine($"\t{after.Variable} = {call(arguments)};");
-                    else if (m.DeclaringType.IsValueType)
-                        writer.WriteLine($"\t{after.Variable} = {EscapeForValue(m.DeclaringType)}{{}};\n\t{call(arguments.Prepend($"\n\t\t&{after.Variable}"))};");
+                    else if (t == typeof(IntPtr) || t == typeof(UIntPtr))
+                        writer.WriteLine($@"{'\t'}{{{EscapeForValue(t)} p{{}};
+{'\t'}{call(arguments.Prepend("\n\t\t&p"))};
+{'\t'}{after.Variable} = p;}}");
+                    else if (t.IsValueType)
+                        writer.WriteLine($@"{'\t'}{after.Variable} = {EscapeForValue(t)}{{}};
+{'\t'}{call(arguments.Prepend($"\n\t\t&{after.Variable}"))};");
                     else
-                        writer.WriteLine($@"{'\t'}{{auto p = f__new_zerod<{Escape(m.DeclaringType)}>();
+                        writer.WriteLine($@"{'\t'}{{auto p = f__new_zerod<{Escape(t)}>();
 {'\t'}{call(arguments.Prepend("\n\t\tp"))};
 {'\t'}{after.Variable} = p;}}");
                     return index;
@@ -1148,16 +1148,16 @@ namespace IL2CXX
                             writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->f__is(&t__type_of<{Escape(typeof(Enum))}>::v__instance))
 {'\t'}{'\t'}switch ({stack.Variable}->f_type()->v__size) {{
 {'\t'}{'\t'}case 1:
-{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int8_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int8_t*>({stack.Variable} + 1));
 {'\t'}{'\t'}{'\t'}break;
 {'\t'}{'\t'}case 2:
-{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int16_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int16_t*>({stack.Variable} + 1));
 {'\t'}{'\t'}{'\t'}break;
 {'\t'}{'\t'}case 4:
-{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int32_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int32_t*>({stack.Variable} + 1));
 {'\t'}{'\t'}{'\t'}break;
 {'\t'}{'\t'}default:
-{'\t'}{'\t'}{'\t'}{after.Variable} = *reinterpret_cast<int64_t*>({stack.Variable} + 1);
+{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int64_t*>({stack.Variable} + 1));
 {'\t'}{'\t'}}}");
                         writer.WriteLine($@"{'\t'}else
 {'\t'}{'\t'}[[unlikely]] f__throw_invalid_cast();");

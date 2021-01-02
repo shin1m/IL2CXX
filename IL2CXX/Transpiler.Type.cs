@@ -14,6 +14,8 @@ namespace IL2CXX
     partial class Transpiler
     {
         private const BindingFlags declaredAndInstance = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        private static readonly MethodInfo getCorElementTypeOfElementType = typeof(Array).GetMethod("GetCorElementTypeOfElementType", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly MethodInfo internalGetCorElementType = typeof(Enum).GetMethod("InternalGetCorElementType", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private class RuntimeDefinition : IEqualityComparer<Type[]>
         {
@@ -544,7 +546,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
 {'\t'}static t_object* f_do_clone(const t_object* a_this);");
-                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine("\tstatic void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
+                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_clear(void* a_p, size_t a_n);
+{'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
                 if (definition.HasUnmanaged)
                     writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t_object* a_this, void* a_p);
 {'\t'}static void f_do_from_unmanaged(t_object* a_this, const void* a_p);
@@ -589,7 +592,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged_blittable;");
                 } catch { }
             if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
-{'\t'}v__rank = {type.GetArrayRank()};");
+{'\t'}v__rank = {type.GetArrayRank()};
+{'\t'}v__cor_element_type = {(byte)getCorElementTypeOfElementType.Invoke(Array.CreateInstance(type, 0), null)};");
             if (td?.DefaultConstructor != null) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
             writerForDefinitions.Write(td?.Delegate);
             var nv = Nullable.GetUnderlyingType(type);
@@ -598,9 +602,11 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             {
                 writerForDefinitions.WriteLine($@"{'\t'}f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
-                if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine("\tf_copy = f_do_copy;");
+                if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear;
+{'\t'}f_copy = f_do_copy;");
                 if (type.IsEnum) writerForDefinitions.WriteLine($@"{'\t'}v__enum_pairs = v__enum_pairs_{identifier};
-{'\t'}v__enum_count = std::size(v__enum_pairs_{identifier});");
+{'\t'}v__enum_count = std::size(v__enum_pairs_{identifier});
+{'\t'}v__cor_element_type = {(byte)internalGetCorElementType.Invoke(Activator.CreateInstance(type), null)};");
             }
             writerForDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
@@ -631,6 +637,10 @@ t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
                         type.IsValueType ? $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;
+}}
+void t__type_of<{identifier}>::f_do_clear(void* a_p, size_t a_n)
+{{
+{'\t'}std::fill_n(static_cast<decltype({identifier}::v__value)*>(a_p), a_n, decltype({identifier}::v__value){{}});
 }}
 void t__type_of<{identifier}>::f_do_copy(const void* a_from, size_t a_n, void* a_to)
 {{

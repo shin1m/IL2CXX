@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 
 namespace IL2CXX
 {
@@ -224,6 +223,13 @@ namespace IL2CXX
 {'\t'}{'\t'}return reinterpret_cast<t__bound*>(this + 1);
 {'\t'}}}
 ", true, null);
+            code.For(
+                type.GetMethod(nameof(Array.Clear)),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
+{'\t'}auto element = type->v__element;
+{'\t'}element->f_clear(reinterpret_cast<char*>(a_0->f__bounds() + type->v__rank) + a_1 * element->v__size, a_2);
+", 0)
+            );
             var copy = type.GetMethod(nameof(Array.Copy), new[] { type, typeof(int), type, typeof(int), typeof(int) });
             code.For(
                 type.GetMethod(nameof(Array.Copy), new[] { type, type, typeof(int) }),
@@ -233,12 +239,15 @@ namespace IL2CXX
                     return ($"\t{transpiler.Escape(copy)}(a_0, 0, a_1, 0, a_2);\n", 1);
                 }
             );
+            // TODO
             code.For(
                 copy,
-                transpiler => ($@"{'\t'}if (a_0->f_type() == a_2->f_type()) {{
-{'\t'}{'\t'}auto rank = a_0->f_type()->v__rank;
-{'\t'}{'\t'}auto n = a_0->f_type()->v__element->v__size;
-{'\t'}{'\t'}a_0->f_type()->v__element->f_copy(reinterpret_cast<char*>(a_0->f__bounds() + rank) + a_1 * n, a_4, reinterpret_cast<char*>(a_2->f__bounds() + rank) + a_3 * n);
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_2") + $@"{'\t'}auto type = a_0->f_type();
+{'\t'}if (type == a_2->f_type()) {{
+{'\t'}{'\t'}auto rank = type->v__rank;
+{'\t'}{'\t'}auto element = type->v__element;
+{'\t'}{'\t'}auto n = element->v__size;
+{'\t'}{'\t'}element->f_copy(reinterpret_cast<char*>(a_0->f__bounds() + rank) + a_1 * n, a_4, reinterpret_cast<char*>(a_2->f__bounds() + rank) + a_3 * n);
 {'\t'}}} else {{
 {'\t'}{'\t'}throw std::runtime_error(""NotImplementedException"");
 {'\t'}}}
@@ -298,6 +307,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("InternalSetValue", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\t*static_cast<t_slot*>(a_0) = a_1;\n", 1)
+            );
+            code.For(
+                type.GetMethod("GetCorElementTypeOfElementType", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\treturn a_0->f_type()->v__cor_element_type;\n", 1)
             );
         })
         .For(typeof(SZArrayHelper<>), (type, code) =>
@@ -568,10 +581,6 @@ namespace IL2CXX
                 transpiler => ("\treturn f__new_string(a_0);\n", 2)
             );
             code.For(
-                type.GetMethod("wstrcpy", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tstd::memcpy(a_0, a_1, a_2 * sizeof(char16_t));\n", 1)
-            );
-            code.For(
                 type.GetConstructor(new[] { typeof(char*) }),
                 transpiler => ("\treturn f__new_string(std::u16string_view(a_0));\n", 1)
             );
@@ -742,10 +751,9 @@ namespace IL2CXX
 ", 0);
                 }
             );
-            // TODO
             code.For(
                 type.GetMethod("InternalGetCorElementType", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\treturn a_0->f_type()->v__cor_element_type;\n", 1)
             );
             // TODO
             code.For(
@@ -778,7 +786,7 @@ namespace IL2CXX
                 transpiler => ($"\treturn gettid();\n", 1)
             );
             code.For(
-                type.GetProperty(nameof(Environment.ProcessorCount)).GetMethod,
+                type.GetMethod("GetProcessorCount", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn std::thread::hardware_concurrency();\n", 1)
             );
             code.For(
@@ -790,7 +798,7 @@ namespace IL2CXX
 {'\t'}return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 ", 0);
             code.For(type.GetProperty(nameof(Environment.TickCount)).GetMethod, tick);
-            code.For(type.GetProperty("TickCount64").GetMethod, tick);
+            code.For(type.GetProperty(nameof(Environment.TickCount64)).GetMethod, tick);
             code.For(
                 type.GetMethod(nameof(Environment.FailFast), new[] { typeof(string) }),
                 transpiler => ($@"{'\t'}std::cerr << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}) << std::endl;
@@ -977,13 +985,6 @@ namespace IL2CXX
 {'\t'}return seed;
 ", 0)
             );
-            code.For(
-                type.GetMethod("GenerateSeed", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}uint32_t seed;
-{'\t'}std::seed_seq().generate(&seed, &seed + 1);
-{'\t'}return seed;
-", 0)
-            );
         })
         .For(typeof(Buffer), (type, code) =>
         {
@@ -996,10 +997,11 @@ namespace IL2CXX
                 methods.First(x => x.Name == "Memmove" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => ($"\tt__type_of<{transpiler.Escape(types[0])}>::f_do_copy(a_1, a_2, a_0);\n", 1)
             );
-            /*code.For(
-                type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(byte*), typeof(byte*), typeof(UIntPtr) }, null),
+            var @byte = typeof(byte).MakeByRefType();
+            code.For(
+                type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { @byte, @byte, typeof(UIntPtr) }, null),
                 transpiler => ("\tstd::memmove(a_0, a_1, a_2);\n", -1)
-            );*/
+            );
         })
         .For(typeof(Console), (type, code) =>
         {
@@ -1024,17 +1026,6 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("SequenceEqual", new[] { @byte, @byte, typeof(UIntPtr) }),
                 transpiler => ("\treturn std::memcmp(a_0, a_1, a_2) == 0;\n", 1)
-            );
-        })
-        .For(Type.GetType("System.SR"), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("GetResourceString", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(string), typeof(string) }, null),
-                transpiler => ("\treturn a_0;\n", 0)
-            );
-            code.For(
-                type.GetMethod("UsingResourceKeys", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn false;\n", 0)
             );
         })
         .For(Type.GetType("System.CLRConfig"), (type, code) =>

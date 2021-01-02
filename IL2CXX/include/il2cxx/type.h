@@ -78,6 +78,7 @@ struct t__type : t__abstract_type
 	bool v__managed;
 	bool v__value_type;
 	bool v__enum;
+	uint8_t v__cor_element_type;
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
@@ -133,6 +134,8 @@ struct t__type : t__abstract_type
 	void (*f_register_finalize)(t_object*) = f_do_register_finalize;
 	static void f_do_suppress_finalize(t_object* a_this);
 	void (*f_suppress_finalize)(t_object*) = f_do_suppress_finalize;
+	static void f_do_clear(void* a_p, size_t a_n);
+	void (*f_clear)(void*, size_t) = f_do_clear;
 	static void f_do_copy(const void* a_from, size_t a_n, void* a_to);
 	void (*f_copy)(const void*, size_t, void*) = f_do_copy;
 	static void f_do_to_unmanaged(const t_object* a_this, void* a_p);

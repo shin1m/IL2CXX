@@ -103,8 +103,8 @@ inline {returns}
 //{'\t'}SetLastError: {dllimport.SetLastError}");
                 writer.WriteLine($@"{prototype}
 {{
-{'\t'}static t_library library(""{dllimport.Value}""s, ""{dllimport.EntryPoint ?? method.Name}"");");
-                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "library.f_symbol()", writer, dllimport.CharSet);
+{'\t'}static void* symbol = f_load_symbol(""{dllimport.Value}""s, ""{dllimport.EntryPoint ?? method.Name}"");");
+                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, dllimport.CharSet);
                 writer.WriteLine('}');
                 return;
             }
@@ -249,7 +249,7 @@ inline {returns}
             }
             while (queuedMethods.Count > 0);
             processed = true;
-            writerForDeclarations.WriteLine(@"#include <il2cxx/base.h>
+            writerForDeclarations.WriteLine(@"#include ""base.h""
 
 namespace il2cxx
 {

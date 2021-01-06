@@ -1,5 +1,4 @@
-#include "engine.h"
-#include "library.h"
+#include <il2cxx/engine.h>
 #include <iostream>
 #include <limits>
 #include <random>
@@ -8,6 +7,14 @@
 #include <utility>
 #include <cstdint>
 #include <cstring>
+
+#ifdef __unix__
+#include <dlfcn.h>
+#include <gnu/lib-names.h>
+#endif
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace il2cxx
 {
@@ -62,6 +69,23 @@ T* t__lazy<T>::f_initialize()
 	v_p.f_initialize();
 	v_initialized.store(&v_p, std::memory_order_release);
 	return &v_p;
+}
+
+inline void* f_load_symbol(const std::string& a_path, const char* a_name)
+{
+#ifdef __unix__
+	auto handle = dlopen(a_path.c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
+	if (handle == NULL) {
+		handle = dlopen(a_path == "libc" ? LIBC_SO : (a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
+		if (handle == NULL) throw std::runtime_error("unable to dlopen " + a_path + ": " + dlerror());
+	}
+	return dlsym(handle, a_name);
+#endif
+#ifdef _WIN32
+	auto handle = LoadLibraryA((a_path + ".dll").c_str());
+	if (handle == NULL) throw std::runtime_error("unable to dlopen: " + a_path);
+	return GetProcAddress(handle, a_name);
+#endif
 }
 
 }

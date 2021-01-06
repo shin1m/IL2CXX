@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class MonitorTests
     {
         static int Default()
@@ -21,8 +21,6 @@ namespace IL2CXX.Tests
             Console.WriteLine(log);
             return log.Length == 100 ? 0 : 1;
         }
-        [Test]
-        public void TestDefault() => Utilities.Test(Default);
         class QuitException : Exception { }
         static int WaitAndPulse()
         {
@@ -73,8 +71,6 @@ namespace IL2CXX.Tests
             Console.WriteLine(log);
             return log == "Hello, World." ? 0 : 1;
         }
-        [Test]
-        public void TestWaitAndPulse() => Utilities.Test(WaitAndPulse);
         static int WaitAndPulseAll()
         {
             var monitor = new object();
@@ -110,15 +106,11 @@ namespace IL2CXX.Tests
             Console.WriteLine(log);
             return log.Length == 100 ? 0 : 1;
         }
-        [Test]
-        public void TestWaitAndPulseAll() => Utilities.Test(WaitAndPulseAll);
         static int WaitTimeout()
         {
             var monitor = new object();
             lock (monitor) return Monitor.Wait(monitor, 1) ? 1 : 0;
         }
-        [Test]
-        public void TestWaitTimeout() => Utilities.Test(WaitTimeout);
         static int TryEnter()
         {
             var monitor = new object();
@@ -158,15 +150,34 @@ namespace IL2CXX.Tests
                 t.Join();
             }
         }
-        [Test]
-        public void TestTryEnter() => Utilities.Test(TryEnter);
         static int IsEntered()
         {
             var monitor = new object();
             lock (monitor) if (!Monitor.IsEntered(monitor)) return 1;
             return Monitor.IsEntered(monitor) ? 2 : 0;
         }
-        [Test, Ignore("Not implemented")]
-        public void TestIsEntered() => Utilities.Test(IsEntered);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Default) => Default(),
+            nameof(WaitAndPulse) => WaitAndPulse(),
+            nameof(WaitAndPulseAll) => WaitAndPulseAll(),
+            nameof(WaitTimeout) => WaitTimeout(),
+            nameof(TryEnter) => TryEnter(),
+            //nameof(IsEntered) => IsEntered(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Default))]
+        [TestCase(nameof(WaitAndPulse))]
+        [TestCase(nameof(WaitAndPulseAll))]
+        [TestCase(nameof(WaitTimeout))]
+        [TestCase(nameof(TryEnter))]
+        [TestCase(nameof(IsEntered), Ignore="Not implemented")]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

@@ -1,10 +1,9 @@
 using System;
-using System.Linq;
 using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class MemberwiseCloneTests
     {
         struct Foo : ICloneable
@@ -28,15 +27,26 @@ namespace IL2CXX.Tests
             var y = (Foo)x.Clone();
             return y.X == "foo" && y.Y == 1 ? 0 : 1;
         }
-        [Test]
-        public void TestCloneValue() => Utilities.Test(CloneValue);
         static int CloneObject()
         {
             var x = new Bar { X = "foo", Y = 1, Z = { X = "bar", Y = 2 } };
             var y = (Bar)x.Clone();
             return y.X == "foo" && y.Y == 1 && y.Z.X == "bar" && y.Z.Y == 2 ? 0 : 1;
         }
-        [Test]
-        public void TestCloneObject() => Utilities.Test(CloneObject);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(CloneValue) => CloneValue(),
+            nameof(CloneObject) => CloneObject(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(CloneValue))]
+        [TestCase(nameof(CloneObject))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

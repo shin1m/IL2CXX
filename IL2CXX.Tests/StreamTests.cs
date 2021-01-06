@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Category("Heavy")]
+    [Parallelizable]
     class StreamTests
     {
         const string FileName = nameof(StreamTests) + "-file";
@@ -26,6 +26,7 @@ namespace IL2CXX.Tests
         public void SetUp() => DeleteFile();
         [TearDown]
         public void TearDown() => DeleteFile();
+
         static int ReadMemory()
         {
             using (var stream = new MemoryStream(new byte[] { 0, 1 }))
@@ -34,8 +35,6 @@ namespace IL2CXX.Tests
                 return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
             }
         }
-        [Test]
-        public void TestReadMemory() => Utilities.Test(ReadMemory);
         static int WriteMemory()
         {
             using (var stream = new MemoryStream())
@@ -44,8 +43,6 @@ namespace IL2CXX.Tests
                 return stream.TryGetBuffer(out var xs) && BytesEquals(xs, 0, 1) ? 0 : 1;
             }
         }
-        [Test]
-        public void TestWriteMemory() => Utilities.Test(WriteMemory);
         static int ReadFile()
         {
             using (var stream = File.OpenRead(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName)))
@@ -54,22 +51,10 @@ namespace IL2CXX.Tests
                 return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
             }
         }
-        [Test]
-        public void TestReadFile()
-        {
-            File.WriteAllBytes(FilePath, new byte[] { 0, 1 });
-            Utilities.Test(ReadFile);
-        }
         static int WriteFile()
         {
             using (var stream = File.OpenWrite(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName))) stream.Write(new byte[] { 0, 1 });
             return 0;
-        }
-        [Test]
-        public void TestWriteFile()
-        {
-            Utilities.Test(WriteFile);
-            BytesEquals(File.ReadAllBytes(FilePath), 0, 1);
         }
         static int ReadTextFile()
         {
@@ -80,15 +65,6 @@ namespace IL2CXX.Tests
                 return reader.ReadLine() == null ? 0 : 3;
             }
         }
-        [Test]
-        public void TestReadTextFile()
-        {
-            File.WriteAllLines(FilePath, new[] {
-                "Hello, World!",
-                "Good bye."
-            });
-            Utilities.Test(ReadTextFile);
-        }
         static int WriteTextFile()
         {
             using (var writer = File.CreateText(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName)))
@@ -98,10 +74,50 @@ namespace IL2CXX.Tests
             }
             return 0;
         }
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(ReadMemory) => ReadMemory(),
+            nameof(WriteMemory) => WriteMemory(),
+            nameof(ReadFile) => ReadFile(),
+            nameof(WriteFile) => WriteFile(),
+            nameof(ReadTextFile) => ReadTextFile(),
+            nameof(WriteTextFile) => WriteTextFile(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(ReadMemory))]
+        [TestCase(nameof(WriteMemory))]
+        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void TestReadFile()
+        {
+            File.WriteAllBytes(FilePath, new byte[] { 0, 1 });
+            Utilities.Run(build, nameof(ReadFile));
+        }
+        [Test]
+        public void TestWriteFile()
+        {
+            Utilities.Run(build, nameof(WriteFile));
+            BytesEquals(File.ReadAllBytes(FilePath), 0, 1);
+        }
+        [Test]
+        public void TestReadTextFile()
+        {
+            File.WriteAllLines(FilePath, new[] {
+                "Hello, World!",
+                "Good bye."
+            });
+            Utilities.Run(build, nameof(ReadTextFile));
+        }
         [Test]
         public void TestWriteTextFile()
         {
-            Utilities.Test(WriteTextFile);
+            Utilities.Run(build, nameof(WriteTextFile));
             Assert.AreEqual(new[] {
                 "Hello, World!",
                 "Good bye."

@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class WaitHandleTests
     {
         static int Mutex()
@@ -27,8 +27,6 @@ namespace IL2CXX.Tests
                 return i == 100 ? 0 : 1;
             }
         }
-        [Test]
-        public void TestMutex() => Utilities.Test(Mutex);
         static int Event()
         {
             using (var ready = new EventWaitHandle(false, EventResetMode.AutoReset))
@@ -50,8 +48,6 @@ namespace IL2CXX.Tests
                 return i == 2 ? 0 : 2;
             }
         }
-        [Test]
-        public void TestEvent() => Utilities.Test(Event);
         static int AutoResetEvent()
         {
             using (var @event = new EventWaitHandle(true, EventResetMode.AutoReset))
@@ -60,8 +56,6 @@ namespace IL2CXX.Tests
                 return @event.WaitOne(0) ? 1 : 0;
             }
         }
-        [Test]
-        public void TestAutoResetEvent() => Utilities.Test(AutoResetEvent);
         static int ManualResetEvent()
         {
             using (var @event = new EventWaitHandle(true, EventResetMode.ManualReset))
@@ -72,8 +66,6 @@ namespace IL2CXX.Tests
                 return @event.WaitOne(0) ? 3 : 0;
             }
         }
-        [Test]
-        public void TestManualResetEvent() => Utilities.Test(ManualResetEvent);
         static int Semaphore()
         {
             using (var semaphore = new Semaphore(0, 1))
@@ -94,8 +86,6 @@ namespace IL2CXX.Tests
                 return i == 100 ? 0 : 2;
             }
         }
-        [Test]
-        public void TestSemaphore() => Utilities.Test(Semaphore);
         static int WaitAll()
         {
             using (var mutex = new Mutex(true))
@@ -115,8 +105,6 @@ namespace IL2CXX.Tests
                 return 0;
             }
         }
-        [Test]
-        public void TestWaitAll() => Utilities.Test(WaitAll);
         static int WaitAny()
         {
             using (var ready = new EventWaitHandle(false, EventResetMode.AutoReset))
@@ -132,8 +120,6 @@ namespace IL2CXX.Tests
                 return WaitHandle.WaitAny(new WaitHandle[] { other, done }) == 1 ? 0 : 1;
             }
         }
-        [Test]
-        public void TestWaitAny() => Utilities.Test(WaitAny);
         static int SignalAndWait()
         {
             using (var ready = new EventWaitHandle(false, EventResetMode.AutoReset))
@@ -147,7 +133,32 @@ namespace IL2CXX.Tests
                 return WaitHandle.SignalAndWait(ready, done) ? 0 : 1;
             }
         }
-        [Test]
-        public void TestSignalAndWait() => Utilities.Test(SignalAndWait);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Mutex) => Mutex(),
+            nameof(Event) => Event(),
+            nameof(AutoResetEvent) => AutoResetEvent(),
+            nameof(ManualResetEvent) => ManualResetEvent(),
+            nameof(Semaphore) => Semaphore(),
+            nameof(WaitAll) => WaitAll(),
+            nameof(WaitAny) => WaitAny(),
+            nameof(SignalAndWait) => SignalAndWait(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Mutex))]
+        [TestCase(nameof(Event))]
+        [TestCase(nameof(AutoResetEvent))]
+        [TestCase(nameof(ManualResetEvent))]
+        [TestCase(nameof(Semaphore))]
+        [TestCase(nameof(WaitAll))]
+        [TestCase(nameof(WaitAny))]
+        [TestCase(nameof(SignalAndWait))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

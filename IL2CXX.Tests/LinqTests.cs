@@ -5,9 +5,15 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class LinqTests
     {
+        static int Count()
+        {
+            var n = Enumerable.Range(0, 128).Count(x => x >= 'A' && x <= 'Z');
+            Console.WriteLine($"# of alphabets: {n}");
+            return n == 26 ? 0 : 1;
+        }
         static IEnumerable<string> EnumerateWords(IEnumerable<string> lines)
         {
             var isWords = Enumerable.Range(0, 128).Select(c => c >= 48 && c < 58 || c >= 65 && c < 91 || c == 95 || c >= 97 && c < 123).ToArray();
@@ -38,8 +44,6 @@ namespace IL2CXX.Tests
             foreach (var x in word2count) Console.WriteLine($"\t{x.Key}: {x.Value}");
             return word2count.Count == 7 ? 0 : 1;
         }
-        [Test]
-        public void TestCountWords() => Utilities.Test(CountWords);
         static Func<string, string> Corrector(IReadOnlyDictionary<string, int> word2count)
         {
             void edits1(string word, Action<string> action)
@@ -94,7 +98,22 @@ namespace IL2CXX.Tests
             if (!test("wide", "wide")) return 3;
             return 0;
         }
-        [Test]
-        public void TestCorrect() => Utilities.Test(Correct);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Count) => Count(),
+            nameof(CountWords) => CountWords(),
+            nameof(Correct) => Correct(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Count))]
+        [TestCase(nameof(CountWords))]
+        [TestCase(nameof(Correct))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

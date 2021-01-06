@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    [Category("Heavy")]
+    [Parallelizable]
     class EncodingTests
     {
         static int GetBytes()
@@ -15,16 +15,12 @@ namespace IL2CXX.Tests
             if (xs[1] != 0xa0) return 3;
             return 0;
         }
-        [Test]
-        public void TestGetBytes() => Utilities.Test(GetBytes);
         static int GetString()
         {
             var x = Encoding.UTF8.GetString(new[] { (byte)0xce, (byte)0xa0 });
             Console.WriteLine(x);
             return x == "\u03a0" ? 0 : 1;
         }
-        [Test]
-        public void TestGetString() => Utilities.Test(GetString);
         static int Convert()
         {
             var utf8 = Encoding.UTF8.GetBytes("\u03a0");
@@ -33,7 +29,22 @@ namespace IL2CXX.Tests
             if (ascii[0] != '?') return 2;
             return 0;
         }
-        [Test]
-        public void TestConvert() => Utilities.Test(Convert);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(GetBytes) => GetBytes(),
+            nameof(GetString) => GetString(),
+            nameof(Convert) => Convert(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(GetBytes))]
+        [TestCase(nameof(GetString))]
+        [TestCase(nameof(Convert))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

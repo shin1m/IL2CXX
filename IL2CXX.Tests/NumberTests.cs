@@ -1,8 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class NumberTests
     {
         static int Single()
@@ -24,8 +27,6 @@ namespace IL2CXX.Tests
             }
             return 0;
         }
-        [Test]
-        public void TestSingle() => Utilities.Test(Single);
         static int Double()
         {
             if (!double.IsPositiveInfinity(double.PositiveInfinity)) return 1;
@@ -45,8 +46,6 @@ namespace IL2CXX.Tests
             }
             return 0;
         }
-        [Test]
-        public void TestDouble() => Utilities.Test(Double);
         static int Unordered()
         {
             int ne(float x, float y) => x != y ? 1 : 0;
@@ -61,7 +60,52 @@ namespace IL2CXX.Tests
             if (ge(float.NaN, float.NaN) == 0) return 5;
             return 0;
         }
-        [Test]
-        public void TestUnordered() => Utilities.Test(Unordered);
+        static int Int32()
+        {
+            var x = new IntPtr(32);
+            return x.ToInt32() == 32 ? 0 : 1;
+        }
+        static unsafe int Pointer()
+        {
+            var x = new IntPtr(32);
+            return new IntPtr(x.ToPointer()) == x ? 0 : 1;
+        }
+        enum Names
+        {
+            Foo, Bar, Zot
+        }
+        static int GetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
+        static int GetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
+        static int ToStringDefault() => Names.Foo.ToString() == "Foo" ? 0 : 1;
+        static int ToStringG() => Names.Foo.ToString("g") == "Foo" ? 0 : 1;
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Single) => Single(),
+            nameof(Double) => Double(),
+            nameof(Unordered) => Unordered(),
+            nameof(Int32) => Int32(),
+            nameof(Pointer) => Pointer(),
+            nameof(GetNames) => GetNames(),
+            nameof(GetValues) => GetValues(),
+            nameof(ToStringDefault) => ToStringDefault(),
+            nameof(ToStringG) => ToStringG(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Single))]
+        [TestCase(nameof(Double))]
+        [TestCase(nameof(Unordered))]
+        [TestCase(nameof(Int32))]
+        [TestCase(nameof(Pointer))]
+        [TestCase(nameof(GetNames))]
+        [TestCase(nameof(GetValues))]
+        [TestCase(nameof(ToStringDefault))]
+        [TestCase(nameof(ToStringG))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

@@ -5,7 +5,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
-    //[Parallelizable]
+    [Parallelizable]
     class FinalizerTests
     {
         class Foo : IDisposable
@@ -46,8 +46,6 @@ namespace IL2CXX.Tests
             Console.WriteLine($"finalized: {Foo.Finalized}");
             return Foo.Finalized == 2 ? 0 : 1;
         }
-        [Test]
-        public void TestCollectAndWait() => Utilities.Test(CollectAndWait);
         static int Suppress()
         {
             WithPadding(() =>
@@ -59,8 +57,6 @@ namespace IL2CXX.Tests
             Console.WriteLine($"finalized: {Foo.Finalized}");
             return Foo.Finalized == 0 ? 0 : 1;
         }
-        [Test]
-        public void TestSuppress() => Utilities.Test(Suppress);
 
         class Bar
         {
@@ -101,7 +97,22 @@ namespace IL2CXX.Tests
             Console.WriteLine($"finalized: {Bar.Finalized}");
             return Bar.Finalized == 1 ? 0 : 2;
         }
-        [Test]
-        public void TestResurrect() => Utilities.Test(Resurrect);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(CollectAndWait) => CollectAndWait(),
+            nameof(Suppress) => Suppress(),
+            nameof(Resurrect) => Resurrect(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(CollectAndWait))]
+        [TestCase(nameof(Suppress))]
+        [TestCase(nameof(Resurrect))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

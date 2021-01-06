@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class DependentHandleTests
     {
         static Func<int> Default()
@@ -54,6 +54,6 @@ namespace IL2CXX.Tests
             )).Compile();
         }
         [Test, Ignore("Requires decoding DynamicMethod")]
-        public void TestDefault() => Utilities.Test(Default());
+        public void TestDefault() => Utilities.Run(Utilities.Build(Default()), null);
     }
 }

@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class ArrayTests
     {
         static int AssertEquals(string[] xs, string[] ys)
@@ -21,16 +21,12 @@ namespace IL2CXX.Tests
             string[] xs = { "Hello, World!" };
             return xs.IsReadOnly ? 1 : 0;
         }
-        [Test]
-        public void TestIsReadOnly() => Utilities.Test(IsReadOnly);
         static int Clear()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
             Array.Clear(xs, 1, 2);
             return AssertEquals(xs, new[] { "Hello", null, null, "Bye" });
         }
-        [Test]
-        public void TestClear() => Utilities.Test(Clear);
         static int Copy()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
@@ -38,60 +34,44 @@ namespace IL2CXX.Tests
             Array.Copy(xs, 1, ys, 2, 3);
             return AssertEquals(ys, new[] { null, null, "World", "Good", "Bye", null });
         }
-        [Test]
-        public void TestCopy() => Utilities.Test(Copy);
         static int ResizeLarger()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
             Array.Resize(ref xs, 6);
             return AssertEquals(xs, new[] { "Hello", "World", "Good", "Bye", null, null });
         }
-        [Test]
-        public void TestResizeLarger() => Utilities.Test(ResizeLarger);
         static int ResizeSmaller()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
             Array.Resize(ref xs, 3);
             return AssertEquals(xs, new[] { "Hello", "World", "Good" });
         }
-        [Test]
-        public void TestResizeSmaller() => Utilities.Test(ResizeSmaller);
         static int IListIsReadOnly()
         {
             IList xs = new[] { "Hello, World!" };
             return xs.IsReadOnly ? 1 : 0;
         }
-        [Test]
-        public void TestIListIsReadOnly() => Utilities.Test(IListIsReadOnly);
         static int IListTIsReadOnly()
         {
             IList<string> xs = new[] { "Hello, World!" };
             return xs.IsReadOnly ? 0 : 1;
         }
-        [Test]
-        public void TestIListTIsReadOnly() => Utilities.Test(IListTIsReadOnly);
         static int IListTCount()
         {
             IList<string> xs = new[] { "Hello, World!" };
             return xs.Count == 1 ? 0 : 1;
         }
-        [Test]
-        public void TestIListTCount() => Utilities.Test(IListTCount);
         static int IListTGetItem()
         {
             IList<string> xs = new[] { "foo" };
             return xs[0] == "foo" ? 0 : 1;
         }
-        [Test]
-        public void TestIListTGetItem() => Utilities.Test(IListTGetItem);
         static int IListTSetItem()
         {
             IList<string> xs = new[] { "foo" };
             xs[0] = "bar";
             return xs[0] == "bar" ? 0 : 1;
         }
-        [Test]
-        public void TestIListTSetItem() => Utilities.Test(IListTSetItem);
         static int IListTCopyTo()
         {
             IList<string> xs = new[] { "World" };
@@ -99,8 +79,6 @@ namespace IL2CXX.Tests
             xs.CopyTo(ys, 1);
             return AssertEquals(ys, new[] { "Hello", "World" });
         }
-        [Test]
-        public void TestIListTCopyTo() => Utilities.Test(IListTCopyTo);
         static int GetEnumerator()
         {
             foreach (var x in (IEnumerable<string>)new[] {
@@ -109,37 +87,70 @@ namespace IL2CXX.Tests
             }) Console.WriteLine(x);
             return 0;
         }
-        [Test]
-        public void TestGetEnumerator() => Utilities.Test(GetEnumerator);
         static int IListTIndexOf()
         {
             IList<string> xs = new[] { "foo", "bar" };
             return xs.IndexOf("bar") == 1 ? 0 : 1;
         }
-        [Test]
-        public void TestIListTIndexOf() => Utilities.Test(IListTIndexOf);
         static int Clone()
         {
             string[] xs = { "foo", "bar" };
             return AssertEquals((string[])xs.Clone(), xs);
         }
-        [Test]
-        public void TestClone() => Utilities.Test(Clone);
         static int Reverse()
         {
             string[] xs = { "foo", "bar" };
             Array.Reverse((Array)xs);
             return AssertEquals(xs, new[] { "bar", "foo" });
         }
-        [Test]
-        public void TestReverse() => Utilities.Test(Reverse);
-        static int ReverseOfT()
+        static int ReverseT()
         {
             string[] xs = { "foo", "bar" };
             Array.Reverse(xs);
             return AssertEquals(xs, new[] { "bar", "foo" });
         }
-        [Test]
-        public void TestReverseOfT() => Utilities.Test(ReverseOfT);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(IsReadOnly) => IsReadOnly(),
+            nameof(Clear) => Clear(),
+            nameof(Copy) => Copy(),
+            nameof(ResizeLarger) => ResizeLarger(),
+            nameof(ResizeSmaller) => ResizeSmaller(),
+            nameof(IListIsReadOnly) => IListIsReadOnly(),
+            nameof(IListTIsReadOnly) => IListTIsReadOnly(),
+            nameof(IListTCount) => IListTCount(),
+            nameof(IListTGetItem) => IListTGetItem(),
+            nameof(IListTSetItem) => IListTSetItem(),
+            nameof(IListTCopyTo) => IListTCopyTo(),
+            nameof(GetEnumerator) => GetEnumerator(),
+            nameof(IListTIndexOf) => IListTIndexOf(),
+            nameof(Clone) => Clone(),
+            nameof(Reverse) => Reverse(),
+            nameof(ReverseT) => ReverseT(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(IsReadOnly))]
+        [TestCase(nameof(Clear))]
+        [TestCase(nameof(Copy))]
+        [TestCase(nameof(ResizeLarger))]
+        [TestCase(nameof(ResizeSmaller))]
+        [TestCase(nameof(IListIsReadOnly))]
+        [TestCase(nameof(IListTIsReadOnly))]
+        [TestCase(nameof(IListTCount))]
+        [TestCase(nameof(IListTGetItem))]
+        [TestCase(nameof(IListTSetItem))]
+        [TestCase(nameof(IListTCopyTo))]
+        [TestCase(nameof(GetEnumerator))]
+        [TestCase(nameof(IListTIndexOf))]
+        [TestCase(nameof(Clone))]
+        [TestCase(nameof(Reverse))]
+        [TestCase(nameof(ReverseT))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

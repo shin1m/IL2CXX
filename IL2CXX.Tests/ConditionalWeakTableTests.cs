@@ -6,7 +6,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
-    //[Parallelizable]
+    [Parallelizable]
     class ConditionalWeakTableTests
     {
         static int Default()
@@ -28,8 +28,6 @@ namespace IL2CXX.Tests
             GC.Collect();
             return wx.TryGetTarget(out _) || wy.TryGetTarget(out _) ? 2 : 0;
         }
-        [Test]
-        public void TestDefault() => Utilities.Test(Default);
         static int AddOrUpdate()
         {
             var table = new ConditionalWeakTable<string, string>();
@@ -39,8 +37,6 @@ namespace IL2CXX.Tests
             table.AddOrUpdate(x, y);
             return table.TryGetValue(x, out var z) && z == y ? 0 : 1;
         }
-        [Test]
-        public void TestAddOrUpdate() => Utilities.Test(AddOrUpdate);
         static int Clear()
         {
             var table = new ConditionalWeakTable<string, string>();
@@ -49,19 +45,19 @@ namespace IL2CXX.Tests
             table.Clear();
             return table.TryGetValue(x, out _) ? 1 : 0;
         }
-        [Test]
-        public void TestClear() => Utilities.Test(Clear);
+        class Foo
+        {
+            public string Value = "Bye";
+        }
         static int GetOrCreateValue()
         {
-            var table = new ConditionalWeakTable<string, string>();
+            var table = new ConditionalWeakTable<string, Foo>();
             var x = "Hello";
-            var y = "World";
+            var y = new Foo { Value = "World" };
             table.Add(x, y);
             if (table.GetOrCreateValue(x) != y) return 1;
-            return table.GetOrCreateValue("Good") == null ? 0 : 2;
+            return table.GetOrCreateValue("Good").Value == "Bye" ? 0 : 2;
         }
-        [Test, Ignore("Requires Activator")]
-        public void TestGetOrCreateValue() => Utilities.Test(GetOrCreateValue);
         static int GetValue()
         {
             var table = new ConditionalWeakTable<string, string>();
@@ -70,8 +66,6 @@ namespace IL2CXX.Tests
             if (table.GetValue(x, k => y) != y) return 1;
             return table.TryGetValue(x, out var z) && z == y ? 0 : 2;
         }
-        [Test]
-        public void TestGetValue() => Utilities.Test(GetValue);
         static int Remove()
         {
             var table = new ConditionalWeakTable<string, string>();
@@ -81,7 +75,28 @@ namespace IL2CXX.Tests
             if (table.Remove(x)) return 2;
             return table.TryGetValue(x, out _) ? 3 : 0;
         }
-        [Test]
-        public void TestRemove() => Utilities.Test(Remove);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Default) => Default(),
+            nameof(AddOrUpdate) => AddOrUpdate(),
+            nameof(Clear) => Clear(),
+            nameof(GetOrCreateValue) => GetOrCreateValue(),
+            nameof(GetValue) => GetValue(),
+            nameof(Remove) => Remove(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Default))]
+        [TestCase(nameof(AddOrUpdate))]
+        [TestCase(nameof(Clear))]
+        [TestCase(nameof(GetOrCreateValue))]
+        [TestCase(nameof(GetValue))]
+        [TestCase(nameof(Remove))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

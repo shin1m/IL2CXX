@@ -6,7 +6,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
-    //[Parallelizable]
+    [Parallelizable]
     class GCHandleTests
     {
         class Foo
@@ -55,8 +55,6 @@ namespace IL2CXX.Tests
                 h.Free();
             }
         }
-        [Test]
-        public void TestWeak() => Utilities.Test(Weak);
         static int WeakTrackResurrection()
         {
             Foo x = null;
@@ -91,8 +89,6 @@ namespace IL2CXX.Tests
                 h.Free();
             }
         }
-        [Test]
-        public void TestWeakTrackResurrection() => Utilities.Test(WeakTrackResurrection);
         static int WeakHandles()
         {
             Foo x = null;
@@ -132,8 +128,6 @@ namespace IL2CXX.Tests
                 wtr.Free();
             }
         }
-        [Test]
-        public void TestWeakHandles() => Utilities.Test(WeakHandles);
         static int Normal()
         {
             var x = "foo";
@@ -151,8 +145,6 @@ namespace IL2CXX.Tests
                 h.Free();
             }
         }
-        [Test]
-        public void TestNormal() => Utilities.Test(Normal);
         static int Pinned()
         {
             var x = "foo";
@@ -170,8 +162,6 @@ namespace IL2CXX.Tests
                 h.Free();
             }
         }
-        [Test]
-        public void TestPinned() => Utilities.Test(Pinned);
         static int IsAllocated()
         {
             var h = new GCHandle();
@@ -189,8 +179,6 @@ namespace IL2CXX.Tests
             }
             return h.IsAllocated ? 3 : 0;
         }
-        [Test]
-        public void TestIsAllocated() => Utilities.Test(IsAllocated);
         static int IntPtr()
         {
             object x = "foo";
@@ -207,7 +195,30 @@ namespace IL2CXX.Tests
                 h.Free();
             }
         }
-        [Test]
-        public void TestIntPtr() => Utilities.Test(IntPtr);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Weak) => Weak(),
+            nameof(WeakTrackResurrection) => WeakTrackResurrection(),
+            nameof(WeakHandles) => WeakHandles(),
+            nameof(Normal) => Normal(),
+            nameof(Pinned) => Pinned(),
+            nameof(IsAllocated) => IsAllocated(),
+            nameof(IntPtr) => IntPtr(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Weak))]
+        [TestCase(nameof(WeakTrackResurrection))]
+        [TestCase(nameof(WeakHandles))]
+        [TestCase(nameof(Normal))]
+        [TestCase(nameof(Pinned))]
+        [TestCase(nameof(IsAllocated))]
+        [TestCase(nameof(IntPtr))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

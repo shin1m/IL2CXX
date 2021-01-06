@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class TryTests
     {
         static int Catch()
@@ -18,8 +18,6 @@ namespace IL2CXX.Tests
                 return e.Message == "foo" ? 0 : 1;
             }
         }
-        [Test]
-        public void TestCatch() => Utilities.Test(Catch);
         static int Filter()
         {
             try
@@ -40,7 +38,20 @@ namespace IL2CXX.Tests
                 return 2;
             }
         }
-        [Test]
-        public void TestFilter() => Utilities.Test(Filter);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Catch) => Catch(),
+            nameof(Filter) => Filter(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Catch))]
+        [TestCase(nameof(Filter))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

@@ -5,7 +5,7 @@ namespace IL2CXX.Tests
 {
     using static Utilities;
 
-    //[Parallelizable]
+    [Parallelizable]
     class WeakReferenceTests
     {
         class Foo
@@ -42,8 +42,6 @@ namespace IL2CXX.Tests
             GC.Collect();
             return w.Target == null ? 0 : 2;
         }
-        [Test]
-        public void TestDefault() => Utilities.Test(Default);
         static int TrackResurrection()
         {
             Foo x = null;
@@ -63,8 +61,6 @@ namespace IL2CXX.Tests
             GC.Collect();
             return w.Target == null ? 0 : 3;
         }
-        [Test]
-        public void TestTrackResurrection() => Utilities.Test(TrackResurrection);
         static int SetTarget()
         {
             var x = new Foo();
@@ -73,8 +69,6 @@ namespace IL2CXX.Tests
             w.Target = y;
             return w.Target == y ? 0 : 1;
         }
-        [Test]
-        public void TestSetTarget() => Utilities.Test(SetTarget);
         static int DefaultOfT()
         {
             Foo x = null;
@@ -88,8 +82,6 @@ namespace IL2CXX.Tests
             GC.Collect();
             return w.TryGetTarget(out _) ? 2 : 0;
         }
-        [Test]
-        public void TestDefaultOfT() => Utilities.Test(DefaultOfT);
         static int TrackResurrectionOfT()
         {
             Foo x = null;
@@ -109,8 +101,6 @@ namespace IL2CXX.Tests
             GC.Collect();
             return w.TryGetTarget(out _) ? 3 : 0;
         }
-        [Test]
-        public void TestTrackResurrectionOfT() => Utilities.Test(TrackResurrectionOfT);
         static int SetTargetOfT()
         {
             var x = new Foo();
@@ -119,7 +109,28 @@ namespace IL2CXX.Tests
             w.SetTarget(y);
             return w.TryGetTarget(out var z) && z == y ? 0 : 1;
         }
-        [Test]
-        public void TestSetTargetOfT() => Utilities.Test(SetTargetOfT);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(Default) => Default(),
+            nameof(TrackResurrection) => TrackResurrection(),
+            nameof(SetTarget) => SetTarget(),
+            nameof(DefaultOfT) => DefaultOfT(),
+            nameof(TrackResurrectionOfT) => TrackResurrectionOfT(),
+            nameof(SetTargetOfT) => SetTargetOfT(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Default))]
+        [TestCase(nameof(TrackResurrection))]
+        [TestCase(nameof(SetTarget))]
+        [TestCase(nameof(DefaultOfT))]
+        [TestCase(nameof(TrackResurrectionOfT))]
+        [TestCase(nameof(SetTargetOfT))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
-    //[Parallelizable]
+    [Parallelizable]
     class MarshalTests
     {
         struct Point
@@ -18,16 +18,12 @@ namespace IL2CXX.Tests
             Console.WriteLine($"{n}");
             return n == 8 ? 0 : 1;
         }
-        [Test]
-        public void TestSizeOfType() => Utilities.Test(SizeOfType);
         static int SizeOfInstance()
         {
             var n = Marshal.SizeOf(new Point { X = 0, Y = 1 });
             Console.WriteLine($"{n}");
             return n == 8 ? 0 : 1;
         }
-        [Test]
-        public void TestSizeOfInstance() => Utilities.Test(SizeOfInstance);
 
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         struct Name
@@ -42,8 +38,6 @@ namespace IL2CXX.Tests
             Console.WriteLine($"{n}");
             return n == Marshal.SizeOf<IntPtr>() + 4 ? 0 : 1;
         }
-        [Test]
-        public void TestSizeOfByValTStr() => Utilities.Test(SizeOfByValTStr);
         static int StructureToPtr()
         {
             var p = Marshal.AllocHGlobal(Marshal.SizeOf<Name>());
@@ -62,8 +56,6 @@ namespace IL2CXX.Tests
                 Marshal.FreeHGlobal(p);
             }
         }
-        [Test]
-        public void TestStructureToPtr() => Utilities.Test(StructureToPtr);
 
         [StructLayout(LayoutKind.Explicit)]
         struct Union
@@ -79,14 +71,10 @@ namespace IL2CXX.Tests
             x.Y = 2;
             return x.X == 2 ? 0 : 1;
         }
-        [Test]
-        public void TestExplicit() => Utilities.Test(Explicit);
 
         static void Foo(IntPtr x, IntPtr y) { }
         static int GetFunctionPointerForDelegate() =>
             Marshal.GetFunctionPointerForDelegate((Action<IntPtr, IntPtr>)Foo) == IntPtr.Zero ? 1 : 0;
-        [Test]
-        public void TestGetFunctionPointerForDelegate() => Utilities.Test(GetFunctionPointerForDelegate);
         delegate IntPtr BarDelegate(IntPtr x, ref IntPtr y);
         static IntPtr Bar(IntPtr x, ref IntPtr y) => new IntPtr((int)x + (int)y);
         static int GetDelegateForFunctionPointer()
@@ -97,8 +85,6 @@ namespace IL2CXX.Tests
             if (d(new IntPtr(1), ref y) != new IntPtr(3)) return 1;
             return p == Marshal.GetFunctionPointerForDelegate(d) ? 0 : 1;
         }
-        [Test]
-        public void TestGetDelegateForFunctionPointer() => Utilities.Test(GetDelegateForFunctionPointer);
 
         struct utsname
         {
@@ -127,7 +113,32 @@ namespace IL2CXX.Tests
             Console.WriteLine($"machine: {name.machine}");
             return 0;
         }
-        [Test]
-        public void TestParameter() => Utilities.Test(Parameter);
+
+        static int Run(string[] arguments) => arguments[1] switch
+        {
+            nameof(SizeOfType) => SizeOfType(),
+            nameof(SizeOfInstance) => SizeOfInstance(),
+            nameof(SizeOfByValTStr) => SizeOfByValTStr(),
+            nameof(StructureToPtr) => StructureToPtr(),
+            nameof(Explicit) => Explicit(),
+            nameof(GetFunctionPointerForDelegate) => GetFunctionPointerForDelegate(),
+            nameof(GetDelegateForFunctionPointer) => GetDelegateForFunctionPointer(),
+            nameof(Parameter) => Parameter(),
+            _ => -1
+        };
+
+        string build;
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(SizeOfType))]
+        [TestCase(nameof(SizeOfInstance))]
+        [TestCase(nameof(SizeOfByValTStr))]
+        [TestCase(nameof(StructureToPtr))]
+        [TestCase(nameof(Explicit))]
+        [TestCase(nameof(GetFunctionPointerForDelegate))]
+        [TestCase(nameof(GetDelegateForFunctionPointer))]
+        [TestCase(nameof(Parameter))]
+        public void Test(string name) => Utilities.Run(build, name);
     }
 }

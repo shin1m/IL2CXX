@@ -31,7 +31,8 @@ namespace IL2CXX.Tests
             }
             return lines.SelectMany(matches);
         }
-        static string[] lines = {
+        static string[] lines =
+        {
             "Hello, World!",
             "Hello, this is shin!",
             "Good bye, World!",
@@ -88,7 +89,8 @@ namespace IL2CXX.Tests
         static int Correct()
         {
             var correct = Corrector(EnumerateWords(lines).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count()));
-            bool test(string word, string expected) {
+            bool test(string word, string expected)
+            {
                 var corrected = correct(word);
                 Console.WriteLine($"{word}: {corrected}");
                 return corrected == expected;

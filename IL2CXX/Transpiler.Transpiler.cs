@@ -41,12 +41,14 @@ namespace IL2CXX
             instructions1[OpCodes.Nop.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack);
-                x.Generate = (index, stack) => {
+                x.Generate = (index, stack) =>
+                {
                     writer.WriteLine();
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 OpCodes.Ldarg_0,
                 OpCodes.Ldarg_1,
                 OpCodes.Ldarg_2,
@@ -60,7 +62,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 OpCodes.Ldloc_0,
                 OpCodes.Ldloc_1,
                 OpCodes.Ldloc_2,
@@ -74,7 +77,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 OpCodes.Stloc_0,
                 OpCodes.Stloc_1,
                 OpCodes.Stloc_2,
@@ -174,7 +178,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 OpCodes.Ldc_I4_M1,
                 OpCodes.Ldc_I4_0,
                 OpCodes.Ldc_I4_1,
@@ -342,7 +347,8 @@ namespace IL2CXX
             string condition_Un(Stack stack, string @operator) => stack.VariableType == "double"
                 ? string.Format("{0} {1} {2} || std::isunordered({0}, {2})", stack.Pop.Variable, @operator, stack.Variable)
                 : $"{stack.Pop.AsUnsigned} {@operator} {stack.AsUnsigned}";
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Br_S, Target: (ParseBranchTarget)ParseBranchTargetI1),
                 (OpCode: OpCodes.Br, Target: (ParseBranchTarget)ParseBranchTargetI4)
             }.ForEach(baseSet =>
@@ -361,7 +367,8 @@ namespace IL2CXX
                         return index;
                     };
                 });
-                new[] {
+                new[]
+                {
                     (OpCode: OpCodes.Brfalse_S, Operator: "!"),
                     (OpCode: OpCodes.Brtrue_S, Operator: string.Empty)
                 }.ForEach(set => instructions1[set.OpCode.Value - OpCodes.Br_S.Value + baseSet.OpCode.Value].For(x =>
@@ -378,7 +385,8 @@ namespace IL2CXX
                         return index;
                     };
                 }));
-                new[] {
+                new[]
+                {
                     (OpCode: OpCodes.Beq_S, Operator: "=="),
                     (OpCode: OpCodes.Bge_S, Operator: ">="),
                     (OpCode: OpCodes.Bgt_S, Operator: ">"),
@@ -398,7 +406,8 @@ namespace IL2CXX
                         return index;
                     };
                 }));
-                new[] {
+                new[]
+                {
                     (OpCode: OpCodes.Bne_Un_S, Operator: "!="),
                     (OpCode: OpCodes.Bge_Un_S, Operator: ">="),
                     (OpCode: OpCodes.Bgt_Un_S, Operator: ">"),
@@ -446,7 +455,8 @@ namespace IL2CXX
                 if (@volatile) writer.WriteLine("\tstd::atomic_thread_fence(std::memory_order_consume);");
                 @volatile = false;
             }
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Ldind_I1, Type: typeof(sbyte)),
                 (OpCode: OpCodes.Ldind_U1, Type: typeof(byte)),
                 (OpCode: OpCodes.Ldind_I2, Type: typeof(short)),
@@ -488,7 +498,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Stind_I1, Type: typeof(sbyte)),
                 (OpCode: OpCodes.Stind_I2, Type: typeof(short)),
                 (OpCode: OpCodes.Stind_I4, Type: typeof(int)),
@@ -515,7 +526,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Add, Operator: "+", Type: typeOfAdd),
                 (OpCode: OpCodes.Sub, Operator: "-", Type: typeOfAdd),
                 (OpCode: OpCodes.Mul, Operator: "*", Type: typeOfAdd),
@@ -539,7 +551,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Div_Un, Operator: "/", Type: typeOfDiv_Un),
                 (OpCode: OpCodes.Rem_Un, Operator: "%", Type: typeOfDiv_Un),
                 (OpCode: OpCodes.Shr_Un, Operator: ">>", Type: typeOfShl)
@@ -552,7 +565,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Neg, Operator: "-"),
                 (OpCode: OpCodes.Not, Operator: "~")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
@@ -564,7 +578,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Conv_I1, Type: typeof(sbyte)),
                 (OpCode: OpCodes.Conv_I2, Type: typeof(short)),
                 (OpCode: OpCodes.Conv_I4, Type: typeof(int)),
@@ -580,7 +595,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Conv_I, Type: "intptr_t"),
                 (OpCode: OpCodes.Conv_U, Type: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
@@ -592,7 +608,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Conv_U4, Type: typeof(uint)),
                 (OpCode: OpCodes.Conv_U8, Type: typeof(ulong)),
                 (OpCode: OpCodes.Conv_U2, Type: typeof(ushort)),
@@ -697,7 +714,8 @@ namespace IL2CXX
             instructions1[OpCodes.Ldstr.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index + 4, stack.Push(typeof(string)));
-                var escapes = new Dictionary<char, string> {
+                var escapes = new Dictionary<char, string>
+                {
                     ['\''] = "\\'",
                     ['"'] = "\\\"",
                     ['?'] = "\\?",
@@ -945,7 +963,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Conv_Ovf_I1_Un, Type: typeof(sbyte)),
                 (OpCode: OpCodes.Conv_Ovf_I2_Un, Type: typeof(short)),
                 (OpCode: OpCodes.Conv_Ovf_I4_Un, Type: typeof(int)),
@@ -963,7 +982,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Conv_Ovf_I_Un, Type: "intptr_t"),
                 (OpCode: OpCodes.Conv_Ovf_U_Un, Type: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
@@ -1029,7 +1049,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Ldelem_I1, Type: typeof(sbyte)),
                 (OpCode: OpCodes.Ldelem_U1, Type: typeof(byte)),
                 (OpCode: OpCodes.Ldelem_I2, Type: typeof(short)),
@@ -1069,7 +1090,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Stelem_I, Type: typeof(IntPtr)),
                 (OpCode: OpCodes.Stelem_I1, Type: typeof(sbyte)),
                 (OpCode: OpCodes.Stelem_I2, Type: typeof(short)),
@@ -1100,7 +1122,8 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldelem.Value].For(x =>
             {
-                x.Estimate = (index, stack) => {
+                x.Estimate = (index, stack) =>
+                {
                     var t = ParseType(ref index);
                     return (index, stack.Pop.Pop.Push(t));
                 };
@@ -1169,7 +1192,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Conv_Ovf_I1, Type: typeof(sbyte)),
                 (OpCode: OpCodes.Conv_Ovf_U1, Type: typeof(byte)),
                 (OpCode: OpCodes.Conv_Ovf_I2, Type: typeof(short)),
@@ -1187,7 +1211,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Conv_Ovf_I, Type: "intptr_t"),
                 (OpCode: OpCodes.Conv_Ovf_U, Type: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
@@ -1222,7 +1247,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Add_Ovf, Operator: "+"),
                 (OpCode: OpCodes.Mul_Ovf, Operator: "*"),
                 (OpCode: OpCodes.Sub_Ovf, Operator: "-")
@@ -1235,7 +1261,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Add_Ovf_Un, Operator: "+"),
                 (OpCode: OpCodes.Mul_Ovf_Un, Operator: "*"),
                 (OpCode: OpCodes.Sub_Ovf_Un, Operator: "-")
@@ -1260,7 +1287,8 @@ namespace IL2CXX
                     return index;
                 };
             });
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Leave, Target: (ParseBranchTarget)ParseBranchTargetI4),
                 (OpCode: OpCodes.Leave_S, Target: (ParseBranchTarget)ParseBranchTargetI1)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
@@ -1277,7 +1305,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Ceq, Operator: "=="),
                 (OpCode: OpCodes.Cgt, Operator: ">"),
                 (OpCode: OpCodes.Clt, Operator: "<")
@@ -1290,7 +1319,8 @@ namespace IL2CXX
                     return index;
                 };
             }));
-            new[] {
+            new[]
+            {
                 (OpCode: OpCodes.Cgt_Un, Operator: ">"),
                 (OpCode: OpCodes.Clt_Un, Operator: "<")
             }.ForEach(set => instructions2[set.OpCode.Value & 0xff].For(x =>

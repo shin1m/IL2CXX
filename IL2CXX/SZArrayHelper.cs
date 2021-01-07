@@ -21,7 +21,8 @@ namespace IL2CXX
 
         public int Count => throw new NotImplementedException();
         public bool IsReadOnly => true;
-        public T this[int index] {
+        public T this[int index]
+        {
             get => throw new NotImplementedException();
             set => throw new NotImplementedException();
         }

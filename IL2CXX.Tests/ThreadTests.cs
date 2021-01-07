@@ -27,7 +27,8 @@ namespace IL2CXX.Tests
         }
         static int Background()
         {
-            new Thread(() => Thread.Sleep(Timeout.Infinite)) {
+            new Thread(() => Thread.Sleep(Timeout.Infinite))
+            {
                 IsBackground = true
             }.Start();
             return 0;

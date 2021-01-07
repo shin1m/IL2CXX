@@ -118,7 +118,8 @@ namespace IL2CXX
         private static readonly OpCode[] opcodes2 = new OpCode[256];
         private static readonly Regex unsafeCharacters = new Regex(@"(\W|_)", RegexOptions.Compiled);
         private static string Escape(string name) => unsafeCharacters.Replace(name, m => string.Join(string.Empty, m.Value.Select(x => $"_{(int)x:x}")));
-        private static readonly IReadOnlyDictionary<Type, string> builtinTypes = new Dictionary<Type, string> {
+        private static readonly IReadOnlyDictionary<Type, string> builtinTypes = new Dictionary<Type, string>
+        {
             [typeof(object)] = "t_object",
             [typeof(Assembly)] = "t__assembly",
             [typeof(RuntimeAssembly)] = "t__runtime_assembly",
@@ -132,7 +133,8 @@ namespace IL2CXX
             [typeof(RuntimeType)] = "t__type",
             [typeof(CriticalFinalizerObject)] = "t__critical_finalizer_object"
         };
-        private static readonly IReadOnlyDictionary<Type, string> primitives = new Dictionary<Type, string> {
+        private static readonly IReadOnlyDictionary<Type, string> primitives = new Dictionary<Type, string>
+        {
             [typeof(bool)] = "bool",
             [typeof(byte)] = "uint8_t",
             [typeof(sbyte)] = "int8_t",
@@ -149,7 +151,8 @@ namespace IL2CXX
             [typeof(void)] = "void"
         };
         private static readonly Type typedReferenceByRefType = typeof(TypedReferenceTag).MakeByRefType();
-        private static readonly IReadOnlyDictionary<(string, string), Type> typeOfAdd = new Dictionary<(string, string), Type> {
+        private static readonly IReadOnlyDictionary<(string, string), Type> typeOfAdd = new Dictionary<(string, string), Type>
+        {
             [("int32_t", "int32_t")] = typeof(int),
             [("int32_t", "void*")] = typeof(void*),
             [("int64_t", "int64_t")] = typeof(long),
@@ -157,14 +160,16 @@ namespace IL2CXX
             [("void*", "void*")] = typeof(void*),
             [("double", "double")] = typeof(double)
         };
-        private static readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un = new Dictionary<(string, string), Type> {
+        private static readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un = new Dictionary<(string, string), Type>
+        {
             [("int32_t", "int32_t")] = typeof(int),
             [("int32_t", "void*")] = typeof(void*),
             [("int64_t", "int64_t")] = typeof(long),
             [("void*", "int32_t")] = typeof(void*),
             [("void*", "void*")] = typeof(void*)
         };
-        private static readonly IReadOnlyDictionary<(string, string), Type> typeOfShl = new Dictionary<(string, string), Type> {
+        private static readonly IReadOnlyDictionary<(string, string), Type> typeOfShl = new Dictionary<(string, string), Type>
+        {
             [("int32_t", "int32_t")] = typeof(int),
             [("int32_t", "void*")] = typeof(int),
             [("int64_t", "int32_t")] = typeof(long),

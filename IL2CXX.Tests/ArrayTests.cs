@@ -81,7 +81,8 @@ namespace IL2CXX.Tests
         }
         static int GetEnumerator()
         {
-            foreach (var x in (IEnumerable<string>)new[] {
+            foreach (var x in (IEnumerable<string>)new[]
+            {
                 "Hello, World!",
                 "Good bye."
             }) Console.WriteLine(x);

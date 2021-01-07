@@ -108,7 +108,8 @@ namespace IL2CXX.Tests
         [Test]
         public void TestReadTextFile()
         {
-            File.WriteAllLines(FilePath, new[] {
+            File.WriteAllLines(FilePath, new[]
+            {
                 "Hello, World!",
                 "Good bye."
             });
@@ -118,7 +119,8 @@ namespace IL2CXX.Tests
         public void TestWriteTextFile()
         {
             Utilities.Run(build, nameof(WriteTextFile));
-            Assert.AreEqual(new[] {
+            Assert.AreEqual(new[]
+            {
                 "Hello, World!",
                 "Good bye."
             }, File.ReadLines(FilePath));

@@ -43,7 +43,8 @@ namespace IL2CXX.Tests
             var p = Marshal.AllocHGlobal(Marshal.SizeOf<Name>());
             try
             {
-                Marshal.StructureToPtr(new Name {
+                Marshal.StructureToPtr(new Name
+                {
                     First = "abcdefgh",
                     Last = "ABCDEFGH"
                 }, p, false);

@@ -14,7 +14,8 @@ namespace IL2CXX.Tests
     {
         static int Spawn(string command, string arguments, string workingDirectory, IEnumerable<(string, string)> environment, Action<string> output, Action<string> error)
         {
-            var si = new ProcessStartInfo(command) {
+            var si = new ProcessStartInfo(command)
+            {
                 Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -61,7 +62,8 @@ namespace IL2CXX.Tests
 #include ""thread.cc""
 #include ""engine.cc""");
             }
-            Assert.AreEqual(0, Spawn("make", "run", build, new[] {
+            Assert.AreEqual(0, Spawn("make", "run", build, new[]
+            {
                 ("CXXFLAGS", "'-I../include' '-I../src' -std=c++17 -g"),
                 ("LDFLAGS", "-lpthread -ldl -lunwind -lunwind-x86_64")
             }, Console.Error.WriteLine, Console.Error.WriteLine));
@@ -71,7 +73,8 @@ namespace IL2CXX.Tests
         public static string Build(Func<string[], int> method) => Build(method.Method);
         public static void Run(string build, string arguments, bool verify = true)
         {
-            IEnumerable<(string, string)> environment = new[] {
+            IEnumerable<(string, string)> environment = new[]
+            {
                 ("IL2CXX_VERBOSE", string.Empty),
             };
             if (verify) environment = environment.Append(("IL2CXX_VERIFY_LEAKS", string.Empty));

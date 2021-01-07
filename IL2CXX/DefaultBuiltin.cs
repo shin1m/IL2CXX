@@ -18,14 +18,7 @@ namespace IL2CXX
                 }
             },
             MethodNameToBody = {
-                ["System.String ToString(System.String, System.IFormatProvider)"] = (transpiler, method) => ($"\treturn f__new_string(u\"{method.ReflectedType}\"sv);\n", 0),
-                ["Boolean TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)"] = (transpiler, method) => ($@"{'\t'}*a_2 = 0;
-{'\t'}return false;
-", 0),
-                ["Boolean System.ISpanFormattable.TryFormat(System.Span`1[System.Char], Int32 ByRef, System.ReadOnlySpan`1[System.Char], System.IFormatProvider)"] = (transpiler, method) => ($@"{'\t'}*a_2 = 0;
-{'\t'}return false;
-", 0),
-                ["Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType.Namespace == "System.Runtime.Intrinsics.X86" ? ("\treturn false;\n", 0) : default,
+                ["Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType.Namespace == "System.Runtime.Intrinsics.X86" ? ("\treturn false;\n", 0) : default
             }
         }
         .SetupInterop()

@@ -55,20 +55,6 @@ namespace IL2CXX
         };
 
         private static Builtin SetupSystem(this Builtin @this) => @this
-        .For(Type.GetType("System.Marvin"), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("GenerateSeed", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}union
-{'\t'}{{
-{'\t'}{'\t'}uint32_t v_32s[2];
-{'\t'}{'\t'}uint64_t v_64;
-{'\t'}}} seed;
-{'\t'}std::seed_seq().generate(seed.v_32s, seed.v_32s + 2);
-{'\t'}return seed.v_64;
-", 0)
-            );
-        })
         .For(typeof(object), (type, code) =>
         {
             code.For(
@@ -838,7 +824,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("GetSystemTimeAsFileTime", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($"\treturn std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch() + std::chrono::seconds(11644473600l)).count() / 100;\n", 0)
+                transpiler => ("\treturn std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch() + std::chrono::seconds(11644473600l)).count() / 100;\n", 0)
             );
         })
         .For(typeof(Math), (type, code) =>
@@ -1003,15 +989,6 @@ namespace IL2CXX
                 transpiler => ("\tstd::memmove(a_0, a_1, a_2);\n", -1)
             );
         })
-        .For(typeof(Console), (type, code) =>
-        {
-            code.For(
-                type.GetMethod(nameof(Console.WriteLine), new[] { typeof(string) }),
-                transpiler => ($@"{'\t'}if (a_0) std::cout << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}});
-{'\t'}std::cout << std::endl;
-", 0)
-            );
-        })
         .For(typeof(MissingMemberException), (type, code) =>
         {
             // TODO
@@ -1020,12 +997,33 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
+        .For(Type.GetType("System.Marvin"), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("GenerateSeed", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}union
+{'\t'}{{
+{'\t'}{'\t'}uint32_t v_32s[2];
+{'\t'}{'\t'}uint64_t v_64;
+{'\t'}}} seed;
+{'\t'}std::seed_seq().generate(seed.v_32s, seed.v_32s + 2);
+{'\t'}return seed.v_64;
+", 0)
+            );
+        })
         .For(Type.GetType("System.SpanHelpers"), (type, code) =>
         {
             var @byte = typeof(byte).MakeByRefType();
             code.For(
                 type.GetMethod("SequenceEqual", new[] { @byte, @byte, typeof(UIntPtr) }),
                 transpiler => ("\treturn std::memcmp(a_0, a_1, a_2) == 0;\n", 1)
+            );
+        })
+        .For(Type.GetType("System.ThrowHelper"), (type, code) =>
+        {
+            code.ForGeneric(
+                type.GetMethod("ThrowForUnsupportedVectorBaseType", BindingFlags.Static | BindingFlags.NonPublic),
+                (transpiler, types) => (string.Empty, 1)
             );
         })
         .For(Type.GetType("System.CLRConfig"), (type, code) =>

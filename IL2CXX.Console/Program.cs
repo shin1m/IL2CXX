@@ -23,38 +23,36 @@ namespace IL2CXX.Console
             var definition = TextWriter.Null;
             try
             {
-                using (var declarations = File.CreateText(Path.Combine(@out, "declarations.h")))
-                using (var inlines = new StringWriter())
-                using (var others = new StringWriter())
-                using (var main = File.CreateText(Path.Combine(@out, "main.cc")))
+                using var declarations = File.CreateText(Path.Combine(@out, "declarations.h"));
+                using var inlines = new StringWriter();
+                using var others = new StringWriter();
+                using var main = File.CreateText(Path.Combine(@out, "main.cc"));
+                main.WriteLine("#include \"declarations.h\"\n");
+                transpiler.Do(entry, declarations, main, (type, inline) =>
                 {
-                    main.WriteLine("#include \"declarations.h\"\n");
-                    transpiler.Do(entry, declarations, main, (type, inline) =>
-                    {
-                        if (inline) return inlines;
-                        if (type.IsInterface || type.IsSubclassOf(typeof(MulticastDelegate))) return others;
-                        definition.Dispose();
-                        if (type2path.TryGetValue(type, out var path)) return definition = new StreamWriter(path, true);
-                        var escaped = transpiler.EscapeType(type);
-                        if (escaped.Length > 240) escaped = escaped.Substring(0, 240);
-                        var name = $"{escaped}.cc";
-                        for (var i = 0; !names.Add(name); ++i) name = $"{escaped}__{i}.cc";
-                        path = Path.Combine(@out, name);
-                        type2path.Add(type, path);
-                        definition = new StreamWriter(path);
-                        definition.WriteLine(@"#include ""declarations.h""
+                    if (inline) return inlines;
+                    if (type.IsInterface || type.IsSubclassOf(typeof(MulticastDelegate))) return others;
+                    definition.Dispose();
+                    if (type2path.TryGetValue(type, out var path)) return definition = new StreamWriter(path, true);
+                    var escaped = transpiler.EscapeType(type);
+                    if (escaped.Length > 240) escaped = escaped.Substring(0, 240);
+                    var name = $"{escaped}.cc";
+                    for (var i = 0; !names.Add(name); ++i) name = $"{escaped}__{i}.cc";
+                    path = Path.Combine(@out, name);
+                    type2path.Add(type, path);
+                    definition = new StreamWriter(path);
+                    definition.WriteLine(@"#include ""declarations.h""
 
 namespace il2cxx
 {");
-                        return definition;
-                    }, Path.Combine(@out, "resources"));
-                    declarations.WriteLine("\nnamespace il2cxx\n{");
-                    declarations.Write(inlines);
-                    declarations.WriteLine("\n}");
-                    main.WriteLine("\nnamespace il2cxx\n{");
-                    main.Write(others);
-                    main.WriteLine("\n}");
-                }
+                    return definition;
+                }, Path.Combine(@out, "resources"));
+                declarations.WriteLine("\nnamespace il2cxx\n{");
+                declarations.Write(inlines);
+                declarations.WriteLine("\n}");
+                main.WriteLine("\nnamespace il2cxx\n{");
+                main.Write(others);
+                main.WriteLine("\n}");
             }
             finally
             {

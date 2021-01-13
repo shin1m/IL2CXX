@@ -23,20 +23,18 @@ namespace IL2CXX.Tests
                 WorkingDirectory = workingDirectory
             };
             foreach (var (name, value) in environment) si.Environment.Add(name, value);
-            using (var process = Process.Start(si))
+            using var process = Process.Start(si);
+            void forward(StreamReader reader, Action<string> write)
             {
-                void forward(StreamReader reader, Action<string> write)
-                {
-                    while (!reader.EndOfStream) write(reader.ReadLine());
-                }
-                var task = Task.WhenAll(
-                    Task.Run(() => forward(process.StandardOutput, output)),
-                    Task.Run(() => forward(process.StandardError, error))
-                );
-                process.WaitForExit();
-                task.Wait();
-                return process.ExitCode;
+                while (!reader.EndOfStream) write(reader.ReadLine());
             }
+            var task = Task.WhenAll(
+                Task.Run(() => forward(process.StandardOutput, output)),
+                Task.Run(() => forward(process.StandardError, error))
+            );
+            process.WaitForExit();
+            task.Wait();
+            return process.ExitCode;
         }
 
         public static string Build(MethodInfo method)

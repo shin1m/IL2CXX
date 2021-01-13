@@ -29,27 +29,21 @@ namespace IL2CXX.Tests
 
         static int ReadMemory()
         {
-            using (var stream = new MemoryStream(new byte[] { 0, 1 }))
-            {
-                var xs = new byte[4];
-                return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
-            }
+            using var stream = new MemoryStream(new byte[] { 0, 1 });
+            var xs = new byte[4];
+            return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
         }
         static int WriteMemory()
         {
-            using (var stream = new MemoryStream())
-            {
-                stream.Write(new byte[] { 0, 1 });
-                return stream.TryGetBuffer(out var xs) && BytesEquals(xs, 0, 1) ? 0 : 1;
-            }
+            using var stream = new MemoryStream();
+            stream.Write(new byte[] { 0, 1 });
+            return stream.TryGetBuffer(out var xs) && BytesEquals(xs, 0, 1) ? 0 : 1;
         }
         static int ReadFile()
         {
-            using (var stream = File.OpenRead(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName)))
-            {
-                var xs = new byte[4];
-                return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
-            }
+            using var stream = File.OpenRead(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName));
+            var xs = new byte[4];
+            return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
         }
         static int WriteFile()
         {
@@ -58,12 +52,10 @@ namespace IL2CXX.Tests
         }
         static int ReadTextFile()
         {
-            using (var reader = File.OpenText(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName)))
-            {
-                if (reader.ReadLine() != "Hello, World!") return 1;
-                if (reader.ReadLine() != "Good bye.") return 2;
-                return reader.ReadLine() == null ? 0 : 3;
-            }
+            using var reader = File.OpenText(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName));
+            if (reader.ReadLine() != "Hello, World!") return 1;
+            if (reader.ReadLine() != "Good bye.") return 2;
+            return reader.ReadLine() == null ? 0 : 3;
         }
         static int WriteTextFile()
         {

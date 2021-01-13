@@ -118,11 +118,9 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
                     {
                         foreach (var x in @return == typeof(void) ? parameters : parameters.Prepend(@return))
                             if (transpiler.IsComposite(x) && x != typeof(string) && x != typeof(StringBuilder) && !typeof(SafeHandle).IsAssignableFrom(x) && !x.IsArray) Marshal.SizeOf(x);
-                        using (var writer = new StringWriter())
-                        {
-                            transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);
-                            Delegate += $"{'\t'}v__invoke_unmanaged = {generate(Type, writer.ToString())};\n";
-                        }
+                        using var writer = new StringWriter();
+                        transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);
+                        Delegate += $"{'\t'}v__invoke_unmanaged = {generate(Type, writer.ToString())};\n";
                     } catch { }
                 }
             }

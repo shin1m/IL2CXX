@@ -111,11 +111,4 @@ void f__from(t_System_2eText_2eStringBuilder* a_p, const char16_t* a_cs);
 std::vector<char> f__to_cs(t_System_2eText_2eStringBuilder* a_p);
 void f__from(t_System_2eText_2eStringBuilder* a_p, const char* a_cs);
 
-[[noreturn]] void f__throw_argument();
-[[noreturn]] void f__throw_argument_null();
-[[noreturn]] void f__throw_index_out_of_range();
-[[noreturn]] void f__throw_invalid_cast();
-[[noreturn]] void f__throw_null_reference();
-[[noreturn]] void f__throw_overflow();
-
 t__type* f__find_type(const std::map<std::string_view, t__type*>& a_name_to_type, std::u16string_view a_name);

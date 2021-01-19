@@ -531,6 +531,20 @@ namespace IL2CXX
                 (OpCode: OpCodes.Add, Operator: "+", Type: typeOfAdd),
                 (OpCode: OpCodes.Sub, Operator: "-", Type: typeOfAdd),
                 (OpCode: OpCodes.Mul, Operator: "*", Type: typeOfAdd),
+                (OpCode: OpCodes.Div_Un, Operator: "/", Type: typeOfDiv_Un),
+                (OpCode: OpCodes.Rem_Un, Operator: "%", Type: typeOfDiv_Un),
+                (OpCode: OpCodes.Shr_Un, Operator: ">>", Type: typeOfShl)
+            }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
+            {
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type[(stack.Pop.VariableType, stack.VariableType)]));
+                x.Generate = (index, stack) =>
+                {
+                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"{stack.Pop.AsUnsigned} {set.Operator} {stack.AsUnsigned}")};");
+                    return index;
+                };
+            }));
+            new[]
+            {
                 (OpCode: OpCodes.Div, Operator: "/", Type: typeOfAdd),
                 (OpCode: OpCodes.Rem, Operator: "%", Type: typeOfAdd),
                 (OpCode: OpCodes.And, Operator: "&", Type: typeOfDiv_Un),
@@ -548,20 +562,6 @@ namespace IL2CXX
                         ? $"std::fmod({stack.Pop.Variable}, {stack.Variable})"
                         : $"{stack.Pop.AsSigned} {set.Operator} {stack.AsSigned}";
                     writer.WriteLine($"\n\t{after.Assign(result)};");
-                    return index;
-                };
-            }));
-            new[]
-            {
-                (OpCode: OpCodes.Div_Un, Operator: "/", Type: typeOfDiv_Un),
-                (OpCode: OpCodes.Rem_Un, Operator: "%", Type: typeOfDiv_Un),
-                (OpCode: OpCodes.Shr_Un, Operator: ">>", Type: typeOfShl)
-            }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
-            {
-                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type[(stack.Pop.VariableType, stack.VariableType)]));
-                x.Generate = (index, stack) =>
-                {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"{stack.Pop.AsUnsigned} {set.Operator} {stack.AsUnsigned}")};");
                     return index;
                 };
             }));
@@ -786,7 +786,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) f__throw_invalid_cast();");
+                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) {GenerateThrow("InvalidCast")};");
                     return index;
                 };
             });
@@ -819,7 +819,7 @@ namespace IL2CXX
                     Trace.Assert(t.IsValueType);
                     writer.WriteLine($" {t}");
                     GenerateCheckNull(stack);
-                    writer.WriteLine($@"{'\t'}if (!{stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();
+                    writer.WriteLine($@"{'\t'}if (!{stack.Variable}->f_type()->f__is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] {GenerateThrow("InvalidCast")};
 {'\t'}{indexToStack[index].Variable} = &static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
                     return index;
                 };
@@ -965,33 +965,26 @@ namespace IL2CXX
             });
             new[]
             {
-                (OpCode: OpCodes.Conv_Ovf_I1_Un, Type: typeof(sbyte)),
-                (OpCode: OpCodes.Conv_Ovf_I2_Un, Type: typeof(short)),
-                (OpCode: OpCodes.Conv_Ovf_I4_Un, Type: typeof(int)),
-                (OpCode: OpCodes.Conv_Ovf_I8_Un, Type: typeof(long)),
-                (OpCode: OpCodes.Conv_Ovf_U1_Un, Type: typeof(byte)),
-                (OpCode: OpCodes.Conv_Ovf_U2_Un, Type: typeof(ushort)),
-                (OpCode: OpCodes.Conv_Ovf_U4_Un, Type: typeof(uint)),
-                (OpCode: OpCodes.Conv_Ovf_U8_Un, Type: typeof(ulong))
+                (OpCode: OpCodes.Conv_Ovf_I1_Un, Type: typeof(sbyte), Primitive: "int8_t"),
+                (OpCode: OpCodes.Conv_Ovf_I2_Un, Type: typeof(short), Primitive: "int16_t"),
+                (OpCode: OpCodes.Conv_Ovf_I4_Un, Type: typeof(int), Primitive: "int32_t"),
+                (OpCode: OpCodes.Conv_Ovf_I8_Un, Type: typeof(long), Primitive: "int64_t"),
+                (OpCode: OpCodes.Conv_Ovf_U1_Un, Type: typeof(byte), Primitive: "uint8_t"),
+                (OpCode: OpCodes.Conv_Ovf_U2_Un, Type: typeof(ushort), Primitive: "uint16_t"),
+                (OpCode: OpCodes.Conv_Ovf_U4_Un, Type: typeof(uint), Primitive: "uint32_t"),
+                (OpCode: OpCodes.Conv_Ovf_U8_Un, Type: typeof(ulong), Primitive: "uint64_t"),
+                (OpCode: OpCodes.Conv_Ovf_I_Un, Type: typeof(void*), Primitive: "intptr_t"),
+                (OpCode: OpCodes.Conv_Ovf_U_Un, Type: typeof(void*), Primitive: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{primitives[set.Type]}>({stack.AsUnsigned});");
-                    return index;
-                };
-            }));
-            new[]
-            {
-                (OpCode: OpCodes.Conv_Ovf_I_Un, Type: "intptr_t"),
-                (OpCode: OpCodes.Conv_Ovf_U_Un, Type: "uintptr_t")
-            }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
-            {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(void*)));
-                x.Generate = (index, stack) =>
-                {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<{set.Type}>({stack.AsUnsigned})")};");
+                    var s = stack.AsUnsigned;
+                    var t = set.Primitive;
+                    writer.WriteLine($@"
+{'\t'}if ({s} > std::numeric_limits<{t}>::max()) {GenerateThrow("Overflow")};
+{'\t'}{indexToStack[index].Assign($"static_cast<{t}>({s})")};");
                     return index;
                 };
             }));
@@ -1016,7 +1009,7 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
-                    if (CheckRange) writer.WriteLine($"\tif ({stack.AsSigned} < 0) [[unlikely]] f__throw_overflow();");
+                    if (CheckRange) writer.WriteLine($"\tif ({stack.AsSigned} < 0) [[unlikely]] {GenerateThrow("Overflow")};");
                     writer.WriteLine($"\t{indexToStack[index].Variable} = f__new_array<{Escape(t.MakeArrayType())}, {EscapeForMember(t)}>({stack.AsSigned});");
                     return index;
                 };
@@ -1183,44 +1176,37 @@ namespace IL2CXX
 {'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int64_t*>({stack.Variable} + 1));
 {'\t'}{'\t'}}}");
                         writer.WriteLine($@"{'\t'}else
-{'\t'}{'\t'}[[unlikely]] f__throw_invalid_cast();");
+{'\t'}{'\t'}[[unlikely]] {GenerateThrow("InvalidCast")};");
                     }
                     else
                     {
-                        writer.WriteLine($"\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] f__throw_invalid_cast();");
+                        writer.WriteLine($"\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] {GenerateThrow("InvalidCast")};");
                     }
                     return index;
                 };
             });
             new[]
             {
-                (OpCode: OpCodes.Conv_Ovf_I1, Type: typeof(sbyte)),
-                (OpCode: OpCodes.Conv_Ovf_U1, Type: typeof(byte)),
-                (OpCode: OpCodes.Conv_Ovf_I2, Type: typeof(short)),
-                (OpCode: OpCodes.Conv_Ovf_U2, Type: typeof(ushort)),
-                (OpCode: OpCodes.Conv_Ovf_I4, Type: typeof(int)),
-                (OpCode: OpCodes.Conv_Ovf_U4, Type: typeof(uint)),
-                (OpCode: OpCodes.Conv_Ovf_I8, Type: typeof(long)),
-                (OpCode: OpCodes.Conv_Ovf_U8, Type: typeof(ulong))
+                (OpCode: OpCodes.Conv_Ovf_I1, Type: typeof(sbyte), Primitive: "int8_t"),
+                (OpCode: OpCodes.Conv_Ovf_U1, Type: typeof(byte), Primitive: "uint8_t"),
+                (OpCode: OpCodes.Conv_Ovf_I2, Type: typeof(short), Primitive: "int16_t"),
+                (OpCode: OpCodes.Conv_Ovf_U2, Type: typeof(ushort), Primitive: "uint16_t"),
+                (OpCode: OpCodes.Conv_Ovf_I4, Type: typeof(int), Primitive: "int32_t"),
+                (OpCode: OpCodes.Conv_Ovf_U4, Type: typeof(uint), Primitive: "uint32_t"),
+                (OpCode: OpCodes.Conv_Ovf_I8, Type: typeof(long), Primitive: "int64_t"),
+                (OpCode: OpCodes.Conv_Ovf_U8, Type: typeof(ulong), Primitive: "uint64_t"),
+                (OpCode: OpCodes.Conv_Ovf_I, Type: typeof(void*), Primitive: "intptr_t"),
+                (OpCode: OpCodes.Conv_Ovf_U, Type: typeof(void*), Primitive: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{primitives[set.Type]}>({stack.AsSigned});");
-                    return index;
-                };
-            }));
-            new[]
-            {
-                (OpCode: OpCodes.Conv_Ovf_I, Type: "intptr_t"),
-                (OpCode: OpCodes.Conv_Ovf_U, Type: "uintptr_t")
-            }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
-            {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(void*)));
-                x.Generate = (index, stack) =>
-                {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<{set.Type}>({stack.AsSigned})")};");
+                    var s = stack.AsSigned;
+                    var t = set.Primitive;
+                    writer.WriteLine($@"
+{'\t'}if ({s} < static_cast<std::make_signed_t<{t}>>(std::numeric_limits<{t}>::min()) || {s} > std::numeric_limits<{t}>::max()) {GenerateThrow("Overflow")};
+{'\t'}{indexToStack[index].Assign($"static_cast<{t}>({s})")};");
                     return index;
                 };
             }));
@@ -1249,29 +1235,35 @@ namespace IL2CXX
             });
             new[]
             {
-                (OpCode: OpCodes.Add_Ovf, Operator: "+"),
-                (OpCode: OpCodes.Mul_Ovf, Operator: "*"),
-                (OpCode: OpCodes.Sub_Ovf, Operator: "-")
+                (OpCode: OpCodes.Add_Ovf, Operator: "add"),
+                (OpCode: OpCodes.Mul_Ovf, Operator: "mul"),
+                (OpCode: OpCodes.Sub_Ovf, Operator: "sub")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfDiv_Un[(stack.Pop.VariableType, stack.VariableType)]));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"{stack.Pop.AsSigned} {set.Operator} {stack.AsSigned}")};");
+                    writer.WriteLine($@"
+{'\t'}{{decltype({stack.Pop.AsSigned} + {stack.AsSigned}) x;
+{'\t'}if (__builtin_{set.Operator}_overflow({stack.Pop.AsSigned}, {stack.AsSigned}, &x)) {GenerateThrow("Overflow")};
+{'\t'}{indexToStack[index].Assign("x")};}}");
                     return index;
                 };
             }));
             new[]
             {
-                (OpCode: OpCodes.Add_Ovf_Un, Operator: "+"),
-                (OpCode: OpCodes.Mul_Ovf_Un, Operator: "*"),
-                (OpCode: OpCodes.Sub_Ovf_Un, Operator: "-")
+                (OpCode: OpCodes.Add_Ovf_Un, Operator: "add"),
+                (OpCode: OpCodes.Mul_Ovf_Un, Operator: "mul"),
+                (OpCode: OpCodes.Sub_Ovf_Un, Operator: "sub")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfDiv_Un[(stack.Pop.VariableType, stack.VariableType)]));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"{stack.Pop.AsUnsigned} {set.Operator} {stack.AsUnsigned}")};");
+                    writer.WriteLine($@"
+{'\t'}{{decltype({stack.Pop.AsUnsigned} + {stack.AsUnsigned}) x;
+{'\t'}if (__builtin_{set.Operator}_overflow({stack.Pop.AsUnsigned}, {stack.AsUnsigned}, &x)) {GenerateThrow("Overflow")};
+{'\t'}{indexToStack[index].Assign("x")};}}");
                     return index;
                 };
             }));

@@ -245,7 +245,7 @@ namespace IL2CXX
                 transpiler =>
                 {
                     var array = transpiler.Escape(typeof(Array));
-                    return (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] f__throw_argument_out_of_range();\n" : string.Empty) + $@"{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
+                    return (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
 {'\t'}auto element = static_cast<t__type*>(a_0);
 {'\t'}auto n = element->v__size * a_1;
 {'\t'}auto p = static_cast<{array}*>(f_engine()->f_object__allocate(a + n));
@@ -315,8 +315,8 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetMethod(nameof(SZArrayHelper<object>.CopyTo)),
-                (transpiler, types) => (transpiler.GenerateCheckArgumentNull("a_1") + (transpiler.CheckRange ? $@"{'\t'}if (a_2 < 0) [[unlikely]] f__throw_index_out_of_range();
-{'\t'}if (a_2 + a_0->v__length > a_1->v__length) [[unlikely]] f__throw_argument();
+                (transpiler, types) => (transpiler.GenerateCheckArgumentNull("a_1") + (transpiler.CheckRange ? $@"{'\t'}if (a_2 < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};
+{'\t'}if (a_2 + a_0->v__length > a_1->v__length) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 " : string.Empty) + "\tstd::copy_n(a_0->f__data(), a_0->v__length, a_1->f__data() + a_2);\n", 0)
             );
             code.ForGeneric(

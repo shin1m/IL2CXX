@@ -45,7 +45,7 @@ namespace IL2CXX
             if (type.IsArray)
             {
                 var rank = type.GetArrayRank();
-                if (handle == type.GetConstructor(Enumerable.Repeat(typeof(int), rank).ToArray()).MethodHandle) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] f__throw_index_out_of_range();\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
+                if (handle == type.GetConstructor(Enumerable.Repeat(typeof(int), rank).ToArray()).MethodHandle) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
 {'\t'}auto extra = sizeof({transpiler.Escape(type.GetElementType())}) * n;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = n;

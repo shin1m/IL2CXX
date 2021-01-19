@@ -8,6 +8,62 @@ namespace IL2CXX.Tests
     [Parallelizable]
     class NumberTests
     {
+        static readonly int mask = 0xfffff;
+        static int Unchecked()
+        {
+            for (var i = 0; i < 32; ++i) Console.WriteLine(i * 104395303 & mask);
+            return 0;
+        }
+        static readonly int max = 2147483647;
+        static int CheckedBinary()
+        {
+            try
+            {
+                Console.WriteLine(checked(max + 10));
+                return 1;
+            }
+            catch (OverflowException)
+            {
+                return 0;
+            }
+        }
+        static int CheckedCast()
+        {
+            try
+            {
+                Console.WriteLine(checked((short)max));
+                return 1;
+            }
+            catch (OverflowException)
+            {
+                return 0;
+            }
+        }
+        static readonly uint umax = 4294967295u;
+        static int CheckedBinaryUnsigned()
+        {
+            try
+            {
+                Console.WriteLine(checked(umax + 10u));
+                return 1;
+            }
+            catch (OverflowException)
+            {
+                return 0;
+            }
+        }
+        static int CheckedCastUnsigned()
+        {
+            try
+            {
+                Console.WriteLine(checked((ushort)umax));
+                return 1;
+            }
+            catch (OverflowException)
+            {
+                return 0;
+            }
+        }
         static int Single()
         {
             if (!float.IsPositiveInfinity(float.PositiveInfinity)) return 1;
@@ -60,12 +116,12 @@ namespace IL2CXX.Tests
             if (ge(float.NaN, float.NaN) == 0) return 5;
             return 0;
         }
-        static int Int32()
+        static int ToInt32()
         {
             var x = new IntPtr(32);
             return x.ToInt32() == 32 ? 0 : 1;
         }
-        static unsafe int Pointer()
+        static unsafe int ToPointer()
         {
             var x = new IntPtr(32);
             return new IntPtr(x.ToPointer()) == x ? 0 : 1;
@@ -74,22 +130,27 @@ namespace IL2CXX.Tests
         {
             Foo, Bar, Zot
         }
-        static int GetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
-        static int GetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
-        static int ToStringDefault() => Names.Foo.ToString() == "Foo" ? 0 : 1;
-        static int ToStringG() => Names.Foo.ToString("g") == "Foo" ? 0 : 1;
+        static int EnumGetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
+        static int EnumGetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
+        static int EnumToStringDefault() => Names.Foo.ToString() == "Foo" ? 0 : 1;
+        static int EnumToStringG() => Names.Foo.ToString("g") == "Foo" ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {
+            nameof(Unchecked) => Unchecked(),
+            nameof(CheckedBinary) => CheckedBinary(),
+            nameof(CheckedCast) => CheckedCast(),
+            nameof(CheckedBinaryUnsigned) => CheckedBinaryUnsigned(),
+            nameof(CheckedCastUnsigned) => CheckedCastUnsigned(),
             nameof(Single) => Single(),
             nameof(Double) => Double(),
             nameof(Unordered) => Unordered(),
-            nameof(Int32) => Int32(),
-            nameof(Pointer) => Pointer(),
-            nameof(GetNames) => GetNames(),
-            nameof(GetValues) => GetValues(),
-            nameof(ToStringDefault) => ToStringDefault(),
-            nameof(ToStringG) => ToStringG(),
+            nameof(ToInt32) => ToInt32(),
+            nameof(ToPointer) => ToPointer(),
+            nameof(EnumGetNames) => EnumGetNames(),
+            nameof(EnumGetValues) => EnumGetValues(),
+            nameof(EnumToStringDefault) => EnumToStringDefault(),
+            nameof(EnumToStringG) => EnumToStringG(),
             _ => -1
         };
 
@@ -97,15 +158,20 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
+        [TestCase(nameof(Unchecked))]
+        [TestCase(nameof(CheckedBinary))]
+        [TestCase(nameof(CheckedCast))]
+        [TestCase(nameof(CheckedBinaryUnsigned))]
+        [TestCase(nameof(CheckedCastUnsigned))]
         [TestCase(nameof(Single))]
         [TestCase(nameof(Double))]
         [TestCase(nameof(Unordered))]
-        [TestCase(nameof(Int32))]
-        [TestCase(nameof(Pointer))]
-        [TestCase(nameof(GetNames))]
-        [TestCase(nameof(GetValues))]
-        [TestCase(nameof(ToStringDefault))]
-        [TestCase(nameof(ToStringG))]
+        [TestCase(nameof(ToInt32))]
+        [TestCase(nameof(ToPointer))]
+        [TestCase(nameof(EnumGetNames))]
+        [TestCase(nameof(EnumGetValues))]
+        [TestCase(nameof(EnumToStringDefault))]
+        [TestCase(nameof(EnumToStringG))]
         public void Test(string name) => Utilities.Run(build, name);
     }
 }

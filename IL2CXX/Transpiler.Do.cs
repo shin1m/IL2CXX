@@ -21,6 +21,7 @@ namespace IL2CXX
         private MethodBase method;
         private byte[] bytes;
         private SortedDictionary<string, (string Prefix, int Index)> definedIndices;
+        private bool hasReturn;
         private Dictionary<int, Stack> indexToStack;
         private TextWriter writer;
         private readonly Stack<ExceptionHandlingClause> tries = new Stack<ExceptionHandlingClause>();
@@ -51,8 +52,10 @@ namespace IL2CXX
             var prototype = $@"{returns}
 {identifier}({string.Join(",", arguments)}
 )";
-            functionDeclarations.WriteLine($"{description}\n{prototype};");
-            if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
+            void writeDeclaration(string attributes)
+            {
+                functionDeclarations.WriteLine($"{description}\n{attributes}{prototype};");
+                if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
 inline {returns}
 {identifier}__v({string.Join(",", arguments.Skip(1).Prepend($"\n\t{Escape(method.DeclaringType)}* a_0"))}
 )
@@ -61,8 +64,10 @@ inline {returns}
     string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_0->v__value"))
 });
 }}");
+            }
             if (builtin.body != null)
             {
+                writeDeclaration(string.Empty);
                 writer = writerForType(method.DeclaringType, builtin.inline > 0);
                 writer.WriteLine(description);
                 if (builtin.inline < 0)
@@ -97,6 +102,7 @@ inline {returns}
             var dllimport = method.GetCustomAttribute<DllImportAttribute>();
             if (dllimport != null)
             {
+                writeDeclaration(string.Empty);
                 functionDeclarations.WriteLine($@"// DLL import:
 //{'\t'}Value: {dllimport.Value}
 //{'\t'}EntryPoint: {dllimport.EntryPoint}
@@ -110,6 +116,7 @@ inline {returns}
             }
             if (bytes == null)
             {
+                writeDeclaration(string.Empty);
                 functionDeclarations.WriteLine("// TO BE PROVIDED");
                 return;
             }
@@ -126,6 +133,7 @@ inline {returns}
     ExceptionHandlingClauseOptions.Filter => $"\n\tfilter: {x.FilterOffset:x04}",
     _ => string.Empty
 }}");
+            hasReturn = false;
             Estimate(0, new Stack(this));
             foreach (var x in body.ExceptionHandlingClauses)
                 switch (x.Flags)
@@ -140,6 +148,7 @@ inline {returns}
                         Estimate(x.HandlerOffset, new Stack(this));
                         break;
                 }
+            writeDeclaration(hasReturn ? string.Empty : "[[noreturn]] ");
             log("\n");
             writer.WriteLine($"\t// init locals: {body.InitLocals}");
             foreach (var x in body.LocalVariables)

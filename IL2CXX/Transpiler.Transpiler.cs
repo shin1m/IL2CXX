@@ -329,7 +329,11 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ret.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (int.MaxValue, GetReturnType(method) == typeof(void) ? stack : stack.Pop);
+                x.Estimate = (index, stack) =>
+                {
+                    hasReturn = true;
+                    return (int.MaxValue, GetReturnType(method) == typeof(void) ? stack : stack.Pop);
+                };
                 x.Generate = (index, stack) =>
                 {
                     writer.Write("\n\treturn");

@@ -1,7 +1,7 @@
-#include <il2cxx/engine.h>
+#include <recyclone/engine.h>
 #include <sys/resource.h>
 
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 extern "C"
 {
 
@@ -43,7 +43,7 @@ struct _Unwind_Context
 	int end_of_stack = 0;
 };
 
-#define __IL2CXX_UNWIND_GETCONTEXT(error)\
+#define __RECYCLONE_UNWIND_GETCONTEXT(error)\
 	_Unwind_Context context;\
 	unw_context_t uc;\
 	if (unw_getcontext(&uc) < 0 || unw_init_local(&context.cursor, &uc) < 0) return error;
@@ -72,7 +72,7 @@ static _Unwind_Reason_Code _Unwind_Phase2(_Unwind_Exception* exception_object, _
 			if (unw_get_reg(&context->cursor, UNW_REG_IP, &ip) < 0) return _URC_FATAL_PHASE2_ERROR;
 			if ((unsigned long)stop_parameter == ip) {
 				actions |= _UA_HANDLER_FRAME;
-				if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(false, std::memory_order_relaxed);
+				if (recyclone::t_thread::v_current) recyclone::t_thread::v_current->v_unwinding.store(false, std::memory_order_relaxed);
 			}
 		}
 		auto reason = personality(_U_VERSION, actions, exception_class, exception_object, context);
@@ -88,13 +88,13 @@ static _Unwind_Reason_Code _Unwind_Phase2(_Unwind_Exception* exception_object, _
 
 _Unwind_Reason_Code _Unwind_RaiseException(_Unwind_Exception* exception_object)
 {
-	if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->v_unwinding.store(true, std::memory_order_relaxed);
-	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE1_ERROR)
+	if (recyclone::t_thread::v_current) recyclone::t_thread::v_current->v_unwinding.store(true, std::memory_order_relaxed);
+	__RECYCLONE_UNWIND_GETCONTEXT(_URC_FATAL_PHASE1_ERROR)
 	auto exception_class = exception_object->exception_class;
 	while (true) {
 		auto ret = unw_step(&context.cursor);
 		if (ret <= 0) return ret == 0 ? _URC_END_OF_STACK : _URC_FATAL_PHASE1_ERROR;
-		if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->f_unthunk(context.cursor);
+		if (recyclone::t_thread::v_current) recyclone::t_thread::v_current->f_unthunk(context.cursor);
 		unw_proc_info_t pi;
 		if (unw_get_proc_info(&context.cursor, &pi) < 0) return _URC_FATAL_PHASE1_ERROR;
 		auto personality = reinterpret_cast<_Unwind_Personality_Fn>(static_cast<uintptr_t>(pi.handler));
@@ -115,7 +115,7 @@ _Unwind_Reason_Code _Unwind_RaiseException(_Unwind_Exception* exception_object)
 _Unwind_Reason_Code _Unwind_ForcedUnwind(_Unwind_Exception* exception_object, _Unwind_Stop_Fn stop, void* stop_parameter)
 {
 	if (!stop) return _URC_FATAL_PHASE2_ERROR;
-	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE2_ERROR)
+	__RECYCLONE_UNWIND_GETCONTEXT(_URC_FATAL_PHASE2_ERROR)
 	exception_object->private_1 = reinterpret_cast<unsigned long>(stop);
 	exception_object->private_2 = reinterpret_cast<unsigned long>(stop_parameter);
 	return _Unwind_Phase2(exception_object, &context);
@@ -123,7 +123,7 @@ _Unwind_Reason_Code _Unwind_ForcedUnwind(_Unwind_Exception* exception_object, _U
 
 void _Unwind_Resume(_Unwind_Exception* exception_object)
 {
-	__IL2CXX_UNWIND_GETCONTEXT(abort())
+	__RECYCLONE_UNWIND_GETCONTEXT(abort())
 	_Unwind_Phase2(exception_object, &context);
 	abort();
 }
@@ -192,7 +192,7 @@ unsigned long _Unwind_GetRegionStart(_Unwind_Context* context)
 _Unwind_Reason_Code _Unwind_Resume_or_Rethrow(_Unwind_Exception* exception_object)
 {
 	if (!exception_object->private_1) return _Unwind_RaiseException(exception_object);
-	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE2_ERROR)
+	__RECYCLONE_UNWIND_GETCONTEXT(_URC_FATAL_PHASE2_ERROR)
 	return _Unwind_Phase2(exception_object, &context);
 }
 
@@ -231,11 +231,11 @@ typedef _Unwind_Reason_Code (*_Unwind_Trace_Fn)(_Unwind_Context*, void*);
 
 _Unwind_Reason_Code _Unwind_Backtrace(_Unwind_Trace_Fn trace, void* trace_parameter)
 {
-	__IL2CXX_UNWIND_GETCONTEXT(_URC_FATAL_PHASE1_ERROR)
+	__RECYCLONE_UNWIND_GETCONTEXT(_URC_FATAL_PHASE1_ERROR)
 	while (true) {
 		auto ret = unw_step(&context.cursor);
 		if (ret <= 0) return ret == 0 ? _URC_END_OF_STACK : _URC_FATAL_PHASE1_ERROR;
-		if (il2cxx::t_thread::v_current) il2cxx::t_thread::v_current->f_unthunk(context.cursor);
+		if (recyclone::t_thread::v_current) recyclone::t_thread::v_current->f_unthunk(context.cursor);
 		if (trace(&context, trace_parameter) != _URC_NO_REASON) return _URC_FATAL_PHASE1_ERROR;
 	}
 }
@@ -250,20 +250,22 @@ void* _Unwind_FindEnclosingFunction(void* ip)
 }
 #endif
 
-namespace il2cxx
+namespace recyclone
 {
 
-IL2CXX__PORTABLE__THREAD t_thread* t_thread::v_current;
+RECYCLONE__THREAD t_thread* t_thread::v_current;
 
-t_thread::t_thread()
+t_thread::t_thread() : v_next(f_engine()->v_thread__head)
 {
+	if (f_engine()->v_exiting) throw std::runtime_error("engine is exiting.");
+	f_engine()->v_thread__head = this;
 	rlimit limit;
 	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
 	v_stack_buffer = std::make_unique<char[]>(limit.rlim_cur * 2);
 	auto p = v_stack_buffer.get() + limit.rlim_cur;
 	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object**>(p);
 	v_stack_copy = reinterpret_cast<t_object**>(p + limit.rlim_cur);
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 	union
 	{
 		t_frame** pp;
@@ -306,7 +308,7 @@ void t_thread::f_initialize(void* a_bottom)
 	rlimit limit;
 	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
 	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit.rlim_cur);
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 	v_stack_preserved->v_base = v_stack_bottom;
 	v_stack_dirty = v_stack_limit;
 #endif
@@ -320,7 +322,7 @@ void t_thread::f_initialize(void* a_bottom)
 	v_done = 0;
 }
 
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 void f_dump(unw_cursor_t& a_cursor)
 {
 	char cs[1024];
@@ -339,7 +341,7 @@ void t_thread::f_thunk(unw_cursor_t& a_cursor)
 	while (true) {
 		if (frame >= v_stack_preserved) throw std::length_error("frame");
 		if (unw_step(&a_cursor) <= 0) throw std::system_error(errno, std::generic_category());
-#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL_DUMP
 		f_dump(a_cursor);
 #endif
 		unw_get_reg(&a_cursor, UNW_REG_SP, reinterpret_cast<unw_word_t*>(&frame->v_base));
@@ -375,21 +377,21 @@ void t_thread::f_epoch()
 		top0 = bottom0 = nullptr;
 	} else {
 		f_epoch_suspend();
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
-#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL_DUMP
 		std::fprintf(stderr, "THREAD(%p), PRESERVED(%p)\n", this, v_stack_preserved->v_base);
 #endif
 		unw_cursor_t cursor;
 		unw_init_local2(&cursor, &v_unw_context, UNW_INIT_SIGNAL_FRAME);
 		if (unw_step(&cursor) <= 0) throw std::system_error(errno, std::generic_category());
-#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL_DUMP
 		f_dump(cursor);
 #endif
 		t_object** top;
 		do {
 			unw_get_reg(&cursor, UNW_REG_SP, reinterpret_cast<unw_word_t*>(&top));
 			if (unw_step(&cursor) <= 0) throw std::system_error(errno, std::generic_category());
-#ifdef IL2CXX__STACK_SCAN_PARTIAL_DUMP
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL_DUMP
 			f_dump(cursor);
 #endif
 		} while (unw_is_signal_frame(&cursor) <= 0);
@@ -416,7 +418,7 @@ void t_thread::f_epoch()
 	{
 		auto top2 = v_stack_last_top;
 		v_stack_last_top = top1;
-		std::lock_guard<std::mutex> lock(f_engine()->v_object__heap.f_mutex());
+		std::lock_guard lock(f_engine()->v_object__heap.f_mutex());
 		if (top1 < top2) {
 			do {
 				auto p = f_engine()->f_object__find(*top0++);
@@ -440,49 +442,6 @@ void t_thread::f_epoch()
 	v_increments.f_flush();
 	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();
-}
-
-IL2CXX__PORTABLE__THREAD t__thread* t__thread::v__current;
-
-bool t__thread::f__priority(pthread_t a_handle, int32_t a_priority)
-{
-	int policy;
-	sched_param sp;
-	if (pthread_getschedparam(a_handle, &policy, &sp)) return false;
-	int max = sched_get_priority_max(policy);
-	if (max == -1) return false;
-	int min = sched_get_priority_min(policy);
-	if (min == -1) return false;
-	sp.sched_priority = a_priority * (max - min) / 4 + min;
-	return !pthread_setschedparam(a_handle, policy, &sp);
-}
-
-void t__thread::f__join()
-{
-	if (this == v__current) throw std::runtime_error("current thread can not be joined.");
-	if (this == f_engine()->v_thread) throw std::runtime_error("engine thread can not be joined.");
-	std::unique_lock<std::mutex> lock(f_engine()->v_thread__mutex);
-	while (v__internal) f_engine()->v_thread__condition.wait(lock);
-}
-
-void t__thread::f__background__(bool a_value)
-{
-	std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
-	if (a_value == v__background) return;
-	v__background = a_value;
-	if (!v__internal || v__internal->v_done < 0) return;
-	if (v__internal->v_done > 0) throw std::runtime_error("already done.");
-	v__internal->v_background = v__background;
-}
-
-void t__thread::f__priority__(int32_t a_value)
-{
-	if (a_value < 0 || a_value > 4) throw std::runtime_error("invalid priority.");
-	std::lock_guard<std::mutex> lock(f_engine()->v_thread__mutex);
-	v__priority = a_value;
-	if (!v__internal || v__internal->v_done < 0) return;
-	if (v__internal->v_done > 0) throw std::runtime_error("already done.");
-	if (!f__priority(v__internal->v_handle, v__priority)) throw std::system_error(errno, std::generic_category());
 }
 
 }

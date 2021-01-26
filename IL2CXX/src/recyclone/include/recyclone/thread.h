@@ -1,22 +1,24 @@
-#ifndef IL2CXX__THREAD_H
-#define IL2CXX__THREAD_H
+#ifndef RECYCLONE__THREAD_H
+#define RECYCLONE__THREAD_H
 
-//#define IL2CXX__STACK_SCAN_PARTIAL
+//#define RECYCLONE__STACK_SCAN_PARTIAL
 
 #include "object.h"
 #include <thread>
 #include <unistd.h>
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #endif
 
-namespace il2cxx
+namespace recyclone
 {
+
+class t_engine;
 
 struct t_thread
 {
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 	struct t_frame
 	{
 		t_object** v_base;
@@ -28,11 +30,10 @@ struct t_thread
 	};
 #endif
 
-	static IL2CXX__PORTABLE__THREAD t_thread* v_current;
+	static RECYCLONE__THREAD t_thread* v_current;
 
-	t_thread* v_next = nullptr;
+	t_thread* v_next;
 	int v_done = -1;
-	t_slot::t_collector* v_collector = t_slot::v_collector;
 	t_slot::t_increments v_increments;
 	t_slot::t_decrements v_decrements;
 #if WIN32
@@ -46,7 +47,7 @@ struct t_thread
 	t_object** v_stack_copy;
 	t_object** v_stack_bottom;
 	void* v_stack_limit;
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 	t_frame* v_stack_frames;
 	t_frame* v_stack_preserved;
 	unw_context_t v_unw_context;
@@ -59,20 +60,20 @@ struct t_thread
 	bool v_background = false;
 
 	t_thread();
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 	~t_thread()
 	{
 		munmap(v_stack_frames, sysconf(_SC_PAGESIZE));
 	}
 #endif
 	void f_initialize(void* a_bottom);
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 	void f_thunk(unw_cursor_t& a_cursor);
 	void f_unthunk(unw_cursor_t& a_cursor);
 #endif
 	void f_epoch_get()
 	{
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 		unw_getcontext(&v_unw_context);
 #else
 		t_object* dummy = nullptr;
@@ -89,22 +90,22 @@ struct t_thread
 		v_reviving = v_increments.v_head;
 	}
 	template<typename T>
-	static IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(T*& a_field, T* a_value)
+	static RECYCLONE__ALWAYS_INLINE void f_assign(T*& a_field, T* a_value)
 	{
 		reinterpret_cast<t_slot&>(a_field) = a_value;
 	}
 	template<typename T_field, typename T_value>
-	static IL2CXX__PORTABLE__ALWAYS_INLINE void f_assign(T_field& a_field, T_value&& a_value)
+	static RECYCLONE__ALWAYS_INLINE void f_assign(T_field& a_field, T_value&& a_value)
 	{
 		a_field = std::forward<T_value>(a_value);
 	}
 	template<typename T_field, typename T_value>
-	IL2CXX__PORTABLE__ALWAYS_INLINE void f_store(T_field& a_field, T_value&& a_value)
+	RECYCLONE__ALWAYS_INLINE void f_store(T_field& a_field, T_value&& a_value)
 	{
 		auto p = &a_field;
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			std::memcpy(p, &a_value, sizeof(T_field));
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 			std::atomic_signal_fence(std::memory_order_release);
 			if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
@@ -112,12 +113,13 @@ struct t_thread
 			f_assign(a_field, std::forward<T_value>(a_value));
 		}
 	}
-	t_object* f_exchange(t_object*& a_target, t_object* a_desired)
+	template<typename T>
+	T* f_exchange(T*& a_target, T* a_desired)
 	{
-                auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
+                auto p = reinterpret_cast<std::atomic<T*>*>(&a_target);
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 			std::atomic_signal_fence(std::memory_order_release);
 			if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
@@ -128,12 +130,13 @@ struct t_thread
 		}
 		return a_desired;
 	}
-	bool f_compare_exchange(t_object*& a_target, t_object*& a_expected, t_object* a_desired)
+	template<typename T>
+	bool f_compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
 	{
-                auto p = reinterpret_cast<std::atomic<t_object*>*>(&a_target);
+                auto p = reinterpret_cast<std::atomic<T*>*>(&a_target);
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			if (p->compare_exchange_strong(a_expected, a_desired)) {
-#ifdef IL2CXX__STACK_SCAN_PARTIAL
+#ifdef RECYCLONE__STACK_SCAN_PARTIAL
 				if (++p > v_stack_dirty) v_stack_dirty = p;
 #endif
 				return true;
@@ -151,41 +154,22 @@ struct t_thread
 };
 
 template<typename T_field, typename T_value>
-IL2CXX__PORTABLE__ALWAYS_INLINE inline void f__store(T_field& a_field, T_value&& a_value)
+RECYCLONE__ALWAYS_INLINE inline void f__store(T_field& a_field, T_value&& a_value)
 {
 	t_thread::v_current->f_store(a_field, std::forward<T_value>(a_value));
 }
 
-inline t_object* f__exchange(t_object*& a_target, t_object* a_desired)
+template<typename T>
+inline T* f__exchange(T*& a_target, T* a_desired)
 {
 	return t_thread::v_current->f_exchange(a_target, a_desired);
 }
 
-inline bool f__compare_exchange(t_object*& a_target, t_object*& a_expected, t_object* a_desired)
+template<typename T>
+inline bool f__compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
 {
 	return t_thread::v_current->f_compare_exchange(a_target, a_expected, a_desired);
 }
-
-struct t__critical_finalizer_object : t_object
-{
-};
-
-struct t__thread : t__critical_finalizer_object
-{
-	static IL2CXX__PORTABLE__THREAD t__thread* v__current;
-
-	static bool f__priority(pthread_t a_handle, int32_t a_priority);
-
-	t_thread* v__internal;
-	bool v__background;
-	int32_t v__priority;
-
-	template<typename T>
-	void f__start(T a_do);
-	void f__join();
-	void f__background__(bool a_value);
-	void f__priority__(int32_t a_value);
-};
 
 }
 

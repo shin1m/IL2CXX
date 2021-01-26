@@ -18,7 +18,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("IsRuntimeImplemented", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => ($"\treturn a_0 && !a_0->f_type()->f__is(&t__type_of<{transpiler.Escape(typeof(RuntimeAssembly))}>::v__instance);\n", 1)
+                transpiler => ($"\treturn a_0 && !a_0->f_type()->f_is(&t__type_of<{transpiler.Escape(typeof(RuntimeAssembly))}>::v__instance);\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(Assembly.Location)).GetMethod,

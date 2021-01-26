@@ -1,12 +1,13 @@
-#include <il2cxx/engine.h>
+#include "engine.h"
+#include "handles.h"
+#include "waitables.h"
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <random>
 #include <regex>
-#include <stdexcept>
-#include <utility>
-#include <cstdint>
-#include <cstring>
+#include <climits>
+#include <cuchar>
 
 #ifdef __unix__
 #include <dlfcn.h>
@@ -20,6 +21,12 @@ namespace il2cxx
 {
 
 using namespace std::literals;
+
+template<typename T0, typename T1>
+inline T1 f__copy(T0 a_in, size_t a_n, T1 a_out)
+{
+	return a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
+}
 
 template<typename T>
 struct t__finally
@@ -63,7 +70,7 @@ public:
 template<typename T>
 T* t__lazy<T>::f_initialize()
 {
-	std::lock_guard<std::recursive_mutex> lock(v_mutex);
+	std::lock_guard lock(v_mutex);
 	if (v_initializing) return &v_p;
 	v_initializing = true;
 	v_p.f_initialize();

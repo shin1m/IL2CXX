@@ -100,7 +100,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto p = a_1->f_extension();
-{'\t'}std::unique_lock<std::recursive_timed_mutex> lock(p->v_mutex, std::adopt_lock);
+{'\t'}std::unique_lock lock(p->v_mutex, std::adopt_lock);
 {'\t'}auto finally = f__finally([&]
 {'\t'}{{
 {'\t'}{'\t'}lock.release();
@@ -122,12 +122,7 @@ namespace IL2CXX
         {
             var helper = type.GetNestedType("StartHelper", BindingFlags.NonPublic);
             code.Base = "t__thread";
-            code.Members = transpiler => ($@"{'\t'}static {transpiler.Escape(type)}* f__current()
-{'\t'}{{
-{'\t'}{'\t'}return static_cast<{transpiler.Escape(type)}*>(v__current);
-{'\t'}}}
-
-{'\t'}{transpiler.EscapeForMember(typeof(ExecutionContext))} v__5fexecutionContext;
+            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(ExecutionContext))} v__5fexecutionContext;
 {'\t'}{transpiler.EscapeForMember(typeof(SynchronizationContext))} v__5fsynchronizationContext;
 {'\t'}{transpiler.EscapeForMember(typeof(string))} v__5fname;
 {'\t'}{transpiler.EscapeForMember(helper)} v__5fstartHelper;
@@ -135,9 +130,9 @@ namespace IL2CXX
 {'\t'}{transpiler.EscapeForMember(typeof(bool))} v__pool;
 {'\t'}{transpiler.EscapeForMember(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
 
-{'\t'}void f__scan(t_scan a_scan)
+{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{{
-{'\t'}{'\t'}t_System_2eObject::f__scan(a_scan);
+{'\t'}{'\t'}t_System_2eObject::f_scan(a_scan);
 {'\t'}{'\t'}a_scan(v__5fexecutionContext);
 {'\t'}{'\t'}a_scan(v__5fsynchronizationContext);
 {'\t'}{'\t'}a_scan(v__5fname);
@@ -159,7 +154,7 @@ namespace IL2CXX
                 {
                     var run = helper.GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic);
                     transpiler.Enqueue(run);
-                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}a_0->f__start([a_0]
+                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}f_engine()->f_start(a_0, [a_0]
 {'\t'}{{
 {'\t'}{'\t'}{transpiler.EscapeForRoot(helper)} p = std::move(a_0->v__5fstartHelper);
 {'\t'}{'\t'}t_thread_static ts;
@@ -170,7 +165,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Thread.Join), Type.EmptyTypes),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\ta_0->f__join();\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\tf_engine()->f_join(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.Sleep), new[] { typeof(int) }),
@@ -190,7 +185,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("SetBackgroundNative", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => ("\ta_0->f__background__(a_1);\n", 1)
+                transpiler => ("\tf_engine()->f_background__(a_0, a_1);\n", 1)
             );
             // TODO
             code.For(
@@ -204,7 +199,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Thread.ManagedThreadId)).GetMethod,
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
             );
             code.For(
                 type.GetMethod("GetPriorityNative", BindingFlags.Instance | BindingFlags.NonPublic),
@@ -212,7 +207,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("SetPriorityNative", BindingFlags.Instance | BindingFlags.NonPublic),
-                transpiler => ("\ta_0->f__priority__(a_1);\n", 1)
+                transpiler => ("\tf_engine()->f_priority__(a_0, a_1);\n", 1)
             );
             code.For(
                 type.GetMethod("GetCurrentProcessorNumber", BindingFlags.Static | BindingFlags.NonPublic),
@@ -220,7 +215,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("GetCurrentThreadNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($"\treturn {transpiler.Escape(typeof(Thread))}::f__current();\n", 1)
+                transpiler => ($"\treturn static_cast<{transpiler.Escape(type)}*>(t_engine::v_current_thread);\n", 1)
             );
             // TODO
             code.For(
@@ -229,7 +224,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("GetThreadDeserializationTracker", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = {transpiler.Escape(typeof(Thread))}::f__current();
+                transpiler => ($@"{'\t'}auto p = static_cast<{transpiler.Escape(type)}*>(t_engine::v_current_thread);
 {'\t'}if (!p->v__deserialization_tracker) p->v__deserialization_tracker = f__new_zerod<{transpiler.Escape(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))}>();
 {'\t'}return p->v__deserialization_tracker;
 ", 0)

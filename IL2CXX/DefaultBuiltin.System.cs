@@ -33,10 +33,10 @@ namespace IL2CXX
 {'\t'}{'\t'}t_value({native} a_value) : v__5fvalue(reinterpret_cast<void*>(a_value))
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}operator void*() const
@@ -116,7 +116,7 @@ namespace IL2CXX
                 (transpiler, actual) =>
                 {
                     var identifier = transpiler.Escape(actual);
-                    return ($"\treturn a_1 && a_1->f_type()->f__is(&t__type_of<{identifier}>::v__instance) && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({identifier})) == 0;\n", 1);
+                    return ($"\treturn a_1 && a_1->f_type()->f_is(&t__type_of<{identifier}>::v__instance) && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({identifier})) == 0;\n", 1);
                 }
             );
         })
@@ -161,10 +161,10 @@ namespace IL2CXX
 {'\t'}{'\t'}t_value(void* a_field) : v__field(a_field)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 ", false, null);
@@ -180,10 +180,10 @@ namespace IL2CXX
 {'\t'}{'\t'}t_value(t__type* a_type) : v__type(a_type)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__scan(t_scan a_scan)
+{'\t'}{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 ", false, null);
@@ -204,7 +204,7 @@ namespace IL2CXX
 {'\t'}{'\t'}int v_lower;
 {'\t'}}};
 {'\t'}size_t v__length;
-{'\t'}t__bound* f__bounds()
+{'\t'}t__bound* f_bounds()
 {'\t'}{{
 {'\t'}{'\t'}return reinterpret_cast<t__bound*>(this + 1);
 {'\t'}}}
@@ -213,7 +213,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Array.Clear)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto element = type->v__element;
-{'\t'}element->f_clear(reinterpret_cast<char*>(a_0->f__bounds() + type->v__rank) + a_1 * element->v__size, a_2);
+{'\t'}element->f_clear(reinterpret_cast<char*>(a_0->f_bounds() + type->v__rank) + a_1 * element->v__size, a_2);
 ", 0)
             );
             var copy = type.GetMethod(nameof(Array.Copy), new[] { type, typeof(int), type, typeof(int), typeof(int) });
@@ -233,7 +233,7 @@ namespace IL2CXX
 {'\t'}{'\t'}auto rank = type->v__rank;
 {'\t'}{'\t'}auto element = type->v__element;
 {'\t'}{'\t'}auto n = element->v__size;
-{'\t'}{'\t'}element->f_copy(reinterpret_cast<char*>(a_0->f__bounds() + rank) + a_1 * n, a_4, reinterpret_cast<char*>(a_2->f__bounds() + rank) + a_3 * n);
+{'\t'}{'\t'}element->f_copy(reinterpret_cast<char*>(a_0->f_bounds() + rank) + a_1 * n, a_4, reinterpret_cast<char*>(a_2->f_bounds() + rank) + a_3 * n);
 {'\t'}}} else {{
 {'\t'}{'\t'}throw std::runtime_error(""NotImplementedException"");
 {'\t'}}}
@@ -250,24 +250,24 @@ namespace IL2CXX
 {'\t'}auto n = element->v__size * a_1;
 {'\t'}auto p = static_cast<{array}*>(f_engine()->f_object__allocate(a + n));
 {'\t'}p->v__length = a_1;
-{'\t'}p->f__bounds()[0] = {{a_1, 0}};
+{'\t'}p->f_bounds()[0] = {{a_1, 0}};
 {'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
-{'\t'}element->v__szarray->f__finish(p);
+{'\t'}element->v__szarray->f_finish(p);
 {'\t'}return p;
 ", 0);
                 }
             );
             code.For(
                 type.GetMethod(nameof(Array.GetLength)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + "\treturn a_0->f__bounds()[a_1].v_length;\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + "\treturn a_0->f_bounds()[a_1].v_length;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Array.GetLowerBound)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + "\treturn a_0->f__bounds()[a_1].v_lower;\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + "\treturn a_0->f_bounds()[a_1].v_lower;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Array.GetUpperBound)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + $@"{'\t'}auto& bound = a_0->f__bounds()[a_1];
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->f_type()->v__rank") + $@"{'\t'}auto& bound = a_0->f_bounds()[a_1];
 {'\t'}return bound.v_lower + bound.v_length - 1;
 ", 1)
             );
@@ -281,7 +281,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("InternalGetReference", declaredAndInstance),
-                transpiler => ($@"{'\t'}auto bounds = a_0->f__bounds();
+                transpiler => ($@"{'\t'}auto bounds = a_0->f_bounds();
 {'\t'}size_t n = 0;
 {'\t'}for (size_t i = 0; i < a_2; ++i) n = n * bounds[i].v_length + (a_3[i] - bounds[i].v_lower);
 {'\t'}auto type = a_0->f_type();
@@ -307,17 +307,17 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetProperty("Item").GetMethod,
-                (transpiler, types) => (transpiler.GenerateCheckRange("a_1", "a_0->v__length") + "\treturn a_0->f__data()[a_1];\n", 1)
+                (transpiler, types) => (transpiler.GenerateCheckRange("a_1", "a_0->v__length") + "\treturn a_0->f_data()[a_1];\n", 1)
             );
             code.ForGeneric(
                 type.GetProperty("Item").SetMethod,
-                (transpiler, types) => (transpiler.GenerateCheckRange("a_1", "a_0->v__length") + "\ta_0->f__data()[a_1] = a_2;\n", 1)
+                (transpiler, types) => (transpiler.GenerateCheckRange("a_1", "a_0->v__length") + "\ta_0->f_data()[a_1] = a_2;\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod(nameof(SZArrayHelper<object>.CopyTo)),
                 (transpiler, types) => (transpiler.GenerateCheckArgumentNull("a_1") + (transpiler.CheckRange ? $@"{'\t'}if (a_2 < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};
 {'\t'}if (a_2 + a_0->v__length > a_1->v__length) [[unlikely]] {transpiler.GenerateThrow("Argument")};
-" : string.Empty) + "\tstd::copy_n(a_0->f__data(), a_0->v__length, a_1->f__data() + a_2);\n", 0)
+" : string.Empty) + "\tstd::copy_n(a_0->f_data(), a_0->v__length, a_1->f_data() + a_2);\n", 0)
             );
             code.ForGeneric(
                 type.GetMethod(nameof(SZArrayHelper<object>.GetEnumerator)),
@@ -411,9 +411,9 @@ namespace IL2CXX
 {'\t'}auto n = type->v__element->v__size * a_1;
 {'\t'}auto p = static_cast<{transpiler.EscapeForValue(typeof(Array))}>(f_engine()->f_object__allocate(sizeof({array}) + sizeof({array}::t__bound) + n));
 {'\t'}p->v__length = a_1;
-{'\t'}p->f__bounds()[0] = {{size_t(a_1), 0}};
-{'\t'}if (!a_2) std::memset(p->f__bounds() + 1, 0, n);
-{'\t'}type->f__finish(p);
+{'\t'}p->f_bounds()[0] = {{size_t(a_1), 0}};
+{'\t'}if (!a_2) std::memset(p->f_bounds() + 1, 0, n);
+{'\t'}type->f_finish(p);
 {'\t'}return p;
 ", 1);
                 }
@@ -479,8 +479,8 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto n = sizeof({transpiler.Escape(typeof(MulticastDelegate))});
 {'\t'}auto p = f_engine()->f_object__allocate(n);
-{'\t'}std::memset(p + 1, 0, n - sizeof(t_object));
-{'\t'}type->f__finish(p);
+{'\t'}std::memset(p + 1, 0, n - sizeof(t__object));
+{'\t'}type->f_finish(p);
 {'\t'}return static_cast<{transpiler.EscapeForValue(typeof(MulticastDelegate))}>(p);
 ", 1)
             );
@@ -535,8 +535,8 @@ namespace IL2CXX
 {'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (type->v__value_type) {{
 {'\t'}{'\t'}auto p = f_engine()->f_object__allocate(type->v__managed_size);
-{'\t'}{'\t'}std::memset(p + 1, 0, type->v__managed_size - sizeof(t_object));
-{'\t'}{'\t'}type->f__finish(p);
+{'\t'}{'\t'}std::memset(p + 1, 0, type->v__managed_size - sizeof(t__object));
+{'\t'}{'\t'}type->f_finish(p);
 {'\t'}{'\t'}return p;
 {'\t'}}}
 {'\t'}if (!type->v__default_constructor) throw std::runtime_error(""no parameterless constructor"");
@@ -583,11 +583,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetConstructor(new[] { typeof(char[]) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f__data(), a_0->v__length));\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f_data(), a_0->v__length));\n", 1)
             );
             code.For(
                 type.GetConstructor(new[] { typeof(char[]), typeof(int), typeof(int) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f__data() + a_1, a_2));\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f_data() + a_1, a_2));\n", 1)
             );
             code.For(
                 type.GetConstructor(new[] { typeof(ReadOnlySpan<char>) }),
@@ -755,9 +755,9 @@ namespace IL2CXX
 {'\t'}auto type = static_cast<t__type*>(p->v__5ftype.v__5fvalue);
 {'\t'}auto value = p->v__5fvalue.v__5fvalue.v__5fvalue;
 {'\t'}if (type->v__value_type) {{
-{'\t'}{'\t'}auto p = f_engine()->f_object__allocate(sizeof(t_object) + type->v__size);
+{'\t'}{'\t'}auto p = f_engine()->f_object__allocate(sizeof(t__object) + type->v__size);
 {'\t'}{'\t'}type->f_copy(value, 1, p + 1);
-{'\t'}{'\t'}type->f__finish(p);
+{'\t'}{'\t'}type->f_finish(p);
 {'\t'}{'\t'}return p;
 {'\t'}}} else {{
 {'\t'}{'\t'}return *static_cast<{transpiler.EscapeForValue(typeof(object))}*>(value);
@@ -777,7 +777,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Environment.HasShutdownStarted)).GetMethod,
-                transpiler => ("\treturn f_engine()->f_shuttingdown();\n", 1)
+                transpiler => ("\treturn f_engine()->f_exiting();\n", 1)
             );
             (string body, int inline) tick(Transpiler transpiler) => ($@"{'\t'}timespec ts;
 {'\t'}if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) throw std::runtime_error(""clock_gettime"");
@@ -977,7 +977,7 @@ namespace IL2CXX
             var methods = GenericMethods(type);
             code.For(
                 type.GetMethod(nameof(Buffer.BlockCopy)),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_2") + "\tf__copy(reinterpret_cast<char*>(a_0->f__bounds() + a_0->f_type()->v__rank) + a_1, a_4, reinterpret_cast<char*>(a_2->f__bounds() + a_2->f_type()->v__rank) + a_3);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_2") + "\tf__copy(reinterpret_cast<char*>(a_0->f_bounds() + a_0->f_type()->v__rank) + a_1, a_4, reinterpret_cast<char*>(a_2->f_bounds() + a_2->f_type()->v__rank) + a_3);\n", 1)
             );
             code.ForGeneric(
                 methods.First(x => x.Name == "Memmove" && x.GetGenericArguments().Length == 1),

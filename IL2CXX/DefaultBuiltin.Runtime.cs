@@ -55,7 +55,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""not enum"");
 {'\t'}auto p = f__new_array<{transpiler.Escape(typeof(string[]))}, {transpiler.Escape(typeof(string))}>(type->v__enum_count);
-{'\t'}for (size_t i = 0; i < type->v__enum_count; ++i) p->f__data()[i] = f__new_string(type->v__enum_pairs[i].second);
+{'\t'}for (size_t i = 0; i < type->v__enum_count; ++i) p->f_data()[i] = f__new_string(type->v__enum_pairs[i].second);
 {'\t'}return p;
 ", 0)
             );
@@ -70,7 +70,7 @@ namespace IL2CXX
 {'\t'}auto n = type->v__enum_count;
 {'\t'}auto p = static_cast<{array}*>(f_engine()->f_object__allocate(a + type->v__size * n));
 {'\t'}p->v__length = n;
-{'\t'}p->f__bounds()[0] = {{n, 0}};
+{'\t'}p->f_bounds()[0] = {{n, 0}};
 {'\t'}auto copy = [&](auto q)
 {'\t'}{{
 {'\t'}{'\t'}for (size_t i = 0; i < n; ++i) q[i] = type->v__enum_pairs[i].first;
@@ -88,7 +88,7 @@ namespace IL2CXX
 {'\t'}default:
 {'\t'}{'\t'}copy(reinterpret_cast<uint64_t*>(reinterpret_cast<char*>(p) + a));
 {'\t'}}}
-{'\t'}type->v__szarray->f__finish(p);
+{'\t'}type->v__szarray->f_finish(p);
 {'\t'}return p;
 ", 0);
                 }
@@ -98,7 +98,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_1) return false;
 {'\t'}auto p = static_cast<t__type*>(a_0);
 {'\t'}auto q = static_cast<t__type*>(a_1);
-{'\t'}return q->f__is(p) || q->f__implementation(p) || p->v__nullable_value == q;
+{'\t'}return q->f_is(p) || q->f_implementation(p) || p->v__nullable_value == q;
 ", 0)
             );
             code.For(
@@ -106,7 +106,7 @@ namespace IL2CXX
                 transpiler =>
                 {
                     var array = $"&t__type_of<{transpiler.Escape(typeof(Array))}>::v__instance";
-                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0 != {array} && a_0->f__is({array});\n", 0);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0 != {array} && a_0->f_is({array});\n", 0);
                 }
             );
             code.For(

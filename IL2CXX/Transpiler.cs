@@ -77,7 +77,7 @@ namespace IL2CXX
                 }
                 else if (!Type.IsValueType)
                 {
-                    VariableType = "t_object*";
+                    VariableType = "t__object*";
                     prefix = "o";
                 }
                 else
@@ -120,7 +120,7 @@ namespace IL2CXX
         private static string Escape(string name) => unsafeCharacters.Replace(name, m => string.Join(string.Empty, m.Value.Select(x => $"_{(int)x:x}")));
         private static readonly IReadOnlyDictionary<Type, string> builtinTypes = new Dictionary<Type, string>
         {
-            [typeof(object)] = "t_object",
+            [typeof(object)] = "t__object",
             [typeof(Assembly)] = "t__assembly",
             [typeof(RuntimeAssembly)] = "t__runtime_assembly",
             [typeof(MemberInfo)] = "t__member_info",
@@ -434,7 +434,7 @@ namespace IL2CXX
             GenerateCheckNull(array);
             writer.WriteLine($"\t{{auto p = static_cast<{Escape(array.Type)}*>({array.Variable});");
             writer.Write(GenerateCheckRange(index.AsUnsigned, "p->v__length"));
-            writer.WriteLine($"\t{access($"p->f__data()[{index.AsUnsigned}]")};}}");
+            writer.WriteLine($"\t{access($"p->f_data()[{index.AsUnsigned}]")};}}");
         }
         public string CastValue(Type type, string variable) =>
             type == typeof(bool) ? $"{variable} != 0" :
@@ -603,7 +603,7 @@ namespace IL2CXX
                 if (IsComposite(x))
                 {
                     if (x.IsValueType) return $"a_{i}";
-                    if (x.IsArray) return $"a_{i} ? a_{i}->f__data() : nullptr";
+                    if (x.IsArray) return $"a_{i} ? a_{i}->f_data() : nullptr";
                 }
                 return $"a_{i}";
             }).Select(x => $"\n\t\t{x}")));

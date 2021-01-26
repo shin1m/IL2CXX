@@ -1,4 +1,25 @@
-IL2CXX__PORTABLE__ALWAYS_INLINE inline t_System_2eString* f__new_string(size_t a_length)
+template<typename T, typename... T_an>
+T* f__new_constructed(T_an&&... a_n)
+{
+	t__new<T> p(0);
+	p->f_construct(std::forward<T_an>(a_n)...);
+	return p;
+}
+
+template<typename T_array, typename T_element>
+T_array* f__new_array(size_t a_length)
+{
+	t__new<T_array> p(sizeof(T_element) * a_length);
+	p->v__length = a_length;
+	p->v__bounds[0] = {a_length, 0};
+	std::memset(p->f_data(), 0, sizeof(T_element) * a_length);
+	return p;
+}
+
+std::u16string f__u16string(std::string_view a_x);
+std::string f__string(std::u16string_view a_x);
+
+RECYCLONE__ALWAYS_INLINE inline t_System_2eString* f__new_string(size_t a_length)
 {
 	t__new<t_System_2eString> p(sizeof(char16_t) * a_length);
 	p->v__5fstringLength = a_length;

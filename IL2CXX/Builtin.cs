@@ -50,20 +50,20 @@ namespace IL2CXX
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = n;
 {string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tp->v__bounds[{i}] = {{static_cast<size_t>(a_{i}), 0}};\n"))
-}{'\t'}std::memset(p->f__data(), 0, extra);
+}{'\t'}std::memset(p->f_data(), 0, extra);
 {'\t'}return p;
 ", 1);
                 string prepare() => transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t i = 0;
-{'\t'}auto bounds = a_0->f__bounds();
+{'\t'}auto bounds = a_0->f_bounds();
 {string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $@"{'\t'}{{
 {'\t'}{'\t'}int j = a_{i + 1} - bounds[{i}].v_lower;
 {'\t'}{transpiler.GenerateCheckRange($"j", $"bounds[{i}].v_length")
 }{'\t'}{'\t'}i = i * bounds[{i}].v_length + j;
 {'\t'}}}
 "))}";
-                if (handle == type.GetMethod("Get").MethodHandle) return (prepare() + "\treturn a_0->f__data()[i];\n", 1);
-                if (handle == type.GetMethod("Set").MethodHandle) return (prepare() + $"\ta_0->f__data()[i] = a_{rank + 1};\n", 1);
-                if (handle == type.GetMethod("Address").MethodHandle) return (prepare() + "\treturn a_0->f__data() + i;\n", 1);
+                if (handle == type.GetMethod("Get").MethodHandle) return (prepare() + "\treturn a_0->f_data()[i];\n", 1);
+                if (handle == type.GetMethod("Set").MethodHandle) return (prepare() + $"\ta_0->f_data()[i] = a_{rank + 1};\n", 1);
+                if (handle == type.GetMethod("Address").MethodHandle) return (prepare() + "\treturn a_0->f_data() + i;\n", 1);
             }
             if (type.IsSubclassOf(typeof(Delegate)) && type != typeof(MulticastDelegate))
             {

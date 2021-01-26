@@ -1,5 +1,5 @@
-#ifndef IL2CXX__HEAP_H
-#define IL2CXX__HEAP_H
+#ifndef RECYCLONE__HEAP_H
+#define RECYCLONE__HEAP_H
 
 #include "define.h"
 #include <atomic>
@@ -8,7 +8,7 @@
 #include <new>
 #include <sys/mman.h>
 
-namespace il2cxx
+namespace recyclone
 {
 
 template<typename T>
@@ -38,9 +38,10 @@ class t_heap
 			q->v_rank = A_rank;
 			q = reinterpret_cast<T*>(block);
 			q->v_cyclic = A_size;
-			a_heap.v_mutex.lock();
-			a_heap.v_blocks.emplace(q, length);
-			a_heap.v_mutex.unlock();
+			{
+				std::lock_guard lock(a_heap.v_mutex);
+				a_heap.v_blocks.emplace(q, length);
+			}
 			v_grown.fetch_add(A_size, std::memory_order_relaxed);
 			return q;
 		}
@@ -88,7 +89,7 @@ class t_heap
 	};
 
 	template<size_t A_rank>
-	static IL2CXX__PORTABLE__THREAD T* v_head;
+	static RECYCLONE__THREAD T* v_head;
 
 	void(*v_wait)();
 	std::map<T*, size_t> v_blocks;
@@ -106,7 +107,7 @@ class t_heap
 	template<size_t A_rank, size_t A_size>
 	T* f_allocate_from(t_of<A_rank, A_size>& a_of);
 	template<size_t A_rank, size_t A_size>
-	IL2CXX__PORTABLE__ALWAYS_INLINE T* f_allocate(t_of<A_rank, A_size>& a_of)
+	RECYCLONE__ALWAYS_INLINE T* f_allocate(t_of<A_rank, A_size>& a_of)
 	{
 		auto p = v_head<A_rank>;
 		if (!p) [[unlikely]] return f_allocate_from(a_of);
@@ -140,7 +141,7 @@ public:
 		a_each(6, v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned);
 		a_each(57, 0, v_allocated, v_freed);
 	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
+	RECYCLONE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
 	{
 		if (a_size <= 1 << 7) [[likely]] return f_allocate(v_of0);
 		return f_allocate_medium(a_size);
@@ -221,7 +222,7 @@ public:
 
 template<typename T>
 template<size_t A_rank>
-IL2CXX__PORTABLE__THREAD T* t_heap<T>::v_head;
+RECYCLONE__THREAD T* t_heap<T>::v_head;
 
 template<typename T>
 template<size_t A_rank, size_t A_size>
@@ -241,10 +242,11 @@ T* t_heap<T>::f_allocate_large(size_t a_size)
 {
 	auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
 	p->v_rank = 57;
-	v_mutex.lock();
-	v_blocks.emplace(p, a_size);
-	++v_allocated;
-	v_mutex.unlock();
+	{
+		std::lock_guard lock(v_mutex);
+		v_blocks.emplace(p, a_size);
+		++v_allocated;
+	}
 	return p;
 }
 

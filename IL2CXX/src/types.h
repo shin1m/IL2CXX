@@ -1,20 +1,43 @@
-#ifndef IL2CXX__TYPE_H
-#define IL2CXX__TYPE_H
+#ifndef IL2CXX__TYPES_H
+#define IL2CXX__TYPES_H
 
-#include "object.h"
+#include <recyclone/thread.h>
 
 namespace il2cxx
 {
 
-struct t__member_info : t_object
+using namespace recyclone;
+
+struct t__type;
+
+struct t__object : t_object
+{
+	t__type* f_type() const;
+	void f_scan(t_scan a_scan)
+	{
+	}
+	void f_construct(t__object* a_p) const
+	{
+	}
+};
+
+struct t__critical_finalizer_object : t__object
+{
+};
+
+struct t__thread : t__critical_finalizer_object
+{
+	t_thread* v__internal;
+	bool v__background;
+	int32_t v__priority;
+};
+
+struct t__member_info : t__object
 {
 	t__type* v__declaring_type;
 	std::u16string_view v__name;
 
-	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr, std::u16string_view a_name = {}) : v__declaring_type(a_declaring_type), v__name(a_name)
-	{
-		v_type = a_type;
-	}
+	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr, std::u16string_view a_name = {});
 };
 
 struct t__method_base : t__member_info
@@ -29,9 +52,9 @@ struct t__constructor_info : t__method_base
 
 struct t__runtime_constructor_info : t__constructor_info
 {
-	t_object*(*v__invoke)();
+	t__object*(*v__invoke)();
 
-	t__runtime_constructor_info(t__type* a_type, t_object*(*a_invoke)()) : t__constructor_info(a_type), v__invoke(a_invoke)
+	t__runtime_constructor_info(t__type* a_type, t__object*(*a_invoke)()) : t__constructor_info(a_type), v__invoke(a_invoke)
 	{
 	}
 };
@@ -46,7 +69,7 @@ struct t__runtime_method_info : t__method_info
 	using t__method_info::t__method_info;
 };
 
-struct t__assembly : t_object
+struct t__assembly : t__object
 {
 };
 
@@ -56,10 +79,7 @@ struct t__runtime_assembly : t__assembly
 	std::u16string_view v__name;
 	t__runtime_method_info* v__entry_point;
 
-	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point)
-	{
-		v_type = a_type;
-	}
+	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point);
 };
 
 struct t__abstract_type : t__member_info
@@ -67,7 +87,7 @@ struct t__abstract_type : t__member_info
 	using t__member_info::t__member_info;
 };
 
-struct t__type : t__abstract_type
+struct t__type : t__abstract_type, t_type
 {
 	t__type* v__base;
 	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
@@ -119,35 +139,27 @@ struct t__type : t__abstract_type
 	v__szarray(a_szarray)
 	{
 	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
-	{
-		//t_slot::t_increments::f_push(this);
-		std::atomic_signal_fence(std::memory_order_release);
-		a_p->v_type = this;
-		t_slot::t_decrements::f_push(a_p);
-	}
-	static void f_do_scan(t_object* a_this, t_scan a_scan);
-	void (*f_scan)(t_object*, t_scan) = f_do_scan;
-	static t_object* f_do_clone(const t_object* a_this);
-	t_object* (*f_clone)(const t_object*) = f_do_clone;
-	static void f_do_register_finalize(t_object* a_this);
-	void (*f_register_finalize)(t_object*) = f_do_register_finalize;
-	static void f_do_suppress_finalize(t_object* a_this);
-	void (*f_suppress_finalize)(t_object*) = f_do_suppress_finalize;
+	using t__object::f_scan;
+	static t__object* f_do_clone(const t__object* a_this);
+	t__object* (*f_clone)(const t__object*) = f_do_clone;
+	static void f_do_register_finalize(t__object* a_this);
+	void (*f_register_finalize)(t__object*) = f_do_register_finalize;
+	static void f_do_suppress_finalize(t__object* a_this);
+	void (*f_suppress_finalize)(t__object*) = f_do_suppress_finalize;
 	static void f_do_clear(void* a_p, size_t a_n);
 	void (*f_clear)(void*, size_t) = f_do_clear;
 	static void f_do_copy(const void* a_from, size_t a_n, void* a_to);
 	void (*f_copy)(const void*, size_t, void*) = f_do_copy;
-	static void f_do_to_unmanaged(const t_object* a_this, void* a_p);
-	static void f_do_to_unmanaged_blittable(const t_object* a_this, void* a_p);
-	void (*f_to_unmanaged)(const t_object*, void*) = f_do_to_unmanaged;
-	static void f_do_from_unmanaged(t_object* a_this, const void* a_p);
-	static void f_do_from_unmanaged_blittable(t_object* a_this, const void* a_p);
-	void (*f_from_unmanaged)(t_object*, const void*) = f_do_from_unmanaged;
+	static void f_do_to_unmanaged(const t__object* a_this, void* a_p);
+	static void f_do_to_unmanaged_blittable(const t__object* a_this, void* a_p);
+	void (*f_to_unmanaged)(const t__object*, void*) = f_do_to_unmanaged;
+	static void f_do_from_unmanaged(t__object* a_this, const void* a_p);
+	static void f_do_from_unmanaged_blittable(t__object* a_this, const void* a_p);
+	void (*f_from_unmanaged)(t__object*, const void*) = f_do_from_unmanaged;
 	static void f_do_destroy_unmanaged(void* a_p);
 	static void f_do_destroy_unmanaged_blittable(void* a_p);
 	void (*f_destroy_unmanaged)(void*) = f_do_destroy_unmanaged;
-	bool f__is(t__type* a_type) const
+	bool f_is(t__type* a_type) const
 	{
 		auto p = this;
 		do {
@@ -156,12 +168,27 @@ struct t__type : t__abstract_type
 		} while (p);
 		return false;
 	}
-	void** f__implementation(t__type* a_interface) const
+	void** f_implementation(t__type* a_interface) const
 	{
 		auto i = v__interface_to_methods.find(a_interface);
 		return i == v__interface_to_methods.end() ? nullptr : i->second.first;
 	}
 };
+
+inline t__type* t__object::f_type() const
+{
+	return static_cast<t__type*>(t_object::f_type());
+}
+
+inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name) : v__declaring_type(a_declaring_type), v__name(a_name)
+{
+	f_type__(a_type);
+}
+
+inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point)
+{
+	f_type__(a_type);
+}
 
 struct t__type_finalizee : t__type
 {
@@ -171,54 +198,54 @@ struct t__type_finalizee : t__type
 		f_register_finalize = f_do_register_finalize;
 		f_suppress_finalize = f_do_suppress_finalize;
 	}
-	IL2CXX__PORTABLE__ALWAYS_INLINE void f__finish(t_object* a_p)
+	RECYCLONE__ALWAYS_INLINE void f_finish(t_object* a_p)
 	{
-		a_p->v_finalizee = true;
-		t__type::f__finish(a_p);
+		a_p->f_finalizee__(true);
+		t__type::f_finish(a_p);
 	}
-	static void f_do_register_finalize(t_object* a_this);
-	static void f_do_suppress_finalize(t_object* a_this);
+	static void f_do_register_finalize(t__object* a_this);
+	static void f_do_suppress_finalize(t__object* a_this);
 };
 
 template<typename T>
 struct t__type_of;
 
 template<typename T_interface, size_t A_i>
-void* f__resolve(t_object* a_this)
+void* f__resolve(t__object* a_this)
 {
 	return a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).second[A_i];
 }
 
 template<typename T_interface, size_t A_i, typename T_r, typename... T_an>
-T_r f__invoke(t_object* a_this, T_an... a_n, void** a_site)
+T_r f__invoke(t__object* a_this, T_an... a_n, void** a_site)
 {
 	auto p = a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).first[A_i];
 	*a_site = p;
-	return reinterpret_cast<T_r(*)(t_object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
+	return reinterpret_cast<T_r(*)(t__object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
 }
 
 template<typename T_interface, size_t A_i, typename T_type, typename T_method, T_method A_method, typename T_r, typename... T_an>
-T_r f__method(t_object* a_this, T_an... a_n, void** a_site)
+T_r f__method(t__object* a_this, T_an... a_n, void** a_site)
 {
 	return a_this->f_type() == &t__type_of<T_type>::v__instance ? A_method(static_cast<T_type*>(a_this), a_n...) : f__invoke<T_interface, A_i, T_r, T_an...>(a_this, a_n..., a_site);
 }
 
 template<typename T_interface, size_t A_i, size_t A_j>
-void* f__generic_resolve(t_object* a_this)
+void* f__generic_resolve(t__object* a_this)
 {
 	return reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).second[A_i])[A_j];
 }
 
 template<typename T_interface, size_t A_i, size_t A_j, typename T_r, typename... T_an>
-T_r f__generic_invoke(t_object* a_this, T_an... a_n, void** a_site)
+T_r f__generic_invoke(t__object* a_this, T_an... a_n, void** a_site)
 {
 	auto p = reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).first[A_i])[A_j];
 	*a_site = p;
-	return reinterpret_cast<T_r(*)(t_object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
+	return reinterpret_cast<T_r(*)(t__object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
 }
 
 template<typename T_interface, size_t A_i, size_t A_j, typename T_type, typename T_method, T_method A_method, typename T_r, typename... T_an>
-T_r f__generic_method(t_object* a_this, T_an... a_n, void** a_site)
+T_r f__generic_method(t__object* a_this, T_an... a_n, void** a_site)
 {
 	return a_this->f_type() == &t__type_of<T_type>::v__instance ? A_method(static_cast<T_type*>(a_this), a_n...) : f__generic_invoke<T_interface, A_i, A_j, T_r, T_an...>(a_this, a_n..., a_site);
 }

@@ -1,3 +1,8 @@
+#include "waitables.h"
+
+namespace il2cxx
+{
+
 std::mutex t__waitable::v_shared;
 std::condition_variable t__waitable::v_awaken;
 
@@ -139,4 +144,6 @@ size_t t__semaphore::f_release(size_t a_count)
 	v_signal.notify_all();
 	v_awaken.notify_all();
 	return n;
+}
+
 }

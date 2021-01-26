@@ -1,3 +1,12 @@
+#ifndef IL2CXX__WAITABLES_H
+#define IL2CXX__WAITABLES_H
+
+#include <mutex>
+#include <condition_variable>
+
+namespace il2cxx
+{
+
 class t__waitable
 {
 	static std::chrono::time_point<std::chrono::steady_clock> f_after(std::chrono::milliseconds a_timeout)
@@ -78,3 +87,7 @@ public:
 	virtual void f_signal();
 	size_t f_release(size_t a_count);
 };
+
+}
+
+#endif

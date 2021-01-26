@@ -86,7 +86,7 @@ namespace IL2CXX
                 {
                     var identifier = transpiler.Escape(Type);
                     DefaultConstructor = $@"
-t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, []() -> t_object*
+t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, []() -> t__object*
 {{
 {'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
@@ -108,7 +108,7 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
 {'\t'}{{
 {body}{'\t'}}})";
                     string call(string @this) => $"{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, @this)))});";
-                    Delegate = $@"{'\t'}v__multicast_invoke = {generate(typeof(MulticastDelegate), $@"{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f__data();
+                    Delegate = $@"{'\t'}v__multicast_invoke = {generate(typeof(MulticastDelegate), $@"{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f_data();
 {'\t'}{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
 {'\t'}{'\t'}for (intptr_t i = 0; i < n; ++i) {call("xs[i]")};
 {'\t'}{'\t'}return {call("xs[n]")};
@@ -248,7 +248,7 @@ struct t__static_{identifier}
                     {
                         if (name == null) name = primitives[type.GetEnumUnderlyingType()];
                         members = $@"{'\t'}{name} v__value;
-{'\t'}void f__construct({name} a_value)
+{'\t'}void f_construct({name} a_value)
 {'\t'}{{
 {'\t'}{'\t'}v__value = a_value;
 {'\t'}}}
@@ -261,21 +261,21 @@ struct t__static_{identifier}
                         var unmanaged = mm.unmanaged;
                         if (members == null)
                         {
-                            string scan(Type x, string y) => x.IsValueType ? $"{y}.f__scan(a_scan)" : $"a_scan({y})";
+                            string scan(Type x, string y) => x.IsValueType ? $"{y}.f_scan(a_scan)" : $"a_scan({y})";
                             if (type.IsArray)
                             {
                                 var element = GetElementType(type);
                                 var elementIdentifier = EscapeForMember(element);
                                 members = $@"{'\t'}t__bound v__bounds[{type.GetArrayRank()}];
-{'\t'}{elementIdentifier}* f__data()
+{'\t'}{elementIdentifier}* f_data()
 {'\t'}{{
 {'\t'}{'\t'}return reinterpret_cast<{elementIdentifier}*>(this + 1);
 {'\t'}}}
 ";
-                                if (IsComposite(element)) members += $@"{'\t'}void f__scan(t_scan a_scan)
+                                if (IsComposite(element)) members += $@"{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{{
-{'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
-{'\t'}{'\t'}auto p = f__data();
+{'\t'}{'\t'}{Escape(type.BaseType)}::f_scan(a_scan);
+{'\t'}{'\t'}auto p = f_data();
 {'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) {scan(element, "p[i]")};
 {'\t'}}}
 ";
@@ -423,20 +423,20 @@ struct {Escape(type)}__unmanaged
                                 string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
                                 members = type.IsValueType
                                     ? $@"{variables("\t\t")}
-{'\t'}{'\t'}void f__destruct()
+{'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
-{string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"\t\t\t{Escape(x)}.f__destruct();\n"))}{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__scan(t_scan a_scan)
+{string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"\t\t\t{Escape(x)}.f_destruct();\n"))}{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{'\t'}{{
 {scanSlots("\t\t\t")}{'\t'}{'\t'}}}
 "
                                     : $@"{variables("\t")}
-{'\t'}void f__scan(t_scan a_scan)
+{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{{
-{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
-{'\t'}void f__construct({identifier}* a_p) const
+{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f_scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
+{'\t'}void f_construct({identifier}* a_p) const
 {'\t'}{{
-{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__construct(a_p);\n")}{string.Join(string.Empty, fields.Select(x => $"{'\t'}{'\t'}new(&a_p->{Escape(x)}) decltype({Escape(x)})({Escape(x)});\n"))}{'\t'}}}
+{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f_construct(a_p);\n")}{string.Join(string.Empty, fields.Select(x => $"{'\t'}{'\t'}new(&a_p->{Escape(x)}) decltype({Escape(x)})({Escape(x)});\n"))}{'\t'}}}
 ";
                             }
                         }
@@ -450,13 +450,13 @@ struct {Escape(type)}__unmanaged
 {'\t'}using t_stacked = {(td.IsManaged ? "il2cxx::t_stacked<t_value>" : "t_value")};
 {'\t'}t_value v__value;
 {'\t'}template<typename T>
-{'\t'}void f__construct(T&& a_value)
+{'\t'}void f_construct(T&& a_value)
 {'\t'}{{
 {'\t'}{'\t'}new(&v__value) decltype(v__value)(std::forward<T>(a_value));
 {'\t'}}}
-{'\t'}void f__scan(t_scan a_scan)
+{'\t'}void f_scan(t_scan a_scan)
 {'\t'}{{
-{'\t'}{'\t'}v__value.f__scan(a_scan);
+{'\t'}{'\t'}v__value.f_scan(a_scan);
 {'\t'}}}
 ";
                         staticDefinitions.Write(unmanaged);
@@ -543,12 +543,12 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 }
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
-{'\t'}static t_object* f_do_clone(const t_object* a_this);");
+{'\t'}static t__object* f_do_clone(const t__object* a_this);");
                 if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_clear(void* a_p, size_t a_n);
 {'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
                 if (definition.HasUnmanaged)
-                    writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t_object* a_this, void* a_p);
-{'\t'}static void f_do_from_unmanaged(t_object* a_this, const void* a_p);
+                    writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t__object* a_this, void* a_p);
+{'\t'}static void f_do_from_unmanaged(t__object* a_this, const void* a_p);
 {'\t'}static void f_do_destroy_unmanaged(void* a_p);");
             }
             else
@@ -598,7 +598,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             if (nv != null) writerForDefinitions.WriteLine($"\tv__nullable_value = &t__type_of<{Escape(nv)}>::v__instance;");
             if (definition is TypeDefinition)
             {
-                writerForDefinitions.WriteLine($@"{'\t'}f_scan = f_do_scan;
+                writerForDefinitions.WriteLine($@"{'\t'}t_type::f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
                 if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear;
 {'\t'}f_copy = f_do_copy;");
@@ -612,9 +612,9 @@ t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
             {
                 writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_scan(t_object* a_this, t_scan a_scan)
 {{
-{'\t'}static_cast<{identifier}*>(a_this)->f__scan(a_scan);
+{'\t'}static_cast<{identifier}*>(a_this)->f_scan(a_scan);
 }}
-t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
+t__object* t__type_of<{identifier}>::f_do_clone(const t__object* a_this)
 {{");
                 if (type.IsArray)
                 {
@@ -624,7 +624,7 @@ t_object* t__type_of<{identifier}>::f_do_clone(const t_object* a_this)
 {'\t'}q->v__length = p->v__length;
 {'\t'}std::memcpy(q->v__bounds, p->v__bounds, sizeof(p->v__bounds));
 {'\t'}auto p0 = reinterpret_cast<const {element}*>(p + 1);
-{'\t'}auto p1 = q->f__data();
+{'\t'}auto p1 = q->f_data();
 {'\t'}for (size_t i = 0; i < p->v__length; ++i) new(p1 + i) {element}(p0[i]);
 {'\t'}return q;");
                 }
@@ -644,7 +644,7 @@ void t__type_of<{identifier}>::f_do_copy(const void* a_from, size_t a_n, void* a
 {{
 {'\t'}f__copy(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));" :
                     $@"{'\t'}t__new<{identifier}> p(0);
-{'\t'}static_cast<const {identifier}*>(a_this)->f__construct(p);
+{'\t'}static_cast<const {identifier}*>(a_this)->f_construct(p);
 {'\t'}return p;");
                 }
                 writerForDefinitions.WriteLine('}');
@@ -654,11 +654,11 @@ void t__type_of<{identifier}>::f_do_copy(const void* a_from, size_t a_n, void* a
                         ? $"reinterpret_cast<{qualifier} {identifier}::t_value*>(a_this + 1)"
                         : $"static_cast<{qualifier} {identifier}*>(a_this)";
                     var at = $"{identifier}{(type.IsValueType ? "::t_value" : string.Empty)}*";
-                    writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_to_unmanaged(const t_object* a_this, void* a_p)
+                    writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_to_unmanaged(const t__object* a_this, void* a_p)
 {{
 {'\t'}static_cast<{identifier}__unmanaged*>(a_p)->f_in({@this("const ")});
 }}
-void t__type_of<{identifier}>::f_do_from_unmanaged(t_object* a_this, const void* a_p)
+void t__type_of<{identifier}>::f_do_from_unmanaged(t__object* a_this, const void* a_p)
 {{
 {'\t'}static_cast<const {identifier}__unmanaged*>(a_p)->f_out({@this(string.Empty)});
 }}

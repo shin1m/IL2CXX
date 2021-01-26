@@ -37,7 +37,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(Marshal.Copy), new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_1") + "\tstd::memcpy(a_1->f__data() + a_2, a_0, a_3);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_1") + "\tstd::memcpy(a_1->f_data() + a_2, a_0, a_3);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Marshal.DestroyStructure), new[] { typeof(IntPtr), typeof(Type) }),
@@ -53,7 +53,7 @@ namespace IL2CXX
 {'\t'}q->v__5ftarget = q;
 {'\t'}q->v__5fmethodPtr = p->v__invoke_unmanaged;
 {'\t'}q->v__5fmethodPtrAux = a_0;
-{'\t'}p->f__finish(q);
+{'\t'}p->f_finish(q);
 {'\t'}return q;
 ", 0)
             );
@@ -86,7 +86,7 @@ namespace IL2CXX
 {'\t'}auto type = static_cast<t__type*>(a_1);
 {'\t'}auto p = f_engine()->f_object__allocate(type->v__managed_size);
 {'\t'}type->f_from_unmanaged(p, a_0);
-{'\t'}type->f__finish(p);
+{'\t'}type->f_finish(p);
 {'\t'}return p;
 ", 1)
             );
@@ -109,7 +109,7 @@ namespace IL2CXX
         {
             code.ForGeneric(
                 type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference)),
-                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0->f__data());\n", 1)
+                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0->f_data());\n", 1)
             );
         })
         .For(typeof(NativeLibrary), (type, code) =>
@@ -123,15 +123,15 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.GetHashCode), BindingFlags.Static | BindingFlags.Public),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t_object*>(a_0));\n", 1)
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
             );
             code.For(
                 type.GetMethod("GetRawArrayData", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f__bounds() + a_0->f_type()->v__rank);\n", 1)
+                transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f_bounds() + a_0->f_type()->v__rank);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.InitializeArray)),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\tstd::memcpy(a_0->f__bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\tstd::memcpy(a_0->f_bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
             );
             {
                 var method = type.GetMethod("IsBitwiseEquatable", BindingFlags.Static | BindingFlags.NonPublic);
@@ -157,7 +157,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("ObjectHasComponentSize", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
-{'\t'}return type == &t__type_of<{transpiler.Escape(typeof(string))}>::v__instance || type->f__is(&t__type_of<{transpiler.Escape(typeof(Array))}>::v__instance);
+{'\t'}return type == &t__type_of<{transpiler.Escape(typeof(string))}>::v__instance || type->f_is(&t__type_of<{transpiler.Escape(typeof(Array))}>::v__instance);
 ", 1)
             );
         })
@@ -178,7 +178,7 @@ namespace IL2CXX
                 type.GetMethod("GetPrimaryAndSecondary"),
                 transpiler => ($@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue);
 {'\t'}auto primary = p->f_target();
-{'\t'}f__store(*a_1, primary ? static_cast<t_object*>(p->v_secondary) : nullptr);
+{'\t'}f__store(*a_1, primary ? static_cast<t__object*>(p->v_secondary) : nullptr);
 {'\t'}return primary;
 ", 1)
             );

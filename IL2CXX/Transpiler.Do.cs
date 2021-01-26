@@ -72,11 +72,11 @@ inline {returns}
                 writer.WriteLine(description);
                 if (builtin.inline < 0)
                 {
-                    writer.Write("IL2CXX__PORTABLE__NOINLINE ");
+                    writer.Write("RECYCLONE__NOINLINE ");
                 }
                 else
                 {
-                    if (builtin.inline > 1) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
+                    if (builtin.inline > 1) writer.Write("RECYCLONE__ALWAYS_INLINE ");
                     if (builtin.inline > 0) writer.Write("inline ");
                 }
                 writer.WriteLine($"{prototype}\n{{\n{builtin.body}}}");
@@ -88,7 +88,7 @@ inline {returns}
             {
                 writer = writerForType(method.DeclaringType, false);
                 writer.WriteLine(description);
-                writer.Write("IL2CXX__PORTABLE__NOINLINE ");
+                writer.Write("RECYCLONE__NOINLINE ");
             }
             else
             {
@@ -96,7 +96,7 @@ inline {returns}
                 var inline = aggressive || bytes?.Length <= 64;
                 writer = writerForType(method.DeclaringType, inline);
                 writer.WriteLine(description);
-                if (aggressive && bytes?.Length <= 128) writer.Write("IL2CXX__PORTABLE__ALWAYS_INLINE ");
+                if (aggressive && bytes?.Length <= 128) writer.Write("RECYCLONE__ALWAYS_INLINE ");
                 if (inline) writer.Write("inline ");
             }
             var dllimport = method.GetCustomAttribute<DllImportAttribute>();
@@ -189,13 +189,13 @@ inline {returns}
                         {
                             case ExceptionHandlingClauseOptions.Clause:
                                 writer.WriteLine($@"// catch {clause.CatchType}
-}} catch (t_object* e) {{
-{'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f__implementation" : "f__is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;
+}} catch (t__object* e) {{
+{'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;
 {'\t'}{s.Variable} = e;");
                                 break;
                             case ExceptionHandlingClauseOptions.Filter:
                                 writer.WriteLine($@"// filter
-}} catch (t_object* e) {{
+}} catch (t__object* e) {{
 {'\t'}{s.Variable} = e;");
                                 break;
                             case ExceptionHandlingClauseOptions.Finally:
@@ -303,9 +303,7 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                 }
                 WriteRuntimeDefinition(definition, $"v__assembly_{name}", writerForDeclarations, writer);
             }
-            writerForDeclarations.WriteLine(@"
-#include ""utilities.h""
-#include ""waitable.h""");
+            writerForDeclarations.WriteLine("\n#include \"utilities.h\"");
             writerForDeclarations.Write(staticDefinitions);
             writerForDeclarations.WriteLine(@"
 struct t_static
@@ -327,7 +325,7 @@ struct t_thread_static
 {{");
             writerForDeclarations.Write(threadStaticMembers);
             writerForDeclarations.WriteLine($@"
-{'\t'}static IL2CXX__PORTABLE__THREAD t_thread_static* v_instance;
+{'\t'}static RECYCLONE__THREAD t_thread_static* v_instance;
 {'\t'}t_thread_static()
 {'\t'}{{
 {'\t'}{'\t'}v_instance = this;
@@ -344,7 +342,6 @@ struct t_thread_static
 {{
 
 #include ""utilities.cc""
-#include ""waitable.cc""
 
 t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
 
@@ -395,13 +392,13 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
             {
                 arguments0 = $@"
 {'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeof(string[]))}, {EscapeForMember(typeof(string))}>(argc);
-{'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f__data()[i] = f__new_string(argv[i]);";
+{'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f_data()[i] = f__new_string(argv[i]);";
                 arguments1 = "arguments";
             }
             writerForDefinitions.WriteLine($@"
 t_static* t_static::v_instance;
 
-IL2CXX__PORTABLE__THREAD t_thread_static* t_thread_static::v_instance;
+RECYCLONE__THREAD t_thread_static* t_thread_static::v_instance;
 
 }}
 
@@ -409,13 +406,13 @@ int main(int argc, char* argv[])
 {{
 {'\t'}using namespace il2cxx;
 {'\t'}std::setlocale(LC_ALL, """");
-{'\t'}t_engine::t_options options;
+{'\t'}il2cxx::t_engine::t_options options;
 {'\t'}options.v_verbose = std::getenv(""IL2CXX_VERBOSE"");
 {'\t'}options.v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
-{'\t'}t_engine engine(options);
+{'\t'}il2cxx::t_engine engine(options);
 {'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
 {'\t'}{{
-{'\t'}{'\t'}reinterpret_cast<void(*)(t_object*)>(reinterpret_cast<void**>(a_p->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
+{'\t'}{'\t'}reinterpret_cast<void(*)(t_object*)>(reinterpret_cast<void**>(static_cast<t__object*>(a_p)->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
 {'\t'}}}, [&]
 {'\t'}{{{arguments0}
 {'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}({arguments1});\n\t\treturn 0" : $"return {Escape(method)}({arguments1})")};

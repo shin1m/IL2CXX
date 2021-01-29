@@ -8,26 +8,36 @@
 namespace recyclone
 {
 
+template<typename T_type>
 class t_object;
+template<typename T_type>
+struct t_weak_pointer;
+template<typename T_type>
+struct t_thread;
+template<typename T_type>
+struct t_engine;
+template<typename T_type>
+t_engine<T_type>* f_engine();
 
+template<typename T_type>
 class t_slot
 {
-	friend class t_type;
-	friend class t_object;
-	friend struct t_weak_pointer;
-	friend struct t_thread;
-	friend class t_engine;
+	friend T_type;
+	friend class t_object<T_type>;
+	friend struct t_weak_pointer<T_type>;
+	friend struct t_thread<T_type>;
+	friend class t_engine<T_type>;
 
 	template<size_t A_SIZE>
 	struct t_queue
 	{
-		static const size_t V_SIZE = A_SIZE;
+		static constexpr size_t V_SIZE = A_SIZE;
 
-		static RECYCLONE__THREAD t_queue* v_instance;
-		static RECYCLONE__THREAD t_object* volatile* v_head;
-		static RECYCLONE__THREAD t_object* volatile* v_next;
+		static inline RECYCLONE__THREAD t_queue* v_instance;
+		static inline RECYCLONE__THREAD t_object<T_type>* volatile* v_head;
+		static inline RECYCLONE__THREAD t_object<T_type>* volatile* v_next;
 
-		RECYCLONE__ALWAYS_INLINE static void f_push(t_object* a_object)
+		RECYCLONE__ALWAYS_INLINE static void f_push(t_object<T_type>* a_object)
 		{
 			auto p = v_head;
 			*p = a_object;
@@ -37,13 +47,13 @@ class t_slot
 				[[likely]] v_head = p + 1;
 		}
 
-		t_object* volatile v_objects[V_SIZE];
-		std::atomic<t_object* volatile*> v_epoch;
-		t_object* volatile* v_tail{v_objects + V_SIZE - 1};
+		t_object<T_type>* volatile v_objects[V_SIZE];
+		std::atomic<t_object<T_type>* volatile*> v_epoch;
+		t_object<T_type>* volatile* v_tail{v_objects + V_SIZE - 1};
 
 		void f_next() noexcept;
 		template<typename T>
-		void f__flush(t_object* volatile* a_epoch, T a_do)
+		void f__flush(t_object<T_type>* volatile* a_epoch, T a_do)
 		{
 			auto end = v_objects + V_SIZE - 1;
 			if (a_epoch > v_objects)
@@ -74,7 +84,7 @@ class t_slot
 	{
 		void f_flush()
 		{
-			f__flush(v_epoch.load(std::memory_order_acquire), [](auto x)
+			this->f__flush(this->v_epoch.load(std::memory_order_acquire), [](auto x)
 			{
 				x->f_increment();
 			});
@@ -86,31 +96,31 @@ class t_slot
 	struct t_decrements : t_queue<256>
 #endif
 	{
-		t_object* volatile* v_last = v_objects;
+		t_object<T_type>* volatile* v_last = this->v_objects;
 
 		void f_flush()
 		{
-			f__flush(v_last, [](auto x)
+			this->f__flush(v_last, [](auto x)
 			{
 				x->f_decrement();
 			});
-			v_last = v_epoch.load(std::memory_order_acquire);
+			v_last = this->v_epoch.load(std::memory_order_acquire);
 		}
 	};
 
 protected:
-	std::atomic<t_object*> v_p;
+	std::atomic<t_object<T_type>*> v_p;
 
 public:
 	t_slot() = default;
-	t_slot(t_object* a_p) : v_p(a_p)
+	t_slot(t_object<T_type>* a_p) : v_p(a_p)
 	{
 		if (a_p) t_increments::f_push(a_p);
 	}
-	t_slot(const t_slot& a_value) : t_slot(static_cast<t_object*>(a_value))
+	t_slot(const t_slot& a_value) : t_slot(static_cast<t_object<T_type>*>(a_value))
 	{
 	}
-	RECYCLONE__ALWAYS_INLINE t_slot& operator=(t_object* a_p)
+	RECYCLONE__ALWAYS_INLINE t_slot& operator=(t_object<T_type>* a_p)
 	{
 		if (a_p) t_increments::f_push(a_p);
 		if (auto p = v_p.exchange(a_p, std::memory_order_relaxed)) t_decrements::f_push(p);
@@ -118,7 +128,7 @@ public:
 	}
 	RECYCLONE__ALWAYS_INLINE t_slot& operator=(const t_slot& a_value)
 	{
-		return *this = static_cast<t_object*>(a_value);
+		return *this = static_cast<t_object<T_type>*>(a_value);
 	}
 	void f_destruct()
 	{
@@ -128,7 +138,7 @@ public:
 	{
 		return v_p.load(std::memory_order_relaxed);
 	}
-	operator t_object*() const
+	operator t_object<T_type>*() const
 	{
 		return v_p.load(std::memory_order_relaxed);
 	}
@@ -137,43 +147,53 @@ public:
 	{
 		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
 	}
-	t_object* operator->() const
+	t_object<T_type>* operator->() const
 	{
 		return v_p.load(std::memory_order_relaxed);
 	}
 };
 
-template<typename T>
-struct t_slot_of : t_slot
+template<typename T_type>
+template<size_t A_SIZE>
+void t_slot<T_type>::t_queue<A_SIZE>::f_next() noexcept
 {
-	using t_slot::t_slot;
+	f_engine<T_type>()->f_tick();
+	if (v_head < v_objects + V_SIZE - 1) {
+		++v_head;
+		while (v_tail == v_head) f_engine<T_type>()->f_wait();
+		auto tail = v_tail;
+		v_next = std::min(tail < v_head ? v_objects + V_SIZE - 1 : tail - 1, v_head + V_SIZE / 8);
+	} else {
+		v_head = v_objects;
+		while (v_tail == v_head) f_engine<T_type>()->f_wait();
+		v_next = std::min(v_tail - 1, v_head + V_SIZE / 8);
+	}
+}
+
+template<typename T, typename T_type = typename T::t_type>
+struct t_slot_of : t_slot<T_type>
+{
+	using t_slot<T_type>::t_slot;
 	RECYCLONE__ALWAYS_INLINE t_slot_of& operator=(const t_slot_of& a_value)
 	{
-		static_cast<t_slot&>(*this) = a_value;
+		static_cast<t_slot<T_type>&>(*this) = a_value;
 		return *this;
 	}
 	template<typename U>
 	RECYCLONE__ALWAYS_INLINE t_slot_of& operator=(U&& a_value)
 	{
-		static_cast<t_slot&>(*this) = std::forward<U>(a_value);
+		static_cast<t_slot<T_type>&>(*this) = std::forward<U>(a_value);
 		return *this;
 	}
 	operator T*() const
 	{
-		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
+		return static_cast<T*>(this->v_p.load(std::memory_order_relaxed));
 	}
 	T* operator->() const
 	{
-		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
+		return static_cast<T*>(this->v_p.load(std::memory_order_relaxed));
 	}
 };
-
-template<size_t A_SIZE>
-RECYCLONE__THREAD t_slot::t_queue<A_SIZE>* t_slot::t_queue<A_SIZE>::v_instance;
-template<size_t A_SIZE>
-RECYCLONE__THREAD t_object* volatile* t_slot::t_queue<A_SIZE>::v_head;
-template<size_t A_SIZE>
-RECYCLONE__THREAD t_object* volatile* t_slot::t_queue<A_SIZE>::v_next;
 
 template<typename T>
 struct t_root : T

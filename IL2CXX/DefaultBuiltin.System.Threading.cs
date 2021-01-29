@@ -130,9 +130,9 @@ namespace IL2CXX
 {'\t'}{transpiler.EscapeForMember(typeof(bool))} v__pool;
 {'\t'}{transpiler.EscapeForMember(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
 
-{'\t'}void f_scan(t_scan a_scan)
+{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
-{'\t'}{'\t'}t_System_2eObject::f_scan(a_scan);
+{'\t'}{'\t'}t_System_2eObject::f__scan(a_scan);
 {'\t'}{'\t'}a_scan(v__5fexecutionContext);
 {'\t'}{'\t'}a_scan(v__5fsynchronizationContext);
 {'\t'}{'\t'}a_scan(v__5fname);

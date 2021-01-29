@@ -1,5 +1,3 @@
-#include <vector>
-#include "pair.cc"
 #include "thread.cc"
 
 size_t v_finalized;
@@ -12,14 +10,14 @@ int main(int argc, char* argv[])
 	::t_engine engine(options);
 	engine.f_start_finalizer([](auto a_p)
 	{
-		if (a_p->f_type() != &t_pair::t_type::v_instance) return;
+		if (a_p->f_type() != &t_type_of<t_pair>::v_instance) return;
 		std::printf("%s -> ", f_string(a_p).c_str());
 		auto p = static_cast<t_pair*>(a_p);
-		if (p->v_head && p->v_head->f_type() == &t_symbol::t_type::v_instance && static_cast<t_symbol*>(p->v_head)->v_name == "resurrected"sv) {
+		if (p->v_head && p->v_head->f_type() == &t_type_of<t_symbol>::v_instance && static_cast<t_symbol*>(p->v_head)->v_name == "resurrected"sv) {
 			++v_finalized;
 			std::printf("finalized\n");
 		} else {
-			p->v_head = f_symbol("resurrected"sv);
+			p->v_head = f_new<t_symbol>("resurrected"sv);
 			v_resurrected = p;
 			p->f_finalizee__(true);
 			std::printf("resurrected\n");
@@ -27,7 +25,7 @@ int main(int argc, char* argv[])
 	});
 	f_padding([]
 	{
-		auto p = f_cons(f_symbol("foo"sv));
+		auto p = f_new<t_pair>(f_new<t_symbol>("foo"sv));
 		p->f_finalizee__(true);
 	});
 	engine.f_collect();

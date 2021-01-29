@@ -1,6 +1,6 @@
 AC_INIT([recyclone], [202101])
 AM_INIT_AUTOMAKE([foreign nostdinc dist-bzip2 no-dist-gzip])
-AC_CONFIG_SRCDIR([src/engine.cc])
+AC_CONFIG_SRCDIR([include/recyclone/engine.h])
 
 if test "${CXXFLAGS+set}" != set; then
 	CXXFLAGS=
@@ -38,7 +38,6 @@ AM_CONDITIONAL([PROFILE], [test x$profile = xtrue])
 AC_CONFIG_HEADERS([configure.h])
 AC_CONFIG_FILES([
 	Makefile
-	src/Makefile
 	test/Makefile
 ])
 AC_OUTPUT

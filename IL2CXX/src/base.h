@@ -1,7 +1,6 @@
 #include "engine.h"
 #include "handles.h"
 #include "waitables.h"
-#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <random>
@@ -14,6 +13,10 @@
 #include <gnu/lib-names.h>
 #endif
 #ifdef _WIN32
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0400
+#endif
+#define NOMINMAX
 #include <windows.h>
 #endif
 
@@ -22,10 +25,22 @@ namespace il2cxx
 
 using namespace std::literals;
 
-template<typename T0, typename T1>
-inline T1 f__copy(T0 a_in, size_t a_n, T1 a_out)
+template<typename T_field, typename T_value>
+RECYCLONE__ALWAYS_INLINE inline void f__store(T_field& a_field, T_value&& a_value)
 {
-	return a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
+	t_thread<t__type>::v_current->f_store(a_field, std::forward<T_value>(a_value));
+}
+
+template<typename T>
+inline T* f__exchange(T*& a_target, T* a_desired)
+{
+	return t_thread<t__type>::v_current->f_exchange(a_target, a_desired);
+}
+
+template<typename T>
+inline bool f__compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
+{
+	return t_thread<t__type>::v_current->f_compare_exchange(a_target, a_expected, a_desired);
 }
 
 template<typename T>

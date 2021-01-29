@@ -54,9 +54,6 @@ namespace IL2CXX.Tests
                 main.WriteLine(@"
 }
 
-#include ""recyclone/src/object.cc""
-#include ""recyclone/src/thread.cc""
-#include ""recyclone/src/engine.cc""
 #include ""types.cc""
 #include ""engine.cc""
 #include ""handles.cc""

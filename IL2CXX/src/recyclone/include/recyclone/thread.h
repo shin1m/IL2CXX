@@ -1,89 +1,65 @@
 #ifndef RECYCLONE__THREAD_H
 #define RECYCLONE__THREAD_H
 
-//#define RECYCLONE__STACK_SCAN_PARTIAL
-
 #include "object.h"
 #include <thread>
+#include <csignal>
 #include <unistd.h>
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-#define UNW_LOCAL_ONLY
-#include <libunwind.h>
-#endif
+#include <sys/resource.h>
 
 namespace recyclone
 {
 
-class t_engine;
-
+template<typename T_type>
 struct t_thread
 {
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-	struct t_frame
-	{
-		t_object** v_base;
-		uint8_t v_thunk[32];
-		uint8_t* f_return_address()
-		{
-			return v_thunk + 22;
-		}
-	};
-#endif
-
-	static RECYCLONE__THREAD t_thread* v_current;
+	static inline RECYCLONE__THREAD t_thread* v_current;
 
 	t_thread* v_next;
 	int v_done = -1;
-	t_slot::t_increments v_increments;
-	t_slot::t_decrements v_decrements;
+	typename t_slot<T_type>::t_increments v_increments;
+	typename t_slot<T_type>::t_decrements v_decrements;
 #if WIN32
 	HANDLE v_handle;
 #else
 	pthread_t v_handle;
 #endif
 	std::unique_ptr<char[]> v_stack_buffer;
-	t_object** v_stack_last_top;
-	t_object** v_stack_last_bottom;
-	t_object** v_stack_copy;
-	t_object** v_stack_bottom;
+	t_object<T_type>** v_stack_last_top;
+	t_object<T_type>** v_stack_last_bottom;
+	t_object<T_type>** v_stack_copy;
+	t_object<T_type>** v_stack_bottom;
 	void* v_stack_limit;
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-	t_frame* v_stack_frames;
-	t_frame* v_stack_preserved;
-	unw_context_t v_unw_context;
-	void* v_stack_dirty;
-	std::atomic_bool v_unwinding = false;
-#else
-	t_object** v_stack_top;
-#endif
-	t_object* volatile* v_reviving = nullptr;
+	t_object<T_type>** v_stack_top;
+	t_object<T_type>* volatile* v_reviving = nullptr;
 	bool v_background = false;
 
 	t_thread();
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-	~t_thread()
-	{
-		munmap(v_stack_frames, sysconf(_SC_PAGESIZE));
-	}
-#endif
 	void f_initialize(void* a_bottom);
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-	void f_thunk(unw_cursor_t& a_cursor);
-	void f_unthunk(unw_cursor_t& a_cursor);
-#endif
 	void f_epoch_get()
 	{
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-		unw_getcontext(&v_unw_context);
-#else
-		t_object* dummy = nullptr;
+		t_object<T_type>* dummy = nullptr;
 		v_stack_top = &dummy;
-#endif
 		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_release);
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_release);
 	}
-	void f_epoch_suspend();
-	void f_epoch_resume();
+	void f_epoch_suspend()
+	{
+#if WIN32
+		SuspendThread(v_handle);
+		f_epoch_get();
+#else
+		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR1);
+#endif
+	}
+	void f_epoch_resume()
+	{
+#if WIN32
+		ResumeThread(v_handle);
+#else
+		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR2);
+#endif
+	}
 	void f_epoch();
 	void f_revive()
 	{
@@ -92,7 +68,7 @@ struct t_thread
 	template<typename T>
 	static RECYCLONE__ALWAYS_INLINE void f_assign(T*& a_field, T* a_value)
 	{
-		reinterpret_cast<t_slot&>(a_field) = a_value;
+		reinterpret_cast<t_slot<T_type>&>(a_field) = a_value;
 	}
 	template<typename T_field, typename T_value>
 	static RECYCLONE__ALWAYS_INLINE void f_assign(T_field& a_field, T_value&& a_value)
@@ -103,15 +79,10 @@ struct t_thread
 	RECYCLONE__ALWAYS_INLINE void f_store(T_field& a_field, T_value&& a_value)
 	{
 		auto p = &a_field;
-		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
+		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom))
 			std::memcpy(p, &a_value, sizeof(T_field));
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-			std::atomic_signal_fence(std::memory_order_release);
-			if (++p > v_stack_dirty) v_stack_dirty = p;
-#endif
-		} else {
+		else
 			f_assign(a_field, std::forward<T_value>(a_value));
-		}
 	}
 	template<typename T>
 	T* f_exchange(T*& a_target, T* a_desired)
@@ -119,10 +90,6 @@ struct t_thread
                 auto p = reinterpret_cast<std::atomic<T*>*>(&a_target);
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-			std::atomic_signal_fence(std::memory_order_release);
-			if (++p > v_stack_dirty) v_stack_dirty = p;
-#endif
 		} else {
 			if (a_desired) v_increments.f_push(a_desired);
 			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
@@ -135,12 +102,7 @@ struct t_thread
 	{
                 auto p = reinterpret_cast<std::atomic<T*>*>(&a_target);
 		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
-			if (p->compare_exchange_strong(a_expected, a_desired)) {
-#ifdef RECYCLONE__STACK_SCAN_PARTIAL
-				if (++p > v_stack_dirty) v_stack_dirty = p;
-#endif
-				return true;
-			}
+			return p->compare_exchange_strong(a_expected, a_desired);
 		} else {
 			if (a_desired) v_increments.f_push(a_desired);
 			if (p->compare_exchange_strong(a_expected, a_desired)) {
@@ -148,27 +110,93 @@ struct t_thread
 				return true;
 			}
 			if (a_desired) v_decrements.f_push(a_desired);
+			return false;
 		}
-		return false;
 	}
 };
 
-template<typename T_field, typename T_value>
-RECYCLONE__ALWAYS_INLINE inline void f__store(T_field& a_field, T_value&& a_value)
+template<typename T_type>
+t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
 {
-	t_thread::v_current->f_store(a_field, std::forward<T_value>(a_value));
+	if (f_engine<T_type>()->v_exiting) throw std::runtime_error("engine is exiting.");
+	rlimit limit;
+	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
+	v_stack_buffer = std::make_unique<char[]>(limit.rlim_cur * 2);
+	auto p = v_stack_buffer.get() + limit.rlim_cur;
+	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
+	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit.rlim_cur);
+	f_engine<T_type>()->v_thread__head = this;
 }
 
-template<typename T>
-inline T* f__exchange(T*& a_target, T* a_desired)
+template<typename T_type>
+void t_thread<T_type>::f_initialize(void* a_bottom)
 {
-	return t_thread::v_current->f_exchange(a_target, a_desired);
+#if WIN32
+	v_handle = GetCurrentThread();
+#else
+	v_handle = pthread_self();
+#endif
+	v_stack_bottom = reinterpret_cast<t_object<T_type>**>(a_bottom);
+	auto page = sysconf(_SC_PAGESIZE);
+	rlimit limit;
+	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
+	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit.rlim_cur);
+	v_current = this;
+	t_slot<T_type>::t_increments::v_instance = &v_increments;
+	t_slot<T_type>::t_increments::v_head = v_increments.v_objects;
+	t_slot<T_type>::t_increments::v_next = v_increments.v_objects + t_slot<T_type>::t_increments::V_SIZE / 8;
+	t_slot<T_type>::t_decrements::v_instance = &v_decrements;
+	t_slot<T_type>::t_decrements::v_head = v_decrements.v_objects;
+	t_slot<T_type>::t_decrements::v_next = v_decrements.v_objects + t_slot<T_type>::t_decrements::V_SIZE / 8;
+	v_done = 0;
 }
 
-template<typename T>
-inline bool f__compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
+template<typename T_type>
+void t_thread<T_type>::f_epoch()
 {
-	return t_thread::v_current->f_compare_exchange(a_target, a_expected, a_desired);
+	t_object<T_type>** top0;
+	t_object<T_type>** bottom0;
+	auto top1 = v_stack_last_bottom;
+	if (v_done > 0) {
+		++v_done;
+		top0 = bottom0 = nullptr;
+	} else {
+		f_epoch_suspend();
+		auto n = v_stack_bottom - v_stack_top;
+		top0 = v_stack_copy - n;
+		std::memcpy(top0, v_stack_top, n * sizeof(t_object<T_type>**));
+		f_epoch_resume();
+		bottom0 = top0 + n;
+		top1 -= n;
+	}
+	auto decrements = v_stack_last_bottom;
+	{
+		auto top2 = v_stack_last_top;
+		v_stack_last_top = top1;
+		std::lock_guard lock(f_engine<T_type>()->v_object__heap.f_mutex());
+		if (top1 < top2) {
+			do {
+				auto p = f_engine<T_type>()->f_object__find(*top0++);
+				if (p) p->f_increment();
+				*top1++ = p;
+			} while (top1 < top2);
+		} else {
+			for (; top2 < top1; ++top2) if (*top2) *decrements++ = *top2;
+		}
+		for (; top0 < bottom0; ++top1) {
+			auto p = *top0++;
+			auto q = *top1;
+			if (p == q) continue;
+			p = f_engine<T_type>()->f_object__find(p);
+			if (p == q) continue;
+			if (p) p->f_increment();
+			if (q) *decrements++ = q;
+			*top1 = p;
+		}
+	}
+	v_increments.f_flush();
+	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
+	v_decrements.f_flush();
 }
 
 }

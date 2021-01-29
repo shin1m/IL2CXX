@@ -14,7 +14,6 @@ AM_CXXFLAGS += -pg
 AM_LDFLAGS += -pg
 endif
 AM_DEFAULT_SOURCE_EXT = .cc
-LDADD = $(top_builddir)/src/librecyclon.a
 check_PROGRAMS = \
 	test_empty \
 	test_collector \
@@ -24,5 +23,6 @@ check_PROGRAMS = \
 	test_finalizer \
 	test_background \
 	test_monitor \
-	test_weak_pointer
+	test_weak_pointer \
+	test_type_object
 TESTS = $(check_PROGRAMS)

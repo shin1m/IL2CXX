@@ -1,4 +1,3 @@
-#include "pair.cc"
 #include "thread.cc"
 
 t_root<t_slot_of<t_symbol>> v_resurrected;
@@ -10,27 +9,27 @@ int main(int argc, char* argv[])
 	::t_engine engine(options);
 	engine.f_start_finalizer([](auto a_p)
 	{
-		if (a_p->f_type() != &t_symbol::t_type::v_instance) return;
+		if (a_p->f_type() != &t_type_of<t_symbol>::v_instance) return;
 		auto p = static_cast<t_symbol*>(a_p);
 		if (static_cast<t_symbol*>(p)->v_name == "resurrected"sv) return;
 		p->v_name = "resurrected"sv;
 		v_resurrected = p;
 		p->f_finalizee__(true);
 	});
-	std::unique_ptr<t_weak_pointer> w;
+	std::unique_ptr<t_weak_pointer<t_type>> w;
 	f_padding([&]
 	{
-		auto x = f_symbol("foo"sv);
-		w = std::make_unique<t_weak_pointer>(x, false);
+		auto x = f_new<t_symbol>("foo"sv);
+		w = std::make_unique<t_weak_pointer<t_type>>(x, false);
 		assert(w->f_target() == x);
 	});
 	engine.f_collect();
 	assert(w->f_target() == nullptr);
 	f_padding([&]
 	{
-		auto x = f_symbol("bar"sv);
+		auto x = f_new<t_symbol>("bar"sv);
 		x->f_finalizee__(true);
-		w = std::make_unique<t_weak_pointer>(x, true);
+		w = std::make_unique<t_weak_pointer<t_type>>(x, true);
 		assert(w->f_target() == x);
 	});
 	engine.f_collect();
@@ -46,9 +45,9 @@ int main(int argc, char* argv[])
 	assert(w->f_target() == nullptr);
 	f_padding([&]
 	{
-		auto x = f_symbol("foo"sv);
-		w = std::make_unique<t_weak_pointer>(x, true);
-		auto y = f_symbol("bar"sv);
+		auto x = f_new<t_symbol>("foo"sv);
+		w = std::make_unique<t_weak_pointer<t_type>>(x, true);
+		auto y = f_new<t_symbol>("bar"sv);
 		w->f_target__(y);
 		assert(w->f_target() == y);
 	});

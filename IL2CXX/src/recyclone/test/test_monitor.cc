@@ -1,5 +1,4 @@
 #include <functional>
-#include "pair.cc"
 #include "thread.cc"
 
 int main(int argc, char* argv[])
@@ -7,13 +6,13 @@ int main(int argc, char* argv[])
 	::t_engine::t_options options;
 	options.v_verbose = options.v_verify = true;
 	::t_engine engine(options);
-	auto monitor = f_symbol("monitor"sv);
+	auto monitor = f_new<t_symbol>("monitor"sv);
 	auto& mutex = monitor->f_extension()->v_mutex;
 	auto& condition = monitor->f_extension()->v_condition;
 	std::function<void()> action = []
 	{
 	};
-	t_thread* worker;
+	::t_thread* worker;
 	{
 		std::unique_lock lock(mutex);
 		worker = engine.f_start_thread([&]

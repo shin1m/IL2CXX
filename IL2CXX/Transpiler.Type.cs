@@ -261,7 +261,7 @@ struct t__static_{identifier}
                         var unmanaged = mm.unmanaged;
                         if (members == null)
                         {
-                            string scan(Type x, string y) => x.IsValueType ? $"{y}.f_scan(a_scan)" : $"a_scan({y})";
+                            string scan(Type x, string y) => x.IsValueType ? $"{y}.f__scan(a_scan)" : $"a_scan({y})";
                             if (type.IsArray)
                             {
                                 var element = GetElementType(type);
@@ -272,9 +272,9 @@ struct t__static_{identifier}
 {'\t'}{'\t'}return reinterpret_cast<{elementIdentifier}*>(this + 1);
 {'\t'}}}
 ";
-                                if (IsComposite(element)) members += $@"{'\t'}void f_scan(t_scan a_scan)
+                                if (IsComposite(element)) members += $@"{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
-{'\t'}{'\t'}{Escape(type.BaseType)}::f_scan(a_scan);
+{'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
 {'\t'}{'\t'}auto p = f_data();
 {'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) {scan(element, "p[i]")};
 {'\t'}}}
@@ -426,14 +426,14 @@ struct {Escape(type)}__unmanaged
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"\t\t\t{Escape(x)}.f_destruct();\n"))}{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f_scan(t_scan a_scan)
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{'\t'}{{
 {scanSlots("\t\t\t")}{'\t'}{'\t'}}}
 "
                                     : $@"{variables("\t")}
-{'\t'}void f_scan(t_scan a_scan)
+{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
-{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f_scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
+{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
 {'\t'}void f_construct({identifier}* a_p) const
 {'\t'}{{
 {(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f_construct(a_p);\n")}{string.Join(string.Empty, fields.Select(x => $"{'\t'}{'\t'}new(&a_p->{Escape(x)}) decltype({Escape(x)})({Escape(x)});\n"))}{'\t'}}}
@@ -454,9 +454,9 @@ struct {Escape(type)}__unmanaged
 {'\t'}{{
 {'\t'}{'\t'}new(&v__value) decltype(v__value)(std::forward<T>(a_value));
 {'\t'}}}
-{'\t'}void f_scan(t_scan a_scan)
+{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
-{'\t'}{'\t'}v__value.f_scan(a_scan);
+{'\t'}{'\t'}v__value.f__scan(a_scan);
 {'\t'}}}
 ";
                         staticDefinitions.Write(unmanaged);
@@ -542,7 +542,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                     writerForDeclarations.WriteLine($"\t}} v_interface__{ii}__thunks;");
                 }
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
-                writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object* a_this, t_scan a_scan);
+                writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
 {'\t'}static t__object* f_do_clone(const t__object* a_this);");
                 if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_clear(void* a_p, size_t a_n);
 {'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
@@ -598,7 +598,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             if (nv != null) writerForDefinitions.WriteLine($"\tv__nullable_value = &t__type_of<{Escape(nv)}>::v__instance;");
             if (definition is TypeDefinition)
             {
-                writerForDefinitions.WriteLine($@"{'\t'}t_type::f_scan = f_do_scan;
+                writerForDefinitions.WriteLine($@"{'\t'}t__type::f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
                 if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear;
 {'\t'}f_copy = f_do_copy;");
@@ -610,9 +610,9 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
             if (definition is TypeDefinition)
             {
-                writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_scan(t_object* a_this, t_scan a_scan)
+                writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan)
 {{
-{'\t'}static_cast<{identifier}*>(a_this)->f_scan(a_scan);
+{'\t'}static_cast<{identifier}*>(a_this)->f__scan(a_scan);
 }}
 t__object* t__type_of<{identifier}>::f_do_clone(const t__object* a_this)
 {{");

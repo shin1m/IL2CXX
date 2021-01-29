@@ -36,7 +36,7 @@ namespace IL2CXX
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f_scan(t_scan a_scan)
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}operator void*() const
@@ -164,7 +164,7 @@ namespace IL2CXX
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f_scan(t_scan a_scan)
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 ", false, null);
@@ -183,7 +183,7 @@ namespace IL2CXX
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}void f_scan(t_scan a_scan)
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 ", false, null);
@@ -292,7 +292,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("InternalSetValue", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\t*static_cast<t_slot*>(a_0) = a_1;\n", 1)
+                transpiler => ("\t*static_cast<t_slot<t__type>*>(a_0) = a_1;\n", 1)
             );
             code.For(
                 type.GetMethod("GetCorElementTypeOfElementType", BindingFlags.Instance | BindingFlags.NonPublic),

@@ -17,7 +17,7 @@ namespace IL2CXX.Console
             if (Directory.Exists(@out)) Directory.Delete(@out, true);
             Directory.CreateDirectory(@out);
             //var transpiler = new Transpiler(DefaultBuiltin.Create(), Console.Error.WriteLine);
-            var transpiler = new Transpiler(DefaultBuiltin.Create(), _ => { });
+            var transpiler = new Transpiler(DefaultBuiltin.Create(), _ => { }, false);
             var names = new SortedSet<string>();
             var type2path = new Dictionary<Type, string>();
             var definition = TextWriter.Null;
@@ -67,14 +67,11 @@ namespace il2cxx
                 foreach (var x in Directory.EnumerateDirectories(source)) copy(Path.Combine(path, Path.GetFileName(x)));
                 foreach (var x in Directory.EnumerateFiles(source)) File.Copy(x, Path.Combine(destination, Path.GetFileName(x)));
             }
-            copy("include");
             copy("src");
             var name = Path.GetFileNameWithoutExtension(args[0]);
             File.WriteAllText(Path.Combine(@out, "configure.ac"), $@"AC_INIT([{name}], [{DateTime.Today:yyyyMMdd}])
 AM_INIT_AUTOMAKE([foreign nostdinc dist-bzip2 no-dist-gzip subdir-objects])
 AC_CONFIG_SRCDIR([main.cc])
-
-PKG_CHECK_MODULES([LIBUNWIND], [libunwind >= 1.3])
 
 if test ""${{CXXFLAGS+set}}"" != set; then
 	CXXFLAGS=
@@ -115,10 +112,10 @@ AC_CONFIG_FILES([
 AC_OUTPUT
 ");
             File.WriteAllText(Path.Combine(@out, "Makefile.am"), $@"bin_PROGRAMS = {name}
-AM_CPPFLAGS = $(LIBUNWIND_CFLAGS) -Iinclude -Isrc
+AM_CPPFLAGS = -Isrc/recyclone/include -Isrc
 AM_CXXFLAGS = -std=c++17
 AM_LDFLAGS =
-LDADD = -lpthread -ldl $(LIBUNWIND_LIBS) -lunwind-x86_64
+LDADD = -lpthread -ldl
 if DEBUG
 AM_CXXFLAGS += -O0 -g
 else
@@ -137,11 +134,10 @@ GENERATEDSOURCES = \
 {'\t'}main.cc
 $(GENERATEDSOURCES:.cc=.$(OBJEXT)): declarations.h.gch
 {name}_SOURCES = \
-{'\t'}src/slot.cc \
-{'\t'}src/object.cc \
-{'\t'}src/type.cc \
-{'\t'}src/thread.cc \
+{'\t'}src/types.cc \
 {'\t'}src/engine.cc \
+{'\t'}src/handles.cc \
+{'\t'}src/waitables.cc \
 {'\t'}$(GENERATEDSOURCES)
 ");
             return 0;

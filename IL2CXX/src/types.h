@@ -1,7 +1,8 @@
 #ifndef IL2CXX__TYPES_H
 #define IL2CXX__TYPES_H
 
-#include <recyclone/thread.h>
+#include <recyclone/engine.h>
+#include <algorithm>
 
 namespace il2cxx
 {
@@ -10,13 +11,15 @@ using namespace recyclone;
 
 struct t__type;
 
-struct t__object : t_object
+template<typename T>
+using t_slot_of = recyclone::t_slot_of<T, t__type>;
+
+struct t__object : t_object<t__type>
 {
-	t__type* f_type() const;
-	void f_scan(t_scan a_scan)
+	void f__scan(t_scan<t__type>)
 	{
 	}
-	void f_construct(t__object* a_p) const
+	void f_construct(t__object*) const
 	{
 	}
 };
@@ -27,7 +30,7 @@ struct t__critical_finalizer_object : t__object
 
 struct t__thread : t__critical_finalizer_object
 {
-	t_thread* v__internal;
+	t_thread<t__type>* v__internal;
 	bool v__background;
 	int32_t v__priority;
 };
@@ -87,8 +90,13 @@ struct t__abstract_type : t__member_info
 	using t__member_info::t__member_info;
 };
 
-struct t__type : t__abstract_type, t_type
+struct t__type : t__abstract_type
 {
+	static void f_bless(t__object* a_p, t__type* a_type)
+	{
+		a_p->v_type = a_type;
+	}
+
 	t__type* v__base;
 	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
 	t__runtime_assembly* v__assembly;
@@ -139,7 +147,25 @@ struct t__type : t__abstract_type, t_type
 	v__szarray(a_szarray)
 	{
 	}
-	using t__object::f_scan;
+	template<void (t_object<t__type>::*A_push)()>
+	void f_push()
+	{
+	}
+	void f_decrement_push()
+	{
+	}
+	void f_cyclic_decrement_push()
+	{
+	}
+	void f_own()
+	{
+	}
+	RECYCLONE__ALWAYS_INLINE void f_finish(t_object<t__type>* a_p)
+	{
+		a_p->f_bless(this);
+	}
+	static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
+	void (*f_scan)(t_object<t__type>*, t_scan<t__type>) = f_do_scan;
 	static t__object* f_do_clone(const t__object* a_this);
 	t__object* (*f_clone)(const t__object*) = f_do_clone;
 	static void f_do_register_finalize(t__object* a_this);
@@ -175,19 +201,14 @@ struct t__type : t__abstract_type, t_type
 	}
 };
 
-inline t__type* t__object::f_type() const
-{
-	return static_cast<t__type*>(t_object::f_type());
-}
-
 inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name) : v__declaring_type(a_declaring_type), v__name(a_name)
 {
-	f_type__(a_type);
+	t__type::f_bless(this, a_type);
 }
 
 inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point)
 {
-	f_type__(a_type);
+	t__type::f_bless(this, a_type);
 }
 
 struct t__type_finalizee : t__type
@@ -198,7 +219,7 @@ struct t__type_finalizee : t__type
 		f_register_finalize = f_do_register_finalize;
 		f_suppress_finalize = f_do_suppress_finalize;
 	}
-	RECYCLONE__ALWAYS_INLINE void f_finish(t_object* a_p)
+	RECYCLONE__ALWAYS_INLINE void f_finish(t_object<t__type>* a_p)
 	{
 		a_p->f_finalizee__(true);
 		t__type::f_finish(a_p);
@@ -248,6 +269,12 @@ template<typename T_interface, size_t A_i, size_t A_j, typename T_type, typename
 T_r f__generic_method(t__object* a_this, T_an... a_n, void** a_site)
 {
 	return a_this->f_type() == &t__type_of<T_type>::v__instance ? A_method(static_cast<T_type*>(a_this), a_n...) : f__generic_invoke<T_interface, A_i, A_j, T_r, T_an...>(a_this, a_n..., a_site);
+}
+
+template<typename T0, typename T1>
+inline T1 f__copy(T0 a_in, size_t a_n, T1 a_out)
+{
+	return a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
 }
 
 }

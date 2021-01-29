@@ -391,7 +391,7 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
             if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeof(string[]) }))
             {
                 arguments0 = $@"
-{'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeof(string[]))}, {EscapeForMember(typeof(string))}>(argc);
+{'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeof(string[]))}, il2cxx::{EscapeForMember(typeof(string))}>(argc);
 {'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f_data()[i] = f__new_string(argv[i]);";
                 arguments1 = "arguments";
             }
@@ -412,7 +412,7 @@ int main(int argc, char* argv[])
 {'\t'}il2cxx::t_engine engine(options);
 {'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
 {'\t'}{{
-{'\t'}{'\t'}reinterpret_cast<void(*)(t_object*)>(reinterpret_cast<void**>(static_cast<t__object*>(a_p)->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
+{'\t'}{'\t'}reinterpret_cast<void(*)(t_object<t__type>*)>(reinterpret_cast<void**>(static_cast<t__object*>(a_p)->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
 {'\t'}}}, [&]
 {'\t'}{{{arguments0}
 {'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}({arguments1});\n\t\treturn 0" : $"return {Escape(method)}({arguments1})")};

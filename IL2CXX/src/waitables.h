@@ -1,8 +1,9 @@
 #ifndef IL2CXX__WAITABLES_H
 #define IL2CXX__WAITABLES_H
 
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
+#include <thread>
 
 namespace il2cxx
 {

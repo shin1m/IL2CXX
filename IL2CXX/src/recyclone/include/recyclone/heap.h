@@ -89,7 +89,7 @@ class t_heap
 	};
 
 	template<size_t A_rank>
-	static RECYCLONE__THREAD T* v_head;
+	static inline RECYCLONE__THREAD T* v_head;
 
 	void(*v_wait)();
 	std::map<T*, size_t> v_blocks;
@@ -219,10 +219,6 @@ public:
 		return j < i->second && (j & (128 << i->first->v_rank) - 1) == 0 ? static_cast<T*>(a_p) : nullptr;
 	}
 };
-
-template<typename T>
-template<size_t A_rank>
-RECYCLONE__THREAD T* t_heap<T>::v_head;
 
 template<typename T>
 template<size_t A_rank, size_t A_size>

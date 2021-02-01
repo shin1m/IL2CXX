@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-      <Content Include="src/recyclone/include/**; src/*.h; src/*.cc">
+      <Content Include="src/**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

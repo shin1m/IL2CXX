@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 
 namespace IL2CXX.Console
@@ -24,6 +25,8 @@ namespace IL2CXX.Console
             try
             {
                 using var declarations = File.CreateText(Path.Combine(@out, "declarations.h"));
+                declarations.WriteLine(@"#ifndef DECLARATIONS_H
+#define DECLARATIONS_H");
                 using var inlines = new StringWriter();
                 using var others = new StringWriter();
                 using var main = File.CreateText(Path.Combine(@out, "main.cc"));
@@ -49,7 +52,10 @@ namespace il2cxx
                 }, Path.Combine(@out, "resources"));
                 declarations.WriteLine("\nnamespace il2cxx\n{");
                 declarations.Write(inlines);
-                declarations.WriteLine("\n}");
+                declarations.WriteLine(@"
+}
+
+#endif");
                 main.WriteLine("\nnamespace il2cxx\n{");
                 main.Write(others);
                 main.WriteLine("\n}");
@@ -69,76 +75,23 @@ namespace il2cxx
             }
             copy("src");
             var name = Path.GetFileNameWithoutExtension(args[0]);
-            File.WriteAllText(Path.Combine(@out, "configure.ac"), $@"AC_INIT([{name}], [{DateTime.Today:yyyyMMdd}])
-AM_INIT_AUTOMAKE([foreign nostdinc dist-bzip2 no-dist-gzip subdir-objects])
-AC_CONFIG_SRCDIR([main.cc])
+            File.WriteAllText(Path.Combine(@out, "CMakeLists.txt"), $@"cmake_minimum_required(VERSION 3.16)
+project({name})
 
-if test ""${{CXXFLAGS+set}}"" != set; then
-	CXXFLAGS=
-fi
-AC_PROG_CXX
+add_subdirectory(src/recyclone EXCLUDE_FROM_ALL)
 
-AC_C_INLINE
-AC_TYPE_PID_T
-AC_TYPE_SIZE_T
-
-AC_ARG_ENABLE(
-	[debug],
-	AS_HELP_STRING([--enable-debug], [turn on debugging]),
-	[case ""${{enableval}}"" in
-	  yes) debug=true ;;
-	  no) debug=false ;;
-	  *) AC_MSG_ERROR([bad value ${{enableval}} for --enable-debug]) ;;
-	 esac],
-	[debug=false]
-)
-AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
-AC_ARG_ENABLE(
-	[profile],
-	AS_HELP_STRING([--enable-profile], [turn on profiling]),
-	[case ""${{enableval}}"" in
-	  yes) profile=true ;;
-	  no) profile=false ;;
-	  *) AC_MSG_ERROR([bad value ${{enableval}} for --enable-profile]) ;;
-	 esac],
-	[profile=false]
-)
-AM_CONDITIONAL([PROFILE], [test x$profile = xtrue])
-
-AC_CONFIG_HEADERS([configure.h])
-AC_CONFIG_FILES([
-	Makefile
-])
-AC_OUTPUT
-");
-            File.WriteAllText(Path.Combine(@out, "Makefile.am"), $@"bin_PROGRAMS = {name}
-AM_CPPFLAGS = -Isrc/recyclone/include -Isrc
-AM_CXXFLAGS = -std=c++17
-AM_LDFLAGS =
-LDADD = -lpthread -ldl
-if DEBUG
-AM_CXXFLAGS += -O0 -g
-else
-AM_CPPFLAGS += -DNDEBUG
-AM_CXXFLAGS += -O3
-endif
-if PROFILE
-AM_CXXFLAGS += -pg
-AM_LDFLAGS += -pg
-endif
-declarations.h.gch: declarations.h
-MOSTLYCLEANFILES = declarations.h.gch
-{'\t'}$(CXXCOMPILE) -c -o $@ $<
-GENERATEDSOURCES = \
-{'\t'}{string.Join(" \\\n\t", names)} \
-{'\t'}main.cc
-$(GENERATEDSOURCES:.cc=.$(OBJEXT)): declarations.h.gch
-{name}_SOURCES = \
-{'\t'}src/types.cc \
-{'\t'}src/engine.cc \
-{'\t'}src/handles.cc \
-{'\t'}src/waitables.cc \
-{'\t'}$(GENERATEDSOURCES)
+add_executable({name}
+{'\t'}src/types.cc
+{'\t'}src/engine.cc
+{'\t'}src/handles.cc
+{'\t'}src/waitables.cc
+{string.Join(string.Empty, names.Select(x => $"\t{x}\n"))
+}{'\t'}main.cc
+{'\t'})
+target_include_directories({name} PRIVATE src)
+target_link_libraries({name} recyclone dl)
+target_precompile_headers({name} PRIVATE declarations.h)
+file(COPY resources DESTINATION .)
 ");
             return 0;
         }

@@ -59,7 +59,7 @@ class t_engine
 	friend t_engine* f_engine<T_type>();
 
 protected:
-	static inline RECYCLONE__THREAD t_engine* v_instance;
+	static inline thread_local t_engine* v_instance;
 
 	t_conductor v_collector__conductor;
 	size_t v_collector__threshold;

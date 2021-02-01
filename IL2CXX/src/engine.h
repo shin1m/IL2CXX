@@ -8,7 +8,7 @@ namespace il2cxx
 
 struct t_engine : recyclone::t_engine<t__type>
 {
-	static RECYCLONE__THREAD t__thread* v_current_thread;
+	static thread_local t__thread* v_current_thread;
 
 	static bool f_priority(pthread_t a_handle, int32_t a_priority);
 

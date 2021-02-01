@@ -325,7 +325,7 @@ struct t_thread_static
 {{");
             writerForDeclarations.Write(threadStaticMembers);
             writerForDeclarations.WriteLine($@"
-{'\t'}static RECYCLONE__THREAD t_thread_static* v_instance;
+{'\t'}static thread_local t_thread_static* v_instance;
 {'\t'}t_thread_static()
 {'\t'}{{
 {'\t'}{'\t'}v_instance = this;
@@ -398,7 +398,7 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
             writerForDefinitions.WriteLine($@"
 t_static* t_static::v_instance;
 
-RECYCLONE__THREAD t_thread_static* t_thread_static::v_instance;
+thread_local t_thread_static* t_thread_static::v_instance;
 
 }}
 

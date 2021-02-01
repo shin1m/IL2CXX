@@ -13,7 +13,7 @@ namespace recyclone
 template<typename T_type>
 struct t_thread
 {
-	static inline RECYCLONE__THREAD t_thread* v_current;
+	static inline thread_local t_thread* v_current;
 
 	t_thread* v_next;
 	int v_done = -1;

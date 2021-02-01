@@ -89,7 +89,7 @@ class t_heap
 	};
 
 	template<size_t A_rank>
-	static inline RECYCLONE__THREAD T* v_head;
+	static inline thread_local T* v_head;
 
 	void(*v_wait)();
 	std::map<T*, size_t> v_blocks;

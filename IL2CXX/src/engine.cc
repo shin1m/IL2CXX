@@ -3,7 +3,7 @@
 namespace il2cxx
 {
 
-RECYCLONE__THREAD t__thread* t_engine::v_current_thread;
+thread_local t__thread* t_engine::v_current_thread;
 
 bool t_engine::f_priority(pthread_t a_handle, int32_t a_priority)
 {

@@ -33,14 +33,14 @@ class t_object
 		e_color__RED
 	};
 
-	static inline RECYCLONE__THREAD struct
+	static inline thread_local struct
 	{
 		t_object* v_next;
 		t_object* v_previous;
 	} v_roots;
-	static inline RECYCLONE__THREAD t_object* v_scan_stack;
-	static inline RECYCLONE__THREAD t_object* v_cycle;
-	static inline RECYCLONE__THREAD t_object* v_cycles;
+	static inline thread_local t_object* v_scan_stack;
+	static inline thread_local t_object* v_cycle;
+	static inline thread_local t_object* v_cycles;
 
 	RECYCLONE__FORCE_INLINE static void f_append(t_object* a_p)
 	{

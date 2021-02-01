@@ -33,9 +33,9 @@ class t_slot
 	{
 		static constexpr size_t V_SIZE = A_SIZE;
 
-		static inline RECYCLONE__THREAD t_queue* v_instance;
-		static inline RECYCLONE__THREAD t_object<T_type>* volatile* v_head;
-		static inline RECYCLONE__THREAD t_object<T_type>* volatile* v_next;
+		static inline thread_local t_queue* v_instance;
+		static inline thread_local t_object<T_type>* volatile* v_head;
+		static inline thread_local t_object<T_type>* volatile* v_next;
 
 		RECYCLONE__ALWAYS_INLINE static void f_push(t_object<T_type>* a_object)
 		{

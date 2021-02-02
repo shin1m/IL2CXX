@@ -3,6 +3,19 @@
 namespace il2cxx
 {
 
+bool t__thread::f_priority(pthread_t a_handle, int32_t a_priority)
+{
+	int policy;
+	sched_param sp;
+	if (pthread_getschedparam(a_handle, &policy, &sp)) return false;
+	int max = sched_get_priority_max(policy);
+	if (max == -1) return false;
+	int min = sched_get_priority_min(policy);
+	if (min == -1) return false;
+	sp.sched_priority = a_priority * (max - min) / 4 + min;
+	return !pthread_setschedparam(a_handle, policy, &sp);
+}
+
 void t__type::f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan)
 {
 }

@@ -2,6 +2,7 @@
 #define RECYCLONE__ENGINE_H
 
 #include "thread.h"
+#include "extension.h"
 #include <deque>
 #include <semaphore.h>
 
@@ -55,7 +56,7 @@ class t_engine
 {
 	friend class t_object<T_type>;
 	friend class t_weak_pointer<T_type>;
-	friend struct t_thread<T_type>;
+	friend class t_thread<T_type>;
 	friend t_engine* f_engine<T_type>();
 
 protected:
@@ -160,7 +161,7 @@ public:
 		v_collector__conductor.f_wake();
 		v_collector__conductor.f_wait(lock);
 	}
-	RECYCLONE__ALWAYS_INLINE constexpr t_object<T_type>* f_object__allocate(size_t a_size)
+	RECYCLONE__ALWAYS_INLINE constexpr t_object<T_type>* f_allocate(size_t a_size)
 	{
 		auto p = v_object__heap.f_allocate(a_size);
 		p->v_next = nullptr;
@@ -181,6 +182,10 @@ public:
 	{
 		return v_exiting;
 	}
+	template<typename T_thread, typename T_main>
+	void f_start(T_thread* a_thread, T_main a_main);
+	template<typename T_thread>
+	void f_join(T_thread* a_thread);
 };
 
 template<typename T_type>
@@ -433,6 +438,65 @@ void t_engine<T_type>::f_finalize()
 	std::unique_lock lock(v_finalizer__conductor.v_mutex);
 	v_finalizer__conductor.f_wake();
 	v_finalizer__conductor.f_wait(lock);
+}
+
+template<typename T_type>
+template<typename T_thread, typename T_main>
+void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
+{
+	{
+		std::lock_guard lock(v_thread__mutex);
+		if (a_thread->v_internal) throw std::runtime_error("already started.");
+		a_thread->v_internal = new t_thread<T_type>();
+	}
+	t_slot<T_type>::t_increments::f_push(a_thread);
+	try {
+		std::thread([this, a_thread, main = std::move(a_main)]()
+		{
+			v_instance = this;
+			auto internal = a_thread->v_internal;
+			{
+				std::lock_guard lock(v_thread__mutex);
+				internal->f_initialize(&internal);
+				a_thread->f_initialize();
+				if (internal->v_background) v_thread__condition.notify_all();
+			}
+			try {
+				main();
+			} catch (...) {
+			}
+			f_object__return();
+			{
+				std::lock_guard lock(v_thread__mutex);
+				internal->v_background = false;
+				a_thread->v_internal = nullptr;
+			}
+			t_slot<T_type>::t_decrements::f_push(a_thread);
+			internal->f_epoch_get();
+			std::lock_guard lock(v_thread__mutex);
+			++internal->v_done;
+			v_thread__condition.notify_all();
+		}).detach();
+	} catch (...) {
+		{
+			std::lock_guard lock(v_thread__mutex);
+			a_thread->v_internal->v_done = 1;
+			a_thread->v_internal = nullptr;
+			v_thread__condition.notify_all();
+		}
+		t_slot<T_type>::t_decrements::f_push(a_thread);
+		throw;
+	}
+}
+
+template<typename T_type>
+template<typename T_thread>
+void t_engine<T_type>::f_join(T_thread* a_thread)
+{
+	if (a_thread->v_internal == t_thread<T_type>::v_current) throw std::runtime_error("current thread can not be joined.");
+	if (a_thread->v_internal == v_thread__main) throw std::runtime_error("engine thread can not be joined.");
+	std::unique_lock lock(v_thread__mutex);
+	while (a_thread->v_internal) v_thread__condition.wait(lock);
 }
 
 template<typename T_type>

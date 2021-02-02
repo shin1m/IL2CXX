@@ -30,9 +30,17 @@ struct t__critical_finalizer_object : t__object
 
 struct t__thread : t__critical_finalizer_object
 {
-	t_thread<t__type>* v__internal;
+	static bool f_priority(pthread_t a_handle, int32_t a_priority);
+
+	t_thread<t__type>* v_internal;
 	bool v__background;
 	int32_t v__priority;
+
+	void f_initialize()
+	{
+		v_internal->v_background = v__background;
+		f_priority(v_internal->f_handle(), v__priority);
+	}
 };
 
 struct t__member_info : t__object

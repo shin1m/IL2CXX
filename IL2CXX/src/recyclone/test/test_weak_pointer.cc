@@ -1,13 +1,13 @@
-#include "thread.cc"
+#include "thread.h"
+#include "pair.h"
 
 t_root<t_slot_of<t_symbol>> v_resurrected;
 
 int main(int argc, char* argv[])
 {
-	::t_engine::t_options options;
+	t_engine<t_type>::t_options options;
 	options.v_verbose = options.v_verify = true;
-	::t_engine engine(options);
-	engine.f_start_finalizer([](auto a_p)
+	t_engine_with_finalizer engine(options, [](auto a_p)
 	{
 		if (a_p->f_type() != &t_type_of<t_symbol>::v_instance) return;
 		auto p = static_cast<t_symbol*>(a_p);

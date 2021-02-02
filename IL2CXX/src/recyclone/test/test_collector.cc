@@ -1,4 +1,4 @@
-#include "pair.cc"
+#include "pair.h"
 
 template<typename T>
 struct t_fix : private T

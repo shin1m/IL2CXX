@@ -25,22 +25,66 @@ namespace il2cxx
 
 using namespace std::literals;
 
-template<typename T_field, typename T_value>
-RECYCLONE__ALWAYS_INLINE inline void f__store(T_field& a_field, T_value&& a_value)
+template<typename T>
+struct t_stacked : T
 {
-	t_thread<t__type>::v_current->f_store(a_field, std::forward<T_value>(a_value));
+	t_stacked() = default;
+	template<typename U>
+	t_stacked(U&& a_value)
+	{
+		std::memcpy(this, &a_value, sizeof(T));
+	}
+	t_stacked(const t_stacked& a_value) : t_stacked(static_cast<const T&>(a_value))
+	{
+	}
+	template<typename U>
+	t_stacked& operator=(U&& a_value)
+	{
+		std::memcpy(this, &a_value, sizeof(T));
+		return *this;
+	}
+	t_stacked& operator=(const t_stacked& a_value)
+	{
+		return *this = static_cast<const T&>(a_value);
+	}
+};
+
+template<typename T>
+inline RECYCLONE__ALWAYS_INLINE void f__assign(T*& a_field, T* a_value)
+{
+	reinterpret_cast<t_slot<t__type>&>(a_field) = a_value;
+}
+
+template<typename T_field, typename T_value>
+inline RECYCLONE__ALWAYS_INLINE void f__assign(T_field& a_field, T_value&& a_value)
+{
+	a_field = std::forward<T_value>(a_value);
+}
+
+template<typename T_field, typename T_value>
+inline RECYCLONE__ALWAYS_INLINE void f__store(T_field& a_field, T_value&& a_value)
+{
+	auto p = &a_field;
+	if (t_thread<t__type>::f_current()->f_on_stack(p))
+		std::memcpy(p, &a_value, sizeof(T_field));
+	else
+		f__assign(a_field, std::forward<T_value>(a_value));
 }
 
 template<typename T>
 inline T* f__exchange(T*& a_target, T* a_desired)
 {
-	return t_thread<t__type>::v_current->f_exchange(a_target, a_desired);
+	return t_thread<t__type>::f_current()->f_on_stack(&a_target)
+		? reinterpret_cast<std::atomic<T*>&>(a_target).exchange(a_desired, std::memory_order_relaxed)
+		: reinterpret_cast<t_slot_of<T>&>(a_target).f_exchange(a_desired);
 }
 
 template<typename T>
 inline bool f__compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
 {
-	return t_thread<t__type>::v_current->f_compare_exchange(a_target, a_expected, a_desired);
+	return t_thread<t__type>::f_current()->f_on_stack(&a_target)
+		? reinterpret_cast<std::atomic<T*>&>(a_target).compare_exchange_strong(a_expected, a_desired)
+		: reinterpret_cast<t_slot_of<T>&>(a_target).f_compare_exchange(a_expected, a_desired);
 }
 
 template<typename T>

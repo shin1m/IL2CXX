@@ -248,7 +248,7 @@ namespace IL2CXX
                     return (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
 {'\t'}auto element = static_cast<t__type*>(a_0);
 {'\t'}auto n = element->v__size * a_1;
-{'\t'}auto p = static_cast<{array}*>(f_engine()->f_object__allocate(a + n));
+{'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + n));
 {'\t'}p->v__length = a_1;
 {'\t'}p->f_bounds()[0] = {{a_1, 0}};
 {'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
@@ -409,7 +409,7 @@ namespace IL2CXX
                     var array = transpiler.Escape(typeof(Array));
                     return ($@"{'\t'}auto type = static_cast<t__type*>(static_cast<void*>(a_0));
 {'\t'}auto n = type->v__element->v__size * a_1;
-{'\t'}auto p = static_cast<{transpiler.EscapeForValue(typeof(Array))}>(f_engine()->f_object__allocate(sizeof({array}) + sizeof({array}::t__bound) + n));
+{'\t'}auto p = static_cast<{transpiler.EscapeForValue(typeof(Array))}>(f_engine()->f_allocate(sizeof({array}) + sizeof({array}::t__bound) + n));
 {'\t'}p->v__length = a_1;
 {'\t'}p->f_bounds()[0] = {{size_t(a_1), 0}};
 {'\t'}if (!a_2) std::memset(p->f_bounds() + 1, 0, n);
@@ -478,7 +478,7 @@ namespace IL2CXX
                 type.GetMethod("InternalAllocLike", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto n = sizeof({transpiler.Escape(typeof(MulticastDelegate))});
-{'\t'}auto p = f_engine()->f_object__allocate(n);
+{'\t'}auto p = f_engine()->f_allocate(n);
 {'\t'}std::memset(p + 1, 0, n - sizeof(t__object));
 {'\t'}type->f_finish(p);
 {'\t'}return static_cast<{transpiler.EscapeForValue(typeof(MulticastDelegate))}>(p);
@@ -534,7 +534,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (type->v__value_type) {{
-{'\t'}{'\t'}auto p = f_engine()->f_object__allocate(type->v__managed_size);
+{'\t'}{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
 {'\t'}{'\t'}std::memset(p + 1, 0, type->v__managed_size - sizeof(t__object));
 {'\t'}{'\t'}type->f_finish(p);
 {'\t'}{'\t'}return p;
@@ -755,7 +755,7 @@ namespace IL2CXX
 {'\t'}auto type = static_cast<t__type*>(p->v__5ftype.v__5fvalue);
 {'\t'}auto value = p->v__5fvalue.v__5fvalue.v__5fvalue;
 {'\t'}if (type->v__value_type) {{
-{'\t'}{'\t'}auto p = f_engine()->f_object__allocate(sizeof(t__object) + type->v__size);
+{'\t'}{'\t'}auto p = f_engine()->f_allocate(sizeof(t__object) + type->v__size);
 {'\t'}{'\t'}type->f_copy(value, 1, p + 1);
 {'\t'}{'\t'}type->f_finish(p);
 {'\t'}{'\t'}return p;

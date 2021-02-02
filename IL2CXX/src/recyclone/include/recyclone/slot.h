@@ -3,7 +3,6 @@
 
 #include "define.h"
 #include <atomic>
-#include <cstring>
 
 namespace recyclone
 {
@@ -11,11 +10,11 @@ namespace recyclone
 template<typename T_type>
 class t_object;
 template<typename T_type>
-struct t_weak_pointer;
+class t_weak_pointer;
 template<typename T_type>
-struct t_thread;
+class t_thread;
 template<typename T_type>
-struct t_engine;
+class t_engine;
 template<typename T_type>
 t_engine<T_type>* f_engine();
 
@@ -24,8 +23,8 @@ class t_slot
 {
 	friend T_type;
 	friend class t_object<T_type>;
-	friend struct t_weak_pointer<T_type>;
-	friend struct t_thread<T_type>;
+	friend class t_weak_pointer<T_type>;
+	friend class t_thread<T_type>;
 	friend class t_engine<T_type>;
 
 	template<size_t A_SIZE>
@@ -151,6 +150,24 @@ public:
 	{
 		return v_p.load(std::memory_order_relaxed);
 	}
+	t_object<T_type>* f_exchange(t_object<T_type>* a_desired)
+	{
+		if (a_desired) t_increments::f_push(a_desired);
+		a_desired = v_p.exchange(a_desired, std::memory_order_relaxed);
+		if (a_desired) t_decrements::f_push(a_desired);
+		return a_desired;
+	}
+	bool f_compare_exchange(t_object<T_type>*& a_expected, t_object<T_type>* a_desired)
+	{
+		if (a_desired) t_increments::f_push(a_desired);
+		if (v_p.compare_exchange_strong(a_expected, a_desired)) {
+			if (a_expected) t_decrements::f_push(a_expected);
+			return true;
+		} else {
+			if (a_desired) t_decrements::f_push(a_desired);
+			return false;
+		}
+	}
 };
 
 template<typename T_type>
@@ -193,6 +210,14 @@ struct t_slot_of : t_slot<T_type>
 	{
 		return static_cast<T*>(this->v_p.load(std::memory_order_relaxed));
 	}
+	T* f_exchange(T* a_desired)
+	{
+		return static_cast<T*>(t_slot<T_type>::f_exchange(a_desired));
+	}
+	bool f_compare_exchange(T*& a_expected, T* a_desired)
+	{
+		return t_slot<T_type>::f_compare_exchange(reinterpret_cast<t_object<T_type>*&>(a_expected), a_desired);
+	}
 };
 
 template<typename T>
@@ -222,30 +247,6 @@ struct t_root : T
 	{
 		static_cast<T&>(*this) = std::forward<U>(a_value);
 		return *this;
-	}
-};
-
-template<typename T>
-struct t_stacked : T
-{
-	t_stacked() = default;
-	template<typename U>
-	t_stacked(U&& a_value)
-	{
-		std::memcpy(this, &a_value, sizeof(T));
-	}
-	t_stacked(const t_stacked& a_value) : t_stacked(static_cast<const T&>(a_value))
-	{
-	}
-	template<typename U>
-	t_stacked& operator=(U&& a_value)
-	{
-		std::memcpy(this, &a_value, sizeof(T));
-		return *this;
-	}
-	t_stacked& operator=(const t_stacked& a_value)
-	{
-		return *this = static_cast<const T&>(a_value);
 	}
 };
 

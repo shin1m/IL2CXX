@@ -4,6 +4,7 @@
 #include "object.h"
 #include <thread>
 #include <csignal>
+#include <cstring>
 #include <unistd.h>
 #include <sys/resource.h>
 
@@ -11,8 +12,11 @@ namespace recyclone
 {
 
 template<typename T_type>
-struct t_thread
+class t_thread
 {
+	friend class t_weak_pointer<T_type>;
+	friend class t_engine<T_type>;
+
 	static inline thread_local t_thread* v_current;
 
 	t_thread* v_next;
@@ -32,9 +36,7 @@ struct t_thread
 	void* v_stack_limit;
 	t_object<T_type>** v_stack_top;
 	t_object<T_type>* volatile* v_reviving = nullptr;
-	bool v_background = false;
 
-	t_thread();
 	void f_initialize(void* a_bottom);
 	void f_epoch_get()
 	{
@@ -65,68 +67,29 @@ struct t_thread
 	{
 		v_reviving = v_increments.v_head;
 	}
-	template<typename T>
-	static RECYCLONE__ALWAYS_INLINE void f_assign(T*& a_field, T* a_value)
+
+public:
+	static t_thread* f_current()
 	{
-		reinterpret_cast<t_slot<T_type>&>(a_field) = a_value;
+		return v_current;
 	}
-	template<typename T_field, typename T_value>
-	static RECYCLONE__ALWAYS_INLINE void f_assign(T_field& a_field, T_value&& a_value)
+
+	bool v_background = false;
+
+	t_thread();
+	int f_done() const
 	{
-		a_field = std::forward<T_value>(a_value);
+		return v_done;
 	}
-	template<typename T_field, typename T_value>
-	RECYCLONE__ALWAYS_INLINE void f_store(T_field& a_field, T_value&& a_value)
+	auto f_handle() const
 	{
-		auto p = &a_field;
-		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom))
-			std::memcpy(p, &a_value, sizeof(T_field));
-		else
-			f_assign(a_field, std::forward<T_value>(a_value));
+		return v_handle;
 	}
-	template<typename T>
-	T* f_exchange(T*& a_target, T* a_desired)
+	bool f_on_stack(void* a_p) const
 	{
-                auto p = reinterpret_cast<std::atomic<T*>*>(&a_target);
-		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
-			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
-		} else {
-			if (a_desired) v_increments.f_push(a_desired);
-			a_desired = p->exchange(a_desired, std::memory_order_relaxed);
-			if (a_desired) v_decrements.f_push(a_desired);
-		}
-		return a_desired;
-	}
-	template<typename T>
-	bool f_compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
-	{
-                auto p = reinterpret_cast<std::atomic<T*>*>(&a_target);
-		if (p >= v_stack_limit && p < static_cast<void*>(v_stack_bottom)) {
-			return p->compare_exchange_strong(a_expected, a_desired);
-		} else {
-			if (a_desired) v_increments.f_push(a_desired);
-			if (p->compare_exchange_strong(a_expected, a_desired)) {
-				if (a_expected) v_decrements.f_push(a_expected);
-				return true;
-			}
-			if (a_desired) v_decrements.f_push(a_desired);
-			return false;
-		}
+		return a_p >= v_stack_limit && a_p < static_cast<void*>(v_stack_bottom);
 	}
 };
-
-template<typename T_type>
-t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
-{
-	if (f_engine<T_type>()->v_exiting) throw std::runtime_error("engine is exiting.");
-	rlimit limit;
-	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
-	v_stack_buffer = std::make_unique<char[]>(limit.rlim_cur * 2);
-	auto p = v_stack_buffer.get() + limit.rlim_cur;
-	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
-	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit.rlim_cur);
-	f_engine<T_type>()->v_thread__head = this;
-}
 
 template<typename T_type>
 void t_thread<T_type>::f_initialize(void* a_bottom)
@@ -197,6 +160,19 @@ void t_thread<T_type>::f_epoch()
 	v_increments.f_flush();
 	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();
+}
+
+template<typename T_type>
+t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
+{
+	if (f_engine<T_type>()->v_exiting) throw std::runtime_error("engine is exiting.");
+	rlimit limit;
+	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
+	v_stack_buffer = std::make_unique<char[]>(limit.rlim_cur * 2);
+	auto p = v_stack_buffer.get() + limit.rlim_cur;
+	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
+	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit.rlim_cur);
+	f_engine<T_type>()->v_thread__head = this;
 }
 
 }

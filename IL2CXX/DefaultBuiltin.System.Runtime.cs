@@ -49,7 +49,7 @@ namespace IL2CXX
                 type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto p = static_cast<t__type*>(a_1);
-{'\t'}auto q = static_cast<{transpiler.EscapeForValue(typeof(Delegate))}>(f_engine()->f_object__allocate(sizeof({transpiler.Escape(typeof(MulticastDelegate))})));
+{'\t'}auto q = static_cast<{transpiler.EscapeForValue(typeof(Delegate))}>(f_engine()->f_allocate(sizeof({transpiler.Escape(typeof(MulticastDelegate))})));
 {'\t'}q->v__5ftarget = q;
 {'\t'}q->v__5fmethodPtr = p->v__invoke_unmanaged;
 {'\t'}q->v__5fmethodPtrAux = a_0;
@@ -84,7 +84,7 @@ namespace IL2CXX
                 type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(Type) }, null),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
-{'\t'}auto p = f_engine()->f_object__allocate(type->v__managed_size);
+{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
 {'\t'}type->f_from_unmanaged(p, a_0);
 {'\t'}type->f_finish(p);
 {'\t'}return p;

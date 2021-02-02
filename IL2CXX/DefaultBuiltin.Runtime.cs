@@ -68,7 +68,7 @@ namespace IL2CXX
 {'\t'}if (!type->v__enum) throw std::runtime_error(""not enum"");
 {'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
 {'\t'}auto n = type->v__enum_count;
-{'\t'}auto p = static_cast<{array}*>(f_engine()->f_object__allocate(a + type->v__size * n));
+{'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + type->v__size * n));
 {'\t'}p->v__length = n;
 {'\t'}p->f_bounds()[0] = {{n, 0}};
 {'\t'}auto copy = [&](auto q)

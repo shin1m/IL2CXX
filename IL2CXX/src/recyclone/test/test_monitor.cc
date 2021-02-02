@@ -1,11 +1,12 @@
+#include "thread.h"
+#include "pair.h"
 #include <functional>
-#include "thread.cc"
 
 int main(int argc, char* argv[])
 {
-	::t_engine::t_options options;
+	t_engine<t_type>::t_options options;
 	options.v_verbose = options.v_verify = true;
-	::t_engine engine(options);
+	t_engine_with_threads engine(options);
 	auto monitor = f_new<t_symbol>("monitor"sv);
 	auto& mutex = monitor->f_extension()->v_mutex;
 	auto& condition = monitor->f_extension()->v_condition;

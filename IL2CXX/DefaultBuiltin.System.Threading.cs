@@ -128,7 +128,6 @@ namespace IL2CXX
 {'\t'}{transpiler.EscapeForMember(helper)} v__5fstartHelper;
 {'\t'}{transpiler.EscapeForMember(typeof(bool))} v__5fmayNeedResetForThreadPool;
 {'\t'}{transpiler.EscapeForMember(typeof(bool))} v__pool;
-{'\t'}{transpiler.EscapeForMember(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))} v__deserialization_tracker;
 
 {'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
@@ -137,7 +136,6 @@ namespace IL2CXX
 {'\t'}{'\t'}a_scan(v__5fsynchronizationContext);
 {'\t'}{'\t'}a_scan(v__5fname);
 {'\t'}{'\t'}a_scan(v__5fstartHelper);
-{'\t'}{'\t'}a_scan(v__deserialization_tracker);
 {'\t'}}}
 ", true, null);
             code.For(
@@ -221,13 +219,6 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetOptimalMaxSpinWaitsPerSpinIterationInternal", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn 7;\n", 1)
-            );
-            code.For(
-                type.GetMethod("GetThreadDeserializationTracker", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = static_cast<{transpiler.Escape(type)}*>(t_engine::v_current_thread);
-{'\t'}if (!p->v__deserialization_tracker) p->v__deserialization_tracker = f__new_zerod<{transpiler.Escape(Type.GetType("System.Runtime.Serialization.DeserializationTracker"))}>();
-{'\t'}return p->v__deserialization_tracker;
-", 0)
             );
             code.For(
                 type.GetMethod("ThreadNameChanged", BindingFlags.Instance | BindingFlags.NonPublic),

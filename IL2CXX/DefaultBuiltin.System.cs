@@ -820,13 +820,6 @@ namespace IL2CXX
                 (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(types[0].MakeByRefType())}>(a_0->v__5fvalue.v__5fvalue);\n", 1)
             );
         })
-        .For(typeof(DateTime), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("GetSystemTimeAsFileTime", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch() + std::chrono::seconds(11644473600l)).count() / 100;\n", 0)
-            );
-        })
         .For(typeof(Math), (type, code) =>
         {
             foreach (var t in new[] { typeof(double), typeof(float) })
@@ -960,16 +953,6 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(MathF.Tan)),
                 transpiler => ("\treturn std::tan(a_0);\n", 1)
-            );
-        })
-        .For(typeof(Random), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("GenerateGlobalSeed", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}uint32_t seed;
-{'\t'}std::seed_seq().generate(&seed, &seed + 1);
-{'\t'}return seed;
-", 0)
             );
         })
         .For(typeof(Buffer), (type, code) =>

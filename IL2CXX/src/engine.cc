@@ -27,4 +27,14 @@ void t_engine::f_priority__(t__thread* a_thread, int32_t a_value)
 	if (!t__thread::f_priority(internal->f_handle(), a_thread->v__priority)) throw std::system_error(errno, std::generic_category());
 }
 
+size_t t_engine::f_load_count() const
+{
+	size_t n = 0;
+	v_object__heap.f_statistics([&](auto, auto, auto a_allocated, auto a_freed)
+	{
+		n += a_allocated - a_freed;
+	});
+	return n;
+}
+
 }

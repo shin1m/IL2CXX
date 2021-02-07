@@ -21,6 +21,7 @@ struct t_engine : recyclone::t_engine<t__type>
 	void f_priority__(t__thread* a_thread, int32_t a_value);
 	template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
 	int f_run(void(*a_finalize)(t_object<t__type>*), T_main a_main);
+	size_t f_load_count() const;
 };
 
 template<typename T>

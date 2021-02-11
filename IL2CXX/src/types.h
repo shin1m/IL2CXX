@@ -100,7 +100,7 @@ struct t__abstract_type : t__member_info
 
 struct t__type : t__abstract_type
 {
-	static void f_bless(t__object* a_p, t__type* a_type)
+	static void f_be(t__object* a_p, t__type* a_type)
 	{
 		a_p->v_type = a_type;
 	}
@@ -170,7 +170,7 @@ struct t__type : t__abstract_type
 	}
 	RECYCLONE__ALWAYS_INLINE void f_finish(t_object<t__type>* a_p)
 	{
-		a_p->f_bless(this);
+		a_p->f_be(this);
 	}
 	static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
 	void (*f_scan)(t_object<t__type>*, t_scan<t__type>) = f_do_scan;
@@ -211,12 +211,12 @@ struct t__type : t__abstract_type
 
 inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name) : v__declaring_type(a_declaring_type), v__name(a_name)
 {
-	t__type::f_bless(this, a_type);
+	t__type::f_be(this, a_type);
 }
 
 inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point)
 {
-	t__type::f_bless(this, a_type);
+	t__type::f_be(this, a_type);
 }
 
 struct t__type_finalizee : t__type

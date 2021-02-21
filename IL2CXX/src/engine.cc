@@ -3,7 +3,7 @@
 namespace il2cxx
 {
 
-thread_local t__thread* t_engine::v_current_thread;
+RECYCLONE__THREAD t__thread* t_engine::v_current_thread;
 
 void t_engine::f_background__(t__thread* a_thread, bool a_value)
 {

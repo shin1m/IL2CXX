@@ -8,7 +8,7 @@ namespace il2cxx
 
 struct t_engine : recyclone::t_engine<t__type>
 {
-	static thread_local t__thread* v_current_thread;
+	static RECYCLONE__THREAD t__thread* v_current_thread;
 
 	using recyclone::t_engine<t__type>::t_engine;
 	RECYCLONE__ALWAYS_INLINE constexpr t__object* f_allocate(size_t a_size)

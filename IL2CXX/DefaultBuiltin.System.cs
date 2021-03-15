@@ -726,7 +726,8 @@ namespace IL2CXX
                 {
                     var method = type.GetMethod(nameof(object.ToString), Type.EmptyTypes);
                     transpiler.Enqueue(method);
-                    return ($@"{'\t'}if (a_1->v__5fstringLength != 1) throw std::runtime_error(""FormatException"");
+                    return ($@"{'\t'}if (!a_1) return {transpiler.Escape(method)}(a_0);
+{'\t'}if (a_1->v__5fstringLength != 1) throw std::runtime_error(""FormatException"");
 {'\t'}switch (a_1->v__5ffirstChar) {{
 {'\t'}case u'G':
 {'\t'}case u'g':

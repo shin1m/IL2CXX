@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
@@ -31,6 +32,17 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("InternalGet", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn static_cast<t__handle*>(a_0.v__5fvalue)->f_target();\n", 1)
+            );
+        })
+        .For(typeof(GCSettings), (type, code) =>
+        {
+            code.For(
+                type.GetProperty(nameof(GCSettings.IsServerGC)).GetMethod,
+                transpiler => ("\treturn false;\n", 1)
+            );
+            code.For(
+                type.GetProperty(nameof(GCSettings.LatencyMode)).GetMethod,
+                transpiler => ("\treturn 1;\n", 1)
             );
         })
         .For(typeof(Marshal), (type, code) =>

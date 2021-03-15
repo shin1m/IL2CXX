@@ -117,6 +117,10 @@ namespace IL2CXX
                 type.GetMethod("WaitHandleCleanupNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            code.For(
+                type.GetMethod("UnregisterWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
         })
         .For(typeof(Thread), (type, code) =>
         {

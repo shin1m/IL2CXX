@@ -13,6 +13,10 @@ namespace IL2CXX
                 type.GetMethod("UseOptionC", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 0)
             );
+            code.For(
+                type.GetMethod("Compile", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
         });
     }
 }

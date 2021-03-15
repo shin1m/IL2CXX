@@ -75,7 +75,8 @@ T* f__new_zerod()
 template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
 int t_engine::f_run(void(*a_finalize)(t_object<t__type>*), T_main a_main)
 {
-	auto thread = v_current_thread = f__new_zerod<T_thread>();
+	// Preventing optimized out.
+	volatile auto thread = v_current_thread = f__new_zerod<T_thread>();
 	thread->v_internal = v_thread__main;
 	{
 		auto finalizer = f__new_zerod<T_thread>();

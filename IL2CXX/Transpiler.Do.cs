@@ -412,10 +412,15 @@ int main(int argc, char* argv[])
 {'\t'}il2cxx::t_engine engine(options);
 {'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
 {'\t'}{{
-{'\t'}{'\t'}reinterpret_cast<void(*)(t_object<t__type>*)>(reinterpret_cast<void**>(static_cast<t__object*>(a_p)->f_type() + 1)[{typeToRuntime[typeof(object)].GetIndex(finalizeOfObject)}])(a_p);
+{'\t'}{'\t'}{GenerateVirtualCall(finalizeOfObject, "a_p", Enumerable.Empty<string>(), x => x)};
 {'\t'}}}, [&]
 {'\t'}{{{arguments0}
-{'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}({arguments1});\n\t\treturn 0" : $"return {Escape(method)}({arguments1})")};
+{'\t'}{'\t'}try {{
+{'\t'}{'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}({arguments1});\n\t\t\treturn 0" : $"return {Escape(method)}({arguments1})")};
+{'\t'}{'\t'}}} catch (t_object<t__type>* p) {{
+{'\t'}{'\t'}{'\t'}{GenerateVirtualCall(typeof(object).GetMethod(nameof(object.ToString)), "p", Enumerable.Empty<string>(), x => $"auto s = {x};")}
+{'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}));
+{'\t'}{'\t'}}}
 {'\t'}}});
 }}");
         }

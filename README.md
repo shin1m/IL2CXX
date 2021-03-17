@@ -33,7 +33,7 @@ Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 	mkdir out-Foo/build
 	cd out-Foo/build
 	cmake -DCMAKE_BUILD_TYPE=Release ..
-	cmake --build . -j 6 # or whatever
+	cmake --build . -j6 # or whatever
 
 	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/6.0.x ./Foo
 
@@ -42,6 +42,38 @@ Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 Below are build durations on my Core i7-8550U laptop:
 * [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples) Platformer2D - 25 minutes
 * [bepuphysics2](https://github.com/bepu/bepuphysics2) Demos.GL - 100 minutes
+
+# Comparing GC Pauses
+
+I compared GC pauses in IL2CXX to those in .NET 6 preview using the same way introduced by [this blog post](https://mattwarren.org/2017/01/13/Analysing-Pause-times-in-the-.NET-GC/).
+
+The full code is in `gc_latency_experiment` directory.
+
+Below is the result:
+
+![all](gc_latency_experiment/all.png)
+
+![IL2CXX and WKS](gc_latency_experiment/IL2CXX-WKS.png)
+
+Regarding latency distribtion, IL2CXX looks better than both the Workstation GC (WKS) and the Server GC (SVR) of .NET 6 preview.
+Regarding total time, SVR is the fastest. (SVR < IL2CXX < WKS)
+
+IL2CXX is advantageous in this particular case because no cycles (cyclic object graphs) are involved in the case.
+Without cycles, all it has to do is concurrent reference counting, and running cycle collection only increases GC pause.
+
+Another thing found here is that the max GC pause in IL2CXX is two times longer than that in the Workstation GC.
+There are several options to consider in order to reduce the max GC pause:
+
+* Size of increment/decrement queues.
+  * `recyclone::t_slot<>::t_increments`
+  * `recyclone::t_slot<>::t_decrements`
+* Frequency of cycle collection.
+  * `recyclone::t_engine<>::v_collector__threshold`
+* Batch size of cycle collection.
+
+Currently, the last item can not be adjusted.
+The cycle collection always processes all the candidate roots at once.
+I think it is possible to change the cycle collection to finish early leaving the rest of the candidate roots to the next epoch.
 
 # License
 

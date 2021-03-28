@@ -24,7 +24,7 @@ namespace IL2CXX.Tests
             };
             foreach (var (name, value) in environment) si.Environment.Add(name, value);
             using var process = Process.Start(si);
-            void forward(StreamReader reader, Action<string> write)
+            static void forward(StreamReader reader, Action<string> write)
             {
                 while (!reader.EndOfStream) write(reader.ReadLine());
             }
@@ -56,14 +56,20 @@ namespace IL2CXX.Tests
 
 #include ""types.cc""
 #include ""engine.cc""
-#include ""handles.cc""
-#include ""waitables.cc""");
+#include ""handles.cc""");
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) main.WriteLine("#include \"waitables.cc\"");
             }
-            Assert.AreEqual(0, Spawn("make", "run", build, new[]
-            {
-                ("CXXFLAGS", "-I../src/recyclone/include -I../src -std=c++17 -g"),
-                ("LDFLAGS", "-lpthread -ldl")
-            }, Console.Error.WriteLine, Console.Error.WriteLine));
+            File.WriteAllText(Path.Combine(build, "CMakeLists.txt"), @"cmake_minimum_required(VERSION 3.16)
+project(run)
+add_subdirectory(../src/recyclone recyclone-build EXCLUDE_FROM_ALL)
+add_executable(run run.cc)
+target_include_directories(run PRIVATE ../src)
+target_compile_options(run PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
+target_link_libraries(run recyclone)
+");
+            var cmake = Environment.GetEnvironmentVariable("CMAKE_PATH") ?? "cmake";
+            Assert.AreEqual(0, Spawn(cmake, ". -DCMAKE_BUILD_TYPE=Debug", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
+            Assert.AreEqual(0, Spawn(cmake, "--build .", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
             return build;
         }
         public static string Build(Func<int> method) => Build(method.Method);
@@ -75,7 +81,7 @@ namespace IL2CXX.Tests
                 ("IL2CXX_VERBOSE", string.Empty),
             };
             if (verify) environment = environment.Append(("IL2CXX_VERIFY_LEAKS", string.Empty));
-            Assert.AreEqual(0, Spawn(Path.Combine(build, "run"), arguments, build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
+            Assert.AreEqual(0, Spawn(Path.Combine(build, "Debug", "run"), arguments, build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
         }
 
         [StructLayout(LayoutKind.Sequential, Size = 4096)]

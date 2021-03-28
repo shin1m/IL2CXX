@@ -25,8 +25,8 @@ namespace IL2CXX
             public readonly Type Type;
             public bool IsManaged;
             public bool HasUnmanaged;
-            public readonly List<MethodInfo> Methods = new List<MethodInfo>();
-            public readonly Dictionary<MethodKey, int> MethodToIndex = new Dictionary<MethodKey, int>();
+            public readonly List<MethodInfo> Methods = new();
+            public readonly Dictionary<MethodKey, int> MethodToIndex = new();
 
             public RuntimeDefinition(Type type) => Type = type;
             protected void Add(MethodInfo method, Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex)
@@ -50,10 +50,8 @@ namespace IL2CXX
         }
         class TypeDefinition : RuntimeDefinition
         {
-            private static readonly MethodKey finalizeKeyOfObject = new MethodKey(finalizeOfObject);
-
             public readonly TypeDefinition Base;
-            public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new Dictionary<Type, MethodInfo[]>();
+            public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new();
             public readonly string DefaultConstructor;
             public readonly string Delegate;
 
@@ -117,7 +115,7 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
                     try
                     {
                         foreach (var x in @return == typeof(void) ? parameters : parameters.Prepend(@return))
-                            if (transpiler.IsComposite(x) && x != typeof(string) && x != typeof(StringBuilder) && !typeof(SafeHandle).IsAssignableFrom(x) && !x.IsArray) Marshal.SizeOf(x);
+                            if (IsComposite(x) && x != typeof(string) && x != typeof(StringBuilder) && !typeof(SafeHandle).IsAssignableFrom(x) && !x.IsArray) Marshal.SizeOf(x);
                         using var writer = new StringWriter();
                         transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);
                         Delegate += $"{'\t'}v__invoke_unmanaged = {generate(Type, writer.ToString())};\n";
@@ -127,16 +125,16 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
             protected override int GetIndex(MethodKey method) => MethodToIndex.TryGetValue(method, out var i) ? i : Base?.GetIndex(method) ?? -1;
         }
 
-        private readonly StringWriter typeDeclarations = new StringWriter();
-        private readonly StringWriter typeDefinitions = new StringWriter();
-        private readonly StringWriter staticDefinitions = new StringWriter();
-        private readonly StringWriter staticMembers = new StringWriter();
-        private readonly StringWriter threadStaticMembers = new StringWriter();
-        private readonly StringWriter fieldDeclarations = new StringWriter();
-        private readonly StringWriter fieldDefinitions = new StringWriter();
-        private readonly List<RuntimeDefinition> runtimeDefinitions = new List<RuntimeDefinition>();
-        private readonly Dictionary<Type, RuntimeDefinition> typeToRuntime = new Dictionary<Type, RuntimeDefinition>();
-        private readonly Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex = new Dictionary<MethodKey, Dictionary<Type[], int>>();
+        private readonly StringWriter typeDeclarations = new();
+        private readonly StringWriter typeDefinitions = new();
+        private readonly StringWriter staticDefinitions = new();
+        private readonly StringWriter staticMembers = new();
+        private readonly StringWriter threadStaticMembers = new();
+        private readonly StringWriter fieldDeclarations = new();
+        private readonly StringWriter fieldDefinitions = new();
+        private readonly List<RuntimeDefinition> runtimeDefinitions = new();
+        private readonly Dictionary<Type, RuntimeDefinition> typeToRuntime = new();
+        private readonly Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex = new();
         private bool processed;
 
         private RuntimeDefinition Define(Type type)
@@ -366,6 +364,9 @@ struct {Escape(type)}__unmanaged
                                     string variable(FieldInfo x) => $"{EscapeForMember(x.FieldType)} {Escape(x)};";
                                     if (layout?.Value == LayoutKind.Explicit)
                                     {
+                                        sb.AppendLine($@"#pragma pack(push, 1)
+{indent}union
+{indent}{{");
                                         int n;
                                         try
                                         {
@@ -375,10 +376,7 @@ struct {Escape(type)}__unmanaged
                                         {
                                             n = layout.Size;
                                         }
-                                        sb.AppendLine($@"#pragma pack(push, 1)
-{indent}union
-{indent}{{
-{indent}{'\t'}char v__size[{n}];");
+                                        if (n > 0) sb.AppendLine($"{indent}\tchar v__size[{n}];");
                                         var i = 0;
                                         foreach (var x in fields)
                                         {

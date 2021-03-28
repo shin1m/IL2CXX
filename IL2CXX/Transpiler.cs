@@ -92,7 +92,7 @@ namespace IL2CXX
                 transpiler.definedIndices.TryGetValue(VariableType, out var defined);
                 if (index > defined.Index) transpiler.definedIndices[VariableType] = (prefix, index);
             }
-            public Stack Push(Type type) => new Stack(this, type);
+            public Stack Push(Type type) => new(this, type);
             public IEnumerator<Stack> GetEnumerator()
             {
                 for (var x = this; x != null; x = x.Pop) yield return x;
@@ -116,7 +116,7 @@ namespace IL2CXX
 
         private static readonly OpCode[] opcodes1 = new OpCode[256];
         private static readonly OpCode[] opcodes2 = new OpCode[256];
-        private static readonly Regex unsafeCharacters = new Regex(@"(\W|_)", RegexOptions.Compiled);
+        private static readonly Regex unsafeCharacters = new(@"(\W|_)", RegexOptions.Compiled);
         private static string Escape(string name) => unsafeCharacters.Replace(name, m => string.Join(string.Empty, m.Value.Select(x => $"_{(int)x:x}")));
         private static readonly IReadOnlyDictionary<Type, string> builtinTypes = new Dictionary<Type, string>
         {
@@ -195,11 +195,11 @@ namespace IL2CXX
         public readonly bool CheckRange;
         private readonly Instruction[] instructions1 = new Instruction[256];
         private readonly Instruction[] instructions2 = new Instruction[256];
-        private readonly HashSet<string> typeIdentifiers = new HashSet<string>();
-        private readonly Dictionary<Type, string> typeToIdentifier = new Dictionary<Type, string>();
-        private readonly HashSet<(Type, string)> methodIdentifiers = new HashSet<(Type, string)>();
-        private readonly Dictionary<MethodKey, string> methodToIdentifier = new Dictionary<MethodKey, string>();
-        private readonly HashSet<MethodBase> ldftnMethods = new HashSet<MethodBase>();
+        private readonly HashSet<string> typeIdentifiers = new();
+        private readonly Dictionary<Type, string> typeToIdentifier = new();
+        private readonly HashSet<(Type, string)> methodIdentifiers = new();
+        private readonly Dictionary<MethodKey, string> methodToIdentifier = new();
+        private readonly HashSet<MethodBase> ldftnMethods = new();
 
         private static Type MakeByRefType(Type type) => type == typeof(TypedReference) ? typedReferenceByRefType : type.MakeByRefType();
         private static Type MakePointerType(Type type) => type == typeof(TypedReference) ? typeof(TypedReferenceTag*) : type.MakePointerType();
@@ -251,17 +251,7 @@ namespace IL2CXX
             var offset = ParseI4(ref index);
             return index + offset;
         }
-        private Type[] GetGenericArguments()
-        {
-            try
-            {
-                return method.GetGenericArguments();
-            }
-            catch (NotSupportedException)
-            {
-                return null;
-            }
-        }
+        private Type[] GetGenericArguments() => method.IsGenericMethod ? method.GetGenericArguments() : null;
         private Type ParseType(ref int index) =>
             method.Module.ResolveType(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
         private FieldInfo ParseField(ref int index) =>
@@ -321,6 +311,11 @@ namespace IL2CXX
                     0x18 => typeof(IntPtr),
                     0x19 => typeof(UIntPtr),
                     0x1C => typeof(object),
+                    0x20 => ((Func<Type>)(() =>
+                    {
+                        other();
+                        return type();
+                    }))(),
                     _ => throw new Exception()
                 };
             }
@@ -342,7 +337,7 @@ namespace IL2CXX
             return method.IsStatic ? parameters[index].ParameterType : index > 0 ? parameters[index - 1].ParameterType : GetThisType(method);
         }
         private static Type GetReturnType(MethodBase method) => method is MethodInfo x ? x.ReturnType : typeof(void);
-        private Stack EstimateCall(MethodBase method, Stack stack)
+        private static Stack EstimateCall(MethodBase method, Stack stack)
         {
             stack = stack.ElementAt(method.GetParameters().Length + (method.IsStatic ? 0 : 1));
             var @return = GetReturnType(method);
@@ -371,7 +366,7 @@ namespace IL2CXX
             log("exit");
         }
         public void Enqueue(MethodBase method) => queuedMethods.Enqueue(method);
-        private bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
+        private static bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
         public string EscapeType(Type type)
         {
             if (typeToIdentifier.TryGetValue(type, out var name)) return name;
@@ -406,7 +401,7 @@ namespace IL2CXX
         public string EscapeForMember(Type type) => EscapeForValue(type, "t_slot_of<{0}>");
         public string EscapeForRoot(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"t_root<{EscapeForValue(type)}>" : EscapeForValue(type, "t_root<t_slot_of<{0}>>");
         public string EscapeForStacked(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"{Escape(type)}::t_stacked" : EscapeForValue(type);
-        public string Escape(FieldInfo field) => $"v_{Escape(field.Name)}";
+        public static string Escape(FieldInfo field) => $"v_{Escape(field.Name)}";
         public string Escape(MethodBase method)
         {
             var key = ToKey(method);
@@ -565,7 +560,11 @@ namespace IL2CXX
                 {
                     var e = GetElementType(x.ParameterType);
                     var @out = Attribute.IsDefined(x, typeof(OutAttribute));
-                    if (@out) writer.WriteLine($"\tf__store(*a_{i}, ({EscapeForValue(e)}){{}});");
+                    if (@out)
+                    {
+                        var t = EscapeForValue(e);
+                        writer.WriteLine($"\tf__store(*a_{i}, {(t.EndsWith("*") ? "nullptr" : $"{t}{{}}")});");
+                    }
                     if (typeof(SafeHandle).IsAssignableFrom(e))
                     {
                         writer.WriteLine($"\tvoid* p{i};");
@@ -623,7 +622,7 @@ namespace IL2CXX
                 }
             if (typeof(SafeHandle).IsAssignableFrom(@return))
             {
-                ConstructorInfo getCI(Type type) => type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(bool) }, null);
+                static ConstructorInfo getCI(Type type) => type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(bool) }, null);
                 var ci = getCI(@return) ?? getCI(typeof(SafeHandle));
                 writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
 {'\t'}{Escape(ci)}(p, result, true);

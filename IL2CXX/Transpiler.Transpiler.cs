@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -740,7 +739,7 @@ namespace IL2CXX
                         if (escapes.TryGetValue(c, out var e))
                             writer.Write(e);
                         else if (c < 0x20 || c >= 0x7f)
-                            writer.Write($"\\x{(ushort)c:X}\"\"");
+                            writer.Write($"\\x{(ushort)c:X}");
                         else
                             writer.Write(c);
                     writer.WriteLine($"\"sv);");
@@ -1433,12 +1432,13 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
+                    var type = EscapeForValue(t);
                     writer.WriteLine(
                         Define(t).IsManaged
                             ? "\tf__store({0}, {1});"
                             : "\t{0} = {1};",
-                        $"*static_cast<{EscapeForValue(t)}*>({stack.Variable})",
-                        $"({EscapeForValue(t)}){{}}"
+                        $"*static_cast<{type}*>({stack.Variable})",
+                        type.EndsWith("*") ? "nullptr" : $"{type}{{}}"
                     );
                     return index;
                 };

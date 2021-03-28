@@ -30,7 +30,12 @@ struct t__critical_finalizer_object : t__object
 
 struct t__thread : t__critical_finalizer_object
 {
+#ifdef __unix__
 	static bool f_priority(pthread_t a_handle, int32_t a_priority);
+#endif
+#ifdef _WIN32
+	static bool f_priority(HANDLE a_handle, int32_t a_priority);
+#endif
 
 	t_thread<t__type>* v_internal;
 	bool v__background;

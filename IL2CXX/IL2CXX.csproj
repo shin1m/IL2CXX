@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-      <Content Include="src/**">
+    <Content Include="src/*;src/recyclone/CMakeLists.txt;src/recyclone/include/**;src/recyclone/test/**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

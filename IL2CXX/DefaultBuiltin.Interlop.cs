@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
 namespace IL2CXX
@@ -9,6 +10,18 @@ namespace IL2CXX
         private static Builtin SetupInterop(this Builtin @this) => @this
         .For(Type.GetType("Interop+Kernel32"), (type, code) =>
         {
+            code.For(
+                type.GetMethod("GetEnvironmentVariable", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(string), typeof(char).MakeByRefType(), typeof(uint) }, null),
+                transpiler => ($@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
+{'\t'}if (!p) return 0;
+{'\t'}auto q = f__u16string(p);
+{'\t'}auto n = q.size();
+{'\t'}if (a_2 < n) return n + 1;
+{'\t'}std::copy_n(q.c_str(), n + 1, a_1);
+{'\t'}return n;
+", 0)
+            );
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
             code.For(
                 type.GetMethod("CloseHandle", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}delete static_cast<t__waitable*>(a_0.v__5fvalue);
@@ -34,17 +47,6 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(typeof(SafeWaitHandle))}>();
 {'\t'}{transpiler.Escape(typeof(SafeWaitHandle).GetConstructor(new[] { typeof(IntPtr), typeof(bool) }))}(p, new t__semaphore(a_2, a_1), true);
 {'\t'}return p;
-", 0)
-            );
-            code.For(
-                type.GetMethod("GetEnvironmentVariable", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(string), typeof(char).MakeByRefType(), typeof(uint) }, null),
-                transpiler => ($@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
-{'\t'}if (!p) return 0;
-{'\t'}auto q = f__u16string(p);
-{'\t'}auto n = q.size();
-{'\t'}if (a_2 < n) return n + 1;
-{'\t'}std::copy_n(q.c_str(), n + 1, a_1);
-{'\t'}return n;
 ", 0)
             );
             code.For(

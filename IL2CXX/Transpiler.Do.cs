@@ -14,17 +14,17 @@ namespace IL2CXX
 
     partial class Transpiler
     {
-        private readonly StringWriter functionDeclarations = new StringWriter();
-        private readonly Queue<Type> queuedTypes = new Queue<Type>();
-        private readonly HashSet<MethodKey> visitedMethods = new HashSet<MethodKey>();
-        private readonly Queue<MethodBase> queuedMethods = new Queue<MethodBase>();
+        private readonly StringWriter functionDeclarations = new();
+        private readonly Queue<Type> queuedTypes = new();
+        private readonly HashSet<MethodKey> visitedMethods = new();
+        private readonly Queue<MethodBase> queuedMethods = new();
         private MethodBase method;
         private byte[] bytes;
         private SortedDictionary<string, (string Prefix, int Index)> definedIndices;
         private bool hasReturn;
         private Dictionary<int, Stack> indexToStack;
         private TextWriter writer;
-        private readonly Stack<ExceptionHandlingClause> tries = new Stack<ExceptionHandlingClause>();
+        private readonly Stack<ExceptionHandlingClause> tries = new();
         private Type constrained;
         private bool @volatile;
 
@@ -46,8 +46,16 @@ namespace IL2CXX
             if (!method.IsStatic && !(method.IsConstructor && builtin.body != null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
             string argument(Type t, int i) => $"\n\t{EscapeForStacked(t)} a_{i}";
             var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
-            if (method is MethodInfo) description.Write(attributes(string.Empty, ((MethodInfo)method).ReturnParameter));
-            var returns = method is MethodInfo m ? EscapeForStacked(m.ReturnType) : method.IsStatic || builtin.body == null ? "void" : EscapeForStacked(method.DeclaringType);
+            string returns;
+            if (method is MethodInfo m)
+            {
+                description.Write(attributes(string.Empty, m.ReturnParameter));
+                returns = EscapeForStacked(m.ReturnType);
+            }
+            else
+            {
+                returns = method.IsStatic || builtin.body == null ? "void" : EscapeForStacked(method.DeclaringType);
+            }
             var identifier = Escape(method);
             var prototype = $@"{returns}
 {identifier}({string.Join(",", arguments)}
@@ -258,8 +266,9 @@ inline {returns}
             }
             while (queuedMethods.Count > 0);
             processed = true;
-            writerForDeclarations.WriteLine(@"#include ""base.h""
-
+            writerForDeclarations.WriteLine("#include \"base.h\"");
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) writerForDeclarations.WriteLine("#include \"waitables.h\"");
+            writerForDeclarations.WriteLine(@"
 namespace il2cxx
 {
 ");

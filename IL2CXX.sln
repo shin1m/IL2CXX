@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26124.0
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31025.218
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IL2CXX", "IL2CXX\IL2CXX.csproj", "{EFF240D4-1CF7-43DF-B29C-967C9558EDBF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IL2CXX", "IL2CXX\IL2CXX.csproj", "{EFF240D4-1CF7-43DF-B29C-967C9558EDBF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IL2CXX.Tests", "IL2CXX.Tests\IL2CXX.Tests.csproj", "{DE749E68-726E-43AF-B6A1-CF278CBA3680}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IL2CXX.Tests", "IL2CXX.Tests\IL2CXX.Tests.csproj", "{DE749E68-726E-43AF-B6A1-CF278CBA3680}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IL2CXX.Console", "IL2CXX.Console\IL2CXX.Console.csproj", "{5A61151C-67CB-40BA-949C-29E8250E4D9A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IL2CXX.Console", "IL2CXX.Console\IL2CXX.Console.csproj", "{5A61151C-67CB-40BA-949C-29E8250E4D9A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,9 +17,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{EFF240D4-1CF7-43DF-B29C-967C9558EDBF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -58,5 +55,11 @@ Global
 		{5A61151C-67CB-40BA-949C-29E8250E4D9A}.Release|x64.Build.0 = Release|Any CPU
 		{5A61151C-67CB-40BA-949C-29E8250E4D9A}.Release|x86.ActiveCfg = Release|Any CPU
 		{5A61151C-67CB-40BA-949C-29E8250E4D9A}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {32A2775F-D1BC-47A7-B312-C7324AF6BA6D}
 	EndGlobalSection
 EndGlobal

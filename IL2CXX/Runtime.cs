@@ -22,7 +22,7 @@ namespace IL2CXX
                 return null;
             }
         }
-        public override AssemblyName GetName(bool copiedName) => new AssemblyName { Name = FullName };
+        public override AssemblyName GetName(bool copiedName) => new() { Name = FullName };
     }
     public abstract class RuntimeConstructorInfo : ConstructorInfo
     {

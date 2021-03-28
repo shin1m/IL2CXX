@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace IL2CXX
@@ -213,7 +214,13 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("GetCurrentProcessorNumber", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn sched_getcpu();\n", 1)
+                transpiler => ($@"#ifdef __unix__
+{'\t'}return sched_getcpu();
+#endif
+#ifdef _WIN32
+{'\t'}return GetCurrentProcessorNumber();
+#endif
+", 1)
             );
             code.For(
                 type.GetMethod("GetCurrentThreadNative", BindingFlags.Static | BindingFlags.NonPublic),
@@ -257,39 +264,59 @@ namespace IL2CXX
                 transpiler => ("\treturn false;\n", 1)
             );
             code.For(
+                type.GetMethod("QueueWaitCompletionNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
                 type.GetMethod("ReportThreadStatusNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
         .For(typeof(WaitHandle), (type, code) =>
         {
-            code.For(
-                type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}static_cast<t__waitable*>(a_0.v__5fvalue)->f_signal();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // TODO
+                code.For(
+                    type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                );
+                code.For(
+                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                );
+            }
+            else
+            {
+                code.For(
+                    type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ($@"{'\t'}static_cast<t__waitable*>(a_0.v__5fvalue)->f_signal();
 {'\t'}return static_cast<t__waitable*>(a_1.v__5fvalue)->f_wait(a_2 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_2)) ? 0 : 0x102;
 ", 0)
-            );
-            code.For(
-                type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn static_cast<t__waitable*>(a_0.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
-            );
-            code.For(
-                type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
-                transpiler => ($@"{'\t'}if (a_2) {{
+                );
+                code.For(
+                    type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\treturn static_cast<t__waitable*>(a_0.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
+                );
+                code.For(
+                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
+                    transpiler => ($@"{'\t'}if (a_2) {{
 {'\t'}{'\t'}return t__waitable::f_wait_all(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3)) ? 0 : 0x102;
 {'\t'}}} else {{
 {'\t'}{'\t'}auto i = t__waitable::f_wait_any(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3));
 {'\t'}{'\t'}return i < a_1 ? i : 0x102;
 {'\t'}}}
 ", 0)
-            );
+                );
+            }
         })
         .For(Type.GetType("System.Threading.LowLevelLifoSemaphore"), (type, code) =>
         {
-            code.For(
-                type.GetMethod("WaitNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn static_cast<t__waitable*>(a_0->v_handle.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
-            );
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                code.For(
+                    type.GetMethod("WaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\treturn static_cast<t__waitable*>(a_0->v_handle.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
+                );
         });
     }
 }

@@ -3,6 +3,7 @@
 namespace il2cxx
 {
 
+#ifdef __unix__
 bool t__thread::f_priority(pthread_t a_handle, int32_t a_priority)
 {
 	int policy;
@@ -15,6 +16,13 @@ bool t__thread::f_priority(pthread_t a_handle, int32_t a_priority)
 	sp.sched_priority = a_priority * (max - min) / 4 + min;
 	return !pthread_setschedparam(a_handle, policy, &sp);
 }
+#endif
+#ifdef _WIN32
+bool t__thread::f_priority(HANDLE a_handle, int32_t a_priority)
+{
+	return SetThreadPriority(a_handle, a_priority + THREAD_PRIORITY_LOWEST);
+}
+#endif
 
 void t__type::f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan)
 {

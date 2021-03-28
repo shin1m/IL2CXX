@@ -5,7 +5,7 @@ namespace IL2CXX
 {
     public struct MethodKey : IEquatable<MethodKey>
     {
-        public static MethodKey ToKey(MethodBase method) => new MethodKey(method);
+        public static MethodKey ToKey(MethodBase method) => new(method);
 
         private readonly RuntimeMethodHandle method;
         private readonly RuntimeTypeHandle type;

@@ -14,18 +14,18 @@ namespace IL2CXX
             public string Base;
             public Func<Transpiler, (string, bool, string)> Members;
             public Func<Transpiler, string> Initialize;
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, int inline)>> MethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, (string, int)>>();
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string, int)>>();
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string, int)>>();
+            public Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, int inline)>> MethodToBody = new();
+            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new();
+            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new();
 
             public void For(MethodBase method, Func<Transpiler, (string body, int inline)> body) => MethodToBody.Add(method.MethodHandle, body);
             public void ForGeneric(MethodBase method, Func<Transpiler, Type[], (string body, int inline)> body) => GenericMethodToBody.Add(method.MethodHandle, body);
             public void ForTree(MethodInfo method, Func<Transpiler, Type, (string body, int inline)> body) => MethodTreeToBody.Add(method.MethodHandle, body);
         }
 
-        public Dictionary<Type, Code> TypeToCode = new Dictionary<Type, Code>();
-        public Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>>> TypeNameToMethodNameToBody = new Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string, int)>>>();
-        public Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>> MethodNameToBody = new Dictionary<string, Func<Transpiler, MethodBase, (string, int)>>();
+        public Dictionary<Type, Code> TypeToCode = new();
+        public Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>>> TypeNameToMethodNameToBody = new();
+        public Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>> MethodNameToBody = new();
 
         public Builtin For(Type type, Action<Type, Code> action)
         {

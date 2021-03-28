@@ -8,7 +8,7 @@ namespace IL2CXX
     {
         public class Enumerator : IEnumerator<T>
         {
-            private T[] array;
+            private readonly T[] array;
             private int index = -1;
 
             public Enumerator(T[] array) => this.array = array;

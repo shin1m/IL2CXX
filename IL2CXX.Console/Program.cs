@@ -6,6 +6,7 @@ using System.Reflection;
 namespace IL2CXX.Console
 {
     using System;
+    using System.Runtime.InteropServices;
 
     class Program
     {
@@ -84,8 +85,8 @@ add_executable({name}
 {'\t'}src/types.cc
 {'\t'}src/engine.cc
 {'\t'}src/handles.cc
-{'\t'}src/waitables.cc
-{string.Join(string.Empty, names.Select(x => $"\t{x}\n"))
+{(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? string.Empty : "\tsrc/waitables.cc\n")
+}{string.Join(string.Empty, names.Select(x => $"\t{x}\n"))
 }{'\t'}main.cc
 {'\t'})
 target_include_directories({name} PRIVATE src)

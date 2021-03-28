@@ -10,6 +10,7 @@ namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
+        private static Builtin ForIf(this Builtin @this, Type type, Action<Type, Builtin.Code> action) => type == null ? @this : @this.For(type, action);
         private static Builtin SetupSystemRuntime(this Builtin @this) => @this
         .For(typeof(ExceptionDispatchInfo), (type, code) =>
         {
@@ -229,7 +230,7 @@ namespace IL2CXX
                 (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
             );
         })
-        .For(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch"), (type, code) =>
+        .ForIf(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch"), (type, code) =>
         {
             // TODO
             code.For(

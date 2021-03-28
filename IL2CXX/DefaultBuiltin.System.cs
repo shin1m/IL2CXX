@@ -561,7 +561,7 @@ namespace IL2CXX
         })
         .For(typeof(string), (type, code) =>
         {
-            code.Initialize = transpiler => $"\t\t{transpiler.Escape(typeof(string).GetField(nameof(string.Empty)))} = f__new_string(u\"\"sv);";
+            code.Initialize = transpiler => $"\t\t{Transpiler.Escape(typeof(string).GetField(nameof(string.Empty)))} = f__new_string(u\"\"sv);";
             code.For(
                 type.GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn f__new_string(a_0);\n", 2)
@@ -770,7 +770,13 @@ namespace IL2CXX
         {
             code.For(
                 type.GetProperty(nameof(Environment.CurrentManagedThreadId)).GetMethod,
-                transpiler => ($"\treturn gettid();\n", 1)
+                transpiler => ($@"#ifdef __unix__
+{'\t'}return gettid();
+#endif
+#ifdef _WIN32
+{'\t'}return GetCurrentThreadId();
+#endif
+", 1)
             );
             code.For(
                 type.GetMethod("GetProcessorCount", BindingFlags.Static | BindingFlags.NonPublic),
@@ -780,12 +786,17 @@ namespace IL2CXX
                 type.GetProperty(nameof(Environment.HasShutdownStarted)).GetMethod,
                 transpiler => ("\treturn f_engine()->f_exiting();\n", 1)
             );
-            (string body, int inline) tick(Transpiler transpiler) => ($@"{'\t'}timespec ts;
+            static (string body, int inline) tick(Transpiler transpiler, string suffix) => ($@"#ifdef __unix__
+{'\t'}timespec ts;
 {'\t'}if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) throw std::runtime_error(""clock_gettime"");
 {'\t'}return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+#endif
+#ifdef _WIN32
+{'\t'}return GetTickCount{suffix}();
+#endif
 ", 0);
-            code.For(type.GetProperty(nameof(Environment.TickCount)).GetMethod, tick);
-            code.For(type.GetProperty(nameof(Environment.TickCount64)).GetMethod, tick);
+            code.For(type.GetProperty(nameof(Environment.TickCount)).GetMethod, transpiler => tick(transpiler, string.Empty));
+            code.For(type.GetProperty(nameof(Environment.TickCount64)).GetMethod, transpiler => tick(transpiler, "64"));
             code.For(
                 type.GetMethod(nameof(Environment.FailFast), new[] { typeof(string) }),
                 transpiler => ($@"{'\t'}std::cerr << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}) << std::endl;

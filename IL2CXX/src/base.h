@@ -1,6 +1,5 @@
 #include "engine.h"
 #include "handles.h"
-#include "waitables.h"
 #include <iostream>
 #include <limits>
 #include <random>
@@ -11,13 +10,6 @@
 #ifdef __unix__
 #include <dlfcn.h>
 #include <gnu/lib-names.h>
-#endif
-#ifdef _WIN32
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0400
-#endif
-#define NOMINMAX
-#include <windows.h>
 #endif
 
 namespace il2cxx
@@ -148,10 +140,65 @@ inline void* f_load_symbol(const std::string& a_path, const char* a_name)
 	return dlsym(handle, a_name);
 #endif
 #ifdef _WIN32
-	auto handle = LoadLibraryA((a_path + ".dll").c_str());
-	if (handle == NULL) throw std::runtime_error("unable to dlopen: " + a_path);
+	auto handle = LoadLibraryA(a_path.c_str());
+	if (handle == NULL) {
+		handle = LoadLibraryA((a_path + ".dll").c_str());
+		if (handle == NULL) throw std::runtime_error("unable to dlopen: " + a_path);
+	}
 	return GetProcAddress(handle, a_name);
 #endif
 }
+
+#ifdef _MSC_VER
+template<typename S, typename T, typename U>
+inline std::enable_if_t<std::is_unsigned_v<U>, bool> __builtin_add_overflow(S a_x, T a_y, U* a_p)
+{
+	U x = a_x;
+	*a_p = x + a_y;
+	return *a_p < x;
+}
+template<typename S, typename T, typename U>
+inline std::enable_if_t<std::is_unsigned_v<U>, bool> __builtin_sub_overflow(S a_x, T a_y, U* a_p)
+{
+	U x = a_x;
+	U y = a_y;
+	*a_p = x - y;
+	return x < y;
+}
+template<typename S, typename T, typename U>
+inline std::enable_if_t<std::is_unsigned_v<U>, bool> __builtin_mul_overflow(S a_x, T a_y, U* a_p)
+{
+	U x = a_x;
+	U y = a_y;
+	*a_p = x * y;
+	return y > 0 && x > std::numeric_limits<U>::max() / y;
+}
+template<typename S, typename T, typename U>
+inline std::enable_if_t<std::is_signed_v<U>, bool> __builtin_add_overflow(S a_x, T a_y, U* a_p)
+{
+	U x = a_x;
+	U y = a_y;
+	*a_p = static_cast<uintmax_t>(x) + static_cast<uintmax_t>(y);
+	return ~(x ^ y) & (x ^ *a_p) & std::numeric_limits<U>::min();
+}
+template<typename S, typename T, typename U>
+inline std::enable_if_t<std::is_signed_v<U>, bool> __builtin_sub_overflow(S a_x, T a_y, U* a_p)
+{
+	U x = a_x;
+	U y = a_y;
+	*a_p = static_cast<uintmax_t>(x) - static_cast<uintmax_t>(y);
+	return (x ^ y) & (x ^ *a_p) & std::numeric_limits<U>::min();
+}
+template<typename S, typename T, typename U>
+inline std::enable_if_t<std::is_signed_v<U>, bool> __builtin_mul_overflow(S a_x, T a_y, U* a_p)
+{
+	U x = a_x;
+	U y = a_y;
+	*a_p = static_cast<uintmax_t>(x) * static_cast<uintmax_t>(y);
+	return x > 0 ? y > std::numeric_limits<U>::max() / x || y < std::numeric_limits<U>::min() / x :
+		x < -1 ? y > std::numeric_limits<U>::min() / x || y < std::numeric_limits<U>::max() / x :
+		x == -1 && y == std::numeric_limits<U>::min();
+}
+#endif
 
 }

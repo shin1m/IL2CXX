@@ -65,7 +65,7 @@ add_subdirectory(../src/recyclone recyclone-build EXCLUDE_FROM_ALL)
 add_executable(run run.cc)
 target_include_directories(run PRIVATE ../src)
 target_compile_options(run PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
-target_link_libraries(run recyclone)
+target_link_libraries(run recyclone $<$<NOT:$<PLATFORM_ID:Windows>>:dl>)
 ");
             var cmake = Environment.GetEnvironmentVariable("CMAKE_PATH") ?? "cmake";
             Assert.AreEqual(0, Spawn(cmake, ". -DCMAKE_BUILD_TYPE=Debug", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
@@ -81,7 +81,9 @@ target_link_libraries(run recyclone)
                 ("IL2CXX_VERBOSE", string.Empty),
             };
             if (verify) environment = environment.Append(("IL2CXX_VERIFY_LEAKS", string.Empty));
-            Assert.AreEqual(0, Spawn(Path.Combine(build, "Debug", "run"), arguments, build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
+            var path = Path.Combine(build, "run");
+            if (!File.Exists(path)) path = Path.Combine(build, "Debug", "run");
+            Assert.AreEqual(0, Spawn(path, arguments, build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
         }
 
         [StructLayout(LayoutKind.Sequential, Size = 4096)]

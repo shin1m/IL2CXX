@@ -563,7 +563,7 @@ namespace IL2CXX
                     if (@out)
                     {
                         var t = EscapeForValue(e);
-                        writer.WriteLine($"\tf__store(*a_{i}, {(t.EndsWith("*") ? "nullptr" : $"{t}{{}}")});");
+                        writer.WriteLine($"\tf__store(*a_{i}, {(t.EndsWith("*") ? $"static_cast<{t}>(nullptr)" : $"{t}{{}}")});");
                     }
                     if (typeof(SafeHandle).IsAssignableFrom(e))
                     {

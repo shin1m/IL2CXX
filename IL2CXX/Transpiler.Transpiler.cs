@@ -1438,7 +1438,7 @@ namespace IL2CXX
                             ? "\tf__store({0}, {1});"
                             : "\t{0} = {1};",
                         $"*static_cast<{type}*>({stack.Variable})",
-                        type.EndsWith("*") ? "nullptr" : $"{type}{{}}"
+                        type.EndsWith("*") ? $"static_cast<{type}>(nullptr)" : $"{type}{{}}"
                     );
                     return index;
                 };

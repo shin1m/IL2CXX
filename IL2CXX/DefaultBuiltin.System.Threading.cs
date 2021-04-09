@@ -263,10 +263,11 @@ namespace IL2CXX
                 type.GetMethod("PerformRuntimeSpecificGateActivities", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 1)
             );
-            code.For(
-                type.GetMethod("QueueWaitCompletionNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
-            );
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                code.For(
+                    type.GetMethod("QueueWaitCompletionNative", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                );
             code.For(
                 type.GetMethod("ReportThreadStatusNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)

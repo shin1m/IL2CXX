@@ -77,11 +77,11 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Marshal.GetLastWin32Error)),
+                type.GetMethod(nameof(Marshal.GetLastPInvokeError)),
                 transpiler => ("\treturn errno;\n", 1)
             );
             code.For(
-                type.GetMethod("SetLastWin32Error", BindingFlags.Static | BindingFlags.NonPublic),
+                type.GetMethod(nameof(Marshal.SetLastPInvokeError)),
                 transpiler => ("\terrno = a_0;\n", 1)
             );
             // TODO

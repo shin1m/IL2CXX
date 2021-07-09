@@ -9,7 +9,7 @@ namespace IL2CXX
         .For(typeof(Regex), (type, code) =>
         {
             code.For(
-                type.GetMethod("UseOptionC", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("UseOptionC", declaredAndInstance),
                 transpiler => ("\treturn false;\n", 0)
             );
             code.For(

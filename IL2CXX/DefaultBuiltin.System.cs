@@ -58,7 +58,7 @@ namespace IL2CXX
         .For(typeof(object), (type, code) =>
         {
             code.For(
-                type.GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("MemberwiseClone", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->f_clone(a_0);\n", 1)
             );
             code.For(
@@ -150,7 +150,7 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             code.For(
-                type.GetMethod("IsRuntimeImplemented", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
                 transpiler => ("\treturn true;\n", 1)
             );
         })
@@ -210,7 +210,14 @@ namespace IL2CXX
 {'\t'}}}
 ", true, null);
             code.For(
-                type.GetMethod(nameof(Array.Clear)),
+                type.GetMethod(nameof(Array.Clear), BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(Array) }, null),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
+{'\t'}auto element = type->v__element;
+{'\t'}element->f_clear(a_0->f_bounds() + type->v__rank, a_0->v__length);
+", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(Array.Clear), new[] { typeof(Array), typeof(int), typeof(int) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto element = type->v__element;
 {'\t'}element->f_clear(reinterpret_cast<char*>(a_0->f_bounds() + type->v__rank) + a_1 * element->v__size, a_2);
@@ -280,22 +287,45 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->v__rank;\n", 1)
             );
             code.For(
-                type.GetMethod("InternalGetReference", declaredAndInstance),
-                transpiler => ($@"{'\t'}auto bounds = a_0->f_bounds();
-{'\t'}size_t n = 0;
-{'\t'}for (size_t i = 0; i < a_2; ++i) n = n * bounds[i].v_length + (a_3[i] - bounds[i].v_lower);
-{'\t'}auto type = a_0->f_type();
-{'\t'}auto p = reinterpret_cast<{transpiler.EscapeForValue(typeof(TypedReference))}*>(a_1);
-{'\t'}p->v__5ftype = {transpiler.EscapeForValue(typeof(IntPtr))}{{type->v__element}};
-{'\t'}p->v__5fvalue.v__5fvalue = {transpiler.EscapeForValue(typeof(IntPtr))}{{reinterpret_cast<char*>(bounds + type->v__rank) + n * type->v__element->v__size}};
+                type.GetMethod("InternalGetValue", declaredAndInstance),
+                transpiler => ($@"{'\t'}auto type = a_0->f_type();
+{'\t'}auto element = type->v__element;
+{'\t'}auto value = reinterpret_cast<char*>(a_0->f_bounds()+ type->v__rank) + a_1 * element->v__size;
+{'\t'}if (element->v__value_type) {{
+{'\t'}{'\t'}auto p = f_engine()->f_allocate(sizeof(t__object) + element->v__size);
+{'\t'}{'\t'}element->f_initialize(value, 1, p + 1);
+{'\t'}{'\t'}element->f_finish(p);
+{'\t'}{'\t'}return p;
+{'\t'}}} else {{
+{'\t'}{'\t'}return *reinterpret_cast<{transpiler.EscapeForValue(typeof(object))}*>(value);
+{'\t'}}}
+", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("InternalSetValue", declaredAndInstance),
+                transpiler => ($@"{'\t'}auto type = a_0->f_type();
+{'\t'}auto element = type->v__element;
+{'\t'}auto value = reinterpret_cast<char*>(a_0->f_bounds()+ type->v__rank) + a_2 * element->v__size;
+{'\t'}if (!a_1) {{
+{'\t'}{'\t'}if (element->v__value_type)
+{'\t'}{'\t'}{'\t'}element->f_clear(value, 1);
+{'\t'}{'\t'}else
+{'\t'}{'\t'}{'\t'}*reinterpret_cast<{transpiler.EscapeForValue(typeof(object))}*>(value) = {{}};
+{'\t'}}} else if (element->v__value_type) {{
+{'\t'}{'\t'}if (a_1->f_type()->f_is(element)) {{
+{'\t'}{'\t'}{'\t'}element->f_copy(a_1 + 1, 1, value);
+{'\t'}{'\t'}}} else {{
+{'\t'}{'\t'}{'\t'}throw std::runtime_error(""NotImplementedException"");
+{'\t'}{'\t'}}}
+{'\t'}}} else {{
+{'\t'}{'\t'}if (!a_1->f_type()->f_is(element) && !a_1->f_type()->f_implementation(element)) throw std::runtime_error(""InvalidCastException"");
+{'\t'}{'\t'}*reinterpret_cast<{transpiler.EscapeForValue(typeof(object))}*>(value) = a_1;
+{'\t'}}}
 ", 0)
             );
             code.For(
-                type.GetMethod("InternalSetValue", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\t*static_cast<t_slot<t__type>*>(a_0) = a_1;\n", 1)
-            );
-            code.For(
-                type.GetMethod("GetCorElementTypeOfElementType", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetCorElementTypeOfElementType", declaredAndInstance),
                 transpiler => ("\treturn a_0->f_type()->v__cor_element_type;\n", 1)
             );
         })
@@ -363,12 +393,12 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod("RestoreDispatchState", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("RestoreDispatchState", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             // TODO
             code.For(
-                type.GetMethod("SetCurrentStackTrace", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("SetCurrentStackTrace", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
         })
@@ -429,11 +459,11 @@ namespace IL2CXX
         .For(typeof(WeakReference), (type, code) =>
         {
             code.For(
-                type.GetMethod("Create", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("Create", declaredAndInstance),
                 transpiler => ($"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
             );
             code.For(
-                type.GetMethod("Finalize", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("Finalize", declaredAndInstance),
                 transpiler => ("\tdelete static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue);\n", 1)
             );
             code.For(
@@ -452,19 +482,19 @@ namespace IL2CXX
         .For(typeof(WeakReference<>), (type, code) =>
         {
             code.ForGeneric(
-                type.GetMethod("Create", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("Create", declaredAndInstance),
                 (transpiler, types) => ($"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(typeof(IntPtr))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
             );
             code.ForGeneric(
-                type.GetMethod("Finalize", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("Finalize", declaredAndInstance),
                 (transpiler, types) => ("\tdelete static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue);\n", 1)
             );
             code.ForGeneric(
-                type.GetProperty("Target", BindingFlags.Instance | BindingFlags.NonPublic).GetMethod,
+                type.GetProperty("Target", declaredAndInstance).GetMethod,
                 (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(types[0])}>(static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target());\n", 1)
             );
             code.ForGeneric(
-                type.GetProperty("Target", BindingFlags.Instance | BindingFlags.NonPublic).SetMethod,
+                type.GetProperty("Target", declaredAndInstance).SetMethod,
                 (transpiler, types) => ("\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n", 1)
             );
         })
@@ -485,16 +515,16 @@ namespace IL2CXX
 ", 1)
             );
             code.For(
-                type.GetMethod("GetInvokeMethod", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetInvokeMethod", declaredAndInstance),
                 transpiler => ("\treturn {};\n", 1)
             );
             code.For(
-                type.GetMethod("GetMulticastInvoke", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetMulticastInvoke", declaredAndInstance),
                 transpiler => ("\treturn a_0->f_type()->v__multicast_invoke;\n", 1)
             );
             // TODO
             code.For(
-                type.GetMethod("GetMethodImpl", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetMethodImpl", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
@@ -502,12 +532,12 @@ namespace IL2CXX
         {
             // TODO
             code.For(
-                type.GetMethod("GetTarget", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetTarget", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             // TODO
             code.For(
-                type.GetMethod("GetMethodImpl", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetMethodImpl", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
@@ -626,7 +656,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod("IsAscii", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("IsAscii", declaredAndInstance),
                 transpiler => ("\treturn false;\n", 1)
             );
             // TODO
@@ -739,7 +769,7 @@ namespace IL2CXX
                 }
             );
             code.For(
-                type.GetMethod("InternalGetCorElementType", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("InternalGetCorElementType", declaredAndInstance),
                 transpiler => ("\treturn a_0->f_type()->v__cor_element_type;\n", 1)
             );
             // TODO
@@ -757,7 +787,7 @@ namespace IL2CXX
 {'\t'}auto value = p->v__5fvalue.v__5fvalue.v__5fvalue;
 {'\t'}if (type->v__value_type) {{
 {'\t'}{'\t'}auto p = f_engine()->f_allocate(sizeof(t__object) + type->v__size);
-{'\t'}{'\t'}type->f_copy(value, 1, p + 1);
+{'\t'}{'\t'}type->f_initialize(value, 1, p + 1);
 {'\t'}{'\t'}type->f_finish(p);
 {'\t'}{'\t'}return p;
 {'\t'}}} else {{
@@ -1017,7 +1047,11 @@ namespace IL2CXX
         .For(Type.GetType("System.ThrowHelper"), (type, code) =>
         {
             code.ForGeneric(
-                type.GetMethod("ThrowForUnsupportedVectorBaseType", BindingFlags.Static | BindingFlags.NonPublic),
+                type.GetMethod("ThrowForUnsupportedNumericsVectorBaseType", BindingFlags.Static | BindingFlags.NonPublic),
+                (transpiler, types) => (string.Empty, 1)
+            );
+            code.ForGeneric(
+                type.GetMethod("ThrowForUnsupportedIntrinsicsVectorBaseType", BindingFlags.Static | BindingFlags.NonPublic),
                 (transpiler, types) => (string.Empty, 1)
             );
         })

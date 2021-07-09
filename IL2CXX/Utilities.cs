@@ -22,6 +22,8 @@ namespace IL2CXX
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowArgumentNull() => throw new ArgumentNullException();
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowArgumentOutOfRange() => throw new ArgumentOutOfRangeException();
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowIndexOutOfRange() => throw new IndexOutOfRangeException();
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowInvalidCast() => throw new InvalidCastException();

@@ -20,7 +20,7 @@ namespace IL2CXX
         .For(typeof(ResourceReader), (type, code) =>
         {
             code.For(
-                type.GetMethod("_LoadObjectV1", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("_LoadObjectV1", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })

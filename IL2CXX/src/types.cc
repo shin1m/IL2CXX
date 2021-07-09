@@ -41,6 +41,11 @@ void t__type::f_do_suppress_finalize(t__object* a_this)
 {
 }
 
+void t__type::f_do_initialize(const void* a_from, size_t a_n, void* a_to)
+{
+	std::uninitialized_copy_n(static_cast<const t_slot<t__type>*>(a_from), a_n, static_cast<t_slot<t__type>*>(a_to));
+}
+
 void t__type::f_do_clear(void* a_p, size_t a_n)
 {
 	std::fill_n(static_cast<t_slot<t__type>*>(a_p), a_n, nullptr);

@@ -27,6 +27,12 @@ namespace IL2CXX.Tests
             Array.Clear(xs, 1, 2);
             return AssertEquals(xs, new[] { "Hello", null, null, "Bye" });
         }
+        /*static int ClearAll()
+        {
+            string[] xs = { "Hello", "World" };
+            Array.Clear(xs);
+            return AssertEquals(xs, new string[] { null, null });
+        }*/
         static int Copy()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
@@ -115,6 +121,7 @@ namespace IL2CXX.Tests
         {
             nameof(IsReadOnly) => IsReadOnly(),
             nameof(Clear) => Clear(),
+            //nameof(ClearAll) => ClearAll(),
             nameof(Copy) => Copy(),
             nameof(ResizeLarger) => ResizeLarger(),
             nameof(ResizeSmaller) => ResizeSmaller(),
@@ -138,6 +145,7 @@ namespace IL2CXX.Tests
         public void OneTimeSetUp() => build = Utilities.Build(Run);
         [TestCase(nameof(IsReadOnly))]
         [TestCase(nameof(Clear))]
+        //[TestCase(nameof(ClearAll))]
         [TestCase(nameof(Copy))]
         [TestCase(nameof(ResizeLarger))]
         [TestCase(nameof(ResizeSmaller))]

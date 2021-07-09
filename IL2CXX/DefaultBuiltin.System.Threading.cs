@@ -144,18 +144,18 @@ namespace IL2CXX
 {'\t'}}}
 ", true, null);
             code.For(
-                type.GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("Initialize", declaredAndInstance),
                 transpiler => ("\ta_0->v__priority == 2;\n", 1)
             );
             code.For(
-                type.GetMethod("InternalFinalize", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("InternalFinalize", declaredAndInstance),
                 transpiler => (string.Empty, 1)
             );
             code.For(
-                type.GetMethod("StartCore", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("StartCore", declaredAndInstance),
                 transpiler =>
                 {
-                    var run = helper.GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var run = helper.GetMethod("Run", declaredAndInstance);
                     transpiler.Enqueue(run);
                     return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}f_engine()->f_start(a_0, [a_0]
 {'\t'}{{
@@ -183,11 +183,11 @@ namespace IL2CXX
                 transpiler => ("\tstd::this_thread::yield();\nreturn true;\n", 1)
             );
             code.For(
-                type.GetMethod("IsBackgroundNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("IsBackgroundNative", declaredAndInstance),
                 transpiler => ("\treturn a_0->v__background;\n", 1)
             );
             code.For(
-                type.GetMethod("SetBackgroundNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("SetBackgroundNative", declaredAndInstance),
                 transpiler => ("\tf_engine()->f_background__(a_0, a_1);\n", 1)
             );
             // TODO
@@ -205,11 +205,11 @@ namespace IL2CXX
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
             );
             code.For(
-                type.GetMethod("GetPriorityNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetPriorityNative", declaredAndInstance),
                 transpiler => ("\treturn a_0->v__priority;\n", 1)
             );
             code.For(
-                type.GetMethod("SetPriorityNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("SetPriorityNative", declaredAndInstance),
                 transpiler => ("\tf_engine()->f_priority__(a_0, a_1);\n", 1)
             );
             code.For(
@@ -232,7 +232,7 @@ namespace IL2CXX
                 transpiler => ("\treturn 7;\n", 1)
             );
             code.For(
-                type.GetMethod("ThreadNameChanged", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("ThreadNameChanged", declaredAndInstance),
                 transpiler => (string.Empty, 1)
             );
             code.For(

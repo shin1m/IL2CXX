@@ -16,7 +16,7 @@ namespace IL2CXX
             {
                 ["System.SR"] = new Dictionary<string, Func<Transpiler, MethodBase, (string, int)>>
                 {
-                    ["System.String GetResourceString(System.String, System.String)"] = (transpiler, method) => ("\treturn a_0;\n", 0),
+                    ["System.String GetResourceString(System.String)"] = (transpiler, method) => ("\treturn a_0;\n", 0),
                     ["Boolean UsingResourceKeys()"] = (transpiler, method) => ("\treturn false;\n", 0)
                 }
             },

@@ -38,15 +38,15 @@ namespace IL2CXX
         .For(Type.GetType("System.Diagnostics.Tracing.EventPipeEventDispatcher"), (type, code) =>
         {
             code.For(
-                type.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null),
+                type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
                 transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
             );
             code.For(
-                type.GetMethod("RemoveEventListener", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("RemoveEventListener", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("SendCommand", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("SendCommand", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
         })
@@ -65,15 +65,15 @@ namespace IL2CXX
                 transpiler => ("\treturn false;\n", 0)
             );
             code.For(
-                type.GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("Initialize", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("ReportOutOfBandMessage", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("ReportOutOfBandMessage", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("SendCommand", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("SendCommand", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
@@ -85,18 +85,18 @@ namespace IL2CXX
                 transpiler => ("\t*a_1 = {};\n", 0)
             );
             code.For(
-                type.GetMethod("WriteEventCore", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("WriteEventCore", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("WriteEventWithRelatedActivityIdCore", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("WriteEventWithRelatedActivityIdCore", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
         })
         .For(Type.GetType("System.Diagnostics.Tracing.FrameworkEventSource"), (type, code) =>
         {
             code.For(
-                type.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null),
+                type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
                 transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
             );
             code.For(

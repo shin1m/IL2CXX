@@ -9,27 +9,27 @@ namespace IL2CXX
         .For(Type.GetType("System.Buffers.ArrayPoolEventSource"), (type, code) =>
         {
             code.For(
-                type.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null),
+                type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
                 transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
             );
             code.For(
-                type.GetMethod("BufferAllocated", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("BufferAllocated", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("BufferRented", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("BufferRented", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("BufferReturned", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("BufferReturned", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("BufferTrimPoll", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("BufferTrimPoll", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod("BufferTrimmed", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("BufferTrimmed", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );
         });

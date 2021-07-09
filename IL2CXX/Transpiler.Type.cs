@@ -14,8 +14,8 @@ namespace IL2CXX
     partial class Transpiler
     {
         private const BindingFlags declaredAndInstance = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        private static readonly MethodInfo getCorElementTypeOfElementType = typeof(Array).GetMethod("GetCorElementTypeOfElementType", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly MethodInfo internalGetCorElementType = typeof(Enum).GetMethod("InternalGetCorElementType", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly MethodInfo getCorElementTypeOfElementType = typeof(Array).GetMethod("GetCorElementTypeOfElementType", declaredAndInstance);
+        private static readonly MethodInfo internalGetCorElementType = typeof(Enum).GetMethod("InternalGetCorElementType", declaredAndInstance);
 
         private class RuntimeDefinition : IEqualityComparer<Type[]>
         {
@@ -483,7 +483,7 @@ struct {Escape(type)}__unmanaged
         private void WriteRuntimeDefinition(RuntimeDefinition definition, string assembly, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
         {
             var type = definition.Type;
-            var @base = definition is TypeDefinition && FinalizeOf(type).MethodHandle != finalizeOfObject.MethodHandle ? "t__type_finalizee" : "t__type";
+            var @base = definition is TypeDefinition && FinalizeOf(type) != null ? "t__type_finalizee" : "t__type";
             var identifier = Escape(type);
             if (type.IsEnum) writerForDefinitions.Write($@"
 std::pair<uint64_t, std::u16string_view> v__enum_pairs_{identifier}[] = {{{
@@ -542,7 +542,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
 {'\t'}static t__object* f_do_clone(const t__object* a_this);");
-                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_clear(void* a_p, size_t a_n);
+                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_initialize(const void* a_from, size_t a_n, void* a_to);
+{'\t'}static void f_do_clear(void* a_p, size_t a_n);
 {'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
                 if (definition.HasUnmanaged)
                     writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t__object* a_this, void* a_p);
@@ -598,7 +599,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             {
                 writerForDefinitions.WriteLine($@"{'\t'}t__type::f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
-                if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear;
+                if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_initialize = f_do_initialize;
+{'\t'}f_clear = f_do_clear;
 {'\t'}f_copy = f_do_copy;");
                 if (type.IsEnum) writerForDefinitions.WriteLine($@"{'\t'}v__enum_pairs = v__enum_pairs_{identifier};
 {'\t'}v__enum_count = std::size(v__enum_pairs_{identifier});
@@ -634,6 +636,10 @@ t__object* t__type_of<{identifier}>::f_do_clone(const t__object* a_this)
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;
 }}
+void t__type_of<{identifier}>::f_do_initialize(const void* a_from, size_t a_n, void* a_to)
+{{
+{'\t'}std::uninitialized_copy_n(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));
+}}
 void t__type_of<{identifier}>::f_do_clear(void* a_p, size_t a_n)
 {{
 {'\t'}std::fill_n(static_cast<decltype({identifier}::v__value)*>(a_p), a_n, decltype({identifier}::v__value){{}});
@@ -641,7 +647,7 @@ void t__type_of<{identifier}>::f_do_clear(void* a_p, size_t a_n)
 void t__type_of<{identifier}>::f_do_copy(const void* a_from, size_t a_n, void* a_to)
 {{
 {'\t'}f__copy(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));" :
-                    $@"{'\t'}t__new<{identifier}> p(0);
+                        $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}static_cast<const {identifier}*>(a_this)->f_construct(p);
 {'\t'}return p;");
                 }

@@ -185,6 +185,8 @@ struct t__type : t__abstract_type
 	void (*f_register_finalize)(t__object*) = f_do_register_finalize;
 	static void f_do_suppress_finalize(t__object* a_this);
 	void (*f_suppress_finalize)(t__object*) = f_do_suppress_finalize;
+	static void f_do_initialize(const void* a_from, size_t a_n, void* a_to);
+	void (*f_initialize)(const void*, size_t, void*) = f_do_initialize;
 	static void f_do_clear(void* a_p, size_t a_n);
 	void (*f_clear)(void*, size_t) = f_do_clear;
 	static void f_do_copy(const void* a_from, size_t a_n, void* a_to);

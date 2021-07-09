@@ -102,7 +102,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod("IsArrayImpl", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("IsArrayImpl", declaredAndInstance),
                 transpiler =>
                 {
                     var array = $"&t__type_of<{transpiler.Escape(typeof(Array))}>::v__instance";
@@ -110,7 +110,7 @@ namespace IL2CXX
                 }
             );
             code.For(
-                type.GetMethod("GetConstructorImpl", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("GetConstructorImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_4") + "\treturn a_4->v__length > 0 ? nullptr : a_0->v__default_constructor;\n", 0)
             );
             code.For(

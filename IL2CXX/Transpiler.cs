@@ -177,7 +177,7 @@ namespace IL2CXX
             [("void*", "int32_t")] = typeof(void*),
             [("void*", "void*")] = typeof(void*)
         };
-        private static MethodInfo FinalizeOf(Type x) => x.GetMethod(nameof(Finalize), BindingFlags.Instance | BindingFlags.NonPublic);
+        private static MethodInfo FinalizeOf(Type x) => x.GetMethod(nameof(Finalize), declaredAndInstance);
         private static readonly MethodInfo finalizeOfObject = FinalizeOf(typeof(object));
 
         static Transpiler()
@@ -622,7 +622,7 @@ namespace IL2CXX
                 }
             if (typeof(SafeHandle).IsAssignableFrom(@return))
             {
-                static ConstructorInfo getCI(Type type) => type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(bool) }, null);
+                static ConstructorInfo getCI(Type type) => type.GetConstructor(declaredAndInstance, null, new[] { typeof(IntPtr), typeof(bool) }, null);
                 var ci = getCI(@return) ?? getCI(typeof(SafeHandle));
                 writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
 {'\t'}{Escape(ci)}(p, result, true);

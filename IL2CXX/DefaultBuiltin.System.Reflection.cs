@@ -17,7 +17,7 @@ namespace IL2CXX
                 transpiler => ("\treturn {};\n", 0)
             );
             code.For(
-                type.GetMethod("IsRuntimeImplemented", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
                 transpiler => ($"\treturn a_0 && !a_0->f_type()->f_is(&t__type_of<{transpiler.Escape(typeof(RuntimeAssembly))}>::v__instance);\n", 1)
             );
             code.For(
@@ -33,7 +33,7 @@ namespace IL2CXX
         {
             // TODO
             code.For(
-                type.GetMethod("ComputePublicKeyToken", BindingFlags.Instance | BindingFlags.NonPublic),
+                type.GetMethod("ComputePublicKeyToken", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })

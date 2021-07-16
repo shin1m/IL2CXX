@@ -221,3 +221,5 @@ t__type* f__find_type(const std::map<std::string_view, t__type*>& a_name_to_type
 	}
 	return nullptr;
 }
+
+RECYCLONE__THREAD int32_t v_last_unmanaged_error;

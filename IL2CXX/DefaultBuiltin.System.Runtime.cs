@@ -78,11 +78,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Marshal.GetLastPInvokeError)),
-                transpiler => ("\treturn errno;\n", 1)
+                transpiler => ("\treturn v_last_unmanaged_error;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Marshal.SetLastPInvokeError)),
-                transpiler => ("\terrno = a_0;\n", 1)
+                transpiler => ("\tv_last_unmanaged_error = a_0;\n", 1)
             );
             // TODO
             code.For(
@@ -243,7 +243,7 @@ namespace IL2CXX
             var methods = GenericMethods(type);
             code.ForGeneric(
                 methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeof(void*), typeof(int) })),
-                (transpiler, types) => ("\treturn a_0 + a_1;\n", 1)
+                (transpiler, types) => ("\treturn static_cast<char*>(a_0) + a_1;\n", 1)
             );
             code.ForGeneric(
                 methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { x.GetGenericArguments()[0].MakeByRefType(), typeof(int) })),

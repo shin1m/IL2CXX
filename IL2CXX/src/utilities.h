@@ -133,3 +133,5 @@ std::vector<char> f__to_cs(t_System_2eText_2eStringBuilder* a_p);
 void f__from(t_System_2eText_2eStringBuilder* a_p, const char* a_cs);
 
 t__type* f__find_type(const std::map<std::string_view, t__type*>& a_name_to_type, std::u16string_view a_name);
+
+extern RECYCLONE__THREAD int32_t v_last_unmanaged_error;

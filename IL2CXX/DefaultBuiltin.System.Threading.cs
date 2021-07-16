@@ -243,6 +243,11 @@ namespace IL2CXX
         // TODO
         .For(typeof(ThreadPool), (type, code) =>
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                code.For(
+                    type.GetMethod("BindIOCompletionCallbackNative", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                );
             code.For(
                 type.GetMethod("GetEnableWorkerTracking", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 0)
@@ -279,12 +284,16 @@ namespace IL2CXX
             {
                 // TODO
                 code.For(
+                    type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\treturn SignalObjectAndWait(a_0, a_1, a_2, TRUE);\n", 0)
+                );
+                code.For(
                     type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                    transpiler => ("\treturn WaitForSingleObjectEx(a_0, a_1, TRUE);\n", 0)
                 );
                 code.For(
                     type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
-                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                    transpiler => ("\treturn WaitForMultipleObjectsEx(a_1, reinterpret_cast<const HANDLE*>(a_0), a_2, a_3, TRUE);\n", 0)
                 );
             }
             else
@@ -318,6 +327,24 @@ namespace IL2CXX
                     type.GetMethod("WaitNative", BindingFlags.Static | BindingFlags.NonPublic),
                     transpiler => ("\treturn static_cast<t__waitable*>(a_0->v_handle.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
                 );
+        })
+        .For(Type.GetType("System.Threading.OverlappedData"), (type, code) =>
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                code.For(
+                    type.GetMethod("AllocateNativeOverlapped", declaredAndInstance),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                );
+                code.For(
+                    type.GetMethod("FreeNativeOverlapped", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                );
+                code.For(
+                    type.GetMethod("GetOverlappedFromNative", BindingFlags.Static | BindingFlags.NonPublic),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                );
+            }
         });
     }
 }

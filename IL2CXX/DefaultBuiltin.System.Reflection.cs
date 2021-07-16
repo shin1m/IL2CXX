@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace IL2CXX
 {
@@ -20,14 +21,24 @@ namespace IL2CXX
                 type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
                 transpiler => ($"\treturn a_0 && !a_0->f_type()->f_is(&t__type_of<{transpiler.Escape(typeof(RuntimeAssembly))}>::v__instance);\n", 1)
             );
-            code.For(
-                type.GetProperty(nameof(Assembly.Location)).GetMethod,
-                transpiler => ($@"{'\t'}char cs[PATH_MAX];
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                code.For(
+                    type.GetProperty(nameof(Assembly.Location)).GetMethod,
+                    transpiler => ($@"{'\t'}char cs[MAX_PATH];
+{'\t'}auto n = GetModuleFileNameA(NULL, cs, sizeof(cs));
+{'\t'}if (n == 0) throw std::system_error(GetLastError(), std::system_category());
+{'\t'}return f__new_string(std::string_view(cs, n));
+", 0)
+                );
+            else
+                code.For(
+                    type.GetProperty(nameof(Assembly.Location)).GetMethod,
+                    transpiler => ($@"{'\t'}char cs[PATH_MAX];
 {'\t'}auto r = readlink(""/proc/self/exe"", cs, sizeof(cs));
 {'\t'}if (r == -1) throw std::system_error(errno, std::generic_category());
 {'\t'}return f__new_string(std::string_view(cs, static_cast<size_t>(r)));
 ", 0)
-            );
+                );
         })
         .For(typeof(AssemblyName), (type, code) =>
         {

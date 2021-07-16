@@ -118,7 +118,7 @@ inline {returns}
                 writer.WriteLine($@"{prototype}
 {{
 {'\t'}static void* symbol = f_load_symbol(""{dllimport.Value}""s, ""{dllimport.EntryPoint ?? method.Name}"");");
-                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, dllimport.CharSet);
+                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, dllimport.CallingConvention, dllimport.CharSet, dllimport.SetLastError);
                 writer.WriteLine('}');
                 return;
             }

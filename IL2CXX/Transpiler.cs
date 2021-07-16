@@ -549,12 +549,16 @@ namespace IL2CXX
             }
             return EscapeForValue(x);
         });
-        private void GenerateInvokeUnmanaged(Type @return, IEnumerable<(ParameterInfo Parameter, int Index)> parameters, string function, TextWriter writer, CharSet charset = CharSet.Auto)
+        private void GenerateInvokeUnmanaged(
+            Type @return, IEnumerable<(ParameterInfo Parameter, int Index)> parameters, string function, TextWriter writer,
+            CallingConvention callingConvention = CallingConvention.Winapi, CharSet charSet = CharSet.Auto, bool setLastError = false
+        )
         {
+            if (callingConvention == CallingConvention.Winapi) callingConvention = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? CallingConvention.StdCall : CallingConvention.Cdecl;
             foreach (var (x, i) in parameters)
                 if (x.ParameterType == typeof(StringBuilder))
                 {
-                    writer.WriteLine($"\tauto cs{i} = {(charset == CharSet.Unicode ? "f__to_cs16" : "f__to_cs")}(a_{i});");
+                    writer.WriteLine($"\tauto cs{i} = {(charSet == CharSet.Unicode ? "f__to_cs16" : "f__to_cs")}(a_{i});");
                 }
                 else if (x.ParameterType.IsByRef)
                 {
@@ -578,8 +582,8 @@ namespace IL2CXX
                 }
             writer.Write($@"{'\t'}{(
     @return == typeof(void) ? string.Empty : "auto result = "
-)}reinterpret_cast<{UnmanagedReturn(@return)}(*)({
-    string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charset).Select(x => $"\n\t\t{x}"))
+)}reinterpret_cast<{UnmanagedReturn(@return)}({(callingConvention == CallingConvention.StdCall ? "__stdcall " : string.Empty)}*)({
+    string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet).Select(x => $"\n\t\t{x}"))
 }
 {'\t'})>({function})(");
             writer.WriteLine(string.Join(",", parameters.Select(xi =>
@@ -589,7 +593,7 @@ namespace IL2CXX
                 if (x == typeof(string))
                 {
                     var s = $"&a_{i}->v__5ffirstChar";
-                    return charset == CharSet.Unicode ? s : $"f__string({{{s}, static_cast<size_t>(a_{i}->v__5fstringLength)}}).c_str()";
+                    return $"a_{i} ? {(charSet == CharSet.Unicode ? s : $"f__string({{{s}, static_cast<size_t>(a_{i}->v__5fstringLength)}}).c_str()")} : nullptr";
                 }
                 if (x == typeof(StringBuilder)) return $"cs{i}.data()";
                 if (x.IsByRef)
@@ -607,6 +611,7 @@ namespace IL2CXX
                 return $"a_{i}";
             }).Select(x => $"\n\t\t{x}")));
             writer.WriteLine("\t);");
+            if (setLastError) writer.WriteLine($"\tv_last_unmanaged_error = {(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "GetLastError()" : "errno")};");
             foreach (var (x, i) in parameters)
                 if (x.ParameterType == typeof(StringBuilder))
                 {

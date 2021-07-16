@@ -106,6 +106,7 @@ namespace IL2CXX.Tests
         static extern void uname(out utsname name);
         static int Parameter()
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return 0;
             uname(out var name);
             Console.WriteLine($"sysname: {name.sysname}");
             Console.WriteLine($"nodename: {name.nodename}");

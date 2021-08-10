@@ -63,15 +63,24 @@ inline std::enable_if_t<std::negation_v<t_has_destroy<T>>> f__marshal_destroy(T)
 {
 }
 
-template<typename T, typename U>
-inline auto f__marshal_in(T& a_x, const U& a_y) -> decltype(a_x.f_in(a_y))
+inline void f__marshal_in(int32_t& a_x, const bool& a_y)
 {
-	a_x.f_in(a_y);
+	a_x = a_y ? 1 : 0;
 }
-template<typename T>
-inline auto f__marshal_out(const T& a_x, T& a_y) -> decltype(a_x.f_out(a_y))
+inline void f__marshal_out(const int32_t& a_x, bool& a_y)
 {
-	a_x.f_out(a_y);
+	a_y = static_cast<bool>(a_x);
+}
+
+template<typename T, typename U>
+inline auto f__marshal_in(T& a_x, const U& a_y) -> decltype(a_x.f_in(&a_y))
+{
+	a_x.f_in(&a_y);
+}
+template<typename T, typename U>
+inline auto f__marshal_out(const T& a_x, U& a_y) -> decltype(a_x.f_out(&a_y))
+{
+	a_x.f_out(&a_y);
 }
 template<typename T>
 inline auto f__marshal_destroy(T& a_x) -> decltype(a_x.f_destroy())
@@ -79,6 +88,11 @@ inline auto f__marshal_destroy(T& a_x) -> decltype(a_x.f_destroy())
 	a_x.f_destroy();
 }
 
+template<typename T, typename U>
+inline auto f__marshal_in(T& a_x, const t_slot_of<U>& a_y) -> decltype(a_x.f_in(a_y))
+{
+	a_x.f_in(a_y);
+}
 template<typename T, typename U>
 inline auto f__marshal_out(const T& a_x, t_slot_of<U>& a_y) -> decltype(a_x.f_out(a_y))
 {

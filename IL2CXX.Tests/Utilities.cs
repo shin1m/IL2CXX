@@ -43,12 +43,18 @@ namespace IL2CXX.Tests
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
             if (Directory.Exists(build)) Directory.Delete(build, true);
             Directory.CreateDirectory(build);
+            using (var load = new MetadataLoadContext(new PathAssemblyResolver(Directory.EnumerateFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll").Append(typeof(Builtin).Assembly.Location).Append(method.Module.Assembly.Location))))
             using (var header = File.CreateText(Path.Combine(build, "run.h")))
             using (var main = File.CreateText(Path.Combine(build, "run.cc")))
             using (var body = new StringWriter())
             {
+                var assembly = load.LoadFromAssemblyPath(method.Module.Assembly.Location);
+                var type = assembly.GetType(method.DeclaringType.FullName, true);
+                method = type.GetMethod(method.Name, BindingFlags.Static | BindingFlags.NonPublic);
                 main.WriteLine("#include \"run.h\"\n");
-                new Transpiler(DefaultBuiltin.Create(), _ => { }).Do(method, header, main, (_, __) => body, Path.Combine(build, "resources"));
+                Type get(Type x) => load.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
+                var target = Environment.OSVersion.Platform;
+                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, header, main, (_, _) => body, Path.Combine(build, "resources"));
                 main.WriteLine("\nnamespace il2cxx\n{");
                 main.Write(body);
                 main.WriteLine(@"
@@ -57,7 +63,7 @@ namespace IL2CXX.Tests
 #include ""types.cc""
 #include ""engine.cc""
 #include ""handles.cc""");
-                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) main.WriteLine("#include \"waitables.cc\"");
+                if (target != PlatformID.Win32NT) main.WriteLine("#include \"waitables.cc\"");
             }
             File.WriteAllText(Path.Combine(build, "CMakeLists.txt"), @"cmake_minimum_required(VERSION 3.16)
 project(run)

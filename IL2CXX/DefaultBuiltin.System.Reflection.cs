@@ -1,13 +1,12 @@
 using System;
 using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
-        private static Builtin SetupSystemReflection(this Builtin @this) => @this
-        .For(typeof(Assembly), (type, code) =>
+        private static Builtin SetupSystemReflection(this Builtin @this, Func<Type, Type> get, PlatformID target) => @this
+        .For(get(typeof(Assembly)), (type, code) =>
         {
             code.For(
                 type.GetMethod(nameof(Assembly.GetEntryAssembly)),
@@ -19,9 +18,9 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
-                transpiler => ($"\treturn a_0 && !a_0->f_type()->f_is(&t__type_of<{transpiler.Escape(typeof(RuntimeAssembly))}>::v__instance);\n", 1)
+                transpiler => ($"\treturn a_0 && !a_0->f_type()->f_is(&t__type_of<{transpiler.Escape(get(typeof(RuntimeAssembly)))}>::v__instance);\n", 1)
             );
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (target == PlatformID.Win32NT)
                 code.For(
                     type.GetProperty(nameof(Assembly.Location)).GetMethod,
                     transpiler => ($@"{'\t'}char cs[MAX_PATH];
@@ -40,7 +39,7 @@ namespace IL2CXX
 ", 0)
                 );
         })
-        .For(typeof(AssemblyName), (type, code) =>
+        .For(get(typeof(AssemblyName)), (type, code) =>
         {
             // TODO
             code.For(
@@ -48,15 +47,15 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(typeof(CustomAttributeData), (type, code) =>
+        .For(get(typeof(CustomAttributeData)), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(ConstructorInfo))} v_m_5fctor;
-{'\t'}{transpiler.EscapeForMember(typeof(Module))} v_m_5fscope;
-{'\t'}//{transpiler.EscapeForMember(typeof(MemberInfo[]))} v_m_5fmembers;
-{'\t'}//{transpiler.EscapeForMember(Type.GetType("System.Reflection.CustomAttributeCtorParameter[]"))} v_m_5fctorParams;
-{'\t'}//{transpiler.EscapeForMember(Type.GetType("System.Reflection.CustomAttributeNamedParameter[]"))} v_m_5fnamedParams;
-{'\t'}{transpiler.EscapeForMember(typeof(object))} v_m_5ftypedCtorArgs;
-{'\t'}{transpiler.EscapeForMember(typeof(object))} v_m_5fnamedArgs;
+            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(get(typeof(ConstructorInfo)))} v_m_5fctor;
+{'\t'}{transpiler.EscapeForMember(get(typeof(Module)))} v_m_5fscope;
+{'\t'}//{transpiler.EscapeForMember(get(typeof(MemberInfo[])))} v_m_5fmembers;
+{'\t'}//{transpiler.EscapeForMember(get(Type.GetType("System.Reflection.CustomAttributeCtorParameter[]")))} v_m_5fctorParams;
+{'\t'}//{transpiler.EscapeForMember(get(Type.GetType("System.Reflection.CustomAttributeNamedParameter[]")))} v_m_5fnamedParams;
+{'\t'}{transpiler.EscapeForMember(get(typeof(object)))} v_m_5ftypedCtorArgs;
+{'\t'}{transpiler.EscapeForMember(get(typeof(object)))} v_m_5fnamedArgs;
 ", true, null);
             // TODO
             code.For(
@@ -69,9 +68,9 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(typeof(LocalVariableInfo), (type, code) =>
+        .For(get(typeof(LocalVariableInfo)), (type, code) =>
         {
-            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(Type))} v_m_5ftype;
+            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(get(typeof(Type)))} v_m_5ftype;
 {'\t'}int32_t v_m_5fisPinned;
 {'\t'}int32_t v_m_5flocalIndex;
 ", true, null);

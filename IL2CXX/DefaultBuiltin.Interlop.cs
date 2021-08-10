@@ -1,17 +1,16 @@
 using System;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
 namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
-        private static Builtin SetupInterop(this Builtin @this) => @this
-        .For(Type.GetType("Interop+Kernel32"), (type, code) =>
+        private static Builtin SetupInterop(this Builtin @this, Func<Type, Type> get, PlatformID target) => @this
+        .For(get(Type.GetType("Interop+Kernel32")), (type, code) =>
         {
             code.For(
-                type.GetMethod("GetEnvironmentVariable", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(string), typeof(char).MakeByRefType(), typeof(uint) }, null),
+                type.GetMethod("GetEnvironmentVariable", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(string)), get(typeof(char)).MakeByRefType(), get(typeof(uint)) }, null),
                 transpiler => ($@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
 {'\t'}if (!p) return 0;
 {'\t'}auto q = f__u16string(p);
@@ -21,7 +20,7 @@ namespace IL2CXX
 {'\t'}return n;
 ", 0)
             );
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
+            if (target == PlatformID.Win32NT) return;
             code.For(
                 type.GetMethod("CloseHandle", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}delete static_cast<t__waitable*>(a_0.v__5fvalue);
@@ -30,22 +29,22 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("CreateEventEx", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(typeof(SafeWaitHandle))}>();
-{'\t'}{transpiler.Escape(typeof(SafeWaitHandle).GetConstructor(new[] { typeof(IntPtr), typeof(bool) }))}(p, new t__event(a_2 & 1, a_2 & 2), true);
+                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
+{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor(new[] { get(typeof(IntPtr)), get(typeof(bool)) }))}(p, new t__event(a_2 & 1, a_2 & 2), true);
 {'\t'}return p;
 ", 0)
             );
             code.For(
                 type.GetMethod("CreateMutexEx", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(typeof(SafeWaitHandle))}>();
-{'\t'}{transpiler.Escape(typeof(SafeWaitHandle).GetConstructor(new[] { typeof(IntPtr), typeof(bool) }))}(p, new t__mutex(a_2 & 1), true);
+                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
+{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor(new[] { get(typeof(IntPtr)), get(typeof(bool)) }))}(p, new t__mutex(a_2 & 1), true);
 {'\t'}return p;
 ", 0)
             );
             code.For(
                 type.GetMethod("CreateSemaphoreEx", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(typeof(SafeWaitHandle))}>();
-{'\t'}{transpiler.Escape(typeof(SafeWaitHandle).GetConstructor(new[] { typeof(IntPtr), typeof(bool) }))}(p, new t__semaphore(a_2, a_1), true);
+                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
+{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor(new[] { get(typeof(IntPtr)), get(typeof(bool)) }))}(p, new t__semaphore(a_2, a_1), true);
 {'\t'}return p;
 ", 0)
             );

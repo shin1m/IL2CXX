@@ -4,8 +4,8 @@ namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
-        private static Builtin SetupSystemBuffers(this Builtin @this) => @this
-        .For(Type.GetType("System.Buffers.ArrayPoolEventSource"), (type, code) =>
+        private static Builtin SetupSystemBuffers(this Builtin @this, Func<Type, Type> get) => @this
+        .For(get(Type.GetType("System.Buffers.ArrayPoolEventSource")), (type, code) =>
         {
             code.For(
                 type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),

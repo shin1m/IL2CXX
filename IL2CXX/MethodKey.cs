@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 
 namespace IL2CXX
@@ -7,18 +8,25 @@ namespace IL2CXX
     {
         public static MethodKey ToKey(MethodBase method) => new(method);
 
-        private readonly RuntimeMethodHandle method;
-        private readonly RuntimeTypeHandle type;
+        public readonly MethodBase Method;
 
         public MethodKey(MethodBase method)
         {
-            this.method = method.MethodHandle;
-            type = method.DeclaringType.TypeHandle;
+            var t = method.DeclaringType;
+            Method = t == null || method.ReflectedType == t ? method : t.GetMethod(
+                method.Name,
+                method.GetGenericArguments().Length,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                method.GetParameters().Select(x => x.ParameterType).ToArray(),
+                null
+            );
         }
-        public static bool operator ==(MethodKey x, MethodKey y) => x.method == y.method && x.type.Equals(y.type);
+        // TODO: Work around for equality bug.
+        public static bool operator ==(MethodKey x, MethodKey y) => x.Method == y.Method && x.Method.Name == y.Method.Name;
         public static bool operator !=(MethodKey x, MethodKey y) => !(x == y);
         public bool Equals(MethodKey x) => this == x;
         public override bool Equals(object x) => x is MethodKey y && this == y;
-        public override int GetHashCode() => method.GetHashCode() ^ type.GetHashCode();
+        public override int GetHashCode() => Method.GetHashCode();
     }
 }

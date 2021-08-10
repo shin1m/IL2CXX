@@ -4,10 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace IL2CXX
 {
+    using static MethodKey;
+
     partial class Transpiler
     {
         [StructLayout(LayoutKind.Explicit)]
@@ -26,12 +30,115 @@ namespace IL2CXX
             [FieldOffset(0)]
             public long Int64;
         }
-        public Transpiler(IBuiltin builtin, Action<string> log, bool checkNull = true, bool checkRange = true)
+        public Transpiler(Func<Type, Type> get, IBuiltin builtin, Action<string> log, PlatformID target, bool is64, bool checkNull = true, bool checkRange = true)
         {
             this.builtin = builtin;
             this.log = log;
+            Target = target;
+            Is64Bit = is64;
             CheckNull = checkNull;
             CheckRange = checkRange;
+            getType = get;
+            typeofObject = get(typeof(object));
+            typeofRuntimeAssembly = get(typeof(RuntimeAssembly));
+            typeofRuntimeConstructorInfo = get(typeof(RuntimeConstructorInfo));
+            typeofRuntimeMethodInfo = get(typeof(RuntimeMethodInfo));
+            typeofRuntimeType = get(typeof(RuntimeType));
+            typeofBoolean = get(typeof(bool));
+            typeofByte = get(typeof(byte));
+            typeofSByte = get(typeof(sbyte));
+            typeofInt16 = get(typeof(short));
+            typeofUInt16 = get(typeof(ushort));
+            typeofInt32 = get(typeof(int));
+            typeofUInt32 = get(typeof(uint));
+            typeofInt64 = get(typeof(long));
+            typeofUInt64 = get(typeof(ulong));
+            typeofVoidPointer = get(typeof(void*));
+            typeofChar = get(typeof(char));
+            typeofDouble = get(typeof(double));
+            typeofSingle = get(typeof(float));
+            typeofVoid = get(typeof(void));
+            typeofIntPtr = get(typeof(IntPtr));
+            typeofUIntPtr = get(typeof(UIntPtr));
+            typeofEnum = get(typeof(Enum));
+            typeofString = get(typeof(string));
+            typeofStringBuilder = get(typeof(StringBuilder));
+            typeofException = get(typeof(Exception));
+            typeofTypedReference = get(typeof(TypedReference));
+            typeofTypedReferenceTag = get(typeof(TypedReferenceTag));
+            typeofDelegate = get(typeof(Delegate));
+            typeofMulticastDelegate = get(typeof(MulticastDelegate));
+            typeofSafeHandle = get(typeof(SafeHandle));
+            typeofOutAttribute = get(typeof(OutAttribute));
+            typeofDllImportAttribute = get(typeof(DllImportAttribute));
+            typeofFieldOffsetAttribute = get(typeof(FieldOffsetAttribute));
+            typeofMarshalAsAttribute = get(typeof(MarshalAsAttribute));
+            typeofThreadStaticAttribute = get(typeof(ThreadStaticAttribute));
+            typeofRuntimeFieldHandle = get(typeof(RuntimeFieldHandle));
+            typeofRuntimeMethodHandle = get(typeof(RuntimeMethodHandle));
+            typeofRuntimeTypeHandle = get(typeof(RuntimeTypeHandle));
+            typeofSZArrayHelper = get(typeof(SZArrayHelper<>));
+            typeofUtilities = get(typeof(Utilities));
+            builtinTypes = new Dictionary<Type, string>
+            {
+                [typeofObject] = "t__object",
+                [get(typeof(Assembly))] = "t__assembly",
+                [typeofRuntimeAssembly] = "t__runtime_assembly",
+                [get(typeof(MemberInfo))] = "t__member_info",
+                [get(typeof(MethodBase))] = "t__method_base",
+                [get(typeof(ConstructorInfo))] = "t__constructor_info",
+                [typeofRuntimeConstructorInfo] = "t__runtime_constructor_info",
+                [get(typeof(MethodInfo))] = "t__method_info",
+                [typeofRuntimeMethodInfo] = "t__runtime_method_info",
+                [get(typeof(Type))] = "t__abstract_type",
+                [typeofRuntimeType] = "t__type",
+                [get(typeof(CriticalFinalizerObject))] = "t__critical_finalizer_object"
+            };
+            primitives = new Dictionary<Type, string>
+            {
+                [typeofBoolean] = "bool",
+                [typeofByte] = "uint8_t",
+                [typeofSByte] = "int8_t",
+                [typeofInt16] = "int16_t",
+                [typeofUInt16] = "uint16_t",
+                [typeofInt32] = "int32_t",
+                [typeofUInt32] = "uint32_t",
+                [typeofInt64] = "int64_t",
+                [typeofUInt64] = "uint64_t",
+                [typeofVoidPointer] = "void*",
+                [typeofChar] = "char16_t",
+                [typeofDouble] = "double",
+                [typeofSingle] = "float",
+                [typeofVoid] = "void"
+            };
+            typedReferenceByRefType = get(typeof(TypedReferenceTag)).MakeByRefType();
+            typeOfAdd = new Dictionary<(string, string), Type>
+            {
+                [("int32_t", "int32_t")] = typeofInt32,
+                [("int32_t", "void*")] = typeofVoidPointer,
+                [("int64_t", "int64_t")] = typeofInt64,
+                [("void*", "int32_t")] = typeofVoidPointer,
+                [("void*", "void*")] = typeofVoidPointer,
+                [("double", "double")] = typeofDouble
+            };
+            typeOfDiv_Un = new Dictionary<(string, string), Type>
+            {
+                [("int32_t", "int32_t")] = typeofInt32,
+                [("int32_t", "void*")] = typeofVoidPointer,
+                [("int64_t", "int64_t")] = typeofInt64,
+                [("void*", "int32_t")] = typeofVoidPointer,
+                [("void*", "void*")] = typeofVoidPointer
+            };
+            typeOfShl = new Dictionary<(string, string), Type>
+            {
+                [("int32_t", "int32_t")] = typeofInt32,
+                [("int32_t", "void*")] = typeofInt32,
+                [("int64_t", "int32_t")] = typeofInt64,
+                [("int64_t", "void*")] = typeofInt64,
+                [("void*", "int32_t")] = typeofVoidPointer,
+                [("void*", "void*")] = typeofVoidPointer
+            };
+            finalizeOfObject = FinalizeOf(typeofObject);
             for (int i = 0; i < 256; ++i)
             {
                 instructions1[i] = new Instruction { OpCode = opcodes1[i] };
@@ -170,7 +277,7 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldnull.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Push(typeof(object)));
+                x.Estimate = (index, stack) => (index, stack.Push(typeofObject));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = nullptr;");
@@ -191,7 +298,7 @@ namespace IL2CXX
                 OpCodes.Ldc_I4_8
             }.ForEach((opcode, i) => instructions1[opcode.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Push(typeof(int)));
+                x.Estimate = (index, stack) => (index, stack.Push(typeofInt32));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = {i - 1};");
@@ -200,7 +307,7 @@ namespace IL2CXX
             }));
             instructions1[OpCodes.Ldc_I4_S.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 1, stack.Push(typeof(int)));
+                x.Estimate = (index, stack) => (index + 1, stack.Push(typeofInt32));
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseI1(ref index);
@@ -210,7 +317,7 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldc_I4.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 4, stack.Push(typeof(int)));
+                x.Estimate = (index, stack) => (index + 4, stack.Push(typeofInt32));
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseI4(ref index);
@@ -220,7 +327,7 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldc_I8.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 8, stack.Push(typeof(long)));
+                x.Estimate = (index, stack) => (index + 8, stack.Push(typeofInt64));
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseI8(ref index);
@@ -230,7 +337,7 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldc_R4.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 4, stack.Push(typeof(float)));
+                x.Estimate = (index, stack) => (index + 4, stack.Push(typeofSingle));
                 x.Generate = (index, stack) =>
                 {
                     var r = ParseR4(ref index);
@@ -250,7 +357,7 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldc_R8.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 8, stack.Push(typeof(double)));
+                x.Estimate = (index, stack) => (index + 8, stack.Push(typeofDouble));
                 x.Generate = (index, stack) =>
                 {
                     var r = ParseR8(ref index);
@@ -308,14 +415,14 @@ namespace IL2CXX
                 {
                     var (_, @return, parameters) = ParseSignature(ref index);
                     stack = stack.ElementAt(parameters.Length + 1);
-                    return (index, @return == typeof(void) ? stack : stack.Push(@return));
+                    return (index, @return == typeofVoid ? stack : stack.Push(@return));
                 };
                 x.Generate = (index, stack) =>
                 {
                     var (cc, @return, parameters) = ParseSignature(ref index);
                     writer.WriteLine($@" {cc} {@return}({string.Join(", ", parameters.AsEnumerable())})
 {'\t'}{(
-    @return == typeof(void) ? string.Empty : $"{indexToStack[index].Variable} = "
+    @return == typeofVoid ? string.Empty : $"{indexToStack[index].Variable} = "
 )}reinterpret_cast<{EscapeForStacked(@return)}(*)({
     string.Join(", ", parameters.Select(EscapeForStacked))
 })>({stack.Variable})({string.Join(",", parameters.Zip(
@@ -331,13 +438,13 @@ namespace IL2CXX
                 x.Estimate = (index, stack) =>
                 {
                     hasReturn = true;
-                    return (int.MaxValue, GetReturnType(method) == typeof(void) ? stack : stack.Pop);
+                    return (int.MaxValue, GetReturnType(method) == typeofVoid ? stack : stack.Pop);
                 };
                 x.Generate = (index, stack) =>
                 {
                     writer.Write("\n\treturn");
                     var @return = GetReturnType(method);
-                    if (@return != typeof(void))
+                    if (@return != typeofVoid)
                     {
                         writer.Write($" {CastValue(@return, stack.Variable)}");
                         stack = stack.Pop;
@@ -460,16 +567,16 @@ namespace IL2CXX
             }
             new[]
             {
-                (OpCode: OpCodes.Ldind_I1, Type: typeof(sbyte)),
-                (OpCode: OpCodes.Ldind_U1, Type: typeof(byte)),
-                (OpCode: OpCodes.Ldind_I2, Type: typeof(short)),
-                (OpCode: OpCodes.Ldind_U2, Type: typeof(ushort)),
-                (OpCode: OpCodes.Ldind_I4, Type: typeof(int)),
-                (OpCode: OpCodes.Ldind_U4, Type: typeof(uint)),
-                (OpCode: OpCodes.Ldind_I8, Type: typeof(long)),
-                (OpCode: OpCodes.Ldind_I, Type: typeof(void*)),
-                (OpCode: OpCodes.Ldind_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Ldind_R8, Type: typeof(double))
+                (OpCode: OpCodes.Ldind_I1, Type: typeofSByte),
+                (OpCode: OpCodes.Ldind_U1, Type: typeofByte),
+                (OpCode: OpCodes.Ldind_I2, Type: typeofInt16),
+                (OpCode: OpCodes.Ldind_U2, Type: typeofUInt16),
+                (OpCode: OpCodes.Ldind_I4, Type: typeofInt32),
+                (OpCode: OpCodes.Ldind_U4, Type: typeofUInt32),
+                (OpCode: OpCodes.Ldind_I8, Type: typeofInt64),
+                (OpCode: OpCodes.Ldind_I, Type: typeofVoidPointer),
+                (OpCode: OpCodes.Ldind_R4, Type: typeofSingle),
+                (OpCode: OpCodes.Ldind_R8, Type: typeofDouble)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
@@ -497,18 +604,18 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine();
-                    withVolatile(() => writer.WriteLine($"\tf__store(*static_cast<{EscapeForValue(typeof(object))}*>({stack.Pop.Variable}), {stack.Variable});"));
+                    withVolatile(() => writer.WriteLine($"\tf__store(*static_cast<{EscapeForValue(typeofObject)}*>({stack.Pop.Variable}), {stack.Variable});"));
                     return index;
                 };
             });
             new[]
             {
-                (OpCode: OpCodes.Stind_I1, Type: typeof(sbyte)),
-                (OpCode: OpCodes.Stind_I2, Type: typeof(short)),
-                (OpCode: OpCodes.Stind_I4, Type: typeof(int)),
-                (OpCode: OpCodes.Stind_I8, Type: typeof(long)),
-                (OpCode: OpCodes.Stind_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Stind_R8, Type: typeof(double))
+                (OpCode: OpCodes.Stind_I1, Type: typeofSByte),
+                (OpCode: OpCodes.Stind_I2, Type: typeofInt16),
+                (OpCode: OpCodes.Stind_I4, Type: typeofInt32),
+                (OpCode: OpCodes.Stind_I8, Type: typeofInt64),
+                (OpCode: OpCodes.Stind_R4, Type: typeofSingle),
+                (OpCode: OpCodes.Stind_R8, Type: typeofDouble)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop);
@@ -583,12 +690,12 @@ namespace IL2CXX
             }));
             new[]
             {
-                (OpCode: OpCodes.Conv_I1, Type: typeof(sbyte)),
-                (OpCode: OpCodes.Conv_I2, Type: typeof(short)),
-                (OpCode: OpCodes.Conv_I4, Type: typeof(int)),
-                (OpCode: OpCodes.Conv_I8, Type: typeof(long)),
-                (OpCode: OpCodes.Conv_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Conv_R8, Type: typeof(double))
+                (OpCode: OpCodes.Conv_I1, Type: typeofSByte),
+                (OpCode: OpCodes.Conv_I2, Type: typeofInt16),
+                (OpCode: OpCodes.Conv_I4, Type: typeofInt32),
+                (OpCode: OpCodes.Conv_I8, Type: typeofInt64),
+                (OpCode: OpCodes.Conv_R4, Type: typeofSingle),
+                (OpCode: OpCodes.Conv_R8, Type: typeofDouble)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
@@ -604,7 +711,7 @@ namespace IL2CXX
                 (OpCode: OpCodes.Conv_U, Type: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(void*)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeofVoidPointer));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<{set.Type}>({stack.AsSigned})")};");
@@ -613,11 +720,11 @@ namespace IL2CXX
             }));
             new[]
             {
-                (OpCode: OpCodes.Conv_U4, Type: typeof(uint)),
-                (OpCode: OpCodes.Conv_U8, Type: typeof(ulong)),
-                (OpCode: OpCodes.Conv_U2, Type: typeof(ushort)),
-                (OpCode: OpCodes.Conv_U1, Type: typeof(byte)),
-                (OpCode: OpCodes.Conv_R_Un, Type: typeof(double))
+                (OpCode: OpCodes.Conv_U4, Type: typeofUInt32),
+                (OpCode: OpCodes.Conv_U8, Type: typeofUInt64),
+                (OpCode: OpCodes.Conv_U2, Type: typeofUInt16),
+                (OpCode: OpCodes.Conv_U1, Type: typeofByte),
+                (OpCode: OpCodes.Conv_R_Un, Type: typeofDouble)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
@@ -641,7 +748,7 @@ namespace IL2CXX
                     var after = indexToStack[index];
                     string generateVirtual(string target) => GenerateVirtualCall(m, target,
                         stack.Take(m.GetParameters().Length).Select(y => y.Variable),
-                        y => $"\t{(GetReturnType(m) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{y};\n"
+                        y => $"\t{(GetReturnType(m) == typeofVoid ? string.Empty : $"{after.Variable} = ")}{y};\n"
                     );
                     void generateConcrete(MethodBase cm)
                     {
@@ -674,7 +781,7 @@ namespace IL2CXX
                         {
                             Enqueue(cm);
                             var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append("p"));
-                            return $"\t{(GetReturnType(cm) == typeof(void) ? string.Empty : $"{after.Variable} = ")}{call};\n";
+                            return $"\t{(GetReturnType(cm) == typeofVoid ? string.Empty : $"{after.Variable} = ")}{call};\n";
                         }
                         if (constrained.IsValueType)
                         {
@@ -687,7 +794,7 @@ namespace IL2CXX
                         }
                         else
                         {
-                            writer.WriteLine($@"{'\t'}{{auto p = *static_cast<{Escape(constrained.IsInterface ? typeof(object) : constrained)}**>({@this.Variable});
+                            writer.WriteLine($@"{'\t'}{{auto p = *static_cast<{Escape(constrained.IsInterface ? typeofObject : constrained)}**>({@this.Variable});
 {(
     isConcrete ? generate(m) :
     constrained.IsSealed ? generate(concrete(constrained)) :
@@ -716,7 +823,7 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldstr.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 4, stack.Push(typeof(string)));
+                x.Estimate = (index, stack) => (index + 4, stack.Push(typeofString));
                 var escapes = new Dictionary<char, string>
                 {
                     ['\''] = "\\'",
@@ -733,7 +840,7 @@ namespace IL2CXX
                 };
                 x.Generate = (index, stack) =>
                 {
-                    var s = method.Module.ResolveString(ParseI4(ref index));
+                    var s = ParseString(ref index);
                     writer.Write($"\n\t{indexToStack[index].Variable} = f__new_string(u\"");
                     foreach (var c in s)
                         if (escapes.TryGetValue(c, out var e))
@@ -763,9 +870,9 @@ namespace IL2CXX
                     string call(IEnumerable<string> xs) => $"{Escape(m)}({string.Join(",", xs)}\n\t)";
                     var parameters = m.GetParameters();
                     var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{CastValue(p.ParameterType, s.Variable)}");
-                    if (builtin.GetBody(this, m).body != null)
+                    if (builtin.GetBody(this, ToKey(m)).body != null)
                         writer.WriteLine($"\t{after.Variable} = {call(arguments)};");
-                    else if (t == typeof(IntPtr) || t == typeof(UIntPtr))
+                    else if (t == typeofIntPtr || t == typeofUIntPtr)
                         writer.WriteLine($@"{'\t'}{{{EscapeForValue(t)} p{{}};
 {'\t'}{call(arguments.Prepend("\n\t\t&p"))};
 {'\t'}{after.Variable} = p;}}");
@@ -798,7 +905,7 @@ namespace IL2CXX
                 x.Estimate = (index, stack) =>
                 {
                     ParseType(ref index);
-                    return (index, stack.Pop.Push(typeof(object)));
+                    return (index, stack.Pop.Push(typeofObject));
                 };
                 x.Generate = (index, stack) =>
                 {
@@ -902,7 +1009,7 @@ namespace IL2CXX
                     return index;
                 };
             });
-            string @static(FieldInfo x) => Attribute.IsDefined(x, typeof(ThreadStaticAttribute))
+            string @static(FieldInfo x) => x.GetCustomAttributesData().Any(x => x.AttributeType == typeofThreadStaticAttribute)
                 ? $"t_thread_static::v_instance->v_{Escape(x.DeclaringType)}.{Escape(x)}"
                 : $"t_static::v_instance->v_{Escape(x.DeclaringType)}->{Escape(x)}";
             instructions1[OpCodes.Ldsfld.Value].For(x =>
@@ -968,16 +1075,16 @@ namespace IL2CXX
             });
             new[]
             {
-                (OpCode: OpCodes.Conv_Ovf_I1_Un, Type: typeof(sbyte), Primitive: "int8_t"),
-                (OpCode: OpCodes.Conv_Ovf_I2_Un, Type: typeof(short), Primitive: "int16_t"),
-                (OpCode: OpCodes.Conv_Ovf_I4_Un, Type: typeof(int), Primitive: "int32_t"),
-                (OpCode: OpCodes.Conv_Ovf_I8_Un, Type: typeof(long), Primitive: "int64_t"),
-                (OpCode: OpCodes.Conv_Ovf_U1_Un, Type: typeof(byte), Primitive: "uint8_t"),
-                (OpCode: OpCodes.Conv_Ovf_U2_Un, Type: typeof(ushort), Primitive: "uint16_t"),
-                (OpCode: OpCodes.Conv_Ovf_U4_Un, Type: typeof(uint), Primitive: "uint32_t"),
-                (OpCode: OpCodes.Conv_Ovf_U8_Un, Type: typeof(ulong), Primitive: "uint64_t"),
-                (OpCode: OpCodes.Conv_Ovf_I_Un, Type: typeof(void*), Primitive: "intptr_t"),
-                (OpCode: OpCodes.Conv_Ovf_U_Un, Type: typeof(void*), Primitive: "uintptr_t")
+                (OpCode: OpCodes.Conv_Ovf_I1_Un, Type: typeofSByte, Primitive: "int8_t"),
+                (OpCode: OpCodes.Conv_Ovf_I2_Un, Type: typeofInt16, Primitive: "int16_t"),
+                (OpCode: OpCodes.Conv_Ovf_I4_Un, Type: typeofInt32, Primitive: "int32_t"),
+                (OpCode: OpCodes.Conv_Ovf_I8_Un, Type: typeofInt64, Primitive: "int64_t"),
+                (OpCode: OpCodes.Conv_Ovf_U1_Un, Type: typeofByte, Primitive: "uint8_t"),
+                (OpCode: OpCodes.Conv_Ovf_U2_Un, Type: typeofUInt16, Primitive: "uint16_t"),
+                (OpCode: OpCodes.Conv_Ovf_U4_Un, Type: typeofUInt32, Primitive: "uint32_t"),
+                (OpCode: OpCodes.Conv_Ovf_U8_Un, Type: typeofUInt64, Primitive: "uint64_t"),
+                (OpCode: OpCodes.Conv_Ovf_I_Un, Type: typeofVoidPointer, Primitive: "intptr_t"),
+                (OpCode: OpCodes.Conv_Ovf_U_Un, Type: typeofVoidPointer, Primitive: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
@@ -993,7 +1100,7 @@ namespace IL2CXX
             }));
             instructions1[OpCodes.Box.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 4, stack.Pop.Push(typeof(object)));
+                x.Estimate = (index, stack) => (index + 4, stack.Pop.Push(typeofObject));
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
@@ -1019,7 +1126,7 @@ namespace IL2CXX
             });
             instructions1[OpCodes.Ldlen.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(void*)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeofVoidPointer));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine();
@@ -1047,15 +1154,15 @@ namespace IL2CXX
             });
             new[]
             {
-                (OpCode: OpCodes.Ldelem_I1, Type: typeof(sbyte)),
-                (OpCode: OpCodes.Ldelem_U1, Type: typeof(byte)),
-                (OpCode: OpCodes.Ldelem_I2, Type: typeof(short)),
-                (OpCode: OpCodes.Ldelem_U2, Type: typeof(ushort)),
-                (OpCode: OpCodes.Ldelem_I4, Type: typeof(int)),
-                (OpCode: OpCodes.Ldelem_U4, Type: typeof(uint)),
-                (OpCode: OpCodes.Ldelem_I8, Type: typeof(long)),
-                (OpCode: OpCodes.Ldelem_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Ldelem_R8, Type: typeof(double))
+                (OpCode: OpCodes.Ldelem_I1, Type: typeofSByte),
+                (OpCode: OpCodes.Ldelem_U1, Type: typeofByte),
+                (OpCode: OpCodes.Ldelem_I2, Type: typeofInt16),
+                (OpCode: OpCodes.Ldelem_U2, Type: typeofUInt16),
+                (OpCode: OpCodes.Ldelem_I4, Type: typeofInt32),
+                (OpCode: OpCodes.Ldelem_U4, Type: typeofUInt32),
+                (OpCode: OpCodes.Ldelem_I8, Type: typeofInt64),
+                (OpCode: OpCodes.Ldelem_R4, Type: typeofSingle),
+                (OpCode: OpCodes.Ldelem_R8, Type: typeofDouble)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type));
@@ -1068,7 +1175,7 @@ namespace IL2CXX
             }));
             instructions1[OpCodes.Ldelem_I.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(void*)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeofVoidPointer));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine();
@@ -1088,13 +1195,13 @@ namespace IL2CXX
             });
             new[]
             {
-                (OpCode: OpCodes.Stelem_I, Type: typeof(IntPtr)),
-                (OpCode: OpCodes.Stelem_I1, Type: typeof(sbyte)),
-                (OpCode: OpCodes.Stelem_I2, Type: typeof(short)),
-                (OpCode: OpCodes.Stelem_I4, Type: typeof(int)),
-                (OpCode: OpCodes.Stelem_I8, Type: typeof(long)),
-                (OpCode: OpCodes.Stelem_R4, Type: typeof(float)),
-                (OpCode: OpCodes.Stelem_R8, Type: typeof(double))
+                (OpCode: OpCodes.Stelem_I, Type: typeofIntPtr),
+                (OpCode: OpCodes.Stelem_I1, Type: typeofSByte),
+                (OpCode: OpCodes.Stelem_I2, Type: typeofInt16),
+                (OpCode: OpCodes.Stelem_I4, Type: typeofInt32),
+                (OpCode: OpCodes.Stelem_I8, Type: typeofInt64),
+                (OpCode: OpCodes.Stelem_R4, Type: typeofSingle),
+                (OpCode: OpCodes.Stelem_R8, Type: typeofDouble)
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Pop.Pop);
@@ -1163,8 +1270,8 @@ namespace IL2CXX
                         var after = indexToStack[index];
                         writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type()->f_is(&t__type_of<{Escape(t)}>::v__instance))
 {'\t'}{'\t'}{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
-                        if (t.IsPrimitive && t != typeof(float) && t != typeof(double))
-                            writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->f_is(&t__type_of<{Escape(typeof(Enum))}>::v__instance))
+                        if (t.IsPrimitive && t != typeofSingle && t != typeofDouble)
+                            writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->f_is(&t__type_of<{Escape(typeofEnum)}>::v__instance))
 {'\t'}{'\t'}switch ({stack.Variable}->f_type()->v__size) {{
 {'\t'}{'\t'}case 1:
 {'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int8_t*>({stack.Variable} + 1));
@@ -1190,16 +1297,16 @@ namespace IL2CXX
             });
             new[]
             {
-                (OpCode: OpCodes.Conv_Ovf_I1, Type: typeof(sbyte), Primitive: "int8_t"),
-                (OpCode: OpCodes.Conv_Ovf_U1, Type: typeof(byte), Primitive: "uint8_t"),
-                (OpCode: OpCodes.Conv_Ovf_I2, Type: typeof(short), Primitive: "int16_t"),
-                (OpCode: OpCodes.Conv_Ovf_U2, Type: typeof(ushort), Primitive: "uint16_t"),
-                (OpCode: OpCodes.Conv_Ovf_I4, Type: typeof(int), Primitive: "int32_t"),
-                (OpCode: OpCodes.Conv_Ovf_U4, Type: typeof(uint), Primitive: "uint32_t"),
-                (OpCode: OpCodes.Conv_Ovf_I8, Type: typeof(long), Primitive: "int64_t"),
-                (OpCode: OpCodes.Conv_Ovf_U8, Type: typeof(ulong), Primitive: "uint64_t"),
-                (OpCode: OpCodes.Conv_Ovf_I, Type: typeof(void*), Primitive: "intptr_t"),
-                (OpCode: OpCodes.Conv_Ovf_U, Type: typeof(void*), Primitive: "uintptr_t")
+                (OpCode: OpCodes.Conv_Ovf_I1, Type: typeofSByte, Primitive: "int8_t"),
+                (OpCode: OpCodes.Conv_Ovf_U1, Type: typeofByte, Primitive: "uint8_t"),
+                (OpCode: OpCodes.Conv_Ovf_I2, Type: typeofInt16, Primitive: "int16_t"),
+                (OpCode: OpCodes.Conv_Ovf_U2, Type: typeofUInt16, Primitive: "uint16_t"),
+                (OpCode: OpCodes.Conv_Ovf_I4, Type: typeofInt32, Primitive: "int32_t"),
+                (OpCode: OpCodes.Conv_Ovf_U4, Type: typeofUInt32, Primitive: "uint32_t"),
+                (OpCode: OpCodes.Conv_Ovf_I8, Type: typeofInt64, Primitive: "int64_t"),
+                (OpCode: OpCodes.Conv_Ovf_U8, Type: typeofUInt64, Primitive: "uint64_t"),
+                (OpCode: OpCodes.Conv_Ovf_I, Type: typeofVoidPointer, Primitive: "intptr_t"),
+                (OpCode: OpCodes.Conv_Ovf_U, Type: typeofVoidPointer, Primitive: "uintptr_t")
             }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
@@ -1215,16 +1322,16 @@ namespace IL2CXX
             }));
             instructions1[OpCodes.Ldtoken.Value].For(x =>
             {
-                x.Estimate = (index, stack) => method.Module.ResolveMember(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments()) switch
+                x.Estimate = (index, stack) => ParseMember(ref index) switch
                 {
-                    FieldInfo f => (index, stack.Push(typeof(RuntimeFieldHandle))),
-                    MethodInfo m => (index, stack.Push(typeof(RuntimeMethodHandle))),
-                    Type t => (index, stack.Push(typeof(RuntimeTypeHandle))),
+                    FieldInfo f => (index, stack.Push(typeofRuntimeFieldHandle)),
+                    MethodInfo m => (index, stack.Push(typeofRuntimeMethodHandle)),
+                    Type t => (index, stack.Push(typeofRuntimeTypeHandle)),
                     _ => throw new Exception()
                 };
                 x.Generate = (index, stack) =>
                 {
-                    var member = method.Module.ResolveMember(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
+                    var member = ParseMember(ref index);
                     writer.WriteLine($@" {member}
 {'\t'}{indexToStack[index].Variable} = {member switch
 {
@@ -1307,7 +1414,7 @@ namespace IL2CXX
                 (OpCode: OpCodes.Clt, Operator: "<")
             }.ForEach(set => instructions2[set.OpCode.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(int)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeofInt32));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = {stack.Pop.AsSigned} {set.Operator} {stack.AsSigned} ? 1 : 0;");
@@ -1320,7 +1427,7 @@ namespace IL2CXX
                 (OpCode: OpCodes.Clt_Un, Operator: "<")
             }.ForEach(set => instructions2[set.OpCode.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeof(int)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeofInt32));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($"\n\t{indexToStack[index].Variable} = {condition_Un(stack, set.Operator)} ? 1 : 0;");
@@ -1332,7 +1439,7 @@ namespace IL2CXX
                 x.Estimate = (index, stack) =>
                 {
                     ParseMethod(ref index);
-                    return (index, stack.Push(typeof(void*)));
+                    return (index, stack.Push(typeofVoidPointer));
                 };
                 x.Generate = (index, stack) =>
                 {
@@ -1348,7 +1455,7 @@ namespace IL2CXX
                 x.Estimate = (index, stack) =>
                 {
                     ParseMethod(ref index);
-                    return (index, stack.Pop.Push(typeof(void*)));
+                    return (index, stack.Pop.Push(typeofVoidPointer));
                 };
                 x.Generate = (index, stack) =>
                 {
@@ -1375,7 +1482,7 @@ namespace IL2CXX
             });
             instructions2[OpCodes.Localloc.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(byte*)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeofByte.MakePointerType()));
                 x.Generate = (index, stack) =>
                 {
                     writer.Write($@"
@@ -1388,7 +1495,7 @@ namespace IL2CXX
             });
             instructions2[OpCodes.Endfilter.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(Exception)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeofException));
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine($@"
@@ -1486,7 +1593,7 @@ namespace IL2CXX
             });
             instructions2[OpCodes.Sizeof.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index + 4, stack.Push(typeof(uint)));
+                x.Estimate = (index, stack) => (index + 4, stack.Push(typeofUInt32));
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
@@ -1496,10 +1603,10 @@ namespace IL2CXX
             });
             instructions2[OpCodes.Refanytype.Value & 0xff].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeof(RuntimeTypeHandle)));
+                x.Estimate = (index, stack) => (index, stack.Pop.Push(typeofRuntimeTypeHandle));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {EscapeForValue(typeof(RuntimeTypeHandle))}{{static_cast<t__type*>({stack.Variable}.v__5ftype.v__5fvalue)}};");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {EscapeForValue(typeofRuntimeTypeHandle)}{{static_cast<t__type*>({stack.Variable}.v__5ftype.v__5fvalue)}};");
                     return index;
                 };
             });

@@ -6,8 +6,8 @@ namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
-        private static Builtin SetupRuntime(this Builtin @this) => @this
-        .For(typeof(RuntimeAssembly), (type, code) =>
+        private static Builtin SetupRuntime(this Builtin @this, Func<Type, Type> get) => @this
+        .For(get(typeof(RuntimeAssembly)), (type, code) =>
         {
             code.For(
                 type.GetProperty(nameof(Assembly.EntryPoint)).GetMethod,
@@ -22,21 +22,21 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 1)
             );
         })
-        .For(typeof(RuntimeConstructorInfo), (type, code) =>
+        .For(get(typeof(RuntimeConstructorInfo)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(MethodBase.Invoke), new[] { typeof(BindingFlags), typeof(Binder), typeof(object[]), typeof(CultureInfo) }),
+                type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__invoke();\n", 0)
             );
         })
-        .For(typeof(RuntimeMethodInfo), (type, code) =>
+        .For(get(typeof(RuntimeMethodInfo)), (type, code) =>
         {
             code.For(
                 type.GetProperty(nameof(MemberInfo.DeclaringType)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__declaring_type;\n", 0)
             );
         })
-        .For(typeof(RuntimeType), (type, code) =>
+        .For(get(typeof(RuntimeType)), (type, code) =>
         {
             code.For(
                 type.GetProperty(nameof(Type.Assembly)).GetMethod,
@@ -54,7 +54,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Type.GetEnumNames)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""not enum"");
-{'\t'}auto p = f__new_array<{transpiler.Escape(typeof(string[]))}, {transpiler.Escape(typeof(string))}>(type->v__enum_count);
+{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.Escape(get(typeof(string)))}>(type->v__enum_count);
 {'\t'}for (size_t i = 0; i < type->v__enum_count; ++i) p->f_data()[i] = f__new_string(type->v__enum_pairs[i].second);
 {'\t'}return p;
 ", 0)
@@ -63,7 +63,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Type.GetEnumValues)),
                 transpiler =>
                 {
-                    var array = transpiler.Escape(typeof(Array));
+                    var array = transpiler.Escape(get(typeof(Array)));
                     return (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""not enum"");
 {'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
@@ -105,7 +105,7 @@ namespace IL2CXX
                 type.GetMethod("IsArrayImpl", declaredAndInstance),
                 transpiler =>
                 {
-                    var array = $"&t__type_of<{transpiler.Escape(typeof(Array))}>::v__instance";
+                    var array = $"&t__type_of<{transpiler.Escape(get(typeof(Array)))}>::v__instance";
                     return (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0 != {array} && a_0->f_is({array});\n", 0);
                 }
             );

@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 
 namespace IL2CXX
@@ -30,16 +29,16 @@ namespace IL2CXX
 
         private void ProcessNextMethod(Func<Type, bool, TextWriter> writerForType)
         {
-            method = queuedMethods.Dequeue();
-            var key = ToKey(method);
+            var key = ToKey(queuedMethods.Dequeue());
+            method = key.Method;
             if (!visitedMethods.Add(key) || method.IsAbstract) return;
-            var builtin = this.builtin.GetBody(this, method);
+            var builtin = this.builtin.GetBody(this, key);
             var description = new StringWriter();
             description.Write($@"
 // {method.DeclaringType.AssemblyQualifiedName}
 // {method}
 // {(method.IsPublic ? "public " : string.Empty)}{(method.IsPrivate ? "private " : string.Empty)}{(method.IsStatic ? "static " : string.Empty)}{(method.IsFinal ? "final " : string.Empty)}{(method.IsVirtual ? "virtual " : string.Empty)}{method.MethodImplementationFlags}");
-            string attributes(string prefix, ICustomAttributeProvider cap) => string.Join(string.Empty, cap.GetCustomAttributes(false).Select(x => $"\n{prefix}// [{x}]"));
+            string attributes(string prefix, ParameterInfo pi) => string.Join(string.Empty, pi.GetCustomAttributesData().Select(x => $"\n{prefix}// [{x}]"));
             var parameters = method.GetParameters().Select(x => (
                 Prefix: $"{attributes("\t", x)}\n\t// {x}", Type: x.ParameterType
             ));
@@ -107,18 +106,26 @@ inline {returns}
                 if (aggressive && bytes?.Length <= 128) writer.Write("RECYCLONE__ALWAYS_INLINE ");
                 if (inline) writer.Write("inline ");
             }
-            var dllimport = method.GetCustomAttribute<DllImportAttribute>();
+            var dllimport = method.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofDllImportAttribute);
             if (dllimport != null)
             {
                 writeDeclaration(string.Empty);
+                var value = (string)dllimport.ConstructorArguments[0].Value;
+                T named<T>(string name, T @default) => (T)dllimport.NamedArguments.FirstOrDefault(x => x.MemberName == name).TypedValue.Value ?? @default;
+                var entryPoint = named(nameof(DllImportAttribute.EntryPoint), method.Name);
+                var callingConvention = named(nameof(DllImportAttribute.CallingConvention), CallingConvention.Winapi);
+                var charSet = named(nameof(DllImportAttribute.CharSet), CharSet.Ansi);
+                var setLastError = named(nameof(DllImportAttribute.SetLastError), false);
                 functionDeclarations.WriteLine($@"// DLL import:
-//{'\t'}Value: {dllimport.Value}
-//{'\t'}EntryPoint: {dllimport.EntryPoint}
-//{'\t'}SetLastError: {dllimport.SetLastError}");
+//{'\t'}Value: {value}
+//{'\t'}EntryPoint: {entryPoint}
+//{'\t'}CallingConvention: {callingConvention}
+//{'\t'}CharSet: {charSet}
+//{'\t'}SetLastError: {setLastError}");
                 writer.WriteLine($@"{prototype}
 {{
-{'\t'}static void* symbol = f_load_symbol(""{dllimport.Value}""s, ""{dllimport.EntryPoint ?? method.Name}"");");
-                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, dllimport.CallingConvention, dllimport.CharSet, dllimport.SetLastError);
+{'\t'}static void* symbol = f_load_symbol(""{value}""s, ""{entryPoint}"");");
+                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, callingConvention, charSet, setLastError);
                 writer.WriteLine('}');
                 return;
             }
@@ -129,7 +136,7 @@ inline {returns}
                 return;
             }
             writer.WriteLine($@"{prototype}
-{{{string.Join(string.Empty, body.ExceptionHandlingClauses.Select(x => $"\n\t// {x}"))}");
+{{");
             definedIndices = new SortedDictionary<string, (string, int)>();
             indexToStack = new Dictionary<int, Stack>();
             log($"{method.DeclaringType}::[{method}]");
@@ -150,7 +157,7 @@ inline {returns}
                         Estimate(x.HandlerOffset, new Stack(this).Push(x.CatchType));
                         break;
                     case ExceptionHandlingClauseOptions.Filter:
-                        Estimate(x.FilterOffset, new Stack(this).Push(typeof(Exception)));
+                        Estimate(x.FilterOffset, new Stack(this).Push(typeofException));
                         break;
                     default:
                         Estimate(x.HandlerOffset, new Stack(this));
@@ -246,17 +253,18 @@ inline {returns}
 
         public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType, string resources)
         {
-            Define(typeof(RuntimeAssembly));
-            Define(typeof(RuntimeConstructorInfo));
-            Define(typeof(RuntimeMethodInfo));
-            Define(typeof(RuntimeType));
+            Define(typeofRuntimeAssembly);
+            Define(typeofRuntimeConstructorInfo);
+            Define(typeofRuntimeMethodInfo);
+            Define(typeofRuntimeType);
             Escape(finalizeOfObject);
-            Define(typeof(Thread));
-            Enqueue(typeof(ThreadStart).GetMethod("Invoke"));
-            Enqueue(typeof(ParameterizedThreadStart).GetMethod("Invoke"));
-            Define(typeof(void));
-            Define(typeof(string[]));
-            Define(typeof(StringBuilder));
+            var typeofThread = getType(typeof(Thread));
+            Define(typeofThread);
+            Enqueue(getType(typeof(ThreadStart)).GetMethod("Invoke"));
+            Enqueue(getType(typeof(ParameterizedThreadStart)).GetMethod("Invoke"));
+            Define(typeofVoid);
+            Define(typeofString.MakeArrayType());
+            Define(typeofStringBuilder);
             Define(method.DeclaringType);
             Enqueue(method);
             do
@@ -267,7 +275,7 @@ inline {returns}
             while (queuedMethods.Count > 0);
             processed = true;
             writerForDeclarations.WriteLine("#include \"base.h\"");
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) writerForDeclarations.WriteLine("#include \"waitables.h\"");
+            if (Target != PlatformID.Win32NT) writerForDeclarations.WriteLine("#include \"waitables.h\"");
             writerForDeclarations.WriteLine(@"
 namespace il2cxx
 {
@@ -365,17 +373,7 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
         if (!m.IsStatic) return false;
         var types = m.GetParameters().Select(x => x.ParameterType);
         var @return = m.ReturnType;
-        if (@return != typeof(void)) types = types.Prepend(@return);
-        try
-        {
-            foreach (var x in types)
-                if (IsComposite(x) && x != typeof(string)) Marshal.SizeOf(x);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
+        return (@return == typeofVoid ? types : types.Prepend(@return)).All(x => !IsComposite(x) || x == typeofString || Define(x).IsMarshallable);
     }).Select(m => $@"
 {'\t'}{{reinterpret_cast<void*>({Escape(m)}), reinterpret_cast<void*>(+[]({
         string.Join(",", UnmanagedSignature(m.GetParameters(), CharSet.Auto).Select((x, i) => $"\n\t\t{x} a_{i}"))
@@ -385,7 +383,7 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
 {'\t'}{'\t'}return {Escape(m)}({string.Join(",", m.GetParameters().Select((x, i) =>
         {
             if (x.ParameterType.IsByRef) return $"reinterpret_cast<{EscapeForStacked(x.ParameterType)}>(a_{i})";
-            if (x.ParameterType == typeof(string)) return $"f__new_string(a_{i})";
+            if (x.ParameterType == typeofString) return $"f__new_string(a_{i})";
             return $"a_{i}";
         }).Select(x => $"\n\t\t\t{x}"))
 }
@@ -397,10 +395,10 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
             writerForDefinitions.Write(fieldDefinitions);
             var arguments0 = string.Empty;
             var arguments1 = string.Empty;
-            if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeof(string[]) }))
+            if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))
             {
                 arguments0 = $@"
-{'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeof(string[]))}, il2cxx::{EscapeForMember(typeof(string))}>(argc);
+{'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeofString.MakeArrayType())}, il2cxx::{EscapeForMember(typeofString)}>(argc);
 {'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f_data()[i] = f__new_string(argv[i]);";
                 arguments1 = "arguments";
             }
@@ -419,15 +417,15 @@ int main(int argc, char* argv[])
 {'\t'}options.v_verbose = std::getenv(""IL2CXX_VERBOSE"");
 {'\t'}options.v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
 {'\t'}il2cxx::t_engine engine(options);
-{'\t'}return engine.f_run<{Escape(typeof(Thread))}, t_static, t_thread_static>([](auto a_p)
+{'\t'}return engine.f_run<{Escape(typeofThread)}, t_static, t_thread_static>([](auto a_p)
 {'\t'}{{
 {'\t'}{'\t'}{GenerateVirtualCall(finalizeOfObject, "a_p", Enumerable.Empty<string>(), x => x)};
 {'\t'}}}, [&]
 {'\t'}{{{arguments0}
 {'\t'}{'\t'}try {{
-{'\t'}{'\t'}{'\t'}{(method.ReturnType == typeof(void) ? $"{Escape(method)}({arguments1});\n\t\t\treturn 0" : $"return {Escape(method)}({arguments1})")};
+{'\t'}{'\t'}{'\t'}{(method.ReturnType == typeofVoid ? $"{Escape(method)}({arguments1});\n\t\t\treturn 0" : $"return {Escape(method)}({arguments1})")};
 {'\t'}{'\t'}}} catch (t_object<t__type>* p) {{
-{'\t'}{'\t'}{'\t'}{GenerateVirtualCall(typeof(object).GetMethod(nameof(object.ToString)), "p", Enumerable.Empty<string>(), x => $"auto s = {x};")}
+{'\t'}{'\t'}{'\t'}{GenerateVirtualCall(typeofObject.GetMethod(nameof(object.ToString)), "p", Enumerable.Empty<string>(), x => $"auto s = {x};")}
 {'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}));
 {'\t'}{'\t'}}}
 {'\t'}}});

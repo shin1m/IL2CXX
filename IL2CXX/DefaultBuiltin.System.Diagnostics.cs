@@ -8,15 +8,15 @@ namespace IL2CXX
     // TODO
     partial class DefaultBuiltin
     {
-        private static Builtin SetupSystemDiagnostics(this Builtin @this) => @this
-        .For(typeof(Debug), (type, code) =>
+        private static Builtin SetupSystemDiagnostics(this Builtin @this, Func<Type, Type> get) => @this
+        .For(get(typeof(Debug)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(Debug.Assert), new[] { typeof(bool) }),
+                type.GetMethod(nameof(Debug.Assert), new[] { get(typeof(bool)) }),
                 transpiler => ("\tif (!a_0) throw std::logic_error(\"Debug.Assert failed.\");\n", 0)
             );
         })
-        .For(typeof(Debugger), (type, code) =>
+        .For(get(typeof(Debugger)), (type, code) =>
         {
             code.For(
                 type.GetMethod(nameof(Debugger.Break)),
@@ -35,7 +35,7 @@ namespace IL2CXX
                 transpiler => (string.Empty, 1)
             );
         })
-        .For(Type.GetType("System.Diagnostics.Tracing.EventPipeEventDispatcher"), (type, code) =>
+        .For(get(Type.GetType("System.Diagnostics.Tracing.EventPipeEventDispatcher")), (type, code) =>
         {
             code.For(
                 type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
@@ -50,7 +50,7 @@ namespace IL2CXX
                 transpiler => (string.Empty, 0)
             );
         })
-        .For(typeof(EventSource), (type, code) =>
+        .For(get(typeof(EventSource)), (type, code) =>
         {
             code.For(
                 type.GetMethod(nameof(EventSource.GetGuid)),
@@ -77,11 +77,11 @@ namespace IL2CXX
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { typeof(Guid) }),
+                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { get(typeof(Guid)) }),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { typeof(Guid), typeof(Guid).MakeByRefType() }),
+                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { get(typeof(Guid)), get(typeof(Guid)).MakeByRefType() }),
                 transpiler => ("\t*a_1 = {};\n", 0)
             );
             code.For(
@@ -93,7 +93,7 @@ namespace IL2CXX
                 transpiler => (string.Empty, 0)
             );
         })
-        .For(Type.GetType("System.Diagnostics.Tracing.FrameworkEventSource"), (type, code) =>
+        .For(get(Type.GetType("System.Diagnostics.Tracing.FrameworkEventSource")), (type, code) =>
         {
             code.For(
                 type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),

@@ -5,6 +5,8 @@ using System.Reflection;
 
 namespace IL2CXX
 {
+    using static MethodKey;
+
     public class Builtin : IBuiltin
     {
         private const BindingFlags declaredAndInstance = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -14,13 +16,17 @@ namespace IL2CXX
             public string Base;
             public Func<Transpiler, (string, bool, string)> Members;
             public Func<Transpiler, string> Initialize;
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, (string body, int inline)>> MethodToBody = new();
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new();
-            public Dictionary<RuntimeMethodHandle, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new();
+            public Dictionary<MethodKey, Func<Transpiler, (string body, int inline)>> MethodToBody = new();
+            public Dictionary<MethodKey, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new();
+            public Dictionary<MethodKey, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new();
 
-            public void For(MethodBase method, Func<Transpiler, (string body, int inline)> body) => MethodToBody.Add(method.MethodHandle, body);
-            public void ForGeneric(MethodBase method, Func<Transpiler, Type[], (string body, int inline)> body) => GenericMethodToBody.Add(method.MethodHandle, body);
-            public void ForTree(MethodInfo method, Func<Transpiler, Type, (string body, int inline)> body) => MethodTreeToBody.Add(method.MethodHandle, body);
+            public void For(MethodBase method, Func<Transpiler, (string body, int inline)> body)
+            {
+                if (method.ReflectedType != method.DeclaringType) throw new InvalidOperationException();
+                MethodToBody.Add(ToKey(method), body);
+            }
+            public void ForGeneric(MethodBase method, Func<Transpiler, Type[], (string body, int inline)> body) => GenericMethodToBody.Add(ToKey(method), body);
+            public void ForTree(MethodInfo method, Func<Transpiler, Type, (string body, int inline)> body) => MethodTreeToBody.Add(ToKey(method), body);
         }
 
         public Dictionary<Type, Code> TypeToCode = new();
@@ -38,14 +44,14 @@ namespace IL2CXX
         public string GetBase(Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Base : null;
         public (string members, bool managed, string unmanaged) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? default : default;
         public string GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
-        public (string body, int inline) GetBody(Transpiler transpiler, MethodBase method)
+        public (string body, int inline) GetBody(Transpiler transpiler, MethodKey key)
         {
+            var method = key.Method;
             var type = method.DeclaringType;
-            var handle = method.MethodHandle;
             if (type.IsArray)
             {
                 var rank = type.GetArrayRank();
-                if (handle == type.GetConstructor(Enumerable.Repeat(typeof(int), rank).ToArray()).MethodHandle) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
+                if (method == type.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, rank).ToArray())) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
 {'\t'}auto extra = sizeof({transpiler.Escape(type.GetElementType())}) * n;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = n;
@@ -61,14 +67,14 @@ namespace IL2CXX
 }{'\t'}{'\t'}i = i * bounds[{i}].v_length + j;
 {'\t'}}}
 "))}";
-                if (handle == type.GetMethod("Get").MethodHandle) return (prepare() + "\treturn a_0->f_data()[i];\n", 1);
-                if (handle == type.GetMethod("Set").MethodHandle) return (prepare() + $"\ta_0->f_data()[i] = a_{rank + 1};\n", 1);
-                if (handle == type.GetMethod("Address").MethodHandle) return (prepare() + "\treturn a_0->f_data() + i;\n", 1);
+                if (key == ToKey(type.GetMethod("Get"))) return (prepare() + "\treturn a_0->f_data()[i];\n", 1);
+                if (key == ToKey(type.GetMethod("Set"))) return (prepare() + $"\ta_0->f_data()[i] = a_{rank + 1};\n", 1);
+                if (key == ToKey(type.GetMethod("Address"))) return (prepare() + "\treturn a_0->f_data() + i;\n", 1);
             }
-            if (type.IsSubclassOf(typeof(Delegate)) && type != typeof(MulticastDelegate))
+            if (type.IsSubclassOf(transpiler.typeofDelegate) && type != transpiler.typeofMulticastDelegate)
             {
                 var invoke = type.GetMethod("Invoke");
-                if (handle == type.GetConstructor(new[] { typeof(object), typeof(IntPtr) }).MethodHandle)
+                if (method == type.GetConstructor(new[] { transpiler.typeofObject, transpiler.typeofIntPtr }))
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
@@ -96,35 +102,50 @@ namespace IL2CXX
 {'\t'}return p;
 ", 1);
                 }
-                else if (handle == invoke.MethodHandle)
+                else if (key == ToKey(invoke))
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    return ($"\treturn reinterpret_cast<{transpiler.EscapeForStacked(@return)}(*)({string.Join(", ", parameters.Prepend(typeof(object)).Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
+                    return ($"\treturn reinterpret_cast<{transpiler.EscapeForStacked(@return)}(*)({string.Join(", ", parameters.Prepend(transpiler.typeofObject).Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
                 }
             }
             if (TypeToCode.TryGetValue(type, out var code))
             {
-                if (code.MethodToBody.TryGetValue(handle, out var body0)) return body0(transpiler);
-                if (method.IsGenericMethod && code.GenericMethodToBody.TryGetValue(((MethodInfo)method).GetGenericMethodDefinition().MethodHandle, out var body1)) return body1(transpiler, method.GetGenericArguments());
+                if (code.MethodToBody.TryGetValue(key, out var body0)) return body0(transpiler);
+                if (method.IsGenericMethod && code.GenericMethodToBody.TryGetValue(ToKey(((MethodInfo)method).GetGenericMethodDefinition()), out var body1)) return body1(transpiler, method.GetGenericArguments());
             }
             if (type.IsGenericType)
             {
                 var gt = type.GetGenericTypeDefinition();
-                if (TypeToCode.TryGetValue(gt, out var gc) && gc.GenericMethodToBody.TryGetValue(MethodBase.GetMethodFromHandle(handle, gt.TypeHandle).MethodHandle, out var body)) return body(transpiler, type.GetGenericArguments());
+                if (TypeToCode.TryGetValue(gt, out var gc))
+                {
+                    MethodBase gm;
+                    if (method == type.TypeInitializer)
+                    {
+                        gm = gt.TypeInitializer;
+                    }
+                    else
+                    {
+                        var all = declaredAndInstance | BindingFlags.Static;
+                        gm = method.IsConstructor
+                            ? gt.GetConstructors(all)[Array.IndexOf(type.GetConstructors(all), method)]
+                            : gt.GetMethods(all)[Array.IndexOf(type.GetMethods(all), method)];
+                    }
+                    if (gc.GenericMethodToBody.TryGetValue(ToKey(gm), out var body)) return body(transpiler, type.GetGenericArguments());
+                }
             }
             if (method is MethodInfo mi)
             {
                 if (mi.IsGenericMethod) mi = mi.GetGenericMethodDefinition();
-                var origin = mi.GetBaseDefinition().MethodHandle;
+                var origin = Transpiler.GetBaseDefinition(mi);
                 for (var t = mi.DeclaringType;;)
                 {
-                    if (TypeToCode.TryGetValue(t, out var c) && c.MethodTreeToBody.TryGetValue(mi.MethodHandle, out var body)) return body(transpiler, type);
-                    if (mi.MethodHandle == origin) break;
+                    if (TypeToCode.TryGetValue(t, out var c) && c.MethodTreeToBody.TryGetValue(ToKey(mi), out var body)) return body(transpiler, type);
+                    if (mi == origin) break;
                     do
                     {
                         t = t.BaseType;
-                        mi = t.GetMethods(declaredAndInstance).FirstOrDefault(x => x.GetBaseDefinition().MethodHandle == origin);
+                        mi = t.GetMethods(declaredAndInstance).FirstOrDefault(x => Transpiler.GetBaseDefinition(x) == origin);
                     } while (mi == null);
                 }
             }

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -14,17 +13,105 @@ namespace IL2CXX
     partial class Transpiler
     {
         private const BindingFlags declaredAndInstance = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        private static readonly MethodInfo getCorElementTypeOfElementType = typeof(Array).GetMethod("GetCorElementTypeOfElementType", declaredAndInstance);
-        private static readonly MethodInfo internalGetCorElementType = typeof(Enum).GetMethod("InternalGetCorElementType", declaredAndInstance);
+        private const BindingFlags exactInstance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.ExactBinding;
 
-        private class RuntimeDefinition : IEqualityComparer<Type[]>
+        private static Type ReplaceGenericMethodParameter(Type type)
+        {
+            if (type.IsGenericMethodParameter) return Type.MakeGenericMethodParameter(type.GenericParameterPosition);
+            if (type.IsSZArray) return ReplaceGenericMethodParameter(type.GetElementType()).MakeArrayType();
+            if (type.IsArray) return ReplaceGenericMethodParameter(type.GetElementType()).MakeArrayType(type.GetArrayRank());
+            if (type.IsByRef) return ReplaceGenericMethodParameter(type.GetElementType()).MakeByRefType();
+            if (type.IsPointer) return ReplaceGenericMethodParameter(type.GetElementType()).MakePointerType();
+            if (type.ContainsGenericParameters) return type.GetGenericTypeDefinition().MakeGenericType(type.GetGenericArguments().Select(ReplaceGenericMethodParameter).ToArray());
+            return type;
+        }
+        public static MethodInfo GetBaseDefinition(MethodInfo method)
+        {
+            if (method.ReflectedType != method.DeclaringType) throw new InvalidOperationException();
+            if (!method.IsVirtual || method.DeclaringType.IsInterface) return method;
+            var name = method.Name;
+            var g = method.GetGenericArguments().Length;
+            var ps = method.GetParameters().Select(x => x.ParameterType).Select(ReplaceGenericMethodParameter).ToArray();
+            MethodInfo get(Type t) => t.GetMethod(name, g, exactInstance, null, ps, null);
+            while (!method.Attributes.HasFlag(MethodAttributes.NewSlot)) method = get(get(method.DeclaringType.BaseType).DeclaringType);
+            return method;
+        }
+        private static string ExplicitName(Type type)
+        {
+            if (type.IsGenericTypeParameter) return type.Name;
+            if (!type.IsGenericType) return type.FullName;
+            var name = type.GetGenericTypeDefinition().FullName;
+            return $"{name.Substring(0, name.IndexOf('`'))}<{string.Join(",", type.GetGenericArguments().Select(ExplicitName))}>";
+        }
+        private InterfaceMapping GetInterfaceMap(Type type, Type @interface)
+        {
+            var ims = @interface.GetMethods();
+            var tms = new MethodInfo[ims.Length];
+            for (var i = 0; i < ims.Length; ++i)
+            {
+                var m = ims[i];
+                var g = m.GetGenericArguments().Length;
+                var ps = m.GetParameters().Select(x => x.ParameterType).Select(ReplaceGenericMethodParameter).ToArray();
+                MethodInfo get(Type t, string name)
+                {
+                    var m = t.GetMethod(name, g, exactInstance, null, ps, null);
+                    return m == null || m.DeclaringType == t ? m : get(m.DeclaringType, name);
+                }
+                var t = type;
+                do
+                {
+                    var prefix = ExplicitName(t.IsGenericType
+                        ? t.GetGenericTypeDefinition().GetInterfaces()[Array.IndexOf(t.GetInterfaces(), @interface)]
+                        : @interface
+                    );
+                    if ((tms[i] = get(t, $"{prefix}.{m.Name}") ?? get(t, m.Name)) != null) break;
+                }
+                while ((t = t.BaseType) != null);
+                if (tms[i] == null) throw new Exception($"{type} -> {@interface} {m}");
+            }
+            return new InterfaceMapping
+            {
+                InterfaceType = @interface,
+                InterfaceMethods = ims,
+                TargetType = type,
+                TargetMethods = tms
+            };
+        }
+        private byte GetCorElementType(Type type) => (byte)(Type.GetTypeCode(type) switch
+        {
+            TypeCode.Boolean => 0x2,
+            TypeCode.Char => 0x3,
+            TypeCode.SByte => 0x4,
+            TypeCode.Byte => 0x5,
+            TypeCode.Int16 => 0x6,
+            TypeCode.UInt16 => 0x7,
+            TypeCode.Int32 => 0x8,
+            TypeCode.UInt32 => 0x9,
+            TypeCode.Int64 => 0xa,
+            TypeCode.UInt64 => 0xb,
+            TypeCode.Single => 0xc,
+            TypeCode.Double => 0xd,
+            //TypeCode.String => 0xe,
+            _ =>
+                type.IsPointer ? 0xf :
+                type.IsArray ? 0x14 :
+                type == typeofIntPtr ? 0x18 :
+                type == typeofUIntPtr ? 0x19 :
+                type.IsSZArray ? 0x1d : 0x1c
+        });
+
+        public class RuntimeDefinition : IEqualityComparer<Type[]>
         {
             bool IEqualityComparer<Type[]>.Equals(Type[] x, Type[] y) => x.SequenceEqual(y);
             int IEqualityComparer<Type[]>.GetHashCode(Type[] x) => x.Select(y => y.GetHashCode()).Aggregate((y, z) => y % z);
 
             public readonly Type Type;
             public bool IsManaged;
+            public bool IsBlittable;
+            public int Alignment;
+            public int UnmanagedSize;
             public bool HasUnmanaged;
+            public bool IsMarshallable => IsBlittable || HasUnmanaged || Type.GetTypeCode(Type) == TypeCode.Boolean;
             public readonly List<MethodInfo> Methods = new();
             public readonly Dictionary<MethodKey, int> MethodToIndex = new();
 
@@ -58,6 +145,26 @@ namespace IL2CXX
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
             {
                 IsManaged = !Type.IsValueType;
+                if (Type.IsPrimitive)
+                {
+                    if (Type == transpiler.typeofBoolean)
+                    {
+                        UnmanagedSize = transpiler.Define(transpiler.typeofInt32).UnmanagedSize;
+                    }
+                    else if (Type != transpiler.typeofChar)
+                    {
+                        IsBlittable = true;
+                        UnmanagedSize = Type == transpiler.typeofIntPtr || Type == transpiler.typeofUIntPtr
+                            ? transpiler.Is64Bit ? 8 : 4
+                            : Marshal.SizeOf(Type.GetType(Type.ToString(), true));
+                    }
+                }
+                else if (Type.IsEnum)
+                {
+                    IsBlittable = true;
+                    UnmanagedSize = transpiler.Define(Type.GetEnumUnderlyingType()).UnmanagedSize;
+                }
+                Alignment = UnmanagedSize;
                 if (Type.BaseType != null)
                 {
                     Base = (TypeDefinition)transpiler.Define(Type.BaseType);
@@ -65,7 +172,7 @@ namespace IL2CXX
                 }
                 foreach (var x in Type.GetMethods(declaredAndInstance).Where(x => x.IsVirtual))
                 {
-                    var i = GetIndex(x.GetBaseDefinition());
+                    var i = GetIndex(GetBaseDefinition(x));
                     if (i < 0)
                         Add(x, transpiler.genericMethodToTypesToIndex);
                     else
@@ -75,7 +182,7 @@ namespace IL2CXX
                 {
                     var definition = (InterfaceDefinition)transpiler.Define(x);
                     var methods = new MethodInfo[definition.Methods.Count];
-                    var map = (Type.IsArray && x.IsGenericType ? typeof(SZArrayHelper<>).MakeGenericType(GetElementType(Type)) : Type).GetInterfaceMap(x);
+                    var map = transpiler.GetInterfaceMap(Type.IsArray && x.IsGenericType ? transpiler.typeofSZArrayHelper.MakeGenericType(transpiler.GetElementType(Type)) : Type, x);
                     foreach (var (i, t) in map.InterfaceMethods.Zip(map.TargetMethods, (i, t) => (i, t))) methods[definition.GetIndex(i)] = t;
                     InterfaceToMethods.Add(x, methods);
                 }
@@ -93,7 +200,7 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
 ";
                     transpiler.Enqueue(constructor);
                 }
-                if (Type.IsSubclassOf(typeof(Delegate)) && Type != typeof(MulticastDelegate))
+                if (Type.IsSubclassOf(transpiler.typeofDelegate) && Type != transpiler.typeofMulticastDelegate)
                 {
                     var invoke = (MethodInfo)Type.GetMethod("Invoke");
                     transpiler.Enqueue(invoke);
@@ -106,20 +213,18 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
 {'\t'}{{
 {body}{'\t'}}})";
                     string call(string @this) => $"{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, @this)))});";
-                    Delegate = $@"{'\t'}v__multicast_invoke = {generate(typeof(MulticastDelegate), $@"{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(typeof(object[]))}*>(a_0->v__5finvocationList)->f_data();
+                    Delegate = $@"{'\t'}v__multicast_invoke = {generate(transpiler.typeofMulticastDelegate, $@"{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(transpiler.typeofObject.MakeArrayType())}*>(a_0->v__5finvocationList)->f_data();
 {'\t'}{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
 {'\t'}{'\t'}for (intptr_t i = 0; i < n; ++i) {call("xs[i]")};
 {'\t'}{'\t'}return {call("xs[n]")};
 ")};
 ";
-                    try
+                    if ((@return == transpiler.typeofVoid ? parameters : parameters.Prepend(@return)).All(x => !IsComposite(x) || x == transpiler.typeofString || x == transpiler.typeofStringBuilder || transpiler.typeofSafeHandle.IsAssignableFrom(x) || x.IsArray || transpiler.Define(x).IsMarshallable))
                     {
-                        foreach (var x in @return == typeof(void) ? parameters : parameters.Prepend(@return))
-                            if (IsComposite(x) && x != typeof(string) && x != typeof(StringBuilder) && !typeof(SafeHandle).IsAssignableFrom(x) && !x.IsArray) Marshal.SizeOf(x);
                         using var writer = new StringWriter();
                         transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);
                         Delegate += $"{'\t'}v__invoke_unmanaged = {generate(Type, writer.ToString())};\n";
-                    } catch { }
+                    }
                 }
             }
             protected override int GetIndex(MethodKey method) => MethodToIndex.TryGetValue(method, out var i) ? i : Base?.GetIndex(method) ?? -1;
@@ -137,13 +242,18 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
         private readonly Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex = new();
         private bool processed;
 
-        private RuntimeDefinition Define(Type type)
+        public RuntimeDefinition Define(Type type)
         {
             if (typeToRuntime.TryGetValue(type, out var definition)) return definition;
             if (processed) throw new InvalidOperationException($"{type}");
             if (type.IsByRef || type.IsPointer)
             {
                 definition = new RuntimeDefinition(type);
+                if (type.IsPointer)
+                {
+                    definition.IsBlittable = true;
+                    definition.Alignment = definition.UnmanagedSize = Define(typeofIntPtr).UnmanagedSize;
+                }
                 typeToRuntime.Add(type, definition);
                 queuedTypes.Enqueue(GetElementType(type));
             }
@@ -169,7 +279,7 @@ struct {Escape(type)}
                     else if (methodToIdentifier.ContainsKey(ToKey(m)))
                         Enqueue(concrete);
                 }
-                foreach (var m in td.Methods.Where(x => !x.IsAbstract)) enqueue(m.GetBaseDefinition(), m);
+                foreach (var m in td.Methods.Where(x => !x.IsAbstract)) enqueue(GetBaseDefinition(m), m);
                 foreach (var p in td.InterfaceToMethods)
                 {
                     var id = typeToRuntime[p.Key];
@@ -181,7 +291,7 @@ struct {Escape(type)}
                 var threadStaticFields = new List<FieldInfo>();
                 if (!type.IsEnum)
                     foreach (var x in type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-                        (Attribute.IsDefined(x, typeof(ThreadStaticAttribute)) ? threadStaticFields : staticFields).Add(x);
+                        (x.GetCustomAttributesData().Any(x => x.AttributeType == typeofThreadStaticAttribute) ? threadStaticFields : staticFields).Add(x);
                 var staticDefinitions = new StringWriter();
                 var staticMembers = new StringWriter();
                 var initialize = builtin.GetInitialize(this, type);
@@ -189,14 +299,12 @@ struct {Escape(type)}
                 {
                     foreach (var x in staticFields)
                     {
-                        var bytes = new byte[Marshal.SizeOf(x.FieldType)];
-                        RuntimeHelpers.InitializeArray(bytes, x.FieldHandle);
                         fieldDeclarations.WriteLine($@"extern uint8_t v__field_{identifier}__{Escape(x.Name)}[];
 inline void* f__field_{identifier}__{Escape(x.Name)}()
 {{
 {'\t'}return v__field_{identifier}__{Escape(x.Name)};
 }}");
-                        fieldDefinitions.WriteLine($@"uint8_t v__field_{identifier}__{Escape(x.Name)}[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};");
+                        fieldDefinitions.WriteLine($@"uint8_t v__field_{identifier}__{Escape(x.Name)}[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
                     }
                 }
                 else if (staticFields.Count > 0 || initialize != null || type.TypeInitializer != null)
@@ -238,7 +346,7 @@ struct t__static_{identifier}
                     declaration += $"\nstruct {identifier}";
                     var @base = type.BaseType == null ? string.Empty : $" : {builtin.GetBase(type) ?? Escape(type.BaseType)}";
                     string members;
-                    if (type == typeof(void))
+                    if (type == typeofVoid)
                     {
                         members = string.Empty;
                     }
@@ -282,70 +390,87 @@ struct t__static_{identifier}
                             {
                                 var fields = type.GetFields(declaredAndInstance);
                                 if (type.IsValueType) td.IsManaged = fields.Select(x => x.FieldType).Any(x => IsComposite(x) && (!x.IsValueType || Define(x).IsManaged));
-                                var blittable = false;
                                 var layout = type.StructLayoutAttribute;
-                                if (layout?.Value == LayoutKind.Sequential)
-                                    try
-                                    {
-                                        GCHandle.Alloc(Activator.CreateInstance(type), GCHandleType.Pinned).Free();
-                                        Marshal.SizeOf(type);
-                                        foreach (var x in fields) Marshal.SizeOf(x.FieldType);
-                                        blittable = true;
-                                    }
-                                    catch
-                                    {
-                                        try
-                                        {
-                                            var n = Marshal.SizeOf(type);
-                                            var sb = new StringBuilder($@"
+                                var kind = layout?.Value ?? LayoutKind.Auto;
+                                CustomAttributeData getMarshalAs(FieldInfo x) => x.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofMarshalAsAttribute);
+                                UnmanagedType? getMarshalAsValue(CustomAttributeData x) => (UnmanagedType?)(int?)x?.ConstructorArguments[0].Value;
+                                if (kind != LayoutKind.Auto)
+                                {
+                                    td.IsBlittable = fields.All(x => Define(x.FieldType).IsBlittable);
+                                    var pack = layout.Pack == 0 ? Define(typeofIntPtr).Alignment : layout.Pack;
+                                    var sizeofTChar = layout.CharSet == CharSet.Unicode ? 2 : 1;
+                                    td.Alignment = Math.Min(fields.Select(x => x.FieldType == typeofString
+                                        ? getMarshalAsValue(getMarshalAs(x)) == UnmanagedType.ByValTStr
+                                            ? sizeofTChar
+                                            : Define(typeofIntPtr).Alignment
+                                        : Define(x.FieldType).Alignment
+                                    ).DefaultIfEmpty(pack).Max(), pack);
+                                }
+                                if (kind == LayoutKind.Sequential && !td.IsBlittable && fields.Select(x => x.FieldType).All(x => x == typeofString || Define(x).IsMarshallable))
+                                {
+                                    var sb = new StringBuilder($@"
 #pragma pack(push, 1)
 struct {Escape(type)}__unmanaged
 {{
 ");
-                                            var i = 0;
-                                            foreach (var x in fields)
+                                    var i = 0;
+                                    int align(int n) => (i + n - 1) / n * n;
+                                    void pad(int j)
+                                    {
+                                        if (j > i) sb.AppendLine($"\tchar v__padding{i}[{j - i}];");
+                                        i = j;
+                                    }
+                                    foreach (var x in fields)
+                                    {
+                                        var f = Escape(x);
+                                        if (x.FieldType == typeofString)
+                                        {
+                                            var marshalAs = getMarshalAs(x);
+                                            var value = getMarshalAsValue(marshalAs);
+                                            var unicode = layout.CharSet == CharSet.Unicode;
+                                            if (value == UnmanagedType.ByValTStr)
                                             {
-                                                var j = (int)Marshal.OffsetOf(type, x.Name);
-                                                if (j > i) sb.AppendLine($"\tchar v__padding{i}[{j - i}];");
-                                                var f = Escape(x);
-                                                var marshalAs = x.GetCustomAttribute<MarshalAsAttribute>();
-                                                if (x.FieldType == typeof(string))
-                                                {
-                                                    var unicode = layout.CharSet == CharSet.Unicode;
-                                                    if (marshalAs?.Value == UnmanagedType.ByValTStr)
-                                                    {
-                                                        sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {f}[{marshalAs.SizeConst}];");
-                                                        i = j + marshalAs.SizeConst * (unicode ? 2 : 1);
-                                                    }
-                                                    else
-                                                    {
-                                                        switch (marshalAs?.Value)
-                                                        {
-                                                            case null:
-                                                            case UnmanagedType.LPStr:
-                                                                unicode = false;
-                                                                break;
-                                                            case UnmanagedType.LPWStr:
-                                                                unicode = true;
-                                                                break;
-                                                        }
-                                                        sb.AppendLine($"\t{(unicode ? "char16_t" : "char")}* {f};");
-                                                        i = j + Marshal.SizeOf<IntPtr>();
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    sb.AppendLine(Define(x.FieldType).HasUnmanaged
-                                                        ? $"\t{Escape(x.FieldType)}__unmanaged {f};"
-                                                        : $"\t{EscapeForValue(x.FieldType)} {f};"
-                                                    );
-                                                    i = j + Marshal.SizeOf(x.FieldType);
-                                                }
+                                                if (unicode) pad(align(Math.Min(2, td.Alignment)));
+                                                //var size = (int)marshalAs.NamedArguments.First(x => x.MemberName == nameof(MarshalAsAttribute.SizeConst)).TypedValue.Value;
+                                                var size = GetSizeConst(x);
+                                                sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {f}[{size}];");
+                                                i += size * (unicode ? 2 : 1);
                                             }
-                                            if (n > i) sb.AppendLine($"\tchar v__padding{i}[{n - i}];");
-                                            var at = $"{Escape(type)}{(type.IsValueType ? "::t_value" : string.Empty)}*";
-                                            var fs = fields.Select(Escape);
-                                            unmanaged = sb.AppendLine($@"{'\t'}void f_in(const {at} a_p)
+                                            else
+                                            {
+                                                var ftd = Define(typeofIntPtr);
+                                                pad(align(Math.Min(ftd.Alignment, td.Alignment)));
+                                                switch (value)
+                                                {
+                                                    case null:
+                                                    case UnmanagedType.LPStr:
+                                                        unicode = false;
+                                                        break;
+                                                    case UnmanagedType.LPWStr:
+                                                        unicode = true;
+                                                        break;
+                                                }
+                                                sb.AppendLine($"\t{(unicode ? "char16_t" : "char")}* {f};");
+                                                i += ftd.UnmanagedSize;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            var ftd = Define(x.FieldType);
+                                            pad(align(Math.Min(ftd.Alignment, td.Alignment)));
+                                            sb.AppendLine(
+                                                x.FieldType == typeofBoolean ? $"\t{EscapeForValue(typeofInt32)} {f};" :
+                                                ftd.HasUnmanaged ? $"\t{Escape(x.FieldType)}__unmanaged {f};" :
+                                                $"\t{EscapeForValue(x.FieldType)} {f};"
+                                            );
+                                            i += ftd.UnmanagedSize;
+                                        }
+                                    }
+                                    td.UnmanagedSize = Math.Max(align(td.Alignment), layout.Size);
+                                    pad(td.UnmanagedSize);
+                                    var at = $"{Escape(type)}{(type.IsValueType ? "::t_value" : string.Empty)}*";
+                                    var fs = fields.Select(Escape);
+                                    unmanaged = sb.AppendLine($@"{'\t'}void f_in(const {at} a_p)
 {'\t'}{{
 {string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_in({x}, a_p->{x});\n"))}{'\t'}}}
 {'\t'}void f_out({at} a_p) const
@@ -356,39 +481,22 @@ struct {Escape(type)}__unmanaged
 {string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_destroy({x});\n"))}{'\t'}}}
 }};
 #pragma pack(pop)").ToString();
-                                        } catch { }
-                                    }
+                                }
                                 string variables(string indent)
                                 {
                                     var sb = new StringBuilder();
                                     string variable(FieldInfo x) => $"{EscapeForMember(x.FieldType)} {Escape(x)};";
-                                    if (layout?.Value == LayoutKind.Explicit)
+                                    if (kind == LayoutKind.Explicit)
                                     {
                                         sb.AppendLine($@"#pragma pack(push, 1)
 {indent}union
 {indent}{{");
-                                        int n;
-                                        try
-                                        {
-                                            n = Marshal.SizeOf(type);
-                                        }
-                                        catch
-                                        {
-                                            n = layout.Size;
-                                        }
-                                        if (n > 0) sb.AppendLine($"{indent}\tchar v__size[{n}];");
+                                        td.UnmanagedSize = Math.Max(td.Alignment, layout.Size);
+                                        sb.AppendLine($"{indent}\tchar v__size[{td.UnmanagedSize}];");
                                         var i = 0;
                                         foreach (var x in fields)
                                         {
-                                            int j;
-                                            try
-                                            {
-                                                j = (int)Marshal.OffsetOf(type, x.Name);
-                                            }
-                                            catch
-                                            {
-                                                j = x.GetCustomAttribute<FieldOffsetAttribute>().Value;
-                                            }
+                                            var j = (int)x.GetCustomAttributesData().First(x => x.AttributeType == typeofFieldOffsetAttribute).ConstructorArguments[0].Value;
                                             sb.AppendLine(j > 0 ? $@"{indent}{'\t'}struct
 {indent}{'\t'}{{
 {indent}{'\t'}{'\t'}char v__offset{i++}[{j}];
@@ -397,19 +505,25 @@ struct {Escape(type)}__unmanaged
                                         }
                                         sb.AppendLine($"{indent}}};\n#pragma pack(pop)");
                                     }
-                                    else if (blittable)
+                                    else if (td.IsBlittable)
                                     {
                                         sb.AppendLine("#pragma pack(push, 1)");
                                         var i = 0;
+                                        int align(int n) => (i + n - 1) / n * n;
+                                        void pad(int j)
+                                        {
+                                            if (j > i) sb.AppendLine($"{indent}char v__padding{i}[{j - i}];");
+                                            i = j;
+                                        }
                                         foreach (var x in fields)
                                         {
-                                            var j = (int)Marshal.OffsetOf(type, x.Name);
-                                            if (j > i) sb.AppendLine($"{indent}char v__padding{i}[{j - i}];");
+                                            var ftd = Define(x.FieldType);
+                                            pad(align(Math.Min(ftd.Alignment, td.Alignment)));
                                             sb.AppendLine($"{indent}{variable(x)}");
-                                            i = j + Marshal.SizeOf(x.FieldType);
+                                            i += ftd.UnmanagedSize;
                                         }
-                                        var n = Marshal.SizeOf(type);
-                                        if (n > i) sb.AppendLine($"{indent}char v__padding{i}[{n - i}];");
+                                        td.UnmanagedSize = Math.Max(align(td.Alignment), layout?.Size ?? 0);
+                                        pad(td.UnmanagedSize);
                                         sb.AppendLine("#pragma pack(pop)");
                                     }
                                     else
@@ -472,7 +586,7 @@ struct {Escape(type)}__unmanaged
             }
             runtimeDefinitions.Add(definition);
             // TODO
-            //if (!type.IsArray && !type.IsByRef && !type.IsPointer && type != typeof(void))
+            //if (!type.IsArray && !type.IsByRef && !type.IsPointer && type != typeofVoid)
             if (type.IsEnum)
                 try
                 {
@@ -487,7 +601,7 @@ struct {Escape(type)}__unmanaged
             var identifier = Escape(type);
             if (type.IsEnum) writerForDefinitions.Write($@"
 std::pair<uint64_t, std::u16string_view> v__enum_pairs_{identifier}[] = {{{
-    string.Join(",", Enum.GetValues(type).Cast<object>().Select(x => $"\n\t{{{(ulong)Convert.ToInt64(x)}ul, u\"{Enum.GetName(type, x)}\"sv}}"))
+    string.Join(",", type.GetFields(BindingFlags.Static | BindingFlags.Public).Select(x => $"\n\t{{{(ulong)Convert.ToInt64(x.GetRawConstantValue())}ul, u\"{x.Name}\"sv}}"))
 }
 }};");
             writerForDeclarations.WriteLine($@"
@@ -519,7 +633,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
     }))
 }{indent}}} v_generic__{Escape(m)};");
                 }
-                writeMethods(td.Methods, (i, m, name) => name, (i, j, m, name) => name, x => x.GetBaseDefinition(), "\t");
+                writeMethods(td.Methods, (i, m, name) => name, (i, j, m, name) => name, GetBaseDefinition, "\t");
                 foreach (var p in td.InterfaceToMethods)
                 {
                     string types(MethodInfo m) => string.Join(", ", m.GetParameters().Select(x => x.ParameterType).Prepend(GetReturnType(m)).Select(EscapeForStacked));
@@ -542,7 +656,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
 {'\t'}static t__object* f_do_clone(const t__object* a_this);");
-                if (type != typeof(void) && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_initialize(const void* a_from, size_t a_n, void* a_to);
+                if (type != typeofVoid && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_initialize(const void* a_from, size_t a_n, void* a_to);
 {'\t'}static void f_do_clear(void* a_p, size_t a_n);
 {'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
                 if (definition.HasUnmanaged)
@@ -571,7 +685,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 )}, {(
     type.IsEnum ? "true" : "false"
 )}, {(
-    type == typeof(void) ? "0" : $"sizeof({EscapeForValue(type)})"
+    type == typeofVoid ? "0" : $"sizeof({EscapeForValue(type)})"
 )}, {szarray})
 {{");
             if (definition is TypeDefinition) writerForDefinitions.WriteLine($"\tv__managed_size = sizeof({Escape(type)});");
@@ -580,17 +694,14 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}f_to_unmanaged = f_do_to_unmanaged;
 {'\t'}f_from_unmanaged = f_do_from_unmanaged;
 {'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged;");
-            else if (!type.IsArray)
-                try
-                {
-                    writerForDefinitions.WriteLine($@"{'\t'}v__unmanaged_size = {Marshal.SizeOf(type)};
+            else if (!type.IsArray && !type.IsEnum && definition.IsBlittable)
+                writerForDefinitions.WriteLine($@"{'\t'}v__unmanaged_size = sizeof({EscapeForValue(type)});
 {'\t'}f_to_unmanaged = f_do_to_unmanaged_blittable;
 {'\t'}f_from_unmanaged = f_do_from_unmanaged_blittable;
 {'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged_blittable;");
-                } catch { }
             if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
 {'\t'}v__rank = {type.GetArrayRank()};
-{'\t'}v__cor_element_type = {(byte)getCorElementTypeOfElementType.Invoke(Array.CreateInstance(type, 0), null)};");
+{'\t'}v__cor_element_type = {GetCorElementType(GetElementType(type))};");
             if (td?.DefaultConstructor != null) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
             writerForDefinitions.Write(td?.Delegate);
             var nv = Nullable.GetUnderlyingType(type);
@@ -599,12 +710,12 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             {
                 writerForDefinitions.WriteLine($@"{'\t'}t__type::f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
-                if (type != typeof(void) && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_initialize = f_do_initialize;
+                if (type != typeofVoid && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_initialize = f_do_initialize;
 {'\t'}f_clear = f_do_clear;
 {'\t'}f_copy = f_do_copy;");
                 if (type.IsEnum) writerForDefinitions.WriteLine($@"{'\t'}v__enum_pairs = v__enum_pairs_{identifier};
 {'\t'}v__enum_count = std::size(v__enum_pairs_{identifier});
-{'\t'}v__cor_element_type = {(byte)internalGetCorElementType.Invoke(Activator.CreateInstance(type), null)};");
+{'\t'}v__cor_element_type = {GetCorElementType(type.GetEnumUnderlyingType())};");
             }
             writerForDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
@@ -631,7 +742,7 @@ t__object* t__type_of<{identifier}>::f_do_clone(const t__object* a_this)
                 else
                 {
                     writerForDefinitions.WriteLine(
-                        type == typeof(void) ? $"\treturn t__new<{identifier}>(0);" :
+                        type == typeofVoid ? $"\treturn t__new<{identifier}>(0);" :
                         type.IsValueType ? $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;

@@ -1,62 +1,61 @@
 using System;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
-        private static Builtin SetupSystemThreading(this Builtin @this) => @this
-        .For(typeof(Interlocked), (type, code) =>
+        private static Builtin SetupSystemThreading(this Builtin @this, Func<Type, Type> get, PlatformID target) => @this
+        .For(get(typeof(Interlocked)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(int).MakeByRefType(), typeof(int), typeof(int) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(int)).MakeByRefType(), get(typeof(int)), get(typeof(int)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}reinterpret_cast<std::atomic_int32_t*>(a_0)->compare_exchange_strong(a_2, a_1);
 {'\t'}return a_2;
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(long).MakeByRefType(), typeof(long), typeof(long) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(long)).MakeByRefType(), get(typeof(long)), get(typeof(long)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}reinterpret_cast<std::atomic_int64_t*>(a_0)->compare_exchange_strong(a_2, a_1);
 {'\t'}return a_2;
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr), typeof(IntPtr) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)), get(typeof(IntPtr)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}void* p = a_2;
 {'\t'}reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).compare_exchange_strong(p, a_1);
-{'\t'}return {transpiler.EscapeForValue(typeof(IntPtr))}{{p}};
+{'\t'}return {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{p}};
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { typeof(object).MakeByRefType(), typeof(object), typeof(object) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(object)).MakeByRefType(), get(typeof(object)), get(typeof(object)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}f__compare_exchange(*a_0, a_2, a_1);
 {'\t'}return a_2;
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(int).MakeByRefType(), typeof(int) }),
+                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(int)).MakeByRefType(), get(typeof(int)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn reinterpret_cast<std::atomic_int32_t*>(a_0)->exchange(a_1);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(long).MakeByRefType(), typeof(long) }),
+                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(long)).MakeByRefType(), get(typeof(long)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn reinterpret_cast<std::atomic_int64_t*>(a_0)->exchange(a_1);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(IntPtr).MakeByRefType(), typeof(IntPtr) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1)}};\n", 1)
+                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)) }),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $"\treturn {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{reinterpret_cast<std::atomic<void*>&>(a_0->v__5fvalue).exchange(a_1)}};\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { typeof(object).MakeByRefType(), typeof(object) }),
+                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(object)).MakeByRefType(), get(typeof(object)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__exchange(*a_0, a_1);\n", 1)
             );
             code.For(
-                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(int).MakeByRefType(), typeof(int) }, null),
+                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(int)).MakeByRefType(), get(typeof(int)) }, null),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn reinterpret_cast<std::atomic_int32_t*>(a_0)->fetch_add(a_1);\n", 1)
             );
             code.For(
-                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(long).MakeByRefType(), typeof(long) }, null),
+                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(long)).MakeByRefType(), get(typeof(long)) }, null),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn reinterpret_cast<std::atomic_int64_t*>(a_0)->fetch_add(a_1);\n", 1)
             );
             code.For(
@@ -64,7 +63,7 @@ namespace IL2CXX
                 transpiler => ("\tstd::atomic_thread_fence(std::memory_order_seq_cst);\n", 1)
             );
         })
-        .For(typeof(Monitor), (type, code) =>
+        .For(get(typeof(Monitor)), (type, code) =>
         {
             code.For(
                 type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
@@ -77,7 +76,7 @@ namespace IL2CXX
                 transpiler => ("\t*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Monitor.Enter), new[] { typeof(object) }),
+                type.GetMethod(nameof(Monitor.Enter), new[] { get(typeof(object)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.lock();\n", 1)
             );
             code.For(
@@ -112,7 +111,7 @@ namespace IL2CXX
 ", 0)
             );
         })
-        .For(typeof(RegisteredWaitHandle), (type, code) =>
+        .For(get(typeof(RegisteredWaitHandle)), (type, code) =>
         {
             code.For(
                 type.GetMethod("WaitHandleCleanupNative", BindingFlags.Static | BindingFlags.NonPublic),
@@ -123,16 +122,16 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(typeof(Thread), (type, code) =>
+        .For(get(typeof(Thread)), (type, code) =>
         {
             var helper = type.GetNestedType("StartHelper", BindingFlags.NonPublic);
             code.Base = "t__thread";
-            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(typeof(ExecutionContext))} v__5fexecutionContext;
-{'\t'}{transpiler.EscapeForMember(typeof(SynchronizationContext))} v__5fsynchronizationContext;
-{'\t'}{transpiler.EscapeForMember(typeof(string))} v__5fname;
+            code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(get(typeof(ExecutionContext)))} v__5fexecutionContext;
+{'\t'}{transpiler.EscapeForMember(get(typeof(SynchronizationContext)))} v__5fsynchronizationContext;
+{'\t'}{transpiler.EscapeForMember(get(typeof(string)))} v__5fname;
 {'\t'}{transpiler.EscapeForMember(helper)} v__5fstartHelper;
-{'\t'}{transpiler.EscapeForMember(typeof(bool))} v__5fmayNeedResetForThreadPool;
-{'\t'}{transpiler.EscapeForMember(typeof(bool))} v__pool;
+{'\t'}{transpiler.EscapeForMember(get(typeof(bool)))} v__5fmayNeedResetForThreadPool;
+{'\t'}{transpiler.EscapeForMember(get(typeof(bool)))} v__pool;
 
 {'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
@@ -171,7 +170,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\tf_engine()->f_join(a_0);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Thread.Sleep), new[] { typeof(int) }),
+                type.GetMethod(nameof(Thread.Sleep), new[] { get(typeof(int)) }),
                 transpiler => ("\tstd::this_thread::sleep_for(a_0 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_0));\n", 1)
             );
             code.For(
@@ -241,9 +240,9 @@ namespace IL2CXX
             );
         })
         // TODO
-        .For(typeof(ThreadPool), (type, code) =>
+        .For(get(typeof(ThreadPool)), (type, code) =>
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (target == PlatformID.Win32NT)
                 code.For(
                     type.GetMethod("BindIOCompletionCallbackNative", BindingFlags.Static | BindingFlags.NonPublic),
                     transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -268,7 +267,7 @@ namespace IL2CXX
                 type.GetMethod("PerformRuntimeSpecificGateActivities", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn false;\n", 1)
             );
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (target == PlatformID.Win32NT)
                 code.For(
                     type.GetMethod("QueueWaitCompletionNative", BindingFlags.Static | BindingFlags.NonPublic),
                     transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
@@ -278,9 +277,9 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(typeof(WaitHandle), (type, code) =>
+        .For(get(typeof(WaitHandle)), (type, code) =>
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (target == PlatformID.Win32NT)
             {
                 // TODO
                 code.For(
@@ -292,7 +291,7 @@ namespace IL2CXX
                     transpiler => ("\treturn WaitForSingleObjectEx(a_0, a_1, TRUE);\n", 0)
                 );
                 code.For(
-                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
+                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int)) }, null),
                     transpiler => ("\treturn WaitForMultipleObjectsEx(a_1, reinterpret_cast<const HANDLE*>(a_0), a_2, a_3, TRUE);\n", 0)
                 );
             }
@@ -309,7 +308,7 @@ namespace IL2CXX
                     transpiler => ("\treturn static_cast<t__waitable*>(a_0.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
                 );
                 code.For(
-                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr*), typeof(int), typeof(bool), typeof(int) }, null),
+                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int)) }, null),
                     transpiler => ($@"{'\t'}if (a_2) {{
 {'\t'}{'\t'}return t__waitable::f_wait_all(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3)) ? 0 : 0x102;
 {'\t'}}} else {{
@@ -320,17 +319,17 @@ namespace IL2CXX
                 );
             }
         })
-        .For(Type.GetType("System.Threading.LowLevelLifoSemaphore"), (type, code) =>
+        .For(get(Type.GetType("System.Threading.LowLevelLifoSemaphore")), (type, code) =>
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (target != PlatformID.Win32NT)
                 code.For(
                     type.GetMethod("WaitNative", BindingFlags.Static | BindingFlags.NonPublic),
                     transpiler => ("\treturn static_cast<t__waitable*>(a_0->v_handle.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
                 );
         })
-        .For(Type.GetType("System.Threading.OverlappedData"), (type, code) =>
+        .For(get(Type.GetType("System.Threading.OverlappedData")), (type, code) =>
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (target == PlatformID.Win32NT)
             {
                 code.For(
                     type.GetMethod("AllocateNativeOverlapped", declaredAndInstance),

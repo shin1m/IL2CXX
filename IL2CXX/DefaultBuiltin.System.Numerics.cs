@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using System.Reflection;
 
@@ -5,8 +6,8 @@ namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
-        private static Builtin SetupSystemNumerics(this Builtin @this) => @this
-        .For(typeof(Vector<>), (type, code) =>
+        private static Builtin SetupSystemNumerics(this Builtin @this, Func<Type, Type> get) => @this
+        .For(get(typeof(Vector<>)), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod("ScalarAdd", BindingFlags.Static | BindingFlags.NonPublic),
@@ -50,13 +51,13 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetMethod("GetAllBitsSetValue", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => (types[0] == typeof(float) ? $@"{'\t'}union
+                (transpiler, types) => (types[0] == get(typeof(float)) ? $@"{'\t'}union
 {'\t'}{{
 {'\t'}{'\t'}int32_t i = -1;
 {'\t'}{'\t'}float f;
 {'\t'}}};
 {'\t'}return f;
-" : types[0] == typeof(double) ? $@"{'\t'}union
+" : types[0] == get(typeof(double)) ? $@"{'\t'}union
 {'\t'}{{
 {'\t'}{'\t'}int64_t i = -1;
 {'\t'}{'\t'}double f;
@@ -81,14 +82,14 @@ namespace IL2CXX
                 (transpiler, types) => ("\treturn std::floor(a_0);\n", 1)
             );
         })
-        .For(typeof(BitOperations), (type, code) =>
+        .For(get(typeof(BitOperations)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(BitOperations.RotateLeft), new[] { typeof(uint), typeof(int) }),
+                type.GetMethod(nameof(BitOperations.RotateLeft), new[] { get(typeof(uint)), get(typeof(int)) }),
                 transpiler => ("\treturn (a_0 << (a_1 & 31)) | (a_0 >> ((32 - a_1) & 31));\n", 2)
             );
             code.For(
-                type.GetMethod(nameof(BitOperations.RotateRight), new[] { typeof(uint), typeof(int) }),
+                type.GetMethod(nameof(BitOperations.RotateRight), new[] { get(typeof(uint)), get(typeof(int)) }),
                 transpiler => ("\treturn (a_0 >> (a_1 & 31)) | (a_0 << ((32 - a_1) & 31));\n", 2)
             );
         });

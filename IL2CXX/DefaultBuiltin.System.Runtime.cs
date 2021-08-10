@@ -11,8 +11,8 @@ namespace IL2CXX
     partial class DefaultBuiltin
     {
         private static Builtin ForIf(this Builtin @this, Type type, Action<Type, Builtin.Code> action) => type == null ? @this : @this.For(type, action);
-        private static Builtin SetupSystemRuntime(this Builtin @this) => @this
-        .For(typeof(ExceptionDispatchInfo), (type, code) =>
+        private static Builtin SetupSystemRuntime(this Builtin @this, Func<Type, Type> get) => @this
+        .For(get(typeof(ExceptionDispatchInfo)), (type, code) =>
         {
             // TODO
             code.For(
@@ -20,11 +20,11 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(typeof(GCHandle), (type, code) =>
+        .For(get(typeof(GCHandle)), (type, code) =>
         {
             code.For(
                 type.GetMethod("InternalAlloc", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($"\treturn {transpiler.EscapeForValue(typeof(IntPtr))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(a_0, a_1)) : new t__normal_handle(a_0)}};\n", 1)
+                transpiler => ($"\treturn {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(a_0, a_1)) : new t__normal_handle(a_0)}};\n", 1)
             );
             code.For(
                 type.GetMethod("InternalFree", BindingFlags.Static | BindingFlags.NonPublic),
@@ -35,7 +35,7 @@ namespace IL2CXX
                 transpiler => ("\treturn static_cast<t__handle*>(a_0.v__5fvalue)->f_target();\n", 1)
             );
         })
-        .For(typeof(GCSettings), (type, code) =>
+        .For(get(typeof(GCSettings)), (type, code) =>
         {
             code.For(
                 type.GetProperty(nameof(GCSettings.IsServerGC)).GetMethod,
@@ -46,14 +46,14 @@ namespace IL2CXX
                 transpiler => ("\treturn 1;\n", 1)
             );
         })
-        .For(typeof(Marshal), (type, code) =>
+        .For(get(typeof(Marshal)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(Marshal.Copy), new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) }),
+                type.GetMethod(nameof(Marshal.Copy), new[] { get(typeof(IntPtr)), get(typeof(byte[])), get(typeof(int)), get(typeof(int)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_1") + "\tstd::memcpy(a_1->f_data() + a_2, a_0, a_3);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Marshal.DestroyStructure), new[] { typeof(IntPtr), typeof(Type) }),
+                type.GetMethod(nameof(Marshal.DestroyStructure), new[] { get(typeof(IntPtr)), get(typeof(Type)) }),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}static_cast<t__type*>(a_1)->f_destroy_unmanaged(a_0);
 ", 1)
@@ -62,7 +62,7 @@ namespace IL2CXX
                 type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto p = static_cast<t__type*>(a_1);
-{'\t'}auto q = static_cast<{transpiler.EscapeForValue(typeof(Delegate))}>(f_engine()->f_allocate(sizeof({transpiler.Escape(typeof(MulticastDelegate))})));
+{'\t'}auto q = static_cast<{transpiler.EscapeForValue(get(typeof(Delegate)))}>(f_engine()->f_allocate(sizeof({transpiler.Escape(get(typeof(MulticastDelegate)))})));
 {'\t'}q->v__5ftarget = q;
 {'\t'}q->v__5fmethodPtr = p->v__invoke_unmanaged;
 {'\t'}q->v__5fmethodPtrAux = a_0;
@@ -86,7 +86,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(Marshal.GetExceptionForHR), new[] { typeof(int), typeof(IntPtr) }),
+                type.GetMethod(nameof(Marshal.GetExceptionForHR), new[] { get(typeof(int)), get(typeof(IntPtr)) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             code.For(
@@ -94,7 +94,7 @@ namespace IL2CXX
                 transpiler => ("\treturn true;\n", 1)
             );
             code.For(
-                type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(IntPtr), typeof(Type) }, null),
+                type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr)), get(typeof(Type)) }, null),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
 {'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
@@ -112,27 +112,27 @@ namespace IL2CXX
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Marshal.StructureToPtr), new[] { typeof(object), typeof(IntPtr), typeof(bool) }),
+                type.GetMethod(nameof(Marshal.StructureToPtr), new[] { get(typeof(object)), get(typeof(IntPtr)), get(typeof(bool)) }),
                 transpiler => ($@"{'\t'}if (a_2) a_0->f_type()->f_destroy_unmanaged(a_1);
 {'\t'}return a_0->f_type()->f_to_unmanaged(a_0, a_1);
 ", 1)
             );
         })
-        .For(typeof(MemoryMarshal), (type, code) =>
+        .For(get(typeof(MemoryMarshal)), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference)),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0->f_data());\n", 1)
             );
         })
-        .For(typeof(NativeLibrary), (type, code) =>
+        .For(get(typeof(NativeLibrary)), (type, code) =>
         {
             code.For(
                 type.GetMethod("LoadLibraryByName", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(typeof(RuntimeHelpers), (type, code) =>
+        .For(get(typeof(RuntimeHelpers)), (type, code) =>
         {
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.GetHashCode), BindingFlags.Static | BindingFlags.Public),
@@ -147,20 +147,32 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\tstd::memcpy(a_0->f_bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
             );
             {
-                var method = type.GetMethod("IsBitwiseEquatable", BindingFlags.Static | BindingFlags.NonPublic);
-                code.ForGeneric(method,
-                    (transpiler, types) => ($"\treturn {((bool)method.MakeGenericMethod(types).Invoke(null, null) ? "true" : "false")};\n", 1)
+                bool isBitwiseEquatable(Type t) => Type.GetTypeCode(t.IsEnum ? t.GetEnumUnderlyingType() : t) switch
+                {
+                    TypeCode.Boolean => true,
+                    TypeCode.Char => true,
+                    TypeCode.SByte => true,
+                    TypeCode.Byte => true,
+                    TypeCode.Int16 => true,
+                    TypeCode.UInt16 => true,
+                    TypeCode.Int32 => true,
+                    TypeCode.UInt32 => true,
+                    TypeCode.Int64 => true,
+                    TypeCode.UInt64 => true,
+                    _ => false
+                } || t == get(typeof(IntPtr)) || t == get(typeof(UIntPtr));
+                code.ForGeneric(
+                    type.GetMethod("IsBitwiseEquatable", BindingFlags.Static | BindingFlags.NonPublic),
+                    (transpiler, types) => ($"\treturn {(isBitwiseEquatable(types[0]) ? "true" : "false")};\n", 1)
                 );
             }
-            {
-                var method = type.GetMethod("IsReferenceOrContainsReferences");
-                code.ForGeneric(method,
-                    (transpiler, types) => ($"\treturn {((bool)method.MakeGenericMethod(types).Invoke(null, null) ? "true" : "false")};\n", 1)
-                );
-            }
+            code.ForGeneric(
+                type.GetMethod(nameof(RuntimeHelpers.IsReferenceOrContainsReferences)),
+                (transpiler, types) => ($"\treturn {(transpiler.Define(types[0]).IsManaged ? "true" : "false")};\n", 1)
+            );
             code.For(
                 type.GetProperty(nameof(RuntimeHelpers.OffsetToStringData)).GetMethod,
-                transpiler => ($"\treturn offsetof({transpiler.Escape(typeof(string))}, v__5ffirstChar);\n", 1)
+                transpiler => ($"\treturn offsetof({transpiler.Escape(get(typeof(string)))}, v__5ffirstChar);\n", 1)
             );
             // TODO
             code.For(
@@ -170,14 +182,14 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("ObjectHasComponentSize", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
-{'\t'}return type == &t__type_of<{transpiler.Escape(typeof(string))}>::v__instance || type->f_is(&t__type_of<{transpiler.Escape(typeof(Array))}>::v__instance);
+{'\t'}return type == &t__type_of<{transpiler.Escape(get(typeof(string)))}>::v__instance || type->f_is(&t__type_of<{transpiler.Escape(get(typeof(Array)))}>::v__instance);
 ", 1)
             );
         })
-        .For(Type.GetType("System.Runtime.CompilerServices.DependentHandle"), (type, code) =>
+        .For(get(Type.GetType("System.Runtime.CompilerServices.DependentHandle")), (type, code) =>
         {
             code.For(
-                type.GetConstructor(new[] { typeof(object), typeof(object) }),
+                type.GetConstructor(new[] { get(typeof(object)), get(typeof(object)) }),
                 transpiler => ($@"{'\t'}{transpiler.EscapeForValue(type)} value;
 {'\t'}value.v__5fhandle = new t__dependent_handle(a_0, a_1);
 {'\t'}return value;
@@ -214,7 +226,7 @@ namespace IL2CXX
 ", 1)
             );
         })
-        .For(Type.GetType("System.Runtime.Intrinsics.Vector128`1"), (type, code) =>
+        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector128`1")), (type, code) =>
         {
             // TODO
             code.ForGeneric(
@@ -222,7 +234,7 @@ namespace IL2CXX
                 (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
             );
         })
-        .For(Type.GetType("System.Runtime.Intrinsics.Vector256`1"), (type, code) =>
+        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector256`1")), (type, code) =>
         {
             // TODO
             code.ForGeneric(
@@ -230,7 +242,7 @@ namespace IL2CXX
                 (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
             );
         })
-        .ForIf(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch"), (type, code) =>
+        .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch")), (type, code) =>
         {
             // TODO
             code.For(
@@ -238,23 +250,23 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(Type.GetType("Internal.Runtime.CompilerServices.Unsafe"), (type, code) =>
+        .For(get(Type.GetType("Internal.Runtime.CompilerServices.Unsafe")), (type, code) =>
         {
             var methods = GenericMethods(type);
             code.ForGeneric(
-                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeof(void*), typeof(int) })),
+                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { get(typeof(void*)), get(typeof(int)) })),
                 (transpiler, types) => ("\treturn static_cast<char*>(a_0) + a_1;\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { x.GetGenericArguments()[0].MakeByRefType(), typeof(int) })),
+                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { x.GetGenericArguments()[0].MakeByRefType(), get(typeof(int)) })),
                 (transpiler, types) => ("\treturn a_0 + a_1;\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
+                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == get(typeof(IntPtr))),
                 (transpiler, types) => ("\treturn a_0 + static_cast<intptr_t>(a_1);\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == typeof(IntPtr)),
+                methods.Single(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == get(typeof(IntPtr))),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + static_cast<intptr_t>(a_1));\n", 1)
             );
             code.ForGeneric(

@@ -14,11 +14,13 @@ namespace IL2CXX
         public class Code
         {
             public string Base;
+            public Func<Transpiler, string> StaticMembers;
             public Func<Transpiler, (string, bool, string)> Members;
             public Func<Transpiler, string> Initialize;
             public Dictionary<MethodKey, Func<Transpiler, (string body, int inline)>> MethodToBody = new();
             public Dictionary<MethodKey, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new();
             public Dictionary<MethodKey, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new();
+            public Func<Transpiler, MethodBase, (string body, int inline)> AnyToBody;
 
             public void For(MethodBase method, Func<Transpiler, (string body, int inline)> body)
             {
@@ -42,6 +44,7 @@ namespace IL2CXX
         }
 
         public string GetBase(Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Base : null;
+        public string GetStaticMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.StaticMembers?.Invoke(transpiler) : null;
         public (string members, bool managed, string unmanaged) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? default : default;
         public string GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
         public (string body, int inline) GetBody(Transpiler transpiler, MethodKey key)
@@ -113,6 +116,8 @@ namespace IL2CXX
             {
                 if (code.MethodToBody.TryGetValue(key, out var body0)) return body0(transpiler);
                 if (method.IsGenericMethod && code.GenericMethodToBody.TryGetValue(ToKey(((MethodInfo)method).GetGenericMethodDefinition()), out var body1)) return body1(transpiler, method.GetGenericArguments());
+                var body4 = code.AnyToBody?.Invoke(transpiler, method) ?? default;
+                if (body4 != default) return body4;
             }
             if (type.IsGenericType)
             {

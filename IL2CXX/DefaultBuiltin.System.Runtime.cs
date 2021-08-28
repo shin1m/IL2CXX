@@ -1,10 +1,12 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Loader;
 
 namespace IL2CXX
 {
@@ -135,12 +137,22 @@ namespace IL2CXX
         .For(get(typeof(RuntimeHelpers)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(RuntimeHelpers.GetHashCode), BindingFlags.Static | BindingFlags.Public),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
+                type.GetMethod(nameof(GetHashCode), BindingFlags.Static | BindingFlags.Public),
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 0)
             );
             code.For(
                 type.GetMethod("GetRawArrayData", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f_bounds() + a_0->f_type()->v__rank);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(RuntimeHelpers.GetUninitializedObject)),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
+{'\t'}std::memset(p + 1, 0, type->v__unmanaged_size - sizeof(t_object<t__type>));
+{'\t'}type->f_finish(p);
+{'\t'}return p;
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.InitializeArray)),
@@ -230,7 +242,7 @@ namespace IL2CXX
         {
             // TODO
             code.ForGeneric(
-                type.GetMethod(nameof(object.ToString)),
+                type.GetMethod(nameof(ToString)),
                 (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
             );
         })
@@ -238,7 +250,7 @@ namespace IL2CXX
         {
             // TODO
             code.ForGeneric(
-                type.GetMethod(nameof(object.ToString)),
+                type.GetMethod(nameof(ToString)),
                 (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
             );
         })
@@ -310,6 +322,13 @@ namespace IL2CXX
             code.ForGeneric(
                 methods.Single(x => x.Name == "SkipInit" && x.GetGenericArguments().Length == 1),
                 (transpiler, types) => (string.Empty, 1)
+            );
+        })
+        .For(get(typeof(AssemblyLoadContext)), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(AssemblyLoadContext.LoadFromStream), new[] { get(typeof(Stream)), get(typeof(Stream)) }),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         });
     }

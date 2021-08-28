@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Reflection.Emit;
 
 namespace IL2CXX
 {
@@ -74,6 +75,55 @@ namespace IL2CXX
 {'\t'}int32_t v_m_5fisPinned;
 {'\t'}int32_t v_m_5flocalIndex;
 ", true, null);
+        })
+        .For(get(typeof(MethodBase)), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(MethodBase.GetMethodFromHandle), new[] { get(typeof(RuntimeMethodHandle)) }),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(MethodBase.GetMethodFromHandle), new[] { get(typeof(RuntimeMethodHandle)), get(typeof(RuntimeTypeHandle)) }),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+        })
+        .For(get(typeof(System.Reflection.Metadata.AssemblyExtensions)), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(System.Reflection.Metadata.AssemblyExtensions.ApplyUpdate)),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+        })
+        .For(get(typeof(AssemblyBuilder)), (type, code) =>
+        {
+            code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+        })
+        .For(get(typeof(DynamicMethod)), (type, code) =>
+        {
+            code.StaticMembers = transpiler => string.Empty;
+            code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+        })
+        .For(get(typeof(MethodBuilder)), (type, code) =>
+        {
+            code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+        })
+        .For(get(typeof(ModuleBuilder)), (type, code) =>
+        {
+            code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+        })
+        .For(get(typeof(SignatureHelper)), (type, code) =>
+        {
+            code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+        })
+        .For(get(typeof(TypeBuilder)), (type, code) =>
+        {
+            code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
         });
     }
 }

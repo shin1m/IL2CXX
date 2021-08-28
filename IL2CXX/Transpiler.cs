@@ -137,6 +137,7 @@ namespace IL2CXX
         public readonly bool Is64Bit;
         public readonly bool CheckNull;
         public readonly bool CheckRange;
+        public Func<Type, bool> IsInvalid;
         private readonly Func<Type, Type> getType;
         public Type TypeOf<T>() => getType(typeof(T));
         public readonly Type typeofObject;
@@ -160,7 +161,6 @@ namespace IL2CXX
         public readonly Type typeofVoid;
         public readonly Type typeofIntPtr;
         public readonly Type typeofUIntPtr;
-        public readonly Type typeofEnum;
         public readonly Type typeofString;
         public readonly Type typeofStringBuilder;
         public readonly Type typeofException;
@@ -520,7 +520,21 @@ namespace IL2CXX
             }
             log("exit");
         }
-        public void Enqueue(MethodBase method) => queuedMethods.Enqueue(method);
+        private void ThrowIfInvalid(Type type)
+        {
+            if (IsInvalid?.Invoke(type) ?? false) throw new Exception($"{type}");
+        }
+        private void Enqueue(Type type)
+        {
+            ThrowIfInvalid(type);
+            queuedTypes.Enqueue(type);
+        }
+        public void Enqueue(MethodBase method)
+        {
+            if (method is MethodInfo mi) ThrowIfInvalid(mi.ReturnType);
+            foreach (var x in method.GetParameters()) ThrowIfInvalid(x.ParameterType);
+            queuedMethods.Enqueue(method);
+        }
         private static bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
         public string EscapeType(Type type)
         {
@@ -540,7 +554,7 @@ namespace IL2CXX
             {
                 var e = GetElementType(type);
                 var name = e == null ? null : Escape(e);
-                queuedTypes.Enqueue(type);
+                Enqueue(type);
                 if (type.IsByRef) return $"{name}&";
                 if (type.IsPointer) return $"{name}*";
             }

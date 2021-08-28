@@ -40,8 +40,13 @@ namespace IL2CXX
         protected override ConstructorInfo GetConstructorImpl(BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
         public override string[] GetEnumNames() => throw new NotImplementedException();
         public override Array GetEnumValues() => throw new NotImplementedException();
+        public override Type[] GetGenericArguments() => throw new NotImplementedException();
+        public override Type GetGenericTypeDefinition() => throw new NotImplementedException();
         protected override bool IsArrayImpl() => throw new NotImplementedException();
         public override bool IsAssignableFrom(Type c) => throw new NotImplementedException();
+        public override bool IsConstructedGenericType => throw new NotImplementedException();
+        public override bool IsGenericTypeDefinition => throw new NotImplementedException();
+        public override Type MakeGenericType(params Type[] arguments) => throw new NotImplementedException();
         public override string Namespace => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
         public override string ToString() => throw new NotImplementedException();

@@ -123,6 +123,9 @@ struct t__type : t__abstract_type
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
+	t__type* v__generic_type_definition = nullptr;
+	t__type** v__generic_arguments = nullptr;
+	t__type** v__constructed_generic_types = nullptr;
 	t__type* v__szarray;
 	union
 	{

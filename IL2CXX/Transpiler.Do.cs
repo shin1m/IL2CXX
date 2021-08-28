@@ -290,6 +290,7 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
             writerForDeclarations.Write(functionDeclarations);
             var assemblyIdentifiers = new HashSet<string>();
             var assemblyToIdentifier = new Dictionary<Assembly, string>();
+            var genericTypeDefinitionToConstructeds = runtimeDefinitions.Select(x => x.Type).Where(x => x.IsGenericType).GroupBy(x => x.GetGenericTypeDefinition()).ToDictionary(x => x.Key, xs => xs.AsEnumerable());
             foreach (var definition in runtimeDefinitions)
             {
                 var writer = writerForType(definition.Type, false);
@@ -318,7 +319,7 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                                 source.CopyTo(destination);
                     }
                 }
-                WriteRuntimeDefinition(definition, $"v__assembly_{name}", writerForDeclarations, writer);
+                WriteRuntimeDefinition(definition, $"v__assembly_{name}", genericTypeDefinitionToConstructeds, writerForDeclarations, writer);
             }
             writerForDeclarations.WriteLine("\n#include \"utilities.h\"");
             writerForDeclarations.Write(staticDefinitions);

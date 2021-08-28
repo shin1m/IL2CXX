@@ -26,6 +26,15 @@ namespace IL2CXX.Console
                 Directory.CreateDirectory(@out);
                 Type get(Type x) => load.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
                 var transpiler = new Transpiler(get, DefaultBuiltin.Create(get, target), /*Console.Error.WriteLine*/_ => { }, target, is64, false);
+                transpiler.IsInvalid = type =>
+                {
+                    if (type.Name == "InternalModuleBuilder") return true;
+                    if (type.Name == "QCallAssembly") return true;
+                    if (type.Name == "QCallTypeHandle") return true;
+                    if (type.FullName == "System.Reflection.RuntimeAssembly") return true;
+                    if (type.FullName == "System.RuntimeType") return true;
+                    return false;
+                };
                 var definition = TextWriter.Null;
                 try
                 {

@@ -22,6 +22,7 @@ namespace IL2CXX
             if (type.IsArray) return ReplaceGenericMethodParameter(type.GetElementType()).MakeArrayType(type.GetArrayRank());
             if (type.IsByRef) return ReplaceGenericMethodParameter(type.GetElementType()).MakeByRefType();
             if (type.IsPointer) return ReplaceGenericMethodParameter(type.GetElementType()).MakePointerType();
+            if (type.IsGenericTypeParameter) return type;
             if (type.ContainsGenericParameters) return type.GetGenericTypeDefinition().MakeGenericType(type.GetGenericArguments().Select(ReplaceGenericMethodParameter).ToArray());
             return type;
         }
@@ -39,9 +40,11 @@ namespace IL2CXX
         private static string ExplicitName(Type type)
         {
             if (type.IsGenericTypeParameter) return type.Name;
-            if (!type.IsGenericType) return type.FullName;
-            var name = type.GetGenericTypeDefinition().FullName;
-            return $"{name.Substring(0, name.IndexOf('`'))}<{string.Join(",", type.GetGenericArguments().Select(ExplicitName))}>";
+            var prefix = type.IsNested ? $"{ExplicitName(type.DeclaringType)}." : type.Namespace == null ? string.Empty : $"{type.Namespace}.";
+            if (!type.IsGenericType) return prefix + type.Name;
+            var name = type.GetGenericTypeDefinition().Name;
+            var i = name.IndexOf('`');
+            return $"{prefix}{(i < 0 ? name : name.Substring(0, i))}<{string.Join(",", type.GetGenericArguments().Select(ExplicitName))}>";
         }
         private InterfaceMapping GetInterfaceMap(Type type, Type @interface)
         {
@@ -245,8 +248,24 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
         public RuntimeDefinition Define(Type type)
         {
             if (typeToRuntime.TryGetValue(type, out var definition)) return definition;
+            ThrowIfInvalid(type);
             if (processed) throw new InvalidOperationException($"{type}");
-            if (type.IsByRef || type.IsPointer)
+            if (type.IsGenericType)
+            {
+                Enqueue(type.GetGenericTypeDefinition());
+                foreach (var x in type.GetGenericArguments()) Enqueue(x);
+            }
+            if (type.ContainsGenericParameters)
+            {
+                if (type.BaseType != null) Define(type.BaseType);
+                definition = new RuntimeDefinition(type);
+                typeToRuntime.Add(type, definition);
+                typeDeclarations.WriteLine($@"// {type.AssemblyQualifiedName}
+struct {Escape(type)}
+{{
+}};");
+            }
+            else if (type.IsByRef || type.IsPointer)
             {
                 definition = new RuntimeDefinition(type);
                 if (type.IsPointer)
@@ -255,7 +274,7 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
                     definition.Alignment = definition.UnmanagedSize = Define(typeofIntPtr).UnmanagedSize;
                 }
                 typeToRuntime.Add(type, definition);
-                queuedTypes.Enqueue(GetElementType(type));
+                Enqueue(GetElementType(type));
             }
             else if (type.IsInterface)
             {
@@ -287,9 +306,10 @@ struct {Escape(type)}
                 }
                 typeToRuntime[type] = definition = td;
                 var identifier = Escape(type);
+                var builtinStaticMembers = builtin.GetStaticMembers(this, type);
                 var staticFields = new List<FieldInfo>();
                 var threadStaticFields = new List<FieldInfo>();
-                if (!type.IsEnum)
+                if (builtinStaticMembers == null && !type.IsEnum)
                     foreach (var x in type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
                         (x.GetCustomAttributesData().Any(x => x.AttributeType == typeofThreadStaticAttribute) ? threadStaticFields : staticFields).Add(x);
                 var staticDefinitions = new StringWriter();
@@ -307,11 +327,12 @@ inline void* f__field_{identifier}__{Escape(x.Name)}()
                         fieldDefinitions.WriteLine($@"uint8_t v__field_{identifier}__{Escape(x.Name)}[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
                     }
                 }
-                else if (staticFields.Count > 0 || initialize != null || type.TypeInitializer != null)
+                else if (builtinStaticMembers != null || staticFields.Count > 0 || initialize != null || type.TypeInitializer != null)
                 {
                     staticDefinitions.WriteLine($@"
 struct t__static_{identifier}
 {{");
+                    if (builtinStaticMembers != null) staticDefinitions.WriteLine(builtinStaticMembers);
                     foreach (var x in staticFields) staticDefinitions.WriteLine($"\t{EscapeForRoot(x.FieldType)} {Escape(x)}{{}};");
                     staticDefinitions.WriteLine($@"{'\t'}void f_initialize()
 {'\t'}{{");
@@ -590,16 +611,27 @@ struct {Escape(type)}__unmanaged
             if (type.IsEnum)
                 try
                 {
-                    queuedTypes.Enqueue(type.MakeArrayType());
+                    Enqueue(type.MakeArrayType());
                 } catch { }
             return definition;
         }
-        private void WriteRuntimeDefinition(RuntimeDefinition definition, string assembly, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
+        private void WriteRuntimeDefinition(RuntimeDefinition definition, string assembly, IReadOnlyDictionary<Type, IEnumerable<Type>> genericTypeDefinitionToConstructeds, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
         {
             var type = definition.Type;
             var @base = definition is TypeDefinition && FinalizeOf(type) != null ? "t__type_finalizee" : "t__type";
             var identifier = Escape(type);
-            if (type.IsEnum) writerForDefinitions.Write($@"
+            if (type.IsGenericType)
+            {
+                writerForDefinitions.WriteLine($@"
+t__type* v__generic_arguments_{Escape(type)}[] = {{
+{string.Join(string.Empty, type.GetGenericArguments().Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
+}};");
+                if (type.IsGenericTypeDefinition) writerForDefinitions.WriteLine($@"
+t__type* v__constructed_generic_types_{Escape(type)}[] = {{
+{string.Join(string.Empty, (genericTypeDefinitionToConstructeds.TryGetValue(type, out var xs) ? xs : Enumerable.Empty<Type>()).Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
+}};");
+            }
+            if (type.IsEnum && !type.ContainsGenericParameters) writerForDefinitions.Write($@"
 std::pair<uint64_t, std::u16string_view> v__enum_pairs_{identifier}[] = {{{
     string.Join(",", type.GetFields(BindingFlags.Static | BindingFlags.Public).Select(x => $"\n\t{{{(ulong)Convert.ToInt64(x.GetRawConstantValue())}ul, u\"{x.Name}\"sv}}"))
 }
@@ -685,7 +717,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 )}, {(
     type.IsEnum ? "true" : "false"
 )}, {(
-    type == typeofVoid ? "0" : $"sizeof({EscapeForValue(type)})"
+    type == typeofVoid || type.ContainsGenericParameters ? "0" : $"sizeof({EscapeForValue(type)})"
 )}, {szarray})
 {{");
             if (definition is TypeDefinition) writerForDefinitions.WriteLine($"\tv__managed_size = sizeof({Escape(type)});");
@@ -699,6 +731,12 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}f_to_unmanaged = f_do_to_unmanaged_blittable;
 {'\t'}f_from_unmanaged = f_do_from_unmanaged_blittable;
 {'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged_blittable;");
+            if (type.IsGenericType)
+            {
+                writerForDefinitions.WriteLine($@"{'\t'}v__generic_type_definition = &t__type_of<{Escape(type.GetGenericTypeDefinition())}>::v__instance;
+{'\t'}v__generic_arguments = v__generic_arguments_{Escape(type)};");
+                if (type.IsGenericTypeDefinition) writerForDefinitions.WriteLine($"\tv__constructed_generic_types = v__constructed_generic_types_{Escape(type)};");
+            }
             if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
 {'\t'}v__rank = {type.GetArrayRank()};
 {'\t'}v__cor_element_type = {GetCorElementType(GetElementType(type))};");

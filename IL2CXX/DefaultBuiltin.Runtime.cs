@@ -94,6 +94,24 @@ namespace IL2CXX
                 }
             );
             code.For(
+                type.GetMethod(nameof(Type.GetGenericArguments)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__generic_type_definition) throw std::runtime_error(""not generic type"");
+{'\t'}size_t n = 0;
+{'\t'}for (auto p = type->v__generic_arguments; *p; ++p) ++n;
+{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
+{'\t'}for (size_t i = 0; i < n; ++i) p->f_data()[i] = type->v__generic_arguments[i];
+{'\t'}return p;
+", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(Type.GetGenericTypeDefinition)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__generic_type_definition) throw std::runtime_error(""not generic type"");
+{'\t'}return type->v__generic_type_definition;
+", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(Type.IsAssignableFrom)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_1) return false;
 {'\t'}auto p = static_cast<t__type*>(a_0);
@@ -102,16 +120,26 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod("IsArrayImpl", declaredAndInstance),
-                transpiler =>
-                {
-                    var array = $"&t__type_of<{transpiler.Escape(get(typeof(Array)))}>::v__instance";
-                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0 != {array} && a_0->f_is({array});\n", 0);
-                }
+                type.GetProperty(nameof(Type.IsConstructedGenericType)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition != a_0;\n", 0)
             );
             code.For(
-                type.GetMethod("GetConstructorImpl", declaredAndInstance),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_4") + "\treturn a_4->v__length > 0 ? nullptr : a_0->v__default_constructor;\n", 0)
+                type.GetProperty(nameof(Type.IsGenericTypeDefinition)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition == a_0;\n", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(Type.MakeGenericType)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__generic_type_definition) throw std::runtime_error(""not generic type"");
+{'\t'}size_t n = 0;
+{'\t'}for (auto p = type->v__generic_arguments; *p; ++p) ++n;
+{'\t'}if (a_1->v__length != n) throw std::runtime_error(""not same number of types"");
+{'\t'}for (auto p = type->v__constructed_generic_types; *p; ++p) {{
+{'\t'}{'\t'}auto q = (*p)->v__generic_arguments;
+{'\t'}{'\t'}if (std::equal(q, q + n, a_1->f_data())) return *p;
+{'\t'}}}
+{'\t'}throw std::runtime_error(""not supported"");
+", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.Namespace)).GetMethod,
@@ -128,6 +156,18 @@ namespace IL2CXX
             code.For(
                 type.GetProperty(nameof(Type.TypeHandle)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn {a_0};\n", 0)
+            );
+            code.For(
+                type.GetMethod("IsArrayImpl", declaredAndInstance),
+                transpiler =>
+                {
+                    var array = $"&t__type_of<{transpiler.Escape(get(typeof(Array)))}>::v__instance";
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0 != {array} && a_0->f_is({array});\n", 0);
+                }
+            );
+            code.For(
+                type.GetMethod("GetConstructorImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_4") + "\treturn a_4->v__length > 0 ? nullptr : a_0->v__default_constructor;\n", 0)
             );
         });
     }

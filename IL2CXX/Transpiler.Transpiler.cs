@@ -60,7 +60,6 @@ namespace IL2CXX
             typeofVoid = get(typeof(void));
             typeofIntPtr = get(typeof(IntPtr));
             typeofUIntPtr = get(typeof(UIntPtr));
-            typeofEnum = get(typeof(Enum));
             typeofString = get(typeof(string));
             typeofStringBuilder = get(typeof(StringBuilder));
             typeofException = get(typeof(Exception));
@@ -1271,7 +1270,7 @@ namespace IL2CXX
                         writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type()->f_is(&t__type_of<{Escape(t)}>::v__instance))
 {'\t'}{'\t'}{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
                         if (t.IsPrimitive && t != typeofSingle && t != typeofDouble)
-                            writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->f_is(&t__type_of<{Escape(typeofEnum)}>::v__instance))
+                            writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->v__enum)
 {'\t'}{'\t'}switch ({stack.Variable}->f_type()->v__size) {{
 {'\t'}{'\t'}case 1:
 {'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int8_t*>({stack.Variable} + 1));

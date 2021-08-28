@@ -10,16 +10,16 @@ namespace IL2CXX
         private static void SetupPrimitive(Func<Type, Type> get, Type type, Builtin.Code code)
         {
             code.For(
-                type.GetMethod(nameof(object.GetHashCode)),
+                type.GetMethod(nameof(GetHashCode)),
                 transpiler => ("\treturn static_cast<int32_t>(*a_0);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                type.GetMethod(nameof(ToString), Type.EmptyTypes),
                 transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(object.ToString), new[] { get(typeof(string)), get(typeof(IFormatProvider)) }),
+                type.GetMethod(nameof(ToString), new[] { get(typeof(string)), get(typeof(IFormatProvider)) }),
                 transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
             );
         }
@@ -49,7 +49,7 @@ namespace IL2CXX
 {'\t'}{'\t'}}}
 ", false, null);
             code.For(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                type.GetMethod(nameof(ToString), Type.EmptyTypes),
                 transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
             );
         };
@@ -62,20 +62,20 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->f_clone(a_0);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(object.GetType)),
+                type.GetMethod(nameof(GetType)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type();\n", 1)
             );
             code.ForTree(
-                type.GetMethod(nameof(object.Equals), new[] { type }),
+                type.GetMethod(nameof(Equals), new[] { type }),
                 (transpiler, actual) => ("\treturn a_0 == a_1;\n", 0)
             );
             code.For(
-                type.GetMethod(nameof(object.ToString)),
+                type.GetMethod(nameof(ToString)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->f_type()->v__display_name);\n", 0)
             );
             // TODO
             /*code.ForTree(
-                type.GetMethod(nameof(object.ToString)),
+                type.GetMethod(nameof(ToString)),
                 (transpiler, actual) =>
                 {
                     Console.Error.WriteLine($"ToString: {actual}");
@@ -90,11 +90,11 @@ namespace IL2CXX
                 transpiler => ("\treturn static_cast<intptr_t>(a_0);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(object.Equals)),
+                type.GetMethod(nameof(Equals)),
                 transpiler => ("\treturn a_0 == a_1;\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(object.GetHashCode), Type.EmptyTypes),
+                type.GetMethod(nameof(GetHashCode), Type.EmptyTypes),
                 transpiler =>
                 {
                     var marvin = get(Type.GetType("System.Marvin"));
@@ -108,11 +108,11 @@ namespace IL2CXX
                 }
             );
             code.For(
-                type.GetMethod(nameof(object.ToString)),
+                type.GetMethod(nameof(ToString)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->f_type()->v__display_name);\n", 0)
             );
             code.ForTree(
-                type.GetMethod(nameof(object.Equals)),
+                type.GetMethod(nameof(Equals)),
                 (transpiler, actual) =>
                 {
                     var identifier = transpiler.Escape(actual);
@@ -130,7 +130,15 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__find_type(v__name_to_type, {&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)});\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__find_type(v__name_to_type, {&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)});\n", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)), get(typeof(bool)) }),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"
+{'\t'}auto p = f__find_type(v__name_to_type, {{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}});
+{'\t'}if (!p && a_1) throw std::runtime_error(""TypeLoadException"");
+{'\t'}return p;
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.GetTypeFromHandle)),
@@ -188,7 +196,7 @@ namespace IL2CXX
 {'\t'}{'\t'}}}
 ", false, null);
             code.For(
-                type.GetMethod(nameof(object.GetHashCode)),
+                type.GetMethod(nameof(GetHashCode)),
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0->v__type);\n", 1)
             );
             code.For(
@@ -375,16 +383,31 @@ namespace IL2CXX
                 type.GetMethod(nameof(Attribute.GetCustomAttributes), new[] { get(typeof(MemberInfo)), get(typeof(Type)), get(typeof(bool)) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
+            // TODO
+            foreach (var ts in new[]
+            {
+                new[] { get(typeof(PropertyInfo)), get(typeof(Type[])) },
+                new[] { get(typeof(EventInfo)) },
+                new[] { get(typeof(ParameterInfo)) }
+            }) code.For(
+                type.GetMethod("GetParentDefinition", BindingFlags.Static | BindingFlags.NonPublic, null, ts, null),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
         })
         .For(get(typeof(Exception)), (type, code) =>
         {
             // TODO
             code.ForTree(
-                type.GetMethod(nameof(object.ToString)),
+                type.GetMethod(nameof(ToString)),
                 (transpiler, actual) => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}std::u16string s{{a_0->f_type()->v__display_name}};
 {'\t'}if (a_0->v__5fmessage) s = s + u"": "" + &a_0->v__5fmessage->v__5ffirstChar;
 {'\t'}return f__new_string(s);
 ", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("CreateSourceName", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\treturn {};\n", 0)
             );
             // TODO
             code.For(
@@ -500,6 +523,11 @@ namespace IL2CXX
         })
         .For(get(typeof(Delegate)), (type, code) =>
         {
+            // TODO
+            code.For(
+                type.GetMethod(nameof(Delegate.DynamicInvoke)),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
             code.For(
                 type.GetMethod("InternalEqualTypes", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn a_0->f_type() == a_1->f_type();\n", 1)
@@ -514,6 +542,7 @@ namespace IL2CXX
 {'\t'}return static_cast<{transpiler.EscapeForValue(get(typeof(MulticastDelegate)))}>(p);
 ", 1)
             );
+            // TODO
             code.For(
                 type.GetMethod("GetInvokeMethod", declaredAndInstance),
                 transpiler => ("\treturn {};\n", 1)
@@ -641,7 +670,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(object.Equals), new[] { get(typeof(object)) }),
+                type.GetMethod(nameof(Equals), new[] { get(typeof(object)) }),
                 transpiler => default
             );
             // TODO
@@ -695,7 +724,7 @@ namespace IL2CXX
         .For(get(typeof(Enum)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(object.Equals)),
+                type.GetMethod(nameof(Equals)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_1 || a_0->f_type() != a_1->f_type()) return false;
 {'\t'}switch (a_0->f_type()->v__size) {{
 {'\t'}case 1:
@@ -710,7 +739,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(object.GetHashCode)),
+                type.GetMethod(nameof(GetHashCode)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}switch (a_0->f_type()->v__size) {{
 {'\t'}case 1:
 {'\t'}{'\t'}return *reinterpret_cast<uint8_t*>(a_0 + 1);
@@ -724,8 +753,44 @@ namespace IL2CXX
 ", 0)
             );
             // TODO
+            foreach (var (t, u) in new[]
+            {
+                (typeof(sbyte), "int8_t"),
+                (typeof(short), "int16_t"),
+                (typeof(int), "int32_t"),
+                (typeof(long), "int64_t"),
+                (typeof(byte), "uint8_t"),
+                (typeof(ushort), "uint16_t"),
+                (typeof(uint), "uint32_t"),
+                (typeof(ulong), "uint64_t"),
+                (typeof(char), "char16_t"),
+                (typeof(bool), "bool")
+            }) code.For(
+                type.GetMethod(nameof(Enum.ToObject), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { get(typeof(Type)), get(t) }, null),
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"
+{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__enum) throw std::runtime_error(""must be enum"");
+{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
+{'\t'}switch (type->v__size) {{
+{'\t'}case 1:
+{'\t'}{'\t'}*reinterpret_cast<uint8_t*>(p + 1) = a_1;
+{'\t'}{'\t'}break;
+{'\t'}case 2:
+{'\t'}{'\t'}*reinterpret_cast<uint16_t*>(p + 1) = a_1;
+{'\t'}{'\t'}break;
+{'\t'}case 4:
+{'\t'}{'\t'}*reinterpret_cast<uint32_t*>(p + 1) = a_1;
+{'\t'}{'\t'}break;
+{'\t'}default:
+{'\t'}{'\t'}*reinterpret_cast<uint64_t*>(p + 1) = a_1;
+{'\t'}}}
+{'\t'}type->f_finish(p);
+{'\t'}return p;
+", 0)
+            );
+            // TODO
             code.For(
-                type.GetMethod(nameof(object.ToString), Type.EmptyTypes),
+                type.GetMethod(nameof(ToString), Type.EmptyTypes),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}uint64_t i;
 {'\t'}switch (a_0->f_type()->v__size) {{
 {'\t'}case 1:
@@ -754,7 +819,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Enum.ToString), new[] { get(typeof(string)) }),
                 transpiler =>
                 {
-                    var method = type.GetMethod(nameof(object.ToString), Type.EmptyTypes);
+                    var method = type.GetMethod(nameof(ToString), Type.EmptyTypes);
                     transpiler.Enqueue(method);
                     return ($@"{'\t'}if (!a_1) return {transpiler.Escape(method)}(a_0);
 {'\t'}if (a_1->v__5fstringLength != 1) throw std::runtime_error(""FormatException"");
@@ -836,7 +901,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Environment.FailFast), new[] { get(typeof(string)), get(typeof(Exception)) }),
                 transpiler => ($@"{'\t'}std::cerr << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}) << std::endl;
-{transpiler.GenerateVirtualCall(get(typeof(object)).GetMethod(nameof(object.ToString)), "a_1", Enumerable.Empty<string>(), x => $"auto s = {x};")}
+{transpiler.GenerateVirtualCall(get(typeof(object)).GetMethod(nameof(ToString)), "a_1", Enumerable.Empty<string>(), x => $"auto s = {x};")}
 {'\t'}std::cerr << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
 {'\t'}std::abort();
 ", 0)

@@ -570,7 +570,7 @@ namespace IL2CXX
         public string EscapeForMember(Type type) => EscapeForValue(type, "t_slot_of<{0}>");
         public string EscapeForRoot(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"t_root<{EscapeForValue(type)}>" : EscapeForValue(type, "t_root<t_slot_of<{0}>>");
         public string EscapeForStacked(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"{Escape(type)}::t_stacked" : EscapeForValue(type);
-        public static string Escape(FieldInfo field) => $"v_{Escape(field.Name)}";
+        public string Escape(FieldInfo field) => $"v_{Escape(field.Name)}{(!field.IsStatic && field.GetCustomAttributesData().Any(x => x.AttributeType == typeofFieldOffsetAttribute) ? ".v" : string.Empty)}";
         public string Escape(MethodBase method)
         {
             var key = ToKey(method);

@@ -620,7 +620,7 @@ namespace IL2CXX
         })
         .For(get(typeof(string)), (type, code) =>
         {
-            code.Initialize = transpiler => $"\t\t{Transpiler.Escape(get(typeof(string)).GetField(nameof(string.Empty)))} = f__new_string(u\"\"sv);";
+            code.Initialize = transpiler => $"\t\t{transpiler.Escape(get(typeof(string)).GetField(nameof(string.Empty)))} = f__new_string(u\"\"sv);";
             code.For(
                 type.GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn f__new_string(a_0);\n", 2)

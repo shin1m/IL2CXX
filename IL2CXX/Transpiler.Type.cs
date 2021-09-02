@@ -503,6 +503,42 @@ struct {Escape(type)}__unmanaged
 }};
 #pragma pack(pop)").ToString();
                                 }
+                                var slots = fields.Where(x => IsComposite(x.FieldType)).Select(x => (Type: x.FieldType, Name: Escape(x)));
+                                var constructs = fields.Select(Escape);
+                                List<string> mergedFields = null;
+                                int fieldOffset(FieldInfo x) => (int)x.GetCustomAttributesData().First(x => x.AttributeType == typeofFieldOffsetAttribute).ConstructorArguments[0].Value;
+                                if (kind == LayoutKind.Explicit)
+                                {
+                                    td.UnmanagedSize = Math.Max(td.Alignment, layout.Size);
+                                    var map = Enumerable.Repeat(false, td.UnmanagedSize).ToList();
+                                    var rn = Define(typeofIntPtr).UnmanagedSize;
+                                    foreach (var x in fields)
+                                    {
+                                        var reference = IsComposite(x.FieldType) && !x.FieldType.IsValueType;
+                                        var i = fieldOffset(x);
+                                        var j = i + (reference ? rn : Define(x.FieldType).UnmanagedSize);
+                                        while (map.Count < j) map.Add(false);
+                                        for (; i < j; ++i) map[i] = reference;
+                                    }
+                                    td.UnmanagedSize = map.Count;
+                                    mergedFields = new();
+                                    var ss = new List<(Type, string)>();
+                                    for (var i = 0; i < map.Count;)
+                                        if (map[i])
+                                        {
+                                            mergedFields.Add(($"{EscapeForMember(typeofObject)} r{i}"));
+                                            ss.Add((typeofObject, $"v__merged.r{i}"));
+                                            i += rn;
+                                        }
+                                        else
+                                        {
+                                            var j = i;
+                                            do ++i; while (i < map.Count && !map[i]);
+                                            mergedFields.Add(($"char p{j}[{i - j}]"));
+                                        }
+                                    slots = ss;
+                                    constructs = new[] { "v__merged" };
+                                }
                                 string variables(string indent)
                                 {
                                     var sb = new StringBuilder();
@@ -511,20 +547,27 @@ struct {Escape(type)}__unmanaged
                                     {
                                         sb.AppendLine($@"#pragma pack(push, 1)
 {indent}union
-{indent}{{");
-                                        td.UnmanagedSize = Math.Max(td.Alignment, layout.Size);
-                                        sb.AppendLine($"{indent}\tchar v__size[{td.UnmanagedSize}];");
-                                        var i = 0;
-                                        foreach (var x in fields)
-                                        {
-                                            var j = (int)x.GetCustomAttributesData().First(x => x.AttributeType == typeofFieldOffsetAttribute).ConstructorArguments[0].Value;
-                                            sb.AppendLine(j > 0 ? $@"{indent}{'\t'}struct
+{indent}{{
+{indent}{'\t'}struct
 {indent}{'\t'}{{
-{indent}{'\t'}{'\t'}char v__offset{i++}[{j}];
-{indent}{'\t'}{'\t'}{variable(x)}
-{indent}{'\t'}}};" : $"{indent}\t{variable(x)}");
-                                        }
-                                        sb.AppendLine($"{indent}}};\n#pragma pack(pop)");
+{string.Join(string.Empty, mergedFields.Select(x => $"{indent}\t\t{x};\n"))}{indent}{'\t'}}} v__merged;");
+                                        foreach (var x in fields) sb.AppendLine($@"{indent}{'\t'}struct
+{indent}{'\t'}{{
+{indent}{'\t'}{'\t'}char o[{fieldOffset(x)}];
+{indent}{'\t'}{'\t'}{EscapeForMember(x.FieldType)} v;
+{indent}{'\t'}}} v_{Escape(x.Name)};");
+                                        sb.AppendLine($@"{indent}}};
+#pragma pack(pop)
+
+{indent}t_value() = default;
+{indent}t_value(const t_value& a_x) : v__merged(a_x.v__merged)
+{indent}{{
+{indent}}}
+{indent}t_value& operator=(const t_value& a_x)
+{indent}{{
+{indent}{'\t'}v__merged = a_x.v__merged;
+{indent}{'\t'}return *this;
+{indent}}}");
                                     }
                                     else if (td.IsBlittable)
                                     {
@@ -543,8 +586,8 @@ struct {Escape(type)}__unmanaged
                                             sb.AppendLine($"{indent}{variable(x)}");
                                             i += ftd.UnmanagedSize;
                                         }
-                                        td.UnmanagedSize = Math.Max(align(td.Alignment), layout?.Size ?? 0);
-                                        pad(td.UnmanagedSize);
+                                        pad(Math.Max(align(td.Alignment), layout?.Size ?? 0));
+                                        td.UnmanagedSize = i;
                                         sb.AppendLine("#pragma pack(pop)");
                                     }
                                     else
@@ -553,12 +596,12 @@ struct {Escape(type)}__unmanaged
                                     }
                                     return sb.ToString();
                                 }
-                                string scanSlots(string indent) => string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"{indent}{scan(x.FieldType, Escape(x))};\n"));
+                                string scanSlots(string indent) => string.Join(string.Empty, slots.Select(x => $"{indent}{scan(x.Type, x.Name)};\n"));
                                 members = type.IsValueType
                                     ? $@"{variables("\t\t")}
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
-{string.Join(string.Empty, fields.Where(x => IsComposite(x.FieldType)).Select(x => $"\t\t\t{Escape(x)}.f_destruct();\n"))}{'\t'}{'\t'}}}
+{string.Join(string.Empty, slots.Select(x => $"\t\t\t{x.Name}.f_destruct();\n"))}{'\t'}{'\t'}}}
 {'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{'\t'}{{
 {scanSlots("\t\t\t")}{'\t'}{'\t'}}}
@@ -569,7 +612,7 @@ struct {Escape(type)}__unmanaged
 {(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
 {'\t'}void f_construct({identifier}* a_p) const
 {'\t'}{{
-{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f_construct(a_p);\n")}{string.Join(string.Empty, fields.Select(x => $"{'\t'}{'\t'}new(&a_p->{Escape(x)}) decltype({Escape(x)})({Escape(x)});\n"))}{'\t'}}}
+{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f_construct(a_p);\n")}{string.Join(string.Empty, constructs.Select(x => $"{'\t'}{'\t'}new(&a_p->{x}) decltype({x})({x});\n"))}{'\t'}}}
 ";
                             }
                         }

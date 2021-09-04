@@ -1335,7 +1335,9 @@ namespace IL2CXX
 {'\t'}{indexToStack[index].Variable} = {member switch
 {
     FieldInfo f => $"f__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}()",
-    MethodInfo m => $"{Escape(m)}::v__handle",
+    // TODO
+    //MethodInfo m => $"{Escape(m)}::v__handle",
+    MethodInfo m => "{}",
     Type t => $"&t__type_of<{Escape(t)}>::v__instance",
     _ => throw new Exception()
 }};");

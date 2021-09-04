@@ -99,6 +99,11 @@ namespace IL2CXX
             code.Members = transpiler => (string.Empty, false, null);
             code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
         })
+        .For(get(typeof(ConstructorBuilder)), (type, code) =>
+        {
+            code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+        })
         .For(get(typeof(DynamicMethod)), (type, code) =>
         {
             code.StaticMembers = transpiler => string.Empty;
@@ -107,7 +112,7 @@ namespace IL2CXX
         })
         .For(get(typeof(MethodBuilder)), (type, code) =>
         {
-            code.Members = transpiler => (string.Empty, false, null);
+            code.Members = transpiler => ("\tbool v_m_5fbIsBaked;\n", false, null);
             code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
         })
         .For(get(typeof(ModuleBuilder)), (type, code) =>

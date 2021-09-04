@@ -222,7 +222,8 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
 {'\t'}{'\t'}return {call("xs[n]")};
 ")};
 ";
-                    if ((@return == transpiler.typeofVoid ? parameters : parameters.Prepend(@return)).All(x => !IsComposite(x) || x == transpiler.typeofString || x == transpiler.typeofStringBuilder || transpiler.typeofSafeHandle.IsAssignableFrom(x) || x.IsArray || transpiler.Define(x).IsMarshallable))
+                    bool arrayElementIsBlittable(Type x) => !IsComposite(x) || x.IsValueType && transpiler.Define(x).IsBlittable;
+                    if ((@return == transpiler.typeofVoid ? parameters : parameters.Prepend(@return)).All(x => !IsComposite(x) || x == transpiler.typeofString || x == transpiler.typeofStringBuilder || transpiler.typeofSafeHandle.IsAssignableFrom(x) || x.IsArray && arrayElementIsBlittable(transpiler.GetElementType(x)) || transpiler.Define(x).IsMarshallable))
                     {
                         using var writer = new StringWriter();
                         transpiler.GenerateInvokeUnmanaged(@return, invoke.GetParameters().Select((x, i) => (x, i + 1)), "a_0->v__5fmethodPtrAux.v__5fvalue", writer);

@@ -144,6 +144,7 @@ namespace IL2CXX
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new();
             public readonly string DefaultConstructor;
             public readonly string Delegate;
+            public string Fields;
 
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
             {
@@ -194,7 +195,7 @@ namespace IL2CXX
                 {
                     var identifier = transpiler.Escape(Type);
                     DefaultConstructor = $@"
-t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, []() -> t__object*
+t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{transpiler.Escape(type)}>::v__instance, u""{constructor.Name}""sv, {(int)constructor.Attributes}, []() -> t__object*
 {{
 {'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
@@ -288,7 +289,6 @@ struct {Escape(type)}
             }
             else
             {
-                if (type.DeclaringType?.Name == "<PrivateImplementationDetails>") return null;
                 typeToRuntime.Add(type, null);
                 var td = new TypeDefinition(type, this);
                 void enqueue(MethodInfo m, MethodInfo concrete)
@@ -308,6 +308,7 @@ struct {Escape(type)}
                 typeToRuntime[type] = definition = td;
                 var identifier = Escape(type);
                 var builtinStaticMembers = builtin.GetStaticMembers(this, type);
+                var fields = Enumerable.Empty<FieldInfo>();
                 var staticFields = new List<FieldInfo>();
                 var threadStaticFields = new List<FieldInfo>();
                 if (builtinStaticMembers == null && !type.IsEnum)
@@ -316,17 +317,24 @@ struct {Escape(type)}
                 var staticDefinitions = new StringWriter();
                 var staticMembers = new StringWriter();
                 var initialize = builtin.GetInitialize(this, type);
+                void writeFields(IEnumerable<FieldInfo> fields, Func<FieldInfo, string> address)
+                {
+                    foreach (var x in fields)
+                    {
+                        fieldDeclarations.WriteLine($"extern t__runtime_field_info v__field_{identifier}__{Escape(x.Name)};");
+                        fieldDefinitions.WriteLine($@"t__runtime_field_info v__field_{identifier}__{Escape(x.Name)}{{&t__type_of<t__runtime_field_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, &t__type_of<{Escape(x.FieldType)}>::v__instance, +[](void* a_this) -> void*
+{{
+{address(x)}}}}};");
+                    }
+                }
                 if (type.Name == "<PrivateImplementationDetails>")
                 {
                     foreach (var x in staticFields)
                     {
-                        fieldDeclarations.WriteLine($@"extern uint8_t v__field_{identifier}__{Escape(x.Name)}[];
-inline void* f__field_{identifier}__{Escape(x.Name)}()
-{{
-{'\t'}return v__field_{identifier}__{Escape(x.Name)};
-}}");
-                        fieldDefinitions.WriteLine($@"uint8_t v__field_{identifier}__{Escape(x.Name)}[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
+                        fieldDeclarations.WriteLine($"extern uint8_t v__field_{identifier}__{Escape(x.Name)}__data[];");
+                        fieldDefinitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__data[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
                     }
+                    writeFields(staticFields, x => $"\treturn v__field_{identifier}__{Escape(x.Name)}__data;\n");
                 }
                 else if (builtinStaticMembers != null || staticFields.Count > 0 || initialize != null || type.TypeInitializer != null)
                 {
@@ -345,11 +353,8 @@ struct t__static_{identifier}
                     }
                     staticDefinitions.WriteLine($@"{'\t'}}}
 }};");
-                    foreach (var x in staticFields) fieldDeclarations.WriteLine($@"inline void* f__field_{identifier}__{Escape(x.Name)}()
-{{
-{'\t'}return &t_static::v_instance->v_{identifier}->{Escape(x)};
-}}");
                     staticMembers.WriteLine($"\tt__lazy<t__static_{identifier}> v_{identifier};");
+                    writeFields(staticFields, x => $"\treturn &t_static::v_instance->v_{identifier}->{Escape(x)};\n");
                 }
                 var threadStaticMembers = new StringWriter();
                 if (threadStaticFields.Count > 0)
@@ -357,6 +362,7 @@ struct t__static_{identifier}
                     threadStaticMembers.WriteLine("\tstruct\n\t{");
                     foreach (var x in threadStaticFields) threadStaticMembers.WriteLine($"\t\t{EscapeForRoot(x.FieldType)} {Escape(x)}{{}};");
                     threadStaticMembers.WriteLine($"\t}} v_{identifier};");
+                    writeFields(threadStaticFields, x => $"\treturn &t_thread_static::v_instance->v_{identifier}.{Escape(x)};\n");
                 }
                 var declaration = $"// {type.AssemblyQualifiedName}";
                 if (builtinTypes.TryGetValue(type, out var builtinName))
@@ -410,7 +416,7 @@ struct t__static_{identifier}
                             }
                             else
                             {
-                                var fields = type.GetFields(declaredAndInstance);
+                                fields = type.GetFields(declaredAndInstance);
                                 if (type.IsValueType) td.IsManaged = fields.Select(x => x.FieldType).Any(x => IsComposite(x) && (!x.IsValueType || Define(x).IsManaged));
                                 var layout = type.StructLayoutAttribute;
                                 var kind = layout?.Value ?? LayoutKind.Auto;
@@ -644,6 +650,14 @@ struct {Escape(type)}__unmanaged
 {declaration}{@base}
 {{
 {members}}};");
+                    writeFields(fields, x => GenerateCheckNull("a_this") + $@"{'\t'}auto p = {(type.IsValueType ? string.Empty : "*")}static_cast<{EscapeForValue(type)}*>(a_this);
+{'\t'}return &p->{Escape(x)};
+");
+                    td.Fields = $@"
+t__runtime_field_info* v__fields_{identifier}[] = {{
+{string.Join(string.Empty, fields.Concat(staticFields).Concat(threadStaticFields).Select(x => $"\t&v__field_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
+}};
+";
                 }
                 this.staticDefinitions.Write(staticDefinitions);
                 this.staticMembers.Write(staticMembers);
@@ -680,13 +694,15 @@ std::pair<uint64_t, std::u16string_view> v__enum_pairs_{identifier}[] = {{{
     string.Join(",", type.GetFields(BindingFlags.Static | BindingFlags.Public).Select(x => $"\n\t{{{(ulong)Convert.ToInt64(x.GetRawConstantValue())}ul, u\"{x.Name}\"sv}}"))
 }
 }};");
+            var td = definition as TypeDefinition;
+            if (td != null) writerForDefinitions.Write($@"{td.Fields}{td.DefaultConstructor}");
             writerForDeclarations.WriteLine($@"
 template<>
 struct t__type_of<{identifier}> : {@base}
 {{");
-            writerForDefinitions.Write($@"{(definition as TypeDefinition)?.DefaultConstructor}
+            writerForDefinitions.Write($@"
 t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
-            if (definition is TypeDefinition td)
+            if (td != null)
             {
                 void writeMethods(IEnumerable<MethodInfo> methods, Func<int, MethodInfo, string, string> pointer, Func<int, int, MethodInfo, string, string> genericPointer, Func<MethodInfo, MethodInfo> origin, string indent)
                 {
@@ -732,9 +748,9 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
 {'\t'}static t__object* f_do_clone(const t__object* a_this);");
-                if (type != typeofVoid && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_initialize(const void* a_from, size_t a_n, void* a_to);
-{'\t'}static void f_do_clear(void* a_p, size_t a_n);
-{'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);");
+                if (type != typeofVoid && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_clear(void* a_p, size_t a_n);
+{'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);
+{'\t'}static t__object* f_do_box(void* a_p);");
                 if (definition.HasUnmanaged)
                     writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t__object* a_this, void* a_p);
 {'\t'}static void f_do_from_unmanaged(t__object* a_this, const void* a_p);
@@ -754,12 +770,22 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, u""{type.Name}""sv, u""{type.FullName}""sv, u""{type}""sv, {(
+            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, u""{type.Name}""sv, u""{type.FullName}""sv, u""{type}""sv, {
+    (int)type.Attributes
+}, {(
     definition.IsManaged ? "true" : "false"
 )}, {(
     type.IsValueType ? "true" : "false"
 )}, {(
+    type.IsArray ? "true" : "false"
+)}, {(
     type.IsEnum ? "true" : "false"
+)}, {(
+    type.IsPointer ? "true" : "false"
+)}, {(
+    type.HasElementType ? "true" : "false"
+)}, {(
+    type.IsByRefLike ? "true" : "false"
 )}, {(
     type == typeofVoid || type.ContainsGenericParameters ? "0" : $"sizeof({EscapeForValue(type)})"
 )}, {szarray})
@@ -784,6 +810,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
 {'\t'}v__rank = {type.GetArrayRank()};
 {'\t'}v__cor_element_type = {GetCorElementType(GetElementType(type))};");
+            if (td?.Fields != null) writerForDefinitions.WriteLine($"\tv__fields = v__fields_{identifier};");
             if (td?.DefaultConstructor != null) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
             writerForDefinitions.Write(td?.Delegate);
             var nv = Nullable.GetUnderlyingType(type);
@@ -792,9 +819,10 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             {
                 writerForDefinitions.WriteLine($@"{'\t'}t__type::f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
-                if (type != typeofVoid && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_initialize = f_do_initialize;
-{'\t'}f_clear = f_do_clear;
-{'\t'}f_copy = f_do_copy;");
+                if (type != typeofVoid && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear;
+{'\t'}f_copy = f_do_copy;
+{'\t'}f_box = f_do_box;
+{'\t'}f_unbox = f_do_unbox_value;");
                 if (type.IsEnum) writerForDefinitions.WriteLine($@"{'\t'}v__enum_pairs = v__enum_pairs_{identifier};
 {'\t'}v__enum_count = std::size(v__enum_pairs_{identifier});
 {'\t'}v__cor_element_type = {GetCorElementType(type.GetEnumUnderlyingType())};");
@@ -829,17 +857,17 @@ t__object* t__type_of<{identifier}>::f_do_clone(const t__object* a_this)
 {'\t'}new(&p->v__value) decltype({identifier}::v__value)(static_cast<const {identifier}*>(a_this)->v__value);
 {'\t'}return p;
 }}
-void t__type_of<{identifier}>::f_do_initialize(const void* a_from, size_t a_n, void* a_to)
-{{
-{'\t'}std::uninitialized_copy_n(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));
-}}
 void t__type_of<{identifier}>::f_do_clear(void* a_p, size_t a_n)
 {{
 {'\t'}std::fill_n(static_cast<decltype({identifier}::v__value)*>(a_p), a_n, decltype({identifier}::v__value){{}});
 }}
 void t__type_of<{identifier}>::f_do_copy(const void* a_from, size_t a_n, void* a_to)
 {{
-{'\t'}f__copy(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));" :
+{'\t'}f__copy(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));
+}}
+t__object* t__type_of<{identifier}>::f_do_box(void* a_p)
+{{
+{'\t'}return f__new_constructed<{identifier}>(*static_cast<decltype({identifier}::v__value)*>(a_p));" :
                         $@"{'\t'}t__new<{identifier}> p(0);
 {'\t'}static_cast<const {identifier}*>(a_this)->f_construct(p);
 {'\t'}return p;");

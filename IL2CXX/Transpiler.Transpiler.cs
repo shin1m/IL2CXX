@@ -41,8 +41,10 @@ namespace IL2CXX
             getType = get;
             typeofObject = get(typeof(object));
             typeofRuntimeAssembly = get(typeof(RuntimeAssembly));
+            typeofRuntimeFieldInfo = get(typeof(RuntimeFieldInfo));
             typeofRuntimeConstructorInfo = get(typeof(RuntimeConstructorInfo));
             typeofRuntimeMethodInfo = get(typeof(RuntimeMethodInfo));
+            typeofRuntimePropertyInfo = get(typeof(RuntimePropertyInfo));
             typeofRuntimeType = get(typeof(RuntimeType));
             typeofBoolean = get(typeof(bool));
             typeofByte = get(typeof(byte));
@@ -84,11 +86,15 @@ namespace IL2CXX
                 [get(typeof(Assembly))] = "t__assembly",
                 [typeofRuntimeAssembly] = "t__runtime_assembly",
                 [get(typeof(MemberInfo))] = "t__member_info",
+                [get(typeof(FieldInfo))] = "t__field_info",
+                [typeofRuntimeFieldInfo] = "t__runtime_field_info",
                 [get(typeof(MethodBase))] = "t__method_base",
                 [get(typeof(ConstructorInfo))] = "t__constructor_info",
                 [typeofRuntimeConstructorInfo] = "t__runtime_constructor_info",
                 [get(typeof(MethodInfo))] = "t__method_info",
                 [typeofRuntimeMethodInfo] = "t__runtime_method_info",
+                [get(typeof(PropertyInfo))] = "t__property_info",
+                [typeofRuntimePropertyInfo] = "t__runtime_property_info",
                 [get(typeof(Type))] = "t__abstract_type",
                 [typeofRuntimeType] = "t__type",
                 [get(typeof(CriticalFinalizerObject))] = "t__critical_finalizer_object"
@@ -1038,7 +1044,7 @@ namespace IL2CXX
                     var f = ParseField(ref index);
                     writer.Write($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = ");
                     writer.WriteLine(f.DeclaringType.Name == "<PrivateImplementationDetails>"
-                        ? $"f__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}();"
+                        ? $"v__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}__data;"
                         : $"&{@static(f)};"
                     );
                     return index;
@@ -1334,7 +1340,7 @@ namespace IL2CXX
                     writer.WriteLine($@" {member}
 {'\t'}{indexToStack[index].Variable} = {member switch
 {
-    FieldInfo f => $"f__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}()",
+    FieldInfo f => $"&v__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}",
     // TODO
     //MethodInfo m => $"{Escape(m)}::v__handle",
     MethodInfo m => "{}",

@@ -52,8 +52,24 @@ struct t__member_info : t__object
 {
 	t__type* v__declaring_type;
 	std::u16string_view v__name;
+	int32_t v__attributes;
 
-	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr, std::u16string_view a_name = {});
+	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr, std::u16string_view a_name = {}, int32_t a_attributes = 0);
+};
+
+struct t__field_info : t__member_info
+{
+	using t__member_info::t__member_info;
+};
+
+struct t__runtime_field_info : t__field_info
+{
+	t__type* v__type;
+
+	t__runtime_field_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_field_type, void*(*a_address)(void*)) : t__field_info(a_type, a_declaring_type, a_name, a_attributes), v__type(a_field_type), f_address(a_address)
+	{
+	}
+	void* (*f_address)(void*);
 };
 
 struct t__method_base : t__member_info
@@ -70,7 +86,7 @@ struct t__runtime_constructor_info : t__constructor_info
 {
 	t__object*(*v__invoke)();
 
-	t__runtime_constructor_info(t__type* a_type, t__object*(*a_invoke)()) : t__constructor_info(a_type), v__invoke(a_invoke)
+	t__runtime_constructor_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__object*(*a_invoke)()) : t__constructor_info(a_type, a_declaring_type, a_name, a_attributes), v__invoke(a_invoke)
 	{
 	}
 };
@@ -83,6 +99,16 @@ struct t__method_info : t__method_base
 struct t__runtime_method_info : t__method_info
 {
 	using t__method_info::t__method_info;
+};
+
+struct t__property_info : t__member_info
+{
+	using t__member_info::t__member_info;
+};
+
+struct t__runtime_property_info : t__property_info
+{
+	using t__property_info::t__property_info;
 };
 
 struct t__assembly : t__object
@@ -116,9 +142,14 @@ struct t__type : t__abstract_type
 	std::u16string_view v__namespace;
 	std::u16string_view v__full_name;
 	std::u16string_view v__display_name;
+	int32_t v__attribute_flags;
 	bool v__managed;
 	bool v__value_type;
-	bool v__enum;
+	uint8_t v__array : 1;
+	uint8_t v__enum : 1;
+	uint8_t v__pointer : 1;
+	uint8_t v__has_element_type : 1;
+	uint8_t v__by_ref_like : 1;
 	uint8_t v__cor_element_type;
 	size_t v__size;
 	size_t v__managed_size = 0;
@@ -145,6 +176,7 @@ struct t__type : t__abstract_type
 			size_t v__enum_count;
 		};
 	};
+	t__runtime_field_info** v__fields;
 	t__runtime_constructor_info* v__default_constructor = nullptr;
 	t__type* v__nullable_value = nullptr;
 
@@ -153,13 +185,17 @@ struct t__type : t__abstract_type
 		std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods,
 		t__runtime_assembly* a_assembly,
 		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
-		bool a_managed, bool a_value_type, bool a_enum, size_t a_size,
+		int32_t a_attribute_flags,
+		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_pointer, bool a_has_element_type, bool a_by_ref_like,
+		size_t a_size,
 		t__type* a_szarray
 	) : t__abstract_type(a_type, nullptr, a_name), v__base(a_base),
 	v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
-	v__managed(a_managed), v__value_type(a_value_type), v__enum(a_enum), v__size(a_size),
+	v__attribute_flags(a_attribute_flags),
+	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__pointer(a_pointer), v__has_element_type(a_has_element_type), v__by_ref_like(a_by_ref_like),
+	v__size(a_size),
 	v__szarray(a_szarray)
 	{
 	}
@@ -188,12 +224,15 @@ struct t__type : t__abstract_type
 	void (*f_register_finalize)(t__object*) = f_do_register_finalize;
 	static void f_do_suppress_finalize(t__object* a_this);
 	void (*f_suppress_finalize)(t__object*) = f_do_suppress_finalize;
-	static void f_do_initialize(const void* a_from, size_t a_n, void* a_to);
-	void (*f_initialize)(const void*, size_t, void*) = f_do_initialize;
 	static void f_do_clear(void* a_p, size_t a_n);
 	void (*f_clear)(void*, size_t) = f_do_clear;
 	static void f_do_copy(const void* a_from, size_t a_n, void* a_to);
 	void (*f_copy)(const void*, size_t, void*) = f_do_copy;
+	static t__object* f_do_box(void* a_p);
+	t__object* (*f_box)(void*) = f_do_box;
+	static void* f_do_unbox(t__object*& a_this);
+	static void* f_do_unbox_value(t__object*& a_this);
+	void* (*f_unbox)(t__object*&) = f_do_unbox;
 	static void f_do_to_unmanaged(const t__object* a_this, void* a_p);
 	static void f_do_to_unmanaged_blittable(const t__object* a_this, void* a_p);
 	void (*f_to_unmanaged)(const t__object*, void*) = f_do_to_unmanaged;
@@ -219,7 +258,7 @@ struct t__type : t__abstract_type
 	}
 };
 
-inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name) : v__declaring_type(a_declaring_type), v__name(a_name)
+inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes) : v__declaring_type(a_declaring_type), v__name(a_name), v__attributes(a_attributes)
 {
 	t__type::f_be(this, a_type);
 }

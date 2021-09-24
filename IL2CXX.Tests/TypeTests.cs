@@ -50,6 +50,26 @@ namespace IL2CXX.Tests
         }
         static int MakeGenericType() => typeof(Bar<>).MakeGenericType(typeof(Foo)) == typeof(Bar<Foo>) ? 0 : 1;
 
+        class Zot
+        {
+            public string X;
+            public int Y;
+        }
+        static int GetField()
+        {
+            var zot = new Zot { X = "foo", Y = 1 };
+            if (!(typeof(Zot).GetField(nameof(Zot.X)).GetValue(zot) is string x && x == "foo")) return 1;
+            return typeof(Zot).GetField(nameof(Zot.Y)).GetValue(zot) is int y && y == 1 ? 0 : 2;
+        }
+        static int SetField()
+        {
+            var zot = new Zot();
+            typeof(Zot).GetField(nameof(Zot.X)).SetValue(zot, "foo");
+            if (zot.X != "foo") return 1;
+            typeof(Zot).GetField(nameof(Zot.Y)).SetValue(zot, 1);
+            return zot.Y == 1 ? 0 : 2;
+        }
+
         static int Run(string[] arguments) => arguments[1] switch
         {
             nameof(Generic) => Generic(),
@@ -59,6 +79,8 @@ namespace IL2CXX.Tests
             nameof(GetGenericTypeDefinition) => GetGenericTypeDefinition(),
             nameof(GetGenericArguments) => GetGenericArguments(),
             nameof(MakeGenericType) => MakeGenericType(),
+            nameof(GetField) => GetField(),
+            nameof(SetField) => SetField(),
             _ => -1
         };
 
@@ -73,6 +95,8 @@ namespace IL2CXX.Tests
         [TestCase(nameof(GetGenericTypeDefinition))]
         [TestCase(nameof(GetGenericArguments))]
         [TestCase(nameof(MakeGenericType))]
+        [TestCase(nameof(GetField))]
+        [TestCase(nameof(SetField))]
         public void Test(string name) => Utilities.Run(build, name);
     }
 }

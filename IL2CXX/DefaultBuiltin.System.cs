@@ -73,15 +73,6 @@ namespace IL2CXX
                 type.GetMethod(nameof(ToString)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->f_type()->v__display_name);\n", 0)
             );
-            // TODO
-            /*code.ForTree(
-                type.GetMethod(nameof(ToString)),
-                (transpiler, actual) =>
-                {
-                    Console.Error.WriteLine($"ToString: {actual}");
-                    return ($"\treturn f__new_string(u\"{actual}\"sv);\n", 0);
-                }
-            );*/
         })
         .For(get(typeof(ValueType)), (type, code) =>
         {
@@ -126,7 +117,7 @@ namespace IL2CXX
         {
             code.For(
                 type.TypeInitializer,
-                transpiler => (string.Empty, 1)
+                transpiler => ($"\tt_static::v_instance->v_{transpiler.Escape(type)}->{transpiler.Escape(type.GetField(nameof(Type.EmptyTypes)))} = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.EscapeForMember(type)}>(0);\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)) }),
@@ -152,10 +143,12 @@ namespace IL2CXX
                 type.GetMethod("op_Inequality"),
                 transpiler => ("\treturn a_0 != a_1;\n", 1)
             );
-            // TODO
             code.For(
                 type.GetProperty(nameof(Type.IsInterface)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}return ({
+    transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImpl", declaredAndInstance), "a_0", Enumerable.Empty<string>(), x => x)
+} & {(int)TypeAttributes.ClassSemanticsMask}) == {(int)TypeAttributes.Interface};
+", 0)
             );
             code.For(
                 type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
@@ -265,7 +258,7 @@ namespace IL2CXX
 {'\t'}auto n = element->v__size * a_1;
 {'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + n));
 {'\t'}p->v__length = a_1;
-{'\t'}p->f_bounds()[0] = {{a_1, 0}};
+{'\t'}p->f_bounds()[0] = {{static_cast<size_t>(a_1), 0}};
 {'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
 {'\t'}element->v__szarray->f_finish(p);
 {'\t'}return p;
@@ -298,15 +291,7 @@ namespace IL2CXX
                 type.GetMethod("InternalGetValue", declaredAndInstance),
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto element = type->v__element;
-{'\t'}auto value = reinterpret_cast<char*>(a_0->f_bounds()+ type->v__rank) + a_1 * element->v__size;
-{'\t'}if (element->v__value_type) {{
-{'\t'}{'\t'}auto p = f_engine()->f_allocate(sizeof(t__object) + element->v__size);
-{'\t'}{'\t'}element->f_initialize(value, 1, p + 1);
-{'\t'}{'\t'}element->f_finish(p);
-{'\t'}{'\t'}return p;
-{'\t'}}} else {{
-{'\t'}{'\t'}return *reinterpret_cast<{transpiler.EscapeForValue(get(typeof(object)))}*>(value);
-{'\t'}}}
+{'\t'}return element->f_box(reinterpret_cast<char*>(a_0->f_bounds() + type->v__rank) + a_1 * element->v__size);
 ", 0)
             );
             // TODO
@@ -316,19 +301,10 @@ namespace IL2CXX
 {'\t'}auto element = type->v__element;
 {'\t'}auto value = reinterpret_cast<char*>(a_0->f_bounds()+ type->v__rank) + a_2 * element->v__size;
 {'\t'}if (!a_1) {{
-{'\t'}{'\t'}if (element->v__value_type)
-{'\t'}{'\t'}{'\t'}element->f_clear(value, 1);
-{'\t'}{'\t'}else
-{'\t'}{'\t'}{'\t'}*reinterpret_cast<{transpiler.EscapeForValue(get(typeof(object)))}*>(value) = {{}};
-{'\t'}}} else if (element->v__value_type) {{
-{'\t'}{'\t'}if (a_1->f_type()->f_is(element)) {{
-{'\t'}{'\t'}{'\t'}element->f_copy(a_1 + 1, 1, value);
-{'\t'}{'\t'}}} else {{
-{'\t'}{'\t'}{'\t'}throw std::runtime_error(""NotImplementedException"");
-{'\t'}{'\t'}}}
+{'\t'}{'\t'}element->f_clear(value, 1);
 {'\t'}}} else {{
 {'\t'}{'\t'}if (!a_1->f_type()->f_is(element) && !a_1->f_type()->f_implementation(element)) throw std::runtime_error(""InvalidCastException"");
-{'\t'}{'\t'}*reinterpret_cast<{transpiler.EscapeForValue(get(typeof(object)))}*>(value) = a_1;
+{'\t'}{'\t'}element->f_copy(element->f_unbox(a_1), 1, value);
 {'\t'}}}
 ", 0)
             );
@@ -378,11 +354,6 @@ namespace IL2CXX
         })
         .For(get(typeof(Attribute)), (type, code) =>
         {
-            // TODO
-            code.For(
-                type.GetMethod(nameof(Attribute.GetCustomAttributes), new[] { get(typeof(MemberInfo)), get(typeof(Type)), get(typeof(bool)) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
-            );
             // TODO
             foreach (var ts in new[]
             {
@@ -589,7 +560,7 @@ namespace IL2CXX
                 }
             );
             code.For(
-                type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)) }),
+                type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(bool)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (type->v__value_type) {{
@@ -598,29 +569,25 @@ namespace IL2CXX
 {'\t'}{'\t'}type->f_finish(p);
 {'\t'}{'\t'}return p;
 {'\t'}}}
-{'\t'}if (!type->v__default_constructor) throw std::runtime_error(""no parameterless constructor"");
-{'\t'}return type->v__default_constructor->v__invoke();
+{'\t'}auto constructor = type->v__default_constructor;
+{'\t'}if (!constructor) throw std::runtime_error(""no parameterless constructor"");
+{'\t'}if (!a_1 && (constructor->v__attributes & {(int)MethodAttributes.MemberAccessMask}) != {(int)MethodAttributes.Public}) throw std::runtime_error(""no public parameterless constructor"");
+{'\t'}return constructor->v__invoke();
 ", 0)
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(bool)) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
-            );
-            // TODO
-            code.For(
-                type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(object[])) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
-            );
-            // TODO
-            code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)), get(typeof(object[])) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ($@"{'\t'}if (!a_3 || a_3->v__length <= 0) return {transpiler.Escape(type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)) }))}(a_0);
+{transpiler.GenerateCheckArgumentNull("a_0")}{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}throw std::runtime_error(""not supported"");
+", 0)
             );
         })
         .For(get(typeof(string)), (type, code) =>
         {
-            code.Initialize = transpiler => $"\t\t{transpiler.Escape(get(typeof(string)).GetField(nameof(string.Empty)))} = f__new_string(u\"\"sv);";
+            code.Initialize = transpiler => $"\t\t{transpiler.Escape(type.GetField(nameof(string.Empty)))} = f__new_string(u\"\"sv);";
             code.For(
                 type.GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn f__new_string(a_0);\n", 2)
@@ -848,16 +815,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("InternalToObject", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto p = static_cast<{transpiler.EscapeForValue(type)}*>(a_0);
-{'\t'}auto type = static_cast<t__type*>(p->v__5ftype.v__5fvalue);
-{'\t'}auto value = p->v__5fvalue.v__5fvalue.v__5fvalue;
-{'\t'}if (type->v__value_type) {{
-{'\t'}{'\t'}auto p = f_engine()->f_allocate(sizeof(t__object) + type->v__size);
-{'\t'}{'\t'}type->f_initialize(value, 1, p + 1);
-{'\t'}{'\t'}type->f_finish(p);
-{'\t'}{'\t'}return p;
-{'\t'}}} else {{
-{'\t'}{'\t'}return *static_cast<{transpiler.EscapeForValue(get(typeof(object)))}*>(value);
-{'\t'}}}
+{'\t'}return static_cast<t__type*>(p->v__5ftype.v__5fvalue)->f_box(p->v__5fvalue.v__5fvalue.v__5fvalue);
 ", 1)
             );
         })

@@ -37,7 +37,7 @@ namespace IL2CXX.Tests
             return process.ExitCode;
         }
 
-        public static string Build(MethodInfo method)
+        public static string Build(MethodInfo method, IEnumerable<Type> bundle = null)
         {
             Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
@@ -54,7 +54,7 @@ namespace IL2CXX.Tests
                 main.WriteLine("#include \"run.h\"\n");
                 Type get(Type x) => load.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
                 var target = Environment.OSVersion.Platform;
-                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, header, main, (_, _) => body, Path.Combine(build, "resources"));
+                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, header, main, (_, _) => body, Path.Combine(build, "resources"), bundle?.Select(get));
                 main.WriteLine("\nnamespace il2cxx\n{");
                 main.Write(body);
                 main.WriteLine(@"
@@ -78,8 +78,8 @@ target_link_libraries(run recyclone $<$<NOT:$<PLATFORM_ID:Windows>>:dl>)
             Assert.AreEqual(0, Spawn(cmake, "--build .", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
             return build;
         }
-        public static string Build(Func<int> method) => Build(method.Method);
-        public static string Build(Func<string[], int> method) => Build(method.Method);
+        public static string Build(Func<int> method, IEnumerable<Type> bundle = null) => Build(method.Method, bundle);
+        public static string Build(Func<string[], int> method, IEnumerable<Type> bundle = null) => Build(method.Method, bundle);
         public static void Run(string build, string arguments, bool verify = true)
         {
             IEnumerable<(string, string)> environment = new[]

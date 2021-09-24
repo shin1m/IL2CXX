@@ -251,11 +251,13 @@ inline {returns}
             writer.WriteLine('}');
         }
 
-        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType, string resources)
+        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType, string resources, IEnumerable<Type> bundle = null)
         {
             Define(typeofRuntimeAssembly);
+            Define(typeofRuntimeFieldInfo);
             Define(typeofRuntimeConstructorInfo);
             Define(typeofRuntimeMethodInfo);
+            Define(typeofRuntimePropertyInfo);
             Define(typeofRuntimeType);
             Escape(finalizeOfObject);
             var typeofThread = getType(typeof(Thread));
@@ -267,6 +269,7 @@ inline {returns}
             Define(typeofStringBuilder);
             Define(method.DeclaringType);
             Enqueue(method);
+            if (bundle != null) foreach (var x in bundle) Enqueue(x);
             do
             {
                 ProcessNextMethod(writerForType);

@@ -142,8 +142,10 @@ namespace IL2CXX
         public Type TypeOf<T>() => getType(typeof(T));
         public readonly Type typeofObject;
         public readonly Type typeofRuntimeAssembly;
+        public readonly Type typeofRuntimeFieldInfo;
         public readonly Type typeofRuntimeConstructorInfo;
         public readonly Type typeofRuntimeMethodInfo;
+        public readonly Type typeofRuntimePropertyInfo;
         public readonly Type typeofRuntimeType;
         public readonly Type typeofBoolean;
         public readonly Type typeofByte;

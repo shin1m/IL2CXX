@@ -134,6 +134,13 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
+        .For(get(typeof(RuntimeFeature)), (type, code) =>
+        {
+            code.For(
+                type.GetProperty(nameof(RuntimeFeature.IsDynamicCodeSupported)).GetMethod,
+                transpiler => ($"\treturn false;\n", 1)
+            );
+        })
         .For(get(typeof(RuntimeHelpers)), (type, code) =>
         {
             code.For(
@@ -156,7 +163,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.InitializeArray)),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\tstd::memcpy(a_0->f_bounds() + a_0->f_type()->v__rank, a_1.v__field, a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\tstd::memcpy(a_0->f_bounds() + a_0->f_type()->v__rank, static_cast<t__runtime_field_info*>(a_1.v__field)->f_address(nullptr), a_0->f_type()->v__element->v__size * a_0->v__length);\n", 1)
             );
             {
                 bool isBitwiseEquatable(Type t) => Type.GetTypeCode(t.IsEnum ? t.GetEnumUnderlyingType() : t) switch

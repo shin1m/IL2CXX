@@ -5,6 +5,8 @@ namespace IL2CXX.Interop
 {
         internal class Sys
         {
+            [DllImport("libSystem.Native", EntryPoint = "SystemNative_SetPosixSignalHandler")]
+            public static extern void SetPosixSignalHandler(IntPtr handler);
             [DllImport("libSystem.Native", EntryPoint = "SystemNative_SetTerminalInvalidationHandler")]
             public static extern void SetTerminalInvalidationHandler(IntPtr handler);
         }

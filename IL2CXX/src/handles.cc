@@ -20,18 +20,18 @@ void t__weak_handle::f_target__(t__object* a_p)
 
 t__dependent_handle::~t__dependent_handle()
 {
-	v_secondary = nullptr;
+	v_dependent = nullptr;
 }
 
 void t__dependent_handle::f_target__(t__object* a_p)
 {
-	if (!a_p) v_secondary = nullptr;
+	if (!a_p) v_dependent = nullptr;
 	t__weak_handle::f_target__(a_p);
 }
 
 void t__dependent_handle::f_scan(t_scan<t__type> a_scan)
 {
-	a_scan(v_secondary);
+	a_scan(v_dependent);
 }
 
 }

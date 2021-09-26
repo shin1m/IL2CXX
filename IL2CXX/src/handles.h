@@ -35,9 +35,9 @@ struct t__weak_handle : t__handle, t_weak_pointer<t__type>
 
 struct t__dependent_handle : t__weak_handle
 {
-	t_slot_of<t__object> v_secondary;
+	t_slot_of<t__object> v_dependent;
 
-	t__dependent_handle(t__object* a_target, t__object* a_secondary) : t__weak_handle(a_target, false), v_secondary(a_secondary)
+	t__dependent_handle(t__object* a_target, t__object* a_dependent) : t__weak_handle(a_target, false), v_dependent(a_dependent)
 	{
 	}
 	virtual ~t__dependent_handle();

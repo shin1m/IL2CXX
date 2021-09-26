@@ -88,7 +88,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(GetHashCode), Type.EmptyTypes),
                 transpiler =>
                 {
-                    var marvin = get(Type.GetType("System.Marvin"));
+                    var marvin = get(Type.GetType("System.Marvin", true));
                     var seed = marvin.GetProperty("DefaultSeed").GetMethod;
                     var compute = marvin.GetMethod("ComputeHash32", new[] { get(typeof(byte)).MakeByRefType(), get(typeof(uint)), get(typeof(uint)), get(typeof(uint)) });
                     transpiler.Enqueue(seed);
@@ -211,7 +211,7 @@ namespace IL2CXX
 {'\t'}}}
 ", true, null);
             code.For(
-                type.GetMethod(nameof(Array.Clear), BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(Array)) }, null),
+                type.GetMethod(nameof(Array.Clear), new[] { get(typeof(Array)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto element = type->v__element;
 {'\t'}element->f_clear(a_0->f_bounds() + type->v__rank, a_0->v__length);
@@ -871,7 +871,7 @@ namespace IL2CXX
 ", 0)
             );
         })
-        .For(get(Type.GetType("System.ByReference`1")), (type, code) =>
+        .For(get(Type.GetType("System.ByReference`1", true)), (type, code) =>
         {
             code.ForGeneric(
                 type.GetConstructor(new[] { type.GetGenericArguments()[0].MakeByRefType() }),
@@ -1045,7 +1045,7 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(get(Type.GetType("System.Marvin")), (type, code) =>
+        .For(get(Type.GetType("System.Marvin", true)), (type, code) =>
         {
             code.For(
                 type.GetMethod("GenerateSeed", BindingFlags.Static | BindingFlags.NonPublic),
@@ -1059,7 +1059,7 @@ namespace IL2CXX
 ", 0)
             );
         })
-        .For(get(Type.GetType("System.SpanHelpers")), (type, code) =>
+        .For(get(Type.GetType("System.SpanHelpers", true)), (type, code) =>
         {
             var @byte = get(typeof(byte)).MakeByRefType();
             code.For(
@@ -1067,7 +1067,7 @@ namespace IL2CXX
                 transpiler => ("\treturn std::memcmp(a_0, a_1, a_2) == 0;\n", 1)
             );
         })
-        .For(get(Type.GetType("System.ThrowHelper")), (type, code) =>
+        .For(get(Type.GetType("System.ThrowHelper", true)), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod("ThrowForUnsupportedNumericsVectorBaseType", BindingFlags.Static | BindingFlags.NonPublic),
@@ -1076,15 +1076,6 @@ namespace IL2CXX
             code.ForGeneric(
                 type.GetMethod("ThrowForUnsupportedIntrinsicsVectorBaseType", BindingFlags.Static | BindingFlags.NonPublic),
                 (transpiler, types) => (string.Empty, 1)
-            );
-        })
-        .For(get(Type.GetType("System.CLRConfig")), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("GetBoolValue", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}*a_1 = false;
-{'\t'}return false;
-", 0)
             );
         });
     }

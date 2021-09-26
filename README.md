@@ -8,10 +8,10 @@ There are a lot of missing pieces in .NET runtime support as they are implemente
 
 # Requirements
 
-* .NET 6 preview
+* .NET 6
 * C++17 or later
 
-Currently, it is built and tested only by using GCC 10.x on Linux x86-64.
+Currently, it is built and tested only by using GCC 11.x on Linux x86-64.
 
 # How to
 

@@ -227,7 +227,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod("GetOptimalMaxSpinWaitsPerSpinIterationInternal", BindingFlags.Static | BindingFlags.NonPublic),
+                type.GetProperty("OptimalMaxSpinWaitsPerSpinIteration", BindingFlags.Static | BindingFlags.NonPublic).GetMethod,
                 transpiler => ("\treturn 7;\n", 1)
             );
             code.For(

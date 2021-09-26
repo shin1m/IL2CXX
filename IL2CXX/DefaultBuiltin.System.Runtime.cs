@@ -96,14 +96,8 @@ namespace IL2CXX
                 transpiler => ("\treturn true;\n", 1)
             );
             code.For(
-                type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr)), get(typeof(Type)) }, null),
-                transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
-{'\t'}auto type = static_cast<t__type*>(a_1);
-{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
-{'\t'}type->f_from_unmanaged(p, a_0);
-{'\t'}type->f_finish(p);
-{'\t'}return p;
-", 1)
+                type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr)), get(typeof(object)), get(typeof(bool)) }, null),
+                transpiler => ($"\ta_1->f_type()->f_from_unmanaged(a_1, a_0);\n", 1)
             );
             code.For(
                 type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic),
@@ -123,8 +117,12 @@ namespace IL2CXX
         .For(get(typeof(MemoryMarshal)), (type, code) =>
         {
             code.ForGeneric(
-                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference)),
+                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference), 1, new[] { Type.MakeGenericMethodParameter(0).MakeArrayType() }),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0->f_data());\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference), new[] { get(typeof(Array)) }),
+                transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f_bounds() + a_0->f_type()->v__rank);\n", 1)
             );
         })
         .For(get(typeof(NativeLibrary)), (type, code) =>
@@ -146,10 +144,6 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(GetHashCode), BindingFlags.Static | BindingFlags.Public),
                 transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 0)
-            );
-            code.For(
-                type.GetMethod("GetRawArrayData", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f_bounds() + a_0->f_type()->v__rank);\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.GetUninitializedObject)),
@@ -205,47 +199,44 @@ namespace IL2CXX
 ", 1)
             );
         })
-        .For(get(Type.GetType("System.Runtime.CompilerServices.DependentHandle")), (type, code) =>
+        .For(get(typeof(DependentHandle)), (type, code) =>
         {
             code.For(
-                type.GetConstructor(new[] { get(typeof(object)), get(typeof(object)) }),
-                transpiler => ($@"{'\t'}{transpiler.EscapeForValue(type)} value;
-{'\t'}value.v__5fhandle = new t__dependent_handle(a_0, a_1);
-{'\t'}return value;
+                type.GetMethod("InternalInitialize", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn new t__dependent_handle(a_0, a_1);\n", 1)
+            );
+            code.For(
+                type.GetMethod("InternalGetTarget", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn static_cast<t__dependent_handle*>(a_0.v__5fvalue)->f_target();\n", 1)
+            );
+            code.For(
+                type.GetMethod("InternalGetDependent", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn static_cast<t__dependent_handle*>(a_0.v__5fvalue)->v_dependent;\n", 1)
+            );
+            code.For(
+                type.GetMethod("InternalGetTargetAndDependent", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0.v__5fvalue);
+{'\t'}auto target = p->f_target();
+{'\t'}f__store(*a_1, target ? static_cast<t__object*>(p->v_dependent) : nullptr);
+{'\t'}return target;
 ", 1)
             );
             code.For(
-                type.GetMethod("GetPrimary"),
-                transpiler => ("\treturn static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)->f_target();\n", 1)
-            );
-            code.For(
-                type.GetMethod("GetPrimaryAndSecondary"),
-                transpiler => ($@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue);
-{'\t'}auto primary = p->f_target();
-{'\t'}f__store(*a_1, primary ? static_cast<t__object*>(p->v_secondary) : nullptr);
-{'\t'}return primary;
+                type.GetMethod("InternalSetDependent", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0.v__5fvalue);
+{'\t'}if (auto target = p->f_target()) p->v_dependent = a_1;
 ", 1)
             );
             code.For(
-                type.GetMethod("SetPrimary"),
-                transpiler => ("\tstatic_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)->f_target__(a_1);\n", 1)
+                type.GetMethod("InternalSetTargetToNull", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tstatic_cast<t__dependent_handle*>(a_0.v__5fvalue)->f_target__(nullptr);\n", 1)
             );
             code.For(
-                type.GetMethod("SetSecondary"),
-                transpiler => ($@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue);
-{'\t'}if (auto primary = p->f_target()) p->v_secondary = a_1;
-", 1)
-            );
-            code.For(
-                type.GetMethod("Free"),
-                transpiler => ($@"{'\t'}if (auto p = static_cast<t__dependent_handle*>(a_0->v__5fhandle.v__5fvalue)) {{
-{'\t'}{'\t'}a_0->v__5fhandle.v__5fvalue = nullptr;
-{'\t'}{'\t'}delete p;
-{'\t'}}}
-", 1)
+                type.GetMethod("InternalFree", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tdelete static_cast<t__dependent_handle*>(a_0.v__5fvalue);\n", 1)
             );
         })
-        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector128`1")), (type, code) =>
+        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector128`1", true)), (type, code) =>
         {
             // TODO
             code.ForGeneric(
@@ -253,7 +244,7 @@ namespace IL2CXX
                 (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
             );
         })
-        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector256`1")), (type, code) =>
+        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector256`1", true)), (type, code) =>
         {
             // TODO
             code.ForGeneric(
@@ -261,7 +252,7 @@ namespace IL2CXX
                 (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
             );
         })
-        .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch")), (type, code) =>
+        .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch", true)), (type, code) =>
         {
             // TODO
             code.For(
@@ -269,7 +260,7 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
-        .For(get(Type.GetType("Internal.Runtime.CompilerServices.Unsafe")), (type, code) =>
+        .For(get(Type.GetType("Internal.Runtime.CompilerServices.Unsafe", true)), (type, code) =>
         {
             var methods = GenericMethods(type);
             code.ForGeneric(

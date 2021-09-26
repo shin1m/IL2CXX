@@ -358,7 +358,11 @@ namespace IL2CXX
             MethodBase resolve(EntityHandle handle)
             {
                 var m = _resolve(handle);
-                if (m.DeclaringType.FullName == "Interop+Sys" && m.Name == "SetTerminalInvalidationHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetTerminalInvalidationHandler));
+                if (m.DeclaringType.FullName == "Interop+Sys")
+                {
+                    if (m.Name == "SetPosixSignalHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetPosixSignalHandler));
+                    if (m.Name == "SetTerminalInvalidationHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetTerminalInvalidationHandler));
+                }
                 if (m.DeclaringType.FullName == "Interop+Globalization" && m.Name == "EnumCalendarInfo") return TypeOf<Interop.Globalization>().GetMethod(nameof(Interop.Globalization.EnumCalendarInfo));
                 return m;
             }

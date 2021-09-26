@@ -48,7 +48,7 @@ namespace IL2CXX
         }
         private InterfaceMapping GetInterfaceMap(Type type, Type @interface)
         {
-            var ims = @interface.GetMethods();
+            var ims = @interface.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             var tms = new MethodInfo[ims.Length];
             for (var i = 0; i < ims.Length; ++i)
             {
@@ -134,7 +134,7 @@ namespace IL2CXX
             public InterfaceDefinition(Type type, Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex) : base(type)
             {
                 IsManaged = true;
-                foreach (var x in Type.GetMethods()) Add(x, genericMethodToTypesToIndex);
+                foreach (var x in Type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)) Add(x, genericMethodToTypesToIndex);
             }
             protected override int GetIndex(MethodKey method) => MethodToIndex[method];
         }
@@ -691,7 +691,7 @@ t__type* v__constructed_generic_types_{Escape(type)}[] = {{
             }
             if (type.IsEnum && !type.ContainsGenericParameters) writerForDefinitions.Write($@"
 std::pair<uint64_t, std::u16string_view> v__enum_pairs_{identifier}[] = {{{
-    string.Join(",", type.GetFields(BindingFlags.Static | BindingFlags.Public).Select(x => $"\n\t{{{(ulong)Convert.ToInt64(x.GetRawConstantValue())}ul, u\"{x.Name}\"sv}}"))
+    string.Join(",", type.GetFields(BindingFlags.Static | BindingFlags.Public).Select(x => $"\n\t{{{x.GetRawConstantValue() switch { ulong y => y, object y => (ulong)Convert.ToInt64(y) }}ul, u\"{x.Name}\"sv}}"))
 }
 }};");
             var td = definition as TypeDefinition;

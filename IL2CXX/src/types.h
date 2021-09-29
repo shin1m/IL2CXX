@@ -218,6 +218,10 @@ struct t__type : t__abstract_type
 	}
 	static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
 	void (*f_scan)(t_object<t__type>*, t_scan<t__type>) = f_do_scan;
+	void f_finalize(t_object<t__type>* a_this, t_scan<t__type> a_scan)
+	{
+		f_scan(a_this, a_scan);
+	}
 	static t__object* f_do_clone(const t__object* a_this);
 	t__object* (*f_clone)(const t__object*) = f_do_clone;
 	static void f_do_register_finalize(t__object* a_this);

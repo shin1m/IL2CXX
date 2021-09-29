@@ -67,21 +67,22 @@ namespace IL2CXX.Tests
             {
                 WithPadding(() =>
                 {
-                    Console.WriteLine($"x: {x}, h: {h.Target}");
+                    Console.WriteLine($"x: {x}, h: {h.Target}, resurrected: {Foo.Resurrected}");
                     x = null;
                 });
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                if (WithPadding(() =>
+                if (!WithPadding(() =>
                 {
-                    Console.WriteLine($"x: {x}, h: {h.Target}");
-                    return h.Target == null;
+                    Console.WriteLine($"x: {x}, h: {h.Target}, resurrected: {Foo.Resurrected}");
+                    return h.Target != null && Foo.Resurrected != null;
                 })) return 1;
                 WithPadding(() => Foo.Resurrected = null);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
-                Console.WriteLine($"x: {x}, h: {h.Target}");
+                GC.Collect();
+                Console.WriteLine($"x: {x}, h: {h.Target}, resurrected: {Foo.Resurrected}");
                 return h.Target == null ? 0 : 2;
             }
             finally
@@ -104,22 +105,27 @@ namespace IL2CXX.Tests
             {
                 WithPadding(() =>
                 {
-                    Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
+                    Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}, resurrected: {Foo.Resurrected}");
                     x = null;
                 });
                 GC.Collect();
-                if (WithPadding(() =>
+                if (!WithPadding(() =>
                 {
-                    Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
-                    return w.Target != null;
+                    Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}, resurrected: {Foo.Resurrected}");
+                    return w.Target == null;
                 })) return 1;
                 GC.WaitForPendingFinalizers();
-                if (WithPadding(() => wtr.Target == null)) return 2;
+                if (!WithPadding(() =>
+                {
+                    Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}, resurrected: {Foo.Resurrected}");
+                    return wtr.Target != null && Foo.Resurrected != null;
+                })) return 2;
                 WithPadding(() => Foo.Resurrected = null);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
-                Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}");
+                GC.Collect();
+                Console.WriteLine($"w: {w.Target}, wtr: {wtr.Target}, resurrected: {Foo.Resurrected}");
                 return wtr.Target == null ? 0 : 3;
             }
             finally

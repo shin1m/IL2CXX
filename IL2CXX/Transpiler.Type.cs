@@ -311,7 +311,7 @@ struct {Escape(type)}
                 var fields = Enumerable.Empty<FieldInfo>();
                 var staticFields = new List<FieldInfo>();
                 var threadStaticFields = new List<FieldInfo>();
-                if (builtinStaticMembers == null && !type.IsEnum)
+                if (builtinStaticMembers == null)
                     foreach (var x in type.GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
                         (x.GetCustomAttributesData().Any(x => x.AttributeType == typeofThreadStaticAttribute) ? threadStaticFields : staticFields).Add(x);
                 var staticDefinitions = new StringWriter();
@@ -342,10 +342,32 @@ struct {Escape(type)}
 struct t__static_{identifier}
 {{");
                     if (builtinStaticMembers != null) staticDefinitions.WriteLine(builtinStaticMembers);
-                    foreach (var x in staticFields) staticDefinitions.WriteLine($"\t{EscapeForRoot(x.FieldType)} {Escape(x)}{{}};");
+                    foreach (var x in staticFields)
+                        if (x.Attributes.HasFlag(FieldAttributes.Literal) && x.GetRawConstantValue() is object value && value.GetType().IsPrimitive)
+                        {
+                            fieldDeclarations.WriteLine($"extern uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[];");
+                            var bytes = value switch
+                            {
+                                byte b => new[] { b },
+                                sbyte b => new[] { (byte)b },
+                                _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), new[] { value.GetType() }).Invoke(null, new[] { value })
+                            };
+                            fieldDefinitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};");
+                        }
+                        else
+                        {
+                            staticDefinitions.WriteLine($"\t{EscapeForRoot(x.FieldType)} {Escape(x)}{{}};");
+                        }
                     staticDefinitions.WriteLine($@"{'\t'}void f_initialize()
 {'\t'}{{");
                     if (initialize != null) staticDefinitions.WriteLine(initialize);
+                    foreach (var x in staticFields.Where(x => x.Attributes.HasFlag(FieldAttributes.Literal)))
+                        if (x.GetRawConstantValue() is string value)
+                        {
+                            staticDefinitions.Write($"\t\t{Escape(x)} = ");
+                            WriteNewString(staticDefinitions, value);
+                            staticDefinitions.WriteLine(';');
+                        }
                     if (type.TypeInitializer != null)
                     {
                         staticDefinitions.WriteLine($"\t\t{Escape(type.TypeInitializer)}();");
@@ -354,7 +376,10 @@ struct t__static_{identifier}
                     staticDefinitions.WriteLine($@"{'\t'}}}
 }};");
                     staticMembers.WriteLine($"\tt__lazy<t__static_{identifier}> v_{identifier};");
-                    writeFields(staticFields, x => $"\treturn &t_static::v_instance->v_{identifier}->{Escape(x)};\n");
+                    writeFields(staticFields, x => x.Attributes.HasFlag(FieldAttributes.Literal) && (x.GetRawConstantValue()?.GetType().IsPrimitive ?? false)
+                        ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__literal;\n"
+                        : $"\treturn &t_static::v_instance->v_{identifier}->{Escape(x)};\n"
+                    );
                 }
                 var threadStaticMembers = new StringWriter();
                 if (threadStaticFields.Count > 0)
@@ -689,11 +714,6 @@ t__type* v__constructed_generic_types_{Escape(type)}[] = {{
 {string.Join(string.Empty, (genericTypeDefinitionToConstructeds.TryGetValue(type, out var xs) ? xs : Enumerable.Empty<Type>()).Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
 }};");
             }
-            if (type.IsEnum && !type.ContainsGenericParameters) writerForDefinitions.Write($@"
-std::pair<uint64_t, std::u16string_view> v__enum_pairs_{identifier}[] = {{{
-    string.Join(",", type.GetFields(BindingFlags.Static | BindingFlags.Public).Select(x => $"\n\t{{{x.GetRawConstantValue() switch { ulong y => y, object y => (ulong)Convert.ToInt64(y) }}ul, u\"{x.Name}\"sv}}"))
-}
-}};");
             var td = definition as TypeDefinition;
             if (td != null) writerForDefinitions.Write($@"{td.Fields}{td.DefaultConstructor}");
             writerForDeclarations.WriteLine($@"
@@ -823,9 +843,6 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}f_copy = f_do_copy;
 {'\t'}f_box = f_do_box;
 {'\t'}f_unbox = f_do_unbox_value;");
-                if (type.IsEnum) writerForDefinitions.WriteLine($@"{'\t'}v__enum_pairs = v__enum_pairs_{identifier};
-{'\t'}v__enum_count = std::size(v__enum_pairs_{identifier});
-{'\t'}v__cor_element_type = {GetCorElementType(type.GetEnumUnderlyingType())};");
             }
             writerForDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");

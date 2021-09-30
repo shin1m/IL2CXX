@@ -758,27 +758,19 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod(nameof(ToString), Type.EmptyTypes),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}uint64_t i;
-{'\t'}switch (a_0->f_type()->v__size) {{
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto n = a_0->f_type()->v__size;
+{'\t'}auto v = a_0 + 1;
+{'\t'}for (auto p = a_0->f_type()->v__fields; *p; ++p) if (std::memcmp((*p)->f_address(nullptr), v, n) == 0) return f__new_string((*p)->v__name);
+{'\t'}switch (n) {{
 {'\t'}case 1:
-{'\t'}{'\t'}i = *reinterpret_cast<uint8_t*>(a_0 + 1);
-{'\t'}{'\t'}break;
+{'\t'}{'\t'}return f__new_string(std::to_string(*reinterpret_cast<uint8_t*>(v)));
 {'\t'}case 2:
-{'\t'}{'\t'}i = *reinterpret_cast<uint16_t*>(a_0 + 1);
-{'\t'}{'\t'}break;
+{'\t'}{'\t'}return f__new_string(std::to_string(*reinterpret_cast<uint16_t*>(v)));
 {'\t'}case 4:
-{'\t'}{'\t'}i = *reinterpret_cast<uint32_t*>(a_0 + 1);
-{'\t'}{'\t'}break;
+{'\t'}{'\t'}return f__new_string(std::to_string(*reinterpret_cast<uint32_t*>(v)));
 {'\t'}default:
-{'\t'}{'\t'}i = *reinterpret_cast<uint64_t*>(a_0 + 1);
+{'\t'}{'\t'}return f__new_string(std::to_string(*reinterpret_cast<uint64_t*>(v)));
 {'\t'}}}
-{'\t'}auto p = a_0->f_type()->v__enum_pairs;
-{'\t'}auto q = p + a_0->f_type()->v__enum_count;
-{'\t'}auto j = std::lower_bound(p, q, i, [](auto x, auto y)
-{'\t'}{{
-{'\t'}{'\t'}return x.first < y;
-{'\t'}}});
-{'\t'}return j != q && j->first == i ? f__new_string(j->second) : f__new_string(std::to_string(i));
 ", 0)
             );
             // TODO

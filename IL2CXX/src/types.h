@@ -170,11 +170,6 @@ struct t__type : t__abstract_type
 			void* v__multicast_invoke;
 			void* v__invoke_unmanaged;
 		};
-		struct
-		{
-			const std::pair<uint64_t, std::u16string_view>* v__enum_pairs;
-			size_t v__enum_count;
-		};
 	};
 	t__runtime_field_info** v__fields;
 	t__runtime_constructor_info* v__default_constructor = nullptr;

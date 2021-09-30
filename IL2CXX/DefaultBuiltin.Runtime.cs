@@ -112,8 +112,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Type.GetEnumNames)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.Escape(get(typeof(string)))}>(a_0->v__enum_count);
-{'\t'}for (size_t i = 0; i < a_0->v__enum_count; ++i) p->f_data()[i] = f__new_string(a_0->v__enum_pairs[i].second);
+{'\t'}size_t n = 0;
+{'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
+{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.Escape(get(typeof(string)))}>(n);
+{'\t'}for (size_t i = 0; i < n; ++i) p->f_data()[i] = f__new_string(a_0->v__fields[i]->v__name);
 {'\t'}return p;
 ", 0)
             );
@@ -124,26 +126,15 @@ namespace IL2CXX
                     var array = transpiler.Escape(get(typeof(Array)));
                     return (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
 {'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
-{'\t'}auto n = a_0->v__enum_count;
+{'\t'}size_t n = 0;
+{'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
 {'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + a_0->v__size * n));
 {'\t'}p->v__length = n;
 {'\t'}p->f_bounds()[0] = {{n, 0}};
-{'\t'}auto copy = [&](auto q)
-{'\t'}{{
-{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) q[i] = a_0->v__enum_pairs[i].first;
-{'\t'}}};
-{'\t'}switch (a_0->v__size) {{
-{'\t'}case 1:
-{'\t'}{'\t'}copy(reinterpret_cast<uint8_t*>(reinterpret_cast<char*>(p) + a));
-{'\t'}{'\t'}break;
-{'\t'}case 2:
-{'\t'}{'\t'}copy(reinterpret_cast<uint16_t*>(reinterpret_cast<char*>(p) + a));
-{'\t'}{'\t'}break;
-{'\t'}case 4:
-{'\t'}{'\t'}copy(reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(p) + a));
-{'\t'}{'\t'}break;
-{'\t'}default:
-{'\t'}{'\t'}copy(reinterpret_cast<uint64_t*>(reinterpret_cast<char*>(p) + a));
+{'\t'}auto q = reinterpret_cast<char*>(p) + a;
+{'\t'}for (size_t i = 0; i < n; ++i) {{
+{'\t'}{'\t'}std::memcpy(q, a_0->v__fields[i]->f_address(nullptr), a_0->v__size);
+{'\t'}{'\t'}q += a_0->v__size;
 {'\t'}}}
 {'\t'}a_0->v__szarray->f_finish(p);
 {'\t'}return p;

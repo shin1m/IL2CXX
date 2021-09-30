@@ -131,8 +131,8 @@ namespace IL2CXX.Tests
         }
         static int EnumGetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
         static int EnumGetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
-        static int EnumToStringDefault() => Names.Foo.ToString() == "Foo" ? 0 : 1;
-        static int EnumToStringG() => Names.Foo.ToString("g") == "Foo" ? 0 : 1;
+        static int EnumToStringDefault() => Names.Bar.ToString() == "Bar" ? 0 : 1;
+        static int EnumToStringG() => Names.Bar.ToString("g") == "Bar" ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {

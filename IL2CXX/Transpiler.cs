@@ -833,5 +833,31 @@ namespace IL2CXX
             Enqueue(m);
             return $"{Escape(m)}()";
         }
+        static readonly IReadOnlyDictionary<char, string> escapes = new Dictionary<char, string>
+        {
+            ['\''] = "\\'",
+            ['"'] = "\\\"",
+            ['?'] = "\\?",
+            ['\\'] = "\\\\",
+            ['\a'] = "\\a",
+            ['\b'] = "\\b",
+            ['\f'] = "\\f",
+            ['\n'] = "\\n",
+            ['\r'] = "\\r",
+            ['\t'] = "\\t",
+            ['\v'] = "\\v"
+        };
+        private static void WriteNewString(TextWriter writer, string value)
+        {
+            writer.Write("f__new_string(u\"");
+            foreach (var c in value)
+                if (escapes.TryGetValue(c, out var e))
+                    writer.Write(e);
+                else if (c < 0x20 || c >= 0x7f)
+                    writer.Write($"\\x{(ushort)c:X}");
+                else
+                    writer.Write(c);
+            writer.WriteLine("\"sv)");
+        }
     }
 }

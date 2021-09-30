@@ -829,32 +829,12 @@ namespace IL2CXX
             instructions1[OpCodes.Ldstr.Value].For(x =>
             {
                 x.Estimate = (index, stack) => (index + 4, stack.Push(typeofString));
-                var escapes = new Dictionary<char, string>
-                {
-                    ['\''] = "\\'",
-                    ['"'] = "\\\"",
-                    ['?'] = "\\?",
-                    ['\\'] = "\\\\",
-                    ['\a'] = "\\a",
-                    ['\b'] = "\\b",
-                    ['\f'] = "\\f",
-                    ['\n'] = "\\n",
-                    ['\r'] = "\\r",
-                    ['\t'] = "\\t",
-                    ['\v'] = "\\v"
-                };
                 x.Generate = (index, stack) =>
                 {
                     var s = ParseString(ref index);
-                    writer.Write($"\n\t{indexToStack[index].Variable} = f__new_string(u\"");
-                    foreach (var c in s)
-                        if (escapes.TryGetValue(c, out var e))
-                            writer.Write(e);
-                        else if (c < 0x20 || c >= 0x7f)
-                            writer.Write($"\\x{(ushort)c:X}");
-                        else
-                            writer.Write(c);
-                    writer.WriteLine($"\"sv);");
+                    writer.Write($"\n\t{indexToStack[index].Variable} = ");
+                    WriteNewString(writer, s);
+                    writer.WriteLine(';');
                     return index;
                 };
             });

@@ -327,16 +327,7 @@ struct {Escape(type)}
 {address(x)}}}}};");
                     }
                 }
-                if (type.Name == "<PrivateImplementationDetails>")
-                {
-                    foreach (var x in staticFields)
-                    {
-                        fieldDeclarations.WriteLine($"extern uint8_t v__field_{identifier}__{Escape(x.Name)}__data[];");
-                        fieldDefinitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__data[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
-                    }
-                    writeFields(staticFields, x => $"\treturn v__field_{identifier}__{Escape(x.Name)}__data;\n");
-                }
-                else if (builtinStaticMembers != null || staticFields.Count > 0 || initialize != null || type.TypeInitializer != null)
+                if (builtinStaticMembers != null || staticFields.Count > 0 || initialize != null || type.TypeInitializer != null)
                 {
                     staticDefinitions.WriteLine($@"
 struct t__static_{identifier}
@@ -353,6 +344,11 @@ struct t__static_{identifier}
                                 _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), new[] { value.GetType() }).Invoke(null, new[] { value })
                             };
                             fieldDefinitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};");
+                        }
+                        else if (x.Attributes.HasFlag(FieldAttributes.HasFieldRVA))
+                        {
+                            fieldDeclarations.WriteLine($"extern uint8_t v__field_{identifier}__{Escape(x.Name)}__data[];");
+                            fieldDefinitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__data[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
                         }
                         else
                         {
@@ -376,9 +372,10 @@ struct t__static_{identifier}
                     staticDefinitions.WriteLine($@"{'\t'}}}
 }};");
                     staticMembers.WriteLine($"\tt__lazy<t__static_{identifier}> v_{identifier};");
-                    writeFields(staticFields, x => x.Attributes.HasFlag(FieldAttributes.Literal) && (x.GetRawConstantValue()?.GetType().IsPrimitive ?? false)
-                        ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__literal;\n"
-                        : $"\treturn &t_static::v_instance->v_{identifier}->{Escape(x)};\n"
+                    writeFields(staticFields, x =>
+                        x.Attributes.HasFlag(FieldAttributes.Literal) && (x.GetRawConstantValue()?.GetType().IsPrimitive ?? false) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__literal;\n" :
+                        x.Attributes.HasFlag(FieldAttributes.HasFieldRVA) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__data;\n" :
+                        $"\treturn &t_static::v_instance->v_{identifier}->{Escape(x)};\n"
                     );
                 }
                 var threadStaticMembers = new StringWriter();

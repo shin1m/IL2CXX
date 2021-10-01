@@ -466,7 +466,6 @@ namespace IL2CXX
             for (var j = 0; j < n; ++j) parameters[j] = type();
             return (cc, @return, parameters);*/
         }
-        private static readonly Regex staticArrayInitTypeSize = new Regex(@"^__StaticArrayInitTypeSize=(\d+)$", RegexOptions.Compiled);
         private static readonly Type typeofEcmaField = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaField, System.Reflection.MetadataLoadContext", true);
         private static readonly FieldInfo ecmaFieldHandle = typeofEcmaField.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly PropertyInfo ecmaModulePEReader = typeofEcmaModule.GetProperty("PEReader", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -480,10 +479,10 @@ namespace IL2CXX
         }
         private IEnumerable<byte> GetRVAData(FieldInfo field)
         {
-            var match = staticArrayInitTypeSize.Match(field.FieldType.Name);
-            var size = match.Success ? int.Parse(match.Groups[1].Value) : Marshal.SizeOf(Type.GetType(field.FieldType.ToString(), true));
             var handle = (FieldDefinitionHandle)ecmaFieldHandle.GetValue(field);
             var rva = GetMetadataReader(field.Module).GetFieldDefinition(handle).GetRelativeVirtualAddress();
+            var size = field.FieldType.StructLayoutAttribute?.Size ?? 0;
+            if (size <= 0) size = Marshal.SizeOf(Type.GetType(field.FieldType.ToString(), true));
             return ((PEReader)ecmaModulePEReader.GetValue(field.Module)).GetSectionData(rva).GetContent(0, size);
         }
         private Type GetVirtualThisType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeofSZArrayHelper ? type.GetGenericArguments()[0].MakeArrayType() : type;

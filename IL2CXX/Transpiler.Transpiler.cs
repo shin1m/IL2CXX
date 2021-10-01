@@ -1023,7 +1023,7 @@ namespace IL2CXX
                 {
                     var f = ParseField(ref index);
                     writer.Write($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = ");
-                    writer.WriteLine(f.DeclaringType.Name == "<PrivateImplementationDetails>"
+                    writer.WriteLine(f.Attributes.HasFlag(FieldAttributes.HasFieldRVA)
                         ? $"v__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}__data;"
                         : $"&{@static(f)};"
                     );

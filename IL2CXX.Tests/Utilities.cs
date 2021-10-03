@@ -44,22 +44,28 @@ namespace IL2CXX.Tests
             if (Directory.Exists(build)) Directory.Delete(build, true);
             Directory.CreateDirectory(build);
             using (var load = new MetadataLoadContext(new PathAssemblyResolver(Directory.EnumerateFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll").Append(typeof(Builtin).Assembly.Location).Append(method.Module.Assembly.Location))))
-            using (var header = File.CreateText(Path.Combine(build, "run.h")))
-            using (var main = File.CreateText(Path.Combine(build, "run.cc")))
-            using (var body = new StringWriter())
+            using (var declarations = File.CreateText(Path.Combine(build, "declarations.h")))
+            using (var inlines = new StringWriter())
+            using (var definitions = File.CreateText(Path.Combine(build, "definitions.cc")))
+            using (var main = File.CreateText(Path.Combine(build, "main.cc")))
             {
                 var assembly = load.LoadFromAssemblyPath(method.Module.Assembly.Location);
                 var type = assembly.GetType(method.DeclaringType.FullName, true);
                 method = type.GetMethod(method.Name, BindingFlags.Static | BindingFlags.NonPublic);
-                main.WriteLine("#include \"run.h\"\n");
+                definitions.WriteLine(@"#include ""declarations.h""
+
+namespace il2cxx
+{
+");
+                main.WriteLine("#include \"declarations.h\"\n");
                 Type get(Type x) => load.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
                 var target = Environment.OSVersion.Platform;
-                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, header, main, (_, _) => body, Path.Combine(build, "resources"), bundle?.Select(get));
-                main.WriteLine("\nnamespace il2cxx\n{");
-                main.Write(body);
+                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, declarations, main, (_, inline) => inline ? inlines : definitions, Path.Combine(build, "resources"), bundle?.Select(get));
+                declarations.WriteLine("\nnamespace il2cxx\n{");
+                declarations.Write(inlines);
+                declarations.WriteLine("\n}");
+                definitions.WriteLine("\n}");
                 main.WriteLine(@"
-}
-
 #include ""types.cc""
 #include ""engine.cc""
 #include ""handles.cc""");
@@ -68,7 +74,7 @@ namespace IL2CXX.Tests
             File.WriteAllText(Path.Combine(build, "CMakeLists.txt"), @"cmake_minimum_required(VERSION 3.16)
 project(run)
 add_subdirectory(../src/recyclone recyclone-build EXCLUDE_FROM_ALL)
-add_executable(run run.cc)
+add_executable(run definitions.cc main.cc)
 target_include_directories(run PRIVATE ../src)
 target_compile_options(run PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 target_link_libraries(run recyclone $<$<NOT:$<PLATFORM_ID:Windows>>:dl>)

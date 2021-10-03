@@ -26,7 +26,10 @@ namespace IL2CXX
     }
     public abstract class RuntimeFieldInfo : FieldInfo
     {
+        public override FieldAttributes Attributes => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
+        public override Type FieldType => throw new NotImplementedException();
+        public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
         public override object GetValue(object @this) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
@@ -35,6 +38,7 @@ namespace IL2CXX
     public abstract class RuntimeConstructorInfo : ConstructorInfo
     {
         public override Type DeclaringType => throw new NotImplementedException();
+        public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
         public override ParameterInfo[] GetParameters() => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
@@ -43,15 +47,19 @@ namespace IL2CXX
     public abstract class RuntimeMethodInfo : MethodInfo
     {
         public override Type DeclaringType => throw new NotImplementedException();
+        public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
         public override ParameterInfo[] GetParameters() => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
     }
     public abstract class RuntimePropertyInfo : PropertyInfo
     {
+        public override PropertyAttributes Attributes => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
+        public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
+        public override Type PropertyType => throw new NotImplementedException();
     }
     public abstract class RuntimeType : Type
     {
@@ -62,12 +70,15 @@ namespace IL2CXX
         protected override TypeAttributes GetAttributeFlagsImpl() => throw new NotImplementedException();
         protected override ConstructorInfo GetConstructorImpl(BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
         public override ConstructorInfo[] GetConstructors(BindingFlags bindingFlags) => throw new NotImplementedException();
+        public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
         public override string[] GetEnumNames() => throw new NotImplementedException();
         public override Array GetEnumValues() => throw new NotImplementedException();
         public override FieldInfo GetField(string name, BindingFlags bindingFlags) => throw new NotImplementedException();
+        public override FieldInfo[] GetFields(BindingFlags bindingFlags) => throw new NotImplementedException();
         public override Type[] GetGenericArguments() => throw new NotImplementedException();
         public override Type GetGenericTypeDefinition() => throw new NotImplementedException();
+        public override PropertyInfo[] GetProperties(BindingFlags bindingFlags) => throw new NotImplementedException();
         public override Type[] GetInterfaces() => throw new NotImplementedException();
         protected override bool HasElementTypeImpl() => throw new NotImplementedException();
         protected override bool IsArrayImpl() => throw new NotImplementedException();

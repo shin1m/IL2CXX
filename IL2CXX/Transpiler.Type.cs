@@ -685,6 +685,15 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
                 this.staticMembers.Write(staticMembers);
                 this.threadStaticMembers.Write(threadStaticMembers);
             }
+            if (definition is InterfaceDefinition || definition is TypeDefinition)
+            {
+                var identifier = Escape(type);
+                foreach (var x in type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                {
+                    fieldDeclarations.WriteLine($"extern t__runtime_property_info v__property_{identifier}__{Escape(x.Name)};");
+                    fieldDefinitions.WriteLine($@"t__runtime_property_info v__property_{identifier}__{Escape(x.Name)}{{&t__type_of<t__runtime_property_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, &t__type_of<{Escape(x.PropertyType)}>::v__instance}};");
+                }
+            }
             runtimeDefinitions.Add(definition);
             // TODO
             //if (!type.IsArray && !type.IsByRef && !type.IsPointer && type != typeofVoid)
@@ -713,6 +722,11 @@ t__type* v__constructed_generic_types_{Escape(type)}[] = {{
             }
             var td = definition as TypeDefinition;
             if (td != null) writerForDefinitions.Write($@"{td.Fields}{td.DefaultConstructor}");
+            if (definition is InterfaceDefinition || definition is TypeDefinition) writerForDefinitions.Write($@"
+t__runtime_property_info* v__properties_{identifier}[] = {{
+{string.Join(string.Empty, type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Select(x => $"\t&v__property_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
+}};
+");
             writerForDeclarations.WriteLine($@"
 template<>
 struct t__type_of<{identifier}> : {@base}
@@ -829,6 +843,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}v__cor_element_type = {GetCorElementType(GetElementType(type))};");
             if (td?.Fields != null) writerForDefinitions.WriteLine($"\tv__fields = v__fields_{identifier};");
             if (td?.DefaultConstructor != null) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
+            if (definition is InterfaceDefinition || definition is TypeDefinition) writerForDefinitions.WriteLine($"\tv__properties = v__properties_{identifier};");
             writerForDefinitions.Write(td?.Delegate);
             var nv = Nullable.GetUnderlyingType(type);
             if (nv != null) writerForDefinitions.WriteLine($"\tv__nullable_value = &t__type_of<{Escape(nv)}>::v__instance;");

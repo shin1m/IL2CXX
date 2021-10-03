@@ -64,9 +64,9 @@ struct t__field_info : t__member_info
 
 struct t__runtime_field_info : t__field_info
 {
-	t__type* v__type;
+	t__type* v__field_type;
 
-	t__runtime_field_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_field_type, void*(*a_address)(void*)) : t__field_info(a_type, a_declaring_type, a_name, a_attributes), v__type(a_field_type), f_address(a_address)
+	t__runtime_field_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_field_type, void*(*a_address)(void*)) : t__field_info(a_type, a_declaring_type, a_name, a_attributes), v__field_type(a_field_type), f_address(a_address)
 	{
 	}
 	void* (*f_address)(void*);
@@ -108,7 +108,11 @@ struct t__property_info : t__member_info
 
 struct t__runtime_property_info : t__property_info
 {
-	using t__property_info::t__property_info;
+	t__type* v__property_type;
+
+	t__runtime_property_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_property_type) : t__property_info(a_type, a_declaring_type, a_name, a_attributes), v__property_type(a_property_type)
+	{
+	}
 };
 
 struct t__assembly : t__object
@@ -131,6 +135,8 @@ struct t__abstract_type : t__member_info
 
 struct t__type : t__abstract_type
 {
+	static constexpr t__runtime_field_info* v__empty_fields[] = {nullptr};
+	static constexpr t__runtime_property_info* v__empty_properties[] = {nullptr};
 	static void f_be(t__object* a_p, t__type* a_type)
 	{
 		a_p->v_type = a_type;
@@ -142,7 +148,6 @@ struct t__type : t__abstract_type
 	std::u16string_view v__namespace;
 	std::u16string_view v__full_name;
 	std::u16string_view v__display_name;
-	int32_t v__attribute_flags;
 	bool v__managed;
 	bool v__value_type;
 	uint8_t v__array : 1;
@@ -155,8 +160,8 @@ struct t__type : t__abstract_type
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
 	t__type* v__generic_type_definition = nullptr;
-	t__type** v__generic_arguments = nullptr;
-	t__type** v__constructed_generic_types = nullptr;
+	t__type* const* v__generic_arguments = nullptr;
+	t__type* const* v__constructed_generic_types = nullptr;
 	t__type* v__szarray;
 	union
 	{
@@ -171,7 +176,8 @@ struct t__type : t__abstract_type
 			void* v__invoke_unmanaged;
 		};
 	};
-	t__runtime_field_info** v__fields;
+	t__runtime_field_info* const* v__fields = v__empty_fields;
+	t__runtime_property_info* const* v__properties = v__empty_properties;
 	t__runtime_constructor_info* v__default_constructor = nullptr;
 	t__type* v__nullable_value = nullptr;
 
@@ -184,11 +190,10 @@ struct t__type : t__abstract_type
 		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_pointer, bool a_has_element_type, bool a_by_ref_like,
 		size_t a_size,
 		t__type* a_szarray
-	) : t__abstract_type(a_type, nullptr, a_name), v__base(a_base),
+	) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags), v__base(a_base),
 	v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
-	v__attribute_flags(a_attribute_flags),
 	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__pointer(a_pointer), v__has_element_type(a_has_element_type), v__by_ref_like(a_by_ref_like),
 	v__size(a_size),
 	v__szarray(a_szarray)

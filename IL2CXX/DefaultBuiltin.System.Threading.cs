@@ -181,6 +181,11 @@ namespace IL2CXX
                 type.GetMethod(nameof(Thread.Yield)),
                 transpiler => ("\tstd::this_thread::yield();\nreturn true;\n", 1)
             );
+            // TODO
+            code.For(
+                type.GetMethod("GetThreadStateNative", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
             code.For(
                 type.GetMethod("IsBackgroundNative", declaredAndInstance),
                 transpiler => ("\treturn a_0->v__background;\n", 1)
@@ -188,6 +193,11 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("SetBackgroundNative", declaredAndInstance),
                 transpiler => ("\tf_engine()->f_background__(a_0, a_1);\n", 1)
+            );
+            // TODO
+            code.For(
+                type.GetProperty(nameof(Thread.IsAlive)).GetMethod,
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             // TODO
             code.For(
@@ -252,6 +262,14 @@ namespace IL2CXX
                 transpiler => ("\treturn false;\n", 0)
             );
             code.For(
+                type.GetMethod("GetThreadCount", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
+                type.GetMethod("GetPendingUnmanagedWorkItemCount", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
                 type.GetMethod("InitializeConfigAndDetermineUsePortableThreadPool", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn true;\n", 1)
             );
@@ -272,6 +290,10 @@ namespace IL2CXX
                     type.GetMethod("QueueWaitCompletionNative", BindingFlags.Static | BindingFlags.NonPublic),
                     transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
                 );
+            code.For(
+                type.GetMethod("RegisterWaitForSingleObjectNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
             code.For(
                 type.GetMethod("ReportThreadStatusNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)

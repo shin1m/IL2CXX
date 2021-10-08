@@ -307,7 +307,7 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                     if (entry == method)
                     {
                         writerForDeclarations.WriteLine($"\nextern t__runtime_method_info v__assembly_{name}__entry_point;");
-                        writer.WriteLine($"\nt__runtime_method_info v__assembly_{name}__entry_point{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(entry.DeclaringType)}>::v__instance}};");
+                        writer.WriteLine($"\nt__runtime_method_info v__assembly_{name}__entry_point{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(entry.DeclaringType)}>::v__instance, u\"{entry.Name}\"sv, {(int)entry.Attributes}, nullptr}};");
                     }
                     writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
                     writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(entry == method ? $"&v__assembly_{name}__entry_point" : "nullptr")}}};");
@@ -396,7 +396,6 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
 }
 }};
 ");
-            writerForDefinitions.Write(fieldDefinitions);
             var arguments0 = string.Empty;
             var arguments1 = string.Empty;
             if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))

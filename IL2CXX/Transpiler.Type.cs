@@ -37,6 +37,15 @@ namespace IL2CXX
             while (!method.Attributes.HasFlag(MethodAttributes.NewSlot)) method = get(get(method.DeclaringType.BaseType).DeclaringType);
             return method;
         }
+        private MethodInfo GetConcrete(MethodInfo method, Type type)
+        {
+            var ct = (TypeDefinition)Define(type);
+            var methods = method.DeclaringType.IsInterface ? ct.InterfaceToMethods[method.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods;
+            var dt = Define(method.DeclaringType);
+            return method.IsGenericMethod
+                ? methods[dt.GetIndex(method.GetGenericMethodDefinition())].MakeGenericMethod(method.GetGenericArguments())
+                : methods[dt.GetIndex(method)];
+        }
         private static string ExplicitName(Type type)
         {
             if (type.IsGenericTypeParameter) return type.Name;
@@ -117,6 +126,8 @@ namespace IL2CXX
             public bool IsMarshallable => IsBlittable || HasUnmanaged || Type.GetTypeCode(Type) == TypeCode.Boolean;
             public readonly List<MethodInfo> Methods = new();
             public readonly Dictionary<MethodKey, int> MethodToIndex = new();
+            public readonly StringWriter Definitions = new();
+            public bool HasProperties;
 
             public RuntimeDefinition(Type type) => Type = type;
             protected void Add(MethodInfo method, Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex)
@@ -142,9 +153,9 @@ namespace IL2CXX
         {
             public readonly TypeDefinition Base;
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new();
-            public readonly string DefaultConstructor;
             public readonly string Delegate;
-            public string Fields;
+            public bool HasFields;
+            public readonly bool HasDefaultConstructor;
 
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
             {
@@ -194,14 +205,14 @@ namespace IL2CXX
                 if (constructor != null)
                 {
                     var identifier = transpiler.Escape(Type);
-                    DefaultConstructor = $@"
-t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{transpiler.Escape(type)}>::v__instance, u""{constructor.Name}""sv, {(int)constructor.Attributes}, []() -> t__object*
+                    Definitions.WriteLine($@"
+t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{transpiler.Escape(type)}>::v__instance, u""{constructor.Name}""sv, {(int)constructor.Attributes}, [](auto, auto, auto, auto, auto) -> t__object*
 {{
 {'\t'}auto p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}return p;
-}}}};
-";
+}}}};");
+                    HasDefaultConstructor = true;
                     transpiler.Enqueue(constructor);
                 }
                 if (Type.IsSubclassOf(transpiler.typeofDelegate) && Type != transpiler.typeofMulticastDelegate)
@@ -241,12 +252,12 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
         private readonly StringWriter staticMembers = new();
         private readonly StringWriter threadStaticMembers = new();
         private readonly StringWriter fieldDeclarations = new();
-        private readonly StringWriter fieldDefinitions = new();
         private readonly List<RuntimeDefinition> runtimeDefinitions = new();
         private readonly Dictionary<Type, RuntimeDefinition> typeToRuntime = new();
         private readonly Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex = new();
         private bool processed;
 
+        private IEnumerable<PropertyInfo> GetProperties(Type type) => type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance | (type.IsInterface ? BindingFlags.Default : BindingFlags.Static) | BindingFlags.Public | BindingFlags.NonPublic).Where(x => !invalids.Contains(x.PropertyType.FullName));
         public RuntimeDefinition Define(Type type)
         {
             if (typeToRuntime.TryGetValue(type, out var definition)) return definition;
@@ -322,7 +333,7 @@ struct {Escape(type)}
                     foreach (var x in fields)
                     {
                         fieldDeclarations.WriteLine($"extern t__runtime_field_info v__field_{identifier}__{Escape(x.Name)};");
-                        fieldDefinitions.WriteLine($@"t__runtime_field_info v__field_{identifier}__{Escape(x.Name)}{{&t__type_of<t__runtime_field_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, &t__type_of<{Escape(x.FieldType)}>::v__instance, +[](void* a_this) -> void*
+                        td.Definitions.WriteLine($@"t__runtime_field_info v__field_{identifier}__{Escape(x.Name)}{{&t__type_of<t__runtime_field_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, &t__type_of<{Escape(x.FieldType)}>::v__instance, +[](void* a_this) -> void*
 {{
 {address(x)}}}}};");
                     }
@@ -343,12 +354,12 @@ struct t__static_{identifier}
                                 sbyte b => new[] { (byte)b },
                                 _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), new[] { value.GetType() }).Invoke(null, new[] { value })
                             };
-                            fieldDefinitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};");
+                            td.Definitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};");
                         }
                         else if (x.Attributes.HasFlag(FieldAttributes.HasFieldRVA))
                         {
                             fieldDeclarations.WriteLine($"extern uint8_t v__field_{identifier}__{Escape(x.Name)}__data[];");
-                            fieldDefinitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__data[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
+                            td.Definitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__data[] = {{{string.Join(", ", GetRVAData(x).Select(y => $"0x{y:x02}"))}}};");
                         }
                         else
                         {
@@ -675,11 +686,11 @@ struct {Escape(type)}__unmanaged
                     writeFields(fields, x => GenerateCheckNull("a_this") + $@"{'\t'}auto p = {(type.IsValueType ? string.Empty : "*")}static_cast<{EscapeForValue(type)}*>(a_this);
 {'\t'}return &p->{Escape(x)};
 ");
-                    td.Fields = $@"
+                    fields = fields.Concat(staticFields).Concat(threadStaticFields);
+                    if (td.HasFields = fields.Any()) td.Definitions.WriteLine($@"
 t__runtime_field_info* v__fields_{identifier}[] = {{
-{string.Join(string.Empty, fields.Concat(staticFields).Concat(threadStaticFields).Select(x => $"\t&v__field_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
-}};
-";
+{string.Join(string.Empty, fields.Select(x => $"\t&v__field_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
+}};");
                 }
                 this.staticDefinitions.Write(staticDefinitions);
                 this.staticMembers.Write(staticMembers);
@@ -688,10 +699,16 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
             if (definition is InterfaceDefinition || definition is TypeDefinition)
             {
                 var identifier = Escape(type);
-                foreach (var x in type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                foreach (var x in GetProperties(type))
                 {
-                    fieldDeclarations.WriteLine($"extern t__runtime_property_info v__property_{identifier}__{Escape(x.Name)};");
-                    fieldDefinitions.WriteLine($@"t__runtime_property_info v__property_{identifier}__{Escape(x.Name)}{{&t__type_of<t__runtime_property_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, &t__type_of<{Escape(x.PropertyType)}>::v__instance}};");
+                    definition.HasProperties = true;
+                    var variable = Escape(x);
+                    fieldDeclarations.WriteLine($"extern t__runtime_property_info {variable};");
+                    var get = x.GetMethod;
+                    if (get != null) definition.Definitions.WriteLine($"t__runtime_method_info v__method_{Escape(get)}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{get.Name}\"sv, {(int)get.Attributes}, {GenerateInvokeFunction(get)}}};");
+                    var set = x.SetMethod;
+                    if (set != null) definition.Definitions.WriteLine($"t__runtime_method_info v__method_{Escape(set)}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{set.Name}\"sv, {(int)set.Attributes}, {GenerateInvokeFunction(set)}}};");
+                    definition.Definitions.WriteLine($"t__runtime_property_info {variable}{{&t__type_of<t__runtime_property_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, &t__type_of<{Escape(x.PropertyType)}>::v__instance, {(get == null ? "nullptr" : $"&v__method_{Escape(get)}")}, {(set == null ? "nullptr" : $"&v__method_{Escape(set)}")}}};");
                 }
             }
             runtimeDefinitions.Add(definition);
@@ -720,11 +737,10 @@ t__type* v__constructed_generic_types_{Escape(type)}[] = {{
 {string.Join(string.Empty, (genericTypeDefinitionToConstructeds.TryGetValue(type, out var xs) ? xs : Enumerable.Empty<Type>()).Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
 }};");
             }
-            var td = definition as TypeDefinition;
-            if (td != null) writerForDefinitions.Write($@"{td.Fields}{td.DefaultConstructor}");
-            if (definition is InterfaceDefinition || definition is TypeDefinition) writerForDefinitions.Write($@"
+            writerForDefinitions.Write(definition.Definitions);
+            if (definition.HasProperties) writerForDefinitions.Write($@"
 t__runtime_property_info* v__properties_{identifier}[] = {{
-{string.Join(string.Empty, type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Select(x => $"\t&v__property_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
+{string.Join(string.Empty, GetProperties(type).Select(x => $"\t&{Escape(x)},\n"))}{'\t'}nullptr
 }};
 ");
             writerForDeclarations.WriteLine($@"
@@ -733,7 +749,7 @@ struct t__type_of<{identifier}> : {@base}
 {{");
             writerForDefinitions.Write($@"
 t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
-            if (td != null)
+            if (definition is TypeDefinition td)
             {
                 void writeMethods(IEnumerable<MethodInfo> methods, Func<int, MethodInfo, string, string> pointer, Func<int, int, MethodInfo, string, string> genericPointer, Func<MethodInfo, MethodInfo> origin, string indent)
                 {
@@ -841,9 +857,9 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
 {'\t'}v__rank = {type.GetArrayRank()};
 {'\t'}v__cor_element_type = {GetCorElementType(GetElementType(type))};");
-            if (td?.Fields != null) writerForDefinitions.WriteLine($"\tv__fields = v__fields_{identifier};");
-            if (td?.DefaultConstructor != null) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
-            if (definition is InterfaceDefinition || definition is TypeDefinition) writerForDefinitions.WriteLine($"\tv__properties = v__properties_{identifier};");
+            if (td?.HasFields ?? false) writerForDefinitions.WriteLine($"\tv__fields = v__fields_{identifier};");
+            if (td?.HasDefaultConstructor ?? false) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
+            if (definition.HasProperties) writerForDefinitions.WriteLine($"\tv__properties = v__properties_{identifier};");
             writerForDefinitions.Write(td?.Delegate);
             var nv = Nullable.GetUnderlyingType(type);
             if (nv != null) writerForDefinitions.WriteLine($"\tv__nullable_value = &t__type_of<{Escape(nv)}>::v__instance;");

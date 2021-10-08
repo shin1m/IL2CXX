@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
 using System.Reflection;
+using System.Text;
 
 namespace IL2CXX
 {
@@ -33,6 +34,27 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Debugger.NotifyOfCrossThreadDependency)),
                 transpiler => (string.Empty, 1)
+            );
+        })
+        .For(get(typeof(StackFrame)), (type, code) =>
+        {
+            // TODO
+            code.For(
+                type.GetMethod("BuildStackFrame", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );
+        })
+        .For(get(typeof(StackTrace)), (type, code) =>
+        {
+            // TODO
+            code.For(
+                type.GetMethod("CaptureStackTrace", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => (string.Empty, 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.NonPublic, new[] { type.GetNestedType("TraceFormat", BindingFlags.NonPublic), get(typeof(StringBuilder)) }),
+                transpiler => (string.Empty, 0)
             );
         })
         .For(get(Type.GetType("System.Diagnostics.Tracing.EventPipeEventDispatcher")), (type, code) =>

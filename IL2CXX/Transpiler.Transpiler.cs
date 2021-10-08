@@ -409,7 +409,6 @@ namespace IL2CXX
                 {
                     var m = ParseMethod(ref index);
                     writer.WriteLine($" {m.DeclaringType}::[{m}]");
-                    Enqueue(m);
                     GenerateCall(m, Escape(m), stack, indexToStack[index]);
                     return index;
                 };
@@ -748,27 +747,14 @@ namespace IL2CXX
                 };
                 x.Generate = (index, stack) =>
                 {
-                    var m = ParseMethod(ref index);
+                    var m = (MethodInfo)ParseMethod(ref index);
                     writer.WriteLine($" {m.DeclaringType}::[{m}]");
                     var after = indexToStack[index];
                     string generateVirtual(string target) => GenerateVirtualCall(m, target,
-                        stack.Take(m.GetParameters().Length).Select(y => y.Variable),
+                        stack.Take(m.GetParameters().Length).Select(y => y.Variable).Reverse(),
                         y => $"\t{(GetReturnType(m) == typeofVoid ? string.Empty : $"{after.Variable} = ")}{y};\n"
                     );
-                    void generateConcrete(MethodBase cm)
-                    {
-                        Enqueue(cm);
-                        GenerateCall(cm, Escape(cm), stack, after);
-                    }
-                    MethodInfo concrete(Type type)
-                    {
-                        var ct = (TypeDefinition)Define(type);
-                        var methods = m.DeclaringType.IsInterface ? ct.InterfaceToMethods[m.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods;
-                        var dt = Define(m.DeclaringType);
-                        return m.IsGenericMethod
-                            ? methods[dt.GetIndex(((MethodInfo)m).GetGenericMethodDefinition())].MakeGenericMethod(m.GetGenericArguments())
-                            : methods[dt.GetIndex(m)];
-                    }
+                    void generateConcrete(MethodBase cm) => GenerateCall(cm, Escape(cm), stack, after);
                     var isConcrete = !m.DeclaringType.IsInterface && (!m.IsVirtual || m.IsFinal);
                     var @this = stack.ElementAt(m.GetParameters().Length);
                     if (constrained == null)
@@ -776,7 +762,7 @@ namespace IL2CXX
                         if (isConcrete)
                             generateConcrete(m);
                         else if (@this.Type.IsSealed)
-                            generateConcrete(concrete(@this.Type));
+                            generateConcrete(GetConcrete(m, @this.Type));
                         else
                             writer.Write(GenerateCheckNull(@this.Variable) + generateVirtual(@this.Variable));
                     }
@@ -784,13 +770,12 @@ namespace IL2CXX
                     {
                         string generate(MethodBase cm)
                         {
-                            Enqueue(cm);
-                            var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append("p"));
+                            var call = GenerateCall(cm, Escape(cm), stack.Take(cm.GetParameters().Length).Select(y => y.Variable).Append("p").Reverse());
                             return $"\t{(GetReturnType(cm) == typeofVoid ? string.Empty : $"{after.Variable} = ")}{call};\n";
                         }
                         if (constrained.IsValueType)
                         {
-                            var cm = isConcrete ? m : concrete(constrained);
+                            var cm = isConcrete ? m : GetConcrete(m, constrained);
                             if (cm.DeclaringType == constrained)
                                 generateConcrete(cm);
                             else
@@ -802,7 +787,7 @@ namespace IL2CXX
                             writer.WriteLine($@"{'\t'}{{auto p = *static_cast<{Escape(constrained.IsInterface ? typeofObject : constrained)}**>({@this.Variable});
 {(
     isConcrete ? generate(m) :
-    constrained.IsSealed ? generate(concrete(constrained)) :
+    constrained.IsSealed ? generate(GetConcrete(m, constrained)) :
     GenerateCheckNull("p") + generateVirtual("p")
 )}{'\t'}}}");
                         }
@@ -1447,6 +1432,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
+                    Enqueue(m);
                     var function = m.DeclaringType.IsInterface
                         ? $@"{GetInterfaceFunction(m,
                             y => $"f__resolve<{y}>",

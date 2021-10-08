@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace IL2CXX
@@ -30,6 +31,12 @@ namespace IL2CXX
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowNullReference() => throw new NullReferenceException();
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowNotSupported() => throw new NotSupportedException();
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowOverflow() => throw new OverflowException();
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowTarget() => throw new TargetException();
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowTargetParameterCount() => throw new TargetParameterCountException();
     }
 }

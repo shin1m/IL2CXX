@@ -151,9 +151,25 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
+                type.GetProperty(nameof(Type.IsVisible)).GetMethod,
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
                 type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
                 transpiler => ("\treturn true;\n", 1)
             );
+        })
+        .For(get(typeof(ModuleHandle)), (type, code) =>
+        {
+            code.Members = transpiler => ($@"{'\t'}{'\t'}t_value() = default;
+{'\t'}{'\t'}void f_destruct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+", false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
         })
         .For(get(typeof(RuntimeFieldHandle)), (type, code) =>
         {
@@ -361,7 +377,7 @@ namespace IL2CXX
                 new[] { get(typeof(EventInfo)) },
                 new[] { get(typeof(ParameterInfo)) }
             }) code.For(
-                type.GetMethod("GetParentDefinition", BindingFlags.Static | BindingFlags.NonPublic, null, ts, null),
+                type.GetMethod("GetParentDefinition", BindingFlags.Static | BindingFlags.NonPublic, ts),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
@@ -377,13 +393,23 @@ namespace IL2CXX
             );
             // TODO
             code.For(
+                type.GetProperty(nameof(Exception.TargetSite)).GetMethod,
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            // TODO
+            code.For(
                 type.GetMethod("CreateSourceName", BindingFlags.Instance | BindingFlags.NonPublic),
                 transpiler => ("\treturn {};\n", 0)
             );
             // TODO
             code.For(
-                type.GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { type.GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic) }, null),
+                type.GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, new[] { type.GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic) }),
                 transpiler => ("\treturn f__new_string(u\"message from native resources\"sv);\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("IsImmutableAgileException", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn false;\n", 1)
             );
             // TODO
             code.For(
@@ -449,6 +475,11 @@ namespace IL2CXX
 {'\t'}//a_0->... = load;
 ", 0)
             );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(GC.GetTotalAllocatedBytes)),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
         })
         .For(get(typeof(WeakReference)), (type, code) =>
         {
@@ -459,6 +490,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("Finalize", declaredAndInstance),
                 transpiler => ("\tdelete static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue);\n", 1)
+            );
+            code.For(
+                type.GetMethod("IsTrackResurrection", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->v_final;\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.IsAlive)).GetMethod,
@@ -572,7 +607,7 @@ namespace IL2CXX
 {'\t'}auto constructor = type->v__default_constructor;
 {'\t'}if (!constructor) throw std::runtime_error(""no parameterless constructor"");
 {'\t'}if (!a_1 && (constructor->v__attributes & {(int)MethodAttributes.MemberAccessMask}) != {(int)MethodAttributes.Public}) throw std::runtime_error(""no public parameterless constructor"");
-{'\t'}return constructor->v__invoke();
+{'\t'}return constructor->v__invoke(nullptr, 0, nullptr, nullptr, nullptr);
 ", 0)
             );
             // TODO
@@ -733,7 +768,7 @@ namespace IL2CXX
                 (typeof(char), "char16_t"),
                 (typeof(bool), "bool")
             }) code.For(
-                type.GetMethod(nameof(Enum.ToObject), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { get(typeof(Type)), get(t) }, null),
+                type.GetMethod(nameof(Enum.ToObject), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(t) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"
 {'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""must be enum"");
@@ -775,7 +810,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(Enum.ToString), new[] { get(typeof(string)) }),
+                type.GetMethod(nameof(ToString), new[] { get(typeof(string)) }),
                 transpiler =>
                 {
                     var method = type.GetMethod(nameof(ToString), Type.EmptyTypes);
@@ -798,7 +833,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(Type)), get(typeof(string)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType() }, null),
+                type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(typeof(string)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType() }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
@@ -822,6 +857,16 @@ namespace IL2CXX
 {'\t'}return GetCurrentThreadId();
 #endif
 ", 1)
+            );
+            // TODO
+            code.For(
+                type.GetProperty(nameof(Environment.ExitCode)).GetMethod,
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetProperty(nameof(Environment.ExitCode)).SetMethod,
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
             code.For(
                 type.GetMethod("GetProcessorCount", BindingFlags.Static | BindingFlags.NonPublic),
@@ -861,6 +906,11 @@ namespace IL2CXX
                 transpiler => ($@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
 {'\t'}return p ? f__new_string(p) : nullptr;
 ", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("GetCommandLineArgsNative", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
         })
         .For(get(Type.GetType("System.ByReference`1", true)), (type, code) =>
@@ -1025,7 +1075,7 @@ namespace IL2CXX
             );
             var @byte = get(typeof(byte)).MakeByRefType();
             code.For(
-                type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { @byte, @byte, get(typeof(UIntPtr)) }, null),
+                type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, new[] { @byte, @byte, get(typeof(UIntPtr)) }),
                 transpiler => ("\tstd::memmove(a_0, a_1, a_2);\n", -1)
             );
         })

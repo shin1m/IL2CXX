@@ -26,15 +26,6 @@ namespace IL2CXX.Console
                 Directory.CreateDirectory(@out);
                 Type get(Type x) => load.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
                 var transpiler = new Transpiler(get, DefaultBuiltin.Create(get, target), /*Console.Error.WriteLine*/_ => { }, target, is64, false);
-                transpiler.IsInvalid = type =>
-                {
-                    if (type.Name == "InternalModuleBuilder") return true;
-                    if (type.Name == "QCallAssembly") return true;
-                    if (type.Name == "QCallTypeHandle") return true;
-                    if (type.FullName == "System.Reflection.RuntimeAssembly") return true;
-                    if (type.FullName == "System.RuntimeType") return true;
-                    return false;
-                };
                 var definition = TextWriter.Null;
                 try
                 {
@@ -42,13 +33,11 @@ namespace IL2CXX.Console
                     declarations.WriteLine(@"#ifndef DECLARATIONS_H
 #define DECLARATIONS_H");
                     using var inlines = new StringWriter();
-                    using var others = new StringWriter();
                     using var main = File.CreateText(Path.Combine(@out, "main.cc"));
                     main.WriteLine("#include \"declarations.h\"\n");
                     transpiler.Do(entry, declarations, main, (type, inline) =>
                     {
                         if (inline) return inlines;
-                        if (type.IsInterface || type.IsSubclassOf(transpiler.typeofMulticastDelegate)) return others;
                         definition.Dispose();
                         if (type2path.TryGetValue(type, out var path)) return definition = new StreamWriter(path, true);
                         var escaped = transpiler.EscapeType(type);
@@ -70,9 +59,6 @@ namespace il2cxx
 }
 
 #endif");
-                    main.WriteLine("\nnamespace il2cxx\n{");
-                    main.Write(others);
-                    main.WriteLine("\n}");
                 }
                 finally
                 {

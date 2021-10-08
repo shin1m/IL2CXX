@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using NUnit.Framework;
 
 namespace IL2CXX.Tests
@@ -54,6 +55,8 @@ namespace IL2CXX.Tests
         {
             public string X;
             public int Y;
+            public string Z { get; set; }
+            public int W { get; set; }
         }
         static int GetField()
         {
@@ -69,6 +72,37 @@ namespace IL2CXX.Tests
             typeof(Zot).GetField(nameof(Zot.Y)).SetValue(zot, 1);
             return zot.Y == 1 ? 0 : 2;
         }
+        static int GetFields()
+        {
+            if (typeof(Zot).GetFields().Length != 2) return 1;
+            if (typeof(Zot).GetFields(BindingFlags.Instance | BindingFlags.Public).Length != 2) return 2;
+            if (typeof(Zot).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Length != 2) return 3;
+            if (typeof(Zot).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length != 4) return 4;
+            if (typeof(Zot).GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 5;
+            return 0;
+        }
+        static int GetProperty()
+        {
+            var zot = new Zot { Z = "foo", W = 1 };
+            if (!(typeof(Zot).GetProperty(nameof(Zot.Z)).GetValue(zot) is string x && x == "foo")) return 1;
+            return typeof(Zot).GetProperty(nameof(Zot.W)).GetValue(zot) is int y && y == 1 ? 0 : 2;
+        }
+        static int SetProperty()
+        {
+            var zot = new Zot();
+            typeof(Zot).GetProperty(nameof(Zot.Z)).SetValue(zot, "foo");
+            if (zot.Z != "foo") return 1;
+            typeof(Zot).GetProperty(nameof(Zot.W)).SetValue(zot, 1);
+            return zot.W == 1 ? 0 : 2;
+        }
+        static int GetProperties()
+        {
+            if (typeof(Zot).GetProperties().Length != 2) return 1;
+            if (typeof(Zot).GetProperties(BindingFlags.Instance | BindingFlags.Public).Length != 2) return 2;
+            if (typeof(Zot).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic).Length != 0) return 3;
+            if (typeof(Zot).GetProperties(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 4;
+            return 0;
+        }
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -81,6 +115,10 @@ namespace IL2CXX.Tests
             nameof(MakeGenericType) => MakeGenericType(),
             nameof(GetField) => GetField(),
             nameof(SetField) => SetField(),
+            nameof(GetFields) => GetFields(),
+            nameof(GetProperty) => GetProperty(),
+            nameof(SetProperty) => SetProperty(),
+            nameof(GetProperties) => GetProperties(),
             _ => -1
         };
 
@@ -97,6 +135,10 @@ namespace IL2CXX.Tests
         [TestCase(nameof(MakeGenericType))]
         [TestCase(nameof(GetField))]
         [TestCase(nameof(SetField))]
+        [TestCase(nameof(GetFields))]
+        [TestCase(nameof(GetProperty))]
+        [TestCase(nameof(SetProperty))]
+        [TestCase(nameof(GetProperties))]
         public void Test(string name) => Utilities.Run(build, name);
     }
 }

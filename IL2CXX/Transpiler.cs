@@ -137,7 +137,6 @@ namespace IL2CXX
         public readonly bool Is64Bit;
         public readonly bool CheckNull;
         public readonly bool CheckRange;
-        public Func<Type, bool> IsInvalid;
         private readonly Func<Type, Type> getType;
         public Type TypeOf<T>() => getType(typeof(T));
         public readonly Type typeofObject;
@@ -190,10 +189,10 @@ namespace IL2CXX
         private readonly MethodInfo finalizeOfObject;
         private readonly Instruction[] instructions1 = new Instruction[256];
         private readonly Instruction[] instructions2 = new Instruction[256];
-        private readonly HashSet<string> typeIdentifiers = new();
+        private readonly HashSet<string> identifiers = new();
         private readonly Dictionary<Type, string> typeToIdentifier = new();
-        private readonly HashSet<(Type, string)> methodIdentifiers = new();
         private readonly Dictionary<MethodKey, string> methodToIdentifier = new();
+        private readonly Dictionary<PropertyInfo, string> propertyToIdentifier = new();
         private readonly HashSet<MethodBase> ldftnMethods = new();
 
         private Type MakeByRefType(Type type) => type == typeofTypedReference ? typedReferenceByRefType : type.MakeByRefType();
@@ -525,9 +524,21 @@ namespace IL2CXX
             }
             log("exit");
         }
+        private static readonly HashSet<string> invalids = new()
+        {
+            "System.RuntimeType",
+            "System.Diagnostics.StackFrameHelper",
+            "System.Reflection.RuntimeAssembly",
+            "System.Reflection.RuntimeMethodInfo",
+            "System.Reflection.RuntimeModule",
+            "System.Reflection.Emit.InternalAssemblyBuilder",
+            "System.Reflection.Emit.InternalModuleBuilder",
+            "System.Runtime.CompilerServices.QCallAssembly",
+            "System.Runtime.CompilerServices.QCallTypeHandle"
+        };
         private void ThrowIfInvalid(Type type)
         {
-            if (IsInvalid?.Invoke(type) ?? false) throw new Exception($"{type}");
+            if (invalids.Contains(type.FullName)) throw new Exception($"{type}");
         }
         private void Enqueue(Type type)
         {
@@ -536,16 +547,22 @@ namespace IL2CXX
         }
         public void Enqueue(MethodBase method)
         {
+            ThrowIfInvalid(method.DeclaringType);
             if (method is MethodInfo mi) ThrowIfInvalid(mi.ReturnType);
             foreach (var x in method.GetParameters()) ThrowIfInvalid(x.ParameterType);
             queuedMethods.Enqueue(method);
         }
         private static bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
+        private string Identifier(string name)
+        {
+            var x = name;
+            for (var i = 0; !identifiers.Add(x); ++i) x = $"{name}__{i}";
+            return x;
+        }
         public string EscapeType(Type type)
         {
             if (typeToIdentifier.TryGetValue(type, out var name)) return name;
-            var escaped = name = $"t_{Escape(type.ToString())}";
-            for (var i = 0; !typeIdentifiers.Add(name); ++i) name = $"{escaped}__{i}";
+            name = Identifier($"t_{Escape(type.ToString())}");
             typeToIdentifier.Add(type, name);
             return name;
         }
@@ -580,15 +597,22 @@ namespace IL2CXX
         {
             var key = ToKey(method);
             if (methodToIdentifier.TryGetValue(key, out var name)) return name;
-            var escaped = name = $"f_{EscapeType(method.DeclaringType)}__{Escape(method.Name)}";
-            for (var i = 0; !methodIdentifiers.Add((method.DeclaringType, name)); ++i) name = $"{escaped}__{i}";
+            name = Identifier($"f_{EscapeType(method.DeclaringType)}__{Escape(method.Name)}");
             methodToIdentifier.Add(key, name);
+            return name;
+        }
+        private string Escape(PropertyInfo property)
+        {
+            if (propertyToIdentifier.TryGetValue(property, out var name)) return name;
+            name = Identifier($"v__property_{EscapeType(property.DeclaringType)}__{Escape(property.Name)}");
+            propertyToIdentifier.Add(property, name);
             return name;
         }
         private string Escape(MemberInfo member) => member switch
         {
             FieldInfo field => Escape(field),
             MethodBase method => Escape(method),
+            PropertyInfo property => Escape(property),
             _ => throw new Exception()
         };
         public string GenerateCheckNull(string variable) => CheckNull ? $"\tif (!{variable}) [[unlikely]] {GenerateThrow("NullReference")};\n" : string.Empty;
@@ -613,16 +637,17 @@ namespace IL2CXX
             $"static_cast<{EscapeForValue(type)}>({variable})";
         private string GenerateCall(MethodBase method, string function, IEnumerable<string> variables)
         {
+            Enqueue(method);
             var arguments = new List<Type>();
             if (!method.IsStatic) arguments.Add(GetThisType(method));
             arguments.AddRange(method.GetParameters().Select(x => x.ParameterType));
             return $@"{function}({
-    string.Join(",", arguments.Zip(variables.Reverse(), (a, v) => $"\n\t\t{CastValue(a, v)}"))
+    string.Join(",", arguments.Zip(variables, (a, v) => $"\n\t\t{CastValue(a, v)}"))
 }{(arguments.Count > 0 ? "\n\t" : string.Empty)})";
         }
         private void GenerateCall(MethodBase method, string function, Stack stack, Stack after)
         {
-            var call = GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable));
+            var call = GenerateCall(method, function, stack.Take(method.GetParameters().Length + (method.IsStatic ? 0 : 1)).Select(x => x.Variable).Reverse());
             writer.WriteLine($"\t{(GetReturnType(method) == typeofVoid ? string.Empty : $"{after.Variable} = ")}{call};");
         }
         private int EnqueueIndexOf(MethodBase method, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
@@ -650,29 +675,21 @@ namespace IL2CXX
             $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", method.GetParameters().Select(x => EscapeForStacked(x.ParameterType)).Prepend($"{Escape(GetVirtualThisType(method.DeclaringType))}*"))})";
         public string GetVirtualFunction(MethodBase method, string target)
         {
-            Enqueue(method);
-            if (method.IsVirtual)
+            if (!method.IsVirtual) return Escape(method);
+            string at(int i) => $"reinterpret_cast<void**>({target}->f_type() + 1)[{i}]";
+            var concretes = runtimeDefinitions.Where(x => x is TypeDefinition && x.Type.IsSubclassOf(method.DeclaringType)).Select(x => x.Methods);
+            if (method.IsGenericMethod)
             {
-                string at(int i) => $"reinterpret_cast<void**>({target}->f_type() + 1)[{i}]";
-                var concretes = runtimeDefinitions.Where(x => x is TypeDefinition && x.Type.IsSubclassOf(method.DeclaringType)).Select(x => x.Methods);
-                if (method.IsGenericMethod)
-                {
-                    var (i, j) = EnqueueGenericIndexOf(method, concretes);
-                    return $"reinterpret_cast<{GetVirtualFunctionPointer(method)}>(reinterpret_cast<void**>({at(i)})[{j}])";
-                }
-                else
-                {
-                    return $"reinterpret_cast<{GetVirtualFunctionPointer(method)}>({at(EnqueueIndexOf(method, concretes))})";
-                }
+                var (i, j) = EnqueueGenericIndexOf(method, concretes);
+                return $"reinterpret_cast<{GetVirtualFunctionPointer(method)}>(reinterpret_cast<void**>({at(i)})[{j}])";
             }
             else
             {
-                return Escape(method);
+                return $"reinterpret_cast<{GetVirtualFunctionPointer(method)}>({at(EnqueueIndexOf(method, concretes))})";
             }
         }
         private string GetInterfaceFunction(MethodBase method, Func<string, string> normal, Func<string, string> generic)
         {
-            Enqueue(method);
             var concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(x => x.InterfaceToMethods.TryGetValue(method.DeclaringType, out var ms) ? ms : null).Where(x => x != null);
             if (method.IsGenericMethod)
             {
@@ -688,6 +705,7 @@ namespace IL2CXX
         {
             if (method.DeclaringType.IsInterface)
             {
+                Enqueue(method);
                 var types = string.Join(", ", method.GetParameters().Select(x => x.ParameterType).Prepend(GetReturnType(method)).Select(EscapeForStacked));
                 return $@"{'\t'}{{static auto site = &{GetInterfaceFunction(method,
                     x => $"f__invoke<{x}, {types}>",
@@ -695,13 +713,13 @@ namespace IL2CXX
                 )};
 {construct($@"site(
 {'\t'}{'\t'}{CastValue(typeofObject, target)},
-{string.Join(string.Empty, method.GetParameters().Zip(variables.Reverse(), (a, v) => $"\t\t{CastValue(a.ParameterType, v)},\n"))}{'\t'}{'\t'}reinterpret_cast<void**>(&site)
+{string.Join(string.Empty, method.GetParameters().Zip(variables, (a, v) => $"\t\t{CastValue(a.ParameterType, v)},\n"))}{'\t'}{'\t'}reinterpret_cast<void**>(&site)
 {'\t'})")}{'\t'}}}
 ";
             }
             else
             {
-                return construct(GenerateCall(method, GetVirtualFunction(method, target), variables.Append(target)));
+                return construct(GenerateCall(method, GetVirtualFunction(method, target), variables.Prepend(target)));
             }
         }
         private string UnmanagedReturn(Type type) => type == typeofIntPtr || typeofSafeHandle.IsAssignableFrom(type) ? "void*" : EscapeForValue(type);
@@ -857,6 +875,64 @@ namespace IL2CXX
                 else
                     writer.Write(c);
             writer.WriteLine("\"sv)");
+        }
+        private string GenerateInvokeFunction(MethodBase method)
+        {
+            using var writer = new StringWriter();
+            writer.WriteLine("[](t__object* a_this, int32_t, t__object*, t__object* a_parameters, t__object*) -> t__object*\n{");
+            var @return = GetReturnType(method);
+            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic)
+            {
+                writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
+                return writer.ToString();
+            }
+            var parameters = method.GetParameters();
+            writer.WriteLine($@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
+{'\t'}if ({(parameters.Length > 0 ? $"parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};");
+            void writeCheck(Type type, string x, string condition, string exception) => writer.WriteLine($"\tif ({condition} !{x}->f_type()->f_is(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {GenerateThrow(exception)};");
+            var arguments = new List<string>();
+            var @this = GetVirtualThisType(method.DeclaringType);
+            if (!method.IsStatic)
+            {
+                writeCheck(@this, "a_this", "!a_this ||", "Target");
+                arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
+            }
+            arguments.AddRange(method.GetParameters().Select((x, i) =>
+            {
+                writer.WriteLine($"\tauto& p{i} = parameters->f_data()[{i}];");
+                string f(Type type)
+                {
+                    if (type.IsValueType)
+                    {
+                        writeCheck(type, $"p{i}", $"!p{i} ||", "Argument");
+                        return $"static_cast<{Escape(type)}*>(p{i})->v__value";
+                    }
+                    else
+                    {
+                        writeCheck(type, $"p{i}", $"p{i} &&", "Argument");
+                        return $"p{i}";
+                    }
+                }
+                var type = x.ParameterType;
+                return type.IsByRef || type.IsPointer ? $"&{f(GetElementType(type))}" : f(type);
+            }));
+            string construct(string call) => @return == typeofVoid ? $"\t{call};\n\treturn nullptr;\n" : $"\treturn {(@return.IsValueType ? $"f__new_constructed<{Escape(@return)}>({call})" : call)};\n";
+            var isConcrete = !method.DeclaringType.IsInterface && (!method.IsVirtual || method.IsFinal);
+            if (isConcrete)
+            {
+                writer.Write(construct(GenerateCall(method, Escape(method), arguments)));
+            }
+            else if (@this.IsSealed)
+            {
+                var cm = GetConcrete(GetBaseDefinition((MethodInfo)method), @this);
+                writer.Write(construct(GenerateCall(cm, Escape(cm), arguments)));
+            }
+            else
+            {
+                writer.Write(GenerateVirtualCall(GetBaseDefinition((MethodInfo)method), "a_this", arguments.Skip(1), construct));
+            }
+            writer.Write('}');
+            return writer.ToString();
         }
     }
 }

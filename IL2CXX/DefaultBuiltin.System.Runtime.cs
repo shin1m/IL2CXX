@@ -36,6 +36,11 @@ namespace IL2CXX
                 type.GetMethod("InternalGet", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn static_cast<t__handle*>(a_0.v__5fvalue)->f_target();\n", 1)
             );
+            // TODO
+            code.For(
+                type.GetMethod("InternalSet", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
         })
         .For(get(typeof(GCSettings)), (type, code) =>
         {

@@ -66,7 +66,7 @@ namespace IL2CXX
             SetupMethodBase(get, type, code);
             code.For(
                 type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__invoke();\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__invoke(nullptr, 0, nullptr, nullptr, nullptr);\n", 0)
             );
         })
         .For(get(typeof(RuntimeFieldInfo)), (type, code) =>
@@ -104,6 +104,21 @@ namespace IL2CXX
             code.For(
                 type.GetProperty(nameof(PropertyInfo.Attributes)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__attributes;\n", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(PropertyInfo.GetValue), new[] { get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__get) [[unlikely]] {transpiler.GenerateThrow("Argument")};
+{'\t'}return a_0->v__get->v__invoke(a_1, a_2, a_3, a_4, a_5);
+", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(PropertyInfo.SetValue), new[] { get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__set) [[unlikely]] {transpiler.GenerateThrow("Argument")};
+{'\t'}auto n = a_5 ? a_5->v__length : 0;
+{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(n + 1);
+{'\t'}*std::copy_n(a_5->f_data(), n, p->f_data()) = a_2;
+{'\t'}a_0->v__set->v__invoke(a_1, a_3, a_4, p, a_6);
+", 0)
             );
             code.For(
                 type.GetProperty(nameof(PropertyInfo.PropertyType)).GetMethod,
@@ -165,21 +180,37 @@ namespace IL2CXX
 ", 0);
                 }
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(Type.GetField), new[] { get(typeof(string)), get(typeof(BindingFlags)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
-{'\t'}for (auto p = a_0->v__fields; *p; ++p) if ((*p)->v__name == name) return *p;
-{'\t'}return {{}};
+{'\t'}t__runtime_field_info* p = nullptr;
+{'\t'}a_0->f_each_field(a_2, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
+{'\t'}{'\t'}}}) : a_x->v__name != name) return true;
+{'\t'}{'\t'}p = a_x;
+{'\t'}{'\t'}return false;
+{'\t'}}});
+{'\t'}return p;
 ", 0)
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(Type.GetFields), new[] { get(typeof(BindingFlags)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
-{'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
+{'\t'}a_0->f_each_field(a_1, [&](auto)
+{'\t'}{{
+{'\t'}{'\t'}++n;
+{'\t'}{'\t'}return true;
+{'\t'}}});
 {'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(FieldInfo[])))}, {transpiler.Escape(get(typeof(FieldInfo)))}>(n);
-{'\t'}for (size_t i = 0; i < n; ++i) p->f_data()[i] = a_0->v__fields[i];
+{'\t'}auto q = p->f_data();
+{'\t'}a_0->f_each_field(a_1, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}*q++ = a_x;
+{'\t'}{'\t'}return true;
+{'\t'}}});
 {'\t'}return p;
 ", 0)
             );
@@ -207,13 +238,38 @@ namespace IL2CXX
 {'\t'}return p;
 ", 0)
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(Type.GetProperties), new[] { get(typeof(BindingFlags)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
-{'\t'}for (auto p = a_0->v__properties; *p; ++p) ++n;
+{'\t'}a_0->f_each_property(a_1, [&](auto)
+{'\t'}{{
+{'\t'}{'\t'}++n;
+{'\t'}{'\t'}return true;
+{'\t'}}});
 {'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(PropertyInfo[])))}, {transpiler.Escape(get(typeof(PropertyInfo)))}>(n);
-{'\t'}for (size_t i = 0; i < n; ++i) p->f_data()[i] = a_0->v__properties[i];
+{'\t'}auto q = p->f_data();
+{'\t'}a_0->f_each_property(a_1, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}*q++ = a_x;
+{'\t'}{'\t'}return true;
+{'\t'}}});
+{'\t'}return p;
+", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("GetPropertyImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(Type)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}t__runtime_property_info* p = nullptr;
+{'\t'}a_0->f_each_property(a_2, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
+{'\t'}{'\t'}}}) : a_x->v__name != name) return true;
+{'\t'}{'\t'}p = a_x;
+{'\t'}{'\t'}return false;
+{'\t'}}});
 {'\t'}return p;
 ", 0)
             );

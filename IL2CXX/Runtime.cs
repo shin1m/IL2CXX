@@ -58,6 +58,8 @@ namespace IL2CXX
         public override Type DeclaringType => throw new NotImplementedException();
         public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
+        public override object GetValue(object @this, BindingFlags bindingFlags, Binder binder, object[] index, CultureInfo culture) => throw new NotImplementedException();
+        public override void SetValue(object @this, object value, BindingFlags bindingFlags, Binder binder, object[] index, CultureInfo culture) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
         public override Type PropertyType => throw new NotImplementedException();
     }
@@ -79,6 +81,7 @@ namespace IL2CXX
         public override Type[] GetGenericArguments() => throw new NotImplementedException();
         public override Type GetGenericTypeDefinition() => throw new NotImplementedException();
         public override PropertyInfo[] GetProperties(BindingFlags bindingFlags) => throw new NotImplementedException();
+        protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingFlags, Binder binder, Type @return, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
         public override Type[] GetInterfaces() => throw new NotImplementedException();
         protected override bool HasElementTypeImpl() => throw new NotImplementedException();
         protected override bool IsArrayImpl() => throw new NotImplementedException();

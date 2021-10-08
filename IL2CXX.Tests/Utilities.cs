@@ -46,25 +46,36 @@ namespace IL2CXX.Tests
             using (var load = new MetadataLoadContext(new PathAssemblyResolver(Directory.EnumerateFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll").Append(typeof(Builtin).Assembly.Location).Append(method.Module.Assembly.Location))))
             using (var declarations = File.CreateText(Path.Combine(build, "declarations.h")))
             using (var inlines = new StringWriter())
-            using (var definitions = File.CreateText(Path.Combine(build, "definitions.cc")))
+            using (var definitions0 = File.CreateText(Path.Combine(build, "definitions0.cc")))
+            using (var definitions1 = File.CreateText(Path.Combine(build, "definitions1.cc")))
+            using (var definitions2 = File.CreateText(Path.Combine(build, "definitions2.cc")))
             using (var main = File.CreateText(Path.Combine(build, "main.cc")))
             {
                 var assembly = load.LoadFromAssemblyPath(method.Module.Assembly.Location);
                 var type = assembly.GetType(method.DeclaringType.FullName, true);
                 method = type.GetMethod(method.Name, BindingFlags.Static | BindingFlags.NonPublic);
-                definitions.WriteLine(@"#include ""declarations.h""
+                declarations.WriteLine(@"#ifndef DECLARATIONS_H
+#define DECLARATIONS_H");
+                var definitions = new[] { definitions0, definitions1, definitions2 };
+                foreach (var x in definitions) x.WriteLine(@"#include ""declarations.h""
 
 namespace il2cxx
-{
-");
+{");
                 main.WriteLine("#include \"declarations.h\"\n");
                 Type get(Type x) => load.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
                 var target = Environment.OSVersion.Platform;
-                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, declarations, main, (_, inline) => inline ? inlines : definitions, Path.Combine(build, "resources"), bundle?.Select(get));
+                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, declarations, main, (type, inline) => inline ? inlines : definitions[
+                    type.IsValueType || type.IsInterface || type.IsArray ? 0 :
+                    type.IsGenericType ? 1 :
+                    2
+                ], Path.Combine(build, "resources"), bundle?.Select(get));
                 declarations.WriteLine("\nnamespace il2cxx\n{");
                 declarations.Write(inlines);
-                declarations.WriteLine("\n}");
-                definitions.WriteLine("\n}");
+                declarations.WriteLine(@"
+}
+
+#endif");
+                foreach (var x in definitions) x.WriteLine("\n}");
                 main.WriteLine(@"
 #include ""types.cc""
 #include ""engine.cc""
@@ -74,10 +85,11 @@ namespace il2cxx
             File.WriteAllText(Path.Combine(build, "CMakeLists.txt"), @"cmake_minimum_required(VERSION 3.16)
 project(run)
 add_subdirectory(../src/recyclone recyclone-build EXCLUDE_FROM_ALL)
-add_executable(run definitions.cc main.cc)
+add_executable(run definitions0.cc definitions1.cc definitions2.cc main.cc)
 target_include_directories(run PRIVATE ../src)
 target_compile_options(run PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 target_link_libraries(run recyclone $<$<NOT:$<PLATFORM_ID:Windows>>:dl>)
+target_precompile_headers(run PRIVATE declarations.h)
 ");
             var cmake = Environment.GetEnvironmentVariable("CMAKE_PATH") ?? "cmake";
             Assert.AreEqual(0, Spawn(cmake, ". -DCMAKE_BUILD_TYPE=Debug", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));

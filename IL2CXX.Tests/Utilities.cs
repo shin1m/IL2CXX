@@ -37,13 +37,13 @@ namespace IL2CXX.Tests
             return process.ExitCode;
         }
 
-        public static string Build(MethodInfo method, IEnumerable<Type> bundle = null)
+        public static string Build(MethodInfo method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null)
         {
             Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
             if (Directory.Exists(build)) Directory.Delete(build, true);
             Directory.CreateDirectory(build);
-            using (var load = new MetadataLoadContext(new PathAssemblyResolver(Directory.EnumerateFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll").Append(typeof(Builtin).Assembly.Location).Append(method.Module.Assembly.Location))))
+            using (var context = new MetadataLoadContext(new PathAssemblyResolver(Directory.EnumerateFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll").Append(typeof(Builtin).Assembly.Location).Append(method.Module.Assembly.Location))))
             using (var declarations = File.CreateText(Path.Combine(build, "declarations.h")))
             using (var inlines = new StringWriter())
             using (var definitions0 = File.CreateText(Path.Combine(build, "definitions0.cc")))
@@ -51,7 +51,7 @@ namespace IL2CXX.Tests
             using (var definitions2 = File.CreateText(Path.Combine(build, "definitions2.cc")))
             using (var main = File.CreateText(Path.Combine(build, "main.cc")))
             {
-                var assembly = load.LoadFromAssemblyPath(method.Module.Assembly.Location);
+                var assembly = context.LoadFromAssemblyPath(method.Module.Assembly.Location);
                 var type = assembly.GetType(method.DeclaringType.FullName, true);
                 method = type.GetMethod(method.Name, BindingFlags.Static | BindingFlags.NonPublic);
                 declarations.WriteLine(@"#ifndef DECLARATIONS_H
@@ -62,13 +62,18 @@ namespace IL2CXX.Tests
 namespace il2cxx
 {");
                 main.WriteLine("#include \"declarations.h\"\n");
-                Type get(Type x) => load.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
+                Type get(Type x) => context.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
                 var target = Environment.OSVersion.Platform;
-                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem).Do(method, declarations, main, (type, inline) => inline ? inlines : definitions[
+                var reflection = generateReflection?.Select(get).ToHashSet() ?? new HashSet<Type>();
+                new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem)
+                {
+                    Bundle = bundle?.Select(get) ?? Enumerable.Empty<Type>(),
+                    GenerateReflection = reflection.Contains
+                }.Do(method, declarations, main, (type, inline) => inline ? inlines : definitions[
                     type.IsValueType || type.IsInterface || type.IsArray ? 0 :
                     type.IsGenericType ? 1 :
                     2
-                ], Path.Combine(build, "resources"), bundle?.Select(get));
+                ], Path.Combine(build, "resources"));
                 declarations.WriteLine("\nnamespace il2cxx\n{");
                 declarations.Write(inlines);
                 declarations.WriteLine(@"
@@ -96,8 +101,8 @@ target_precompile_headers(run PRIVATE declarations.h)
             Assert.AreEqual(0, Spawn(cmake, "--build .", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
             return build;
         }
-        public static string Build(Func<int> method, IEnumerable<Type> bundle = null) => Build(method.Method, bundle);
-        public static string Build(Func<string[], int> method, IEnumerable<Type> bundle = null) => Build(method.Method, bundle);
+        public static string Build(Func<int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null) => Build(method.Method, bundle, generateReflection);
+        public static string Build(Func<string[], int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null) => Build(method.Method, bundle, generateReflection);
         public static void Run(string build, string arguments, bool verify = true)
         {
             IEnumerable<(string, string)> environment = new[]

@@ -125,7 +125,9 @@ namespace IL2CXX.Tests
         string build;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
+            typeof(Zot)
+        });
         [TestCase(nameof(Generic))]
         [TestCase(nameof(IsGenericTypeDefinition))]
         [TestCase(nameof(IsNotConstructedGenericType))]

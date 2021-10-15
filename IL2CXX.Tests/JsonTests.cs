@@ -36,6 +36,8 @@ namespace IL2CXX.Tests
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run, new[] {
             Type.GetType("System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1,System.Text.Json", true).MakeGenericType(typeof(Foo))
+        }, new[] {
+            typeof(Foo)
         });
         [TestCase(nameof(Deserialize))]
         [TestCase(nameof(Serialize))]

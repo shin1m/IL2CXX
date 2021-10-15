@@ -137,6 +137,8 @@ namespace IL2CXX
         public readonly bool Is64Bit;
         public readonly bool CheckNull;
         public readonly bool CheckRange;
+        public IEnumerable<Type> Bundle = Enumerable.Empty<Type>();
+        public Func<Type, bool> GenerateReflection = _ => false;
         private readonly Func<Type, Type> getType;
         public Type TypeOf<T>() => getType(typeof(T));
         public readonly Type typeofObject;

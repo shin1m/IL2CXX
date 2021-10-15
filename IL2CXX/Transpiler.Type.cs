@@ -383,11 +383,14 @@ struct t__static_{identifier}
                     staticDefinitions.WriteLine($@"{'\t'}}}
 }};");
                     staticMembers.WriteLine($"\tt__lazy<t__static_{identifier}> v_{identifier};");
-                    writeFields(staticFields, x =>
-                        x.Attributes.HasFlag(FieldAttributes.Literal) && (x.GetRawConstantValue()?.GetType().IsPrimitive ?? false) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__literal;\n" :
-                        x.Attributes.HasFlag(FieldAttributes.HasFieldRVA) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__data;\n" :
-                        $"\treturn &t_static::v_instance->v_{identifier}->{Escape(x)};\n"
-                    );
+                    if (GenerateReflection(type))
+                        writeFields(staticFields, x =>
+                            x.Attributes.HasFlag(FieldAttributes.Literal) && (x.GetRawConstantValue()?.GetType().IsPrimitive ?? false) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__literal;\n" :
+                            x.Attributes.HasFlag(FieldAttributes.HasFieldRVA) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__data;\n" :
+                            $"\treturn &t_static::v_instance->v_{identifier}->{Escape(x)};\n"
+                        );
+                    else
+                        writeFields(staticFields.Where(x => x.Attributes.HasFlag(FieldAttributes.HasFieldRVA)), x => $"\treturn v__field_{identifier}__{Escape(x.Name)}__data;\n");
                 }
                 var threadStaticMembers = new StringWriter();
                 if (threadStaticFields.Count > 0)
@@ -395,7 +398,7 @@ struct t__static_{identifier}
                     threadStaticMembers.WriteLine("\tstruct\n\t{");
                     foreach (var x in threadStaticFields) threadStaticMembers.WriteLine($"\t\t{EscapeForRoot(x.FieldType)} {Escape(x)}{{}};");
                     threadStaticMembers.WriteLine($"\t}} v_{identifier};");
-                    writeFields(threadStaticFields, x => $"\treturn &t_thread_static::v_instance->v_{identifier}.{Escape(x)};\n");
+                    if (GenerateReflection(type)) writeFields(threadStaticFields, x => $"\treturn &t_thread_static::v_instance->v_{identifier}.{Escape(x)};\n");
                 }
                 var declaration = $"// {type.AssemblyQualifiedName}";
                 if (builtinTypes.TryGetValue(type, out var builtinName))
@@ -683,20 +686,23 @@ struct {Escape(type)}__unmanaged
 {declaration}{@base}
 {{
 {members}}};");
-                    writeFields(fields, x => GenerateCheckNull("a_this") + $@"{'\t'}auto p = {(type.IsValueType ? string.Empty : "*")}static_cast<{EscapeForValue(type)}*>(a_this);
+                    if (GenerateReflection(type))
+                    {
+                        writeFields(fields, x => GenerateCheckNull("a_this") + $@"{'\t'}auto p = {(type.IsValueType ? string.Empty : "*")}static_cast<{EscapeForValue(type)}*>(a_this);
 {'\t'}return &p->{Escape(x)};
 ");
-                    fields = fields.Concat(staticFields).Concat(threadStaticFields);
-                    if (td.HasFields = fields.Any()) td.Definitions.WriteLine($@"
+                        fields = fields.Concat(staticFields).Concat(threadStaticFields);
+                        if (td.HasFields = fields.Any()) td.Definitions.WriteLine($@"
 t__runtime_field_info* v__fields_{identifier}[] = {{
 {string.Join(string.Empty, fields.Select(x => $"\t&v__field_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
 }};");
+                    }
                 }
                 this.staticDefinitions.Write(staticDefinitions);
                 this.staticMembers.Write(staticMembers);
                 this.threadStaticMembers.Write(threadStaticMembers);
             }
-            if (definition is InterfaceDefinition || definition is TypeDefinition)
+            if (definition is InterfaceDefinition || definition is TypeDefinition && GenerateReflection(type))
             {
                 var identifier = Escape(type);
                 foreach (var x in GetProperties(type))

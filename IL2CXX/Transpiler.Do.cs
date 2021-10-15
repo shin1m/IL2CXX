@@ -251,7 +251,7 @@ inline {returns}
             writer.WriteLine('}');
         }
 
-        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType, string resources, IEnumerable<Type> bundle = null)
+        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType, string resources)
         {
             Define(typeofRuntimeAssembly);
             Define(typeofRuntimeFieldInfo);
@@ -269,7 +269,7 @@ inline {returns}
             Define(typeofStringBuilder);
             Define(method.DeclaringType);
             Enqueue(method);
-            if (bundle != null) foreach (var x in bundle) Enqueue(x);
+            foreach (var x in Bundle) Enqueue(x);
             do
             {
                 ProcessNextMethod(writerForType);

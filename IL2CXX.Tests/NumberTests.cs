@@ -156,7 +156,9 @@ namespace IL2CXX.Tests
         string build;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => build = Utilities.Build(Run);
+        public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
+            typeof(Names)
+        });
         [TestCase(nameof(Unchecked))]
         [TestCase(nameof(CheckedBinary))]
         [TestCase(nameof(CheckedCast))]

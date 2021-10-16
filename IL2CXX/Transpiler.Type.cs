@@ -260,6 +260,7 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
         private IEnumerable<PropertyInfo> GetProperties(Type type) => type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance | (type.IsInterface ? BindingFlags.Default : BindingFlags.Static) | BindingFlags.Public | BindingFlags.NonPublic).Where(x => !invalids.Contains(x.PropertyType.FullName));
         public RuntimeDefinition Define(Type type)
         {
+            type = Normalize(type);
             if (typeToRuntime.TryGetValue(type, out var definition)) return definition;
             ThrowIfInvalid(type);
             if (processed) throw new InvalidOperationException($"{type}");
@@ -823,7 +824,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");
-            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{type.Namespace}""sv, u""{type.Name}""sv, u""{type.FullName}""sv, u""{type}""sv, {
+            writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{(type.IsGenericParameter ? string.Empty : type.Namespace)}""sv, u""{type.Name}""sv, u""{type.FullName}""sv, u""{type}""sv, {
     (int)type.Attributes
 }, {(
     definition.IsManaged ? "true" : "false"

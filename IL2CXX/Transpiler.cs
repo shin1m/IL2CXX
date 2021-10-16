@@ -191,6 +191,7 @@ namespace IL2CXX
         private readonly MethodInfo finalizeOfObject;
         private readonly Instruction[] instructions1 = new Instruction[256];
         private readonly Instruction[] instructions2 = new Instruction[256];
+        private readonly Dictionary<string, Type> genericParameters = new();
         private readonly HashSet<string> identifiers = new();
         private readonly Dictionary<Type, string> typeToIdentifier = new();
         private readonly Dictionary<MethodKey, string> methodToIdentifier = new();
@@ -555,6 +556,14 @@ namespace IL2CXX
             queuedMethods.Enqueue(method);
         }
         private static bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
+        private Type Normalize(Type type)
+        {
+            if (!type.IsGenericParameter) return type;
+            var name = type.ToString();
+            if (genericParameters.TryGetValue(name, out var x)) return x;
+            genericParameters.Add(name, type);
+            return type;
+        }
         private string Identifier(string name)
         {
             var x = name;
@@ -563,6 +572,7 @@ namespace IL2CXX
         }
         public string EscapeType(Type type)
         {
+            type = Normalize(type);
             if (typeToIdentifier.TryGetValue(type, out var name)) return name;
             name = Identifier($"t_{Escape(type.ToString())}");
             typeToIdentifier.Add(type, name);

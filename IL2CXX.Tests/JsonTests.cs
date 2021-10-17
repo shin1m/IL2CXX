@@ -34,11 +34,16 @@ namespace IL2CXX.Tests
         string build;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => build = Utilities.Build(Run, new[] {
-            Type.GetType("System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1,System.Text.Json", true).MakeGenericType(typeof(Foo))
-        }, new[] {
-            typeof(Foo)
-        });
+        public void OneTimeSetUp()
+        {
+            var type = Type.GetType("System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1,System.Text.Json", true);
+            build = Utilities.Build(Run, new[] {
+                type.MakeGenericType(typeof(Foo))
+            }, new[] {
+                type,
+                typeof(Foo)
+            });
+        }
         [TestCase(nameof(Deserialize))]
         [TestCase(nameof(Serialize))]
         public void Test(string name) => Utilities.Run(build, name);

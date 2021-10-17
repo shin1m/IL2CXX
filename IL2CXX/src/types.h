@@ -161,9 +161,6 @@ struct t__type : t__abstract_type
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
-	t__type* v__generic_type_definition = nullptr;
-	t__type* const* v__generic_arguments = nullptr;
-	t__type* const* v__constructed_generic_types = nullptr;
 	t__type* v__szarray;
 	union
 	{
@@ -178,6 +175,9 @@ struct t__type : t__abstract_type
 			void* v__invoke_unmanaged;
 		};
 	};
+	t__type* v__generic_type_definition = nullptr;
+	t__type* const* v__generic_arguments = nullptr;
+	t__type* const* v__constructed_generic_types = nullptr;
 	t__runtime_field_info* const* v__fields = v__empty_fields;
 	t__runtime_property_info* const* v__properties = v__empty_properties;
 	t__runtime_constructor_info* v__default_constructor = nullptr;

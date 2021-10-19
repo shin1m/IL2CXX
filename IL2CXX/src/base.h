@@ -41,6 +41,12 @@ struct t_stacked : T
 	}
 };
 
+template<typename T_field, typename T_value>
+inline RECYCLONE__ALWAYS_INLINE void f__copy(T_field& a_field, T_value&& a_value)
+{
+	std::memcpy(&a_field, &a_value, sizeof(T_field));
+}
+
 template<typename T>
 inline RECYCLONE__ALWAYS_INLINE void f__assign(T*& a_field, T* a_value)
 {

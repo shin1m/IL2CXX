@@ -969,9 +969,9 @@ namespace IL2CXX
                     {
                         GenerateCheckNull(stack.Pop);
                         writer.WriteLine(
-                            f.DeclaringType.IsValueType && Define(f.FieldType).IsManaged
-                                ? "\tf__store({0}, {1});"
-                                : "\t{0} = {1};",
+                            f.DeclaringType.IsByRefLike ? "\tf__copy({0}, {1});" :
+                            f.DeclaringType.IsValueType && Define(f.FieldType).IsManaged ? "\tf__store({0}, {1});" :
+                            "\t{0} = {1};",
                             $"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Pop.Variable})->{Escape(f)}",
                             CastValue(f.FieldType, stack.Variable)
                         );
@@ -1034,9 +1034,9 @@ namespace IL2CXX
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
                     withVolatile(() => writer.WriteLine(
-                        Define(t).IsManaged
-                            ? "\tf__store({0}, {1});"
-                            : "\t{0} = {1};",
+                        t.IsByRefLike ? "\tf__copy({0}, {1});" :
+                        Define(t).IsManaged ? "\tf__store({0}, {1});" :
+                        "\t{0} = {1};",
                         $"*static_cast<{EscapeForValue(t)}*>({stack.Pop.Variable})",
                         CastValue(t, stack.Variable)
                     ));
@@ -1514,9 +1514,9 @@ namespace IL2CXX
                     writer.WriteLine($" {t}");
                     var type = EscapeForValue(t);
                     writer.WriteLine(
-                        Define(t).IsManaged
-                            ? "\tf__store({0}, {1});"
-                            : "\t{0} = {1};",
+                        t.IsByRefLike ? "\tf__store({0}, {1});" :
+                        Define(t).IsManaged ? "\tf__store({0}, {1});" :
+                        "\t{0} = {1};",
                         $"*static_cast<{type}*>({stack.Variable})",
                         type.EndsWith("*") ? $"static_cast<{type}>(nullptr)" : $"{type}{{}}"
                     );

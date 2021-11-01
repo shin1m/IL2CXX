@@ -16,6 +16,7 @@ using t_slot_of = recyclone::t_slot_of<T, t__type>;
 
 struct t__object : t_object<t__type>
 {
+	using t_object<t__type>::t_object;
 	void f__scan(t_scan<t__type>)
 	{
 	}
@@ -329,7 +330,7 @@ struct t__type : t__abstract_type
 	}
 };
 
-inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes) : v__declaring_type(a_declaring_type), v__name(a_name), v__attributes(a_attributes)
+inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes) : t__object(-1), v__declaring_type(a_declaring_type), v__name(a_name), v__attributes(a_attributes)
 {
 	t__type::f_be(this, a_type);
 }

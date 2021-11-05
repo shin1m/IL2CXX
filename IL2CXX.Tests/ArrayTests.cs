@@ -143,23 +143,28 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(IsReadOnly))]
-        [TestCase(nameof(Clear))]
-        [TestCase(nameof(ClearAll))]
-        [TestCase(nameof(Copy))]
-        [TestCase(nameof(ResizeLarger))]
-        [TestCase(nameof(ResizeSmaller))]
-        [TestCase(nameof(IListIsReadOnly))]
-        [TestCase(nameof(IListTIsReadOnly))]
-        [TestCase(nameof(IListTCount))]
-        [TestCase(nameof(IListTGetItem))]
-        [TestCase(nameof(IListTSetItem))]
-        [TestCase(nameof(IListTCopyTo))]
-        [TestCase(nameof(GetEnumerator))]
-        [TestCase(nameof(IListTIndexOf))]
-        [TestCase(nameof(Clone))]
-        [TestCase(nameof(Reverse))]
-        [TestCase(nameof(ReverseT))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(IsReadOnly),
+                nameof(Clear),
+                nameof(ClearAll),
+                nameof(Copy),
+                nameof(ResizeLarger),
+                nameof(ResizeSmaller),
+                nameof(IListIsReadOnly),
+                nameof(IListTIsReadOnly),
+                nameof(IListTCount),
+                nameof(IListTGetItem),
+                nameof(IListTSetItem),
+                nameof(IListTCopyTo),
+                nameof(GetEnumerator),
+                nameof(IListTIndexOf),
+                nameof(Clone),
+                nameof(Reverse),
+                nameof(ReverseT)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

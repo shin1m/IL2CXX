@@ -125,12 +125,17 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(Default))]
-        [TestCase(nameof(TrackResurrection))]
-        [TestCase(nameof(SetTarget))]
-        [TestCase(nameof(DefaultOfT))]
-        [TestCase(nameof(TrackResurrectionOfT))]
-        [TestCase(nameof(SetTargetOfT))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Default),
+                nameof(TrackResurrection),
+                nameof(SetTarget),
+                nameof(DefaultOfT),
+                nameof(TrackResurrectionOfT),
+                nameof(SetTargetOfT)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

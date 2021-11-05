@@ -7,7 +7,11 @@ RECYCLONE__THREAD t__thread* t_engine::v_current_thread;
 
 void t_engine::f_background__(t__thread* a_thread, bool a_value)
 {
-	std::lock_guard lock(v_thread__mutex);
+	f_epoch_region([this]
+	{
+		v_thread__mutex.lock();
+	});
+	std::lock_guard lock(v_thread__mutex, std::adopt_lock);
 	if (a_value == a_thread->v__background) return;
 	a_thread->v__background = a_value;
 	auto internal = a_thread->v_internal;
@@ -19,7 +23,11 @@ void t_engine::f_background__(t__thread* a_thread, bool a_value)
 void t_engine::f_priority__(t__thread* a_thread, int32_t a_value)
 {
 	if (a_value < 0 || a_value > 4) throw std::runtime_error("invalid priority.");
-	std::lock_guard lock(v_thread__mutex);
+	f_epoch_region([this]
+	{
+		v_thread__mutex.lock();
+	});
+	std::lock_guard lock(v_thread__mutex, std::adopt_lock);
 	a_thread->v__priority = a_value;
 	auto internal = a_thread->v_internal;
 	if (!internal || internal->f_done() < 0) return;

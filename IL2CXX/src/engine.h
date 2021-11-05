@@ -6,6 +6,21 @@
 namespace il2cxx
 {
 
+inline auto f_epoch_point()
+{
+	return recyclone::f_epoch_point<t__type>();
+}
+template<typename T>
+inline auto f_epoch_region(T a_do)
+{
+	return recyclone::f_epoch_region<t__type>(a_do);
+}
+template<typename T>
+inline auto f_epoch_noiger(T a_do)
+{
+	return recyclone::f_epoch_noiger<t__type>(a_do);
+}
+
 struct t_engine : recyclone::t_engine<t__type>
 {
 	static RECYCLONE__THREAD t__thread* v_current_thread;
@@ -87,7 +102,10 @@ int t_engine::f_run(void(*a_finalize)(t_object<t__type>*), T_main a_main)
 			f_finalizer(a_finalize);
 		});
 		v_thread__finalizer = finalizer->v_internal;
-		v_finalizer__conductor.f_wait(lock);
+		f_epoch_region([&]
+		{
+			v_finalizer__conductor.f_wait(lock);
+		});
 	}
 	auto s = std::make_unique<T_static>();
 	auto ts = std::make_unique<T_thread_static>();

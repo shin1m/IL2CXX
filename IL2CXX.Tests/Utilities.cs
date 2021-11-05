@@ -87,14 +87,19 @@ namespace il2cxx
 #include ""handles.cc""");
                 if (target != PlatformID.Win32NT) main.WriteLine("#include \"waitables.cc\"");
             }
-            File.WriteAllText(Path.Combine(build, "CMakeLists.txt"), @"cmake_minimum_required(VERSION 3.16)
+            File.WriteAllText(Path.Combine(build, "CMakeLists.txt"), $@"cmake_minimum_required(VERSION 3.16)
 project(run)
 add_subdirectory(../src/recyclone recyclone-build EXCLUDE_FROM_ALL)
-add_executable(run definitions0.cc definitions1.cc definitions2.cc main.cc)
-target_include_directories(run PRIVATE ../src)
-target_compile_options(run PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
-target_link_libraries(run recyclone $<$<NOT:$<PLATFORM_ID:Windows>>:dl>)
-target_precompile_headers(run PRIVATE declarations.h)
+function(add name)
+{'\t'}add_executable(${{name}} definitions0.cc definitions1.cc definitions2.cc main.cc)
+{'\t'}target_include_directories(${{name}} PRIVATE ../src)
+{'\t'}target_compile_options(${{name}} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
+{'\t'}target_link_libraries(${{name}} recyclone $<$<NOT:$<PLATFORM_ID:Windows>>:dl>)
+{'\t'}target_precompile_headers(${{name}} PRIVATE declarations.h)
+endfunction()
+add(run)
+add(runco)
+target_compile_definitions(runco PRIVATE RECYCLONE__COOPERATIVE)
 ");
             var cmake = Environment.GetEnvironmentVariable("CMAKE_PATH") ?? "cmake";
             Assert.AreEqual(0, Spawn(cmake, ". -DCMAKE_BUILD_TYPE=Debug", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
@@ -103,15 +108,16 @@ target_precompile_headers(run PRIVATE declarations.h)
         }
         public static string Build(Func<int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null) => Build(method.Method, bundle, generateReflection);
         public static string Build(Func<string[], int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null) => Build(method.Method, bundle, generateReflection);
-        public static void Run(string build, string arguments, bool verify = true)
+        public static void Run(string build, bool cooperative, string arguments, bool verify = true)
         {
             IEnumerable<(string, string)> environment = new[]
             {
                 ("IL2CXX_VERBOSE", string.Empty),
             };
             if (verify) environment = environment.Append(("IL2CXX_VERIFY_LEAKS", string.Empty));
-            var path = Path.Combine(build, "run");
-            if (!File.Exists(path)) path = Path.Combine(build, "Debug", "run");
+            var name = cooperative ? "runco" : "run";
+            var path = Path.Combine(build, name);
+            if (!File.Exists(path)) path = Path.Combine(build, "Debug", name);
             Assert.AreEqual(0, Spawn(path, arguments, build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
         }
 

@@ -178,16 +178,21 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(SizeOfType))]
-        [TestCase(nameof(SizeOfInstance))]
-        [TestCase(nameof(SizeOfByValTStr))]
-        [TestCase(nameof(StructureToPtr))]
-        [TestCase(nameof(Explicit))]
-        [TestCase(nameof(ExplicitWithReference))]
-        [TestCase(nameof(ExplicitComposite))]
-        [TestCase(nameof(GetFunctionPointerForDelegate))]
-        [TestCase(nameof(GetDelegateForFunctionPointer))]
-        [TestCase(nameof(Parameter))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(SizeOfType),
+                nameof(SizeOfInstance),
+                nameof(SizeOfByValTStr),
+                nameof(StructureToPtr),
+                nameof(Explicit),
+                nameof(ExplicitWithReference),
+                nameof(ExplicitComposite),
+                nameof(GetFunctionPointerForDelegate),
+                nameof(GetDelegateForFunctionPointer),
+                nameof(Parameter)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

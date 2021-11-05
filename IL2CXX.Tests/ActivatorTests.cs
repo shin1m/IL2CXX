@@ -42,10 +42,15 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(CreateInstance))]
-        [TestCase(nameof(CreateInstanceOfT))]
-        [TestCase(nameof(CreateValue))]
-        [TestCase(nameof(CreateValueOfT))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(CreateInstance),
+                nameof(CreateInstanceOfT),
+                nameof(CreateValue),
+                nameof(CreateValueOfT)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

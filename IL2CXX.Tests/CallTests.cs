@@ -159,17 +159,22 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(CallVirtual))]
-        [TestCase(nameof(ConstrainedCallVirtual))]
-        [TestCase(nameof(ConstrainedCallInterface))]
-        [TestCase(nameof(ConstrainedCallVirtualReference))]
-        [TestCase(nameof(Box))]
-        [TestCase(nameof(CallAbstract))]
-        [TestCase(nameof(CallAbstractGeneric))]
-        [TestCase(nameof(CallInterface))]
-        [TestCase(nameof(CallInterfaceGeneric))]
-        [TestCase(nameof(Event))]
-        [TestCase(nameof(Static))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(CallVirtual),
+                nameof(ConstrainedCallVirtual),
+                nameof(ConstrainedCallInterface),
+                nameof(ConstrainedCallVirtualReference),
+                nameof(Box),
+                nameof(CallAbstract),
+                nameof(CallAbstractGeneric),
+                nameof(CallInterface),
+                nameof(CallInterfaceGeneric),
+                nameof(Event),
+                nameof(Static)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

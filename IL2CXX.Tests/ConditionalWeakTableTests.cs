@@ -91,12 +91,17 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(Default))]
-        [TestCase(nameof(AddOrUpdate))]
-        [TestCase(nameof(Clear))]
-        [TestCase(nameof(GetOrCreateValue))]
-        [TestCase(nameof(GetValue))]
-        [TestCase(nameof(Remove))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Default),
+                nameof(AddOrUpdate),
+                nameof(Clear),
+                nameof(GetOrCreateValue),
+                nameof(GetValue),
+                nameof(Remove)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

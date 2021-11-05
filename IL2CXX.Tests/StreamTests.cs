@@ -82,35 +82,40 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(ReadMemory))]
-        [TestCase(nameof(WriteMemory))]
-        public void Test(string name) => Utilities.Run(build, name);
         [Test]
-        public void TestReadFile()
+        public void Test(
+            [Values(
+                nameof(ReadMemory),
+                nameof(WriteMemory)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
+        [Test]
+        public void TestReadFile([Values] bool cooperative)
         {
             File.WriteAllBytes(FilePath, new byte[] { 0, 1 });
-            Utilities.Run(build, nameof(ReadFile));
+            Utilities.Run(build, cooperative, nameof(ReadFile));
         }
         [Test]
-        public void TestWriteFile()
+        public void TestWriteFile([Values] bool cooperative)
         {
-            Utilities.Run(build, nameof(WriteFile));
+            Utilities.Run(build, cooperative, nameof(WriteFile));
             BytesEquals(File.ReadAllBytes(FilePath), 0, 1);
         }
         [Test]
-        public void TestReadTextFile()
+        public void TestReadTextFile([Values] bool cooperative)
         {
             File.WriteAllLines(FilePath, new[]
             {
                 "Hello, World!",
                 "Good bye."
             });
-            Utilities.Run(build, nameof(ReadTextFile));
+            Utilities.Run(build, cooperative, nameof(ReadTextFile));
         }
         [Test]
-        public void TestWriteTextFile()
+        public void TestWriteTextFile([Values] bool cooperative)
         {
-            Utilities.Run(build, nameof(WriteTextFile));
+            Utilities.Run(build, cooperative, nameof(WriteTextFile));
             Assert.AreEqual(new[]
             {
                 "Hello, World!",

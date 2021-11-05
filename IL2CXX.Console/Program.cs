@@ -110,6 +110,7 @@ namespace il2cxx
             var name = Path.GetFileNameWithoutExtension(options.Source);
             File.WriteAllText(Path.Combine(options.Out, "CMakeLists.txt"), $@"cmake_minimum_required(VERSION 3.16)
 project({name})
+option(COOPERATIVE ""Use cooperative suspension"")
 
 add_subdirectory(src/recyclone EXCLUDE_FROM_ALL)
 
@@ -122,6 +123,9 @@ add_executable({name}
 }{'\t'}main.cc
 {'\t'})
 target_include_directories({name} PRIVATE src)
+if(COOPERATIVE)
+{'\t'}target_compile_definitions({name} PRIVATE RECYCLONE__COOPERATIVE)
+endif()
 target_link_libraries({name} recyclone dl)
 target_precompile_headers({name} PRIVATE declarations.h)
 file(COPY resources DESTINATION .)

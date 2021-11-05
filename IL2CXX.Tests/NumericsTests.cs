@@ -58,13 +58,18 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(VectorAdd))]
-        [TestCase(nameof(VectorSubtract))]
-        [TestCase(nameof(VectorMultiply))]
-        [TestCase(nameof(VectorDivide))]
-        [TestCase(nameof(VectorEquals))]
-        [TestCase(nameof(VectorComplement))]
-        [TestCase(nameof(VectorAbs))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(VectorAdd),
+                nameof(VectorSubtract),
+                nameof(VectorMultiply),
+                nameof(VectorDivide),
+                nameof(VectorEquals),
+                nameof(VectorComplement),
+                nameof(VectorAbs)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

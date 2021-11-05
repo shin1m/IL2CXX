@@ -461,6 +461,10 @@ namespace IL2CXX
             string condition_Un(Stack stack, string @operator) => stack.VariableType == "double"
                 ? string.Format("{0} {1} {2} || std::isunordered({0}, {2})", stack.Pop.Variable, @operator, stack.Variable)
                 : $"{stack.Pop.AsUnsigned} {@operator} {stack.AsUnsigned}";
+            string @goto(int index, int target) => target < index ? $@"{{
+{'\t'}{'\t'}f_epoch_point();
+{'\t'}{'\t'}goto L_{target:x04};
+{'\t'}}}" : $"goto L_{target:x04};";
             new[]
             {
                 (OpCode: OpCodes.Br_S, Target: (ParseBranchTarget)ParseBranchTargetI1),
@@ -477,7 +481,7 @@ namespace IL2CXX
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tgoto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\t{@goto(index, target)}");
                         return index;
                     };
                 });
@@ -495,7 +499,7 @@ namespace IL2CXX
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({set.Operator}{stack.Variable}) goto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\tif ({set.Operator}{stack.Variable}) {@goto(index, target)}");
                         return index;
                     };
                 }));
@@ -516,7 +520,7 @@ namespace IL2CXX
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({stack.Pop.AsSigned} {set.Operator} {stack.AsSigned}) goto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\tif ({stack.Pop.AsSigned} {set.Operator} {stack.AsSigned}) {@goto(index, target)}");
                         return index;
                     };
                 }));
@@ -537,7 +541,7 @@ namespace IL2CXX
                     x.Generate = (index, stack) =>
                     {
                         var target = baseSet.Target(ref index);
-                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Operator)}) goto L_{target:x04};");
+                        writer.WriteLine($" {target:x04}\n\tif ({condition_Un(stack, set.Operator)}) {@goto(index, target)}");
                         return index;
                     };
                 }));

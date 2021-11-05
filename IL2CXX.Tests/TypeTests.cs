@@ -129,19 +129,24 @@ namespace IL2CXX.Tests
             typeof(Bar<>),
             typeof(Zot)
         });
-        [TestCase(nameof(Generic))]
-        [TestCase(nameof(IsGenericTypeDefinition))]
-        [TestCase(nameof(IsNotConstructedGenericType))]
-        [TestCase(nameof(IsConstructedGenericType))]
-        [TestCase(nameof(GetGenericTypeDefinition))]
-        [TestCase(nameof(GetGenericArguments))]
-        [TestCase(nameof(MakeGenericType))]
-        [TestCase(nameof(GetField))]
-        [TestCase(nameof(SetField))]
-        [TestCase(nameof(GetFields))]
-        [TestCase(nameof(GetProperty))]
-        [TestCase(nameof(SetProperty))]
-        [TestCase(nameof(GetProperties))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Generic),
+                nameof(IsGenericTypeDefinition),
+                nameof(IsNotConstructedGenericType),
+                nameof(IsConstructedGenericType),
+                nameof(GetGenericTypeDefinition),
+                nameof(GetGenericArguments),
+                nameof(MakeGenericType),
+                nameof(GetField),
+                nameof(SetField),
+                nameof(GetFields),
+                nameof(GetProperty),
+                nameof(SetProperty),
+                nameof(GetProperties)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

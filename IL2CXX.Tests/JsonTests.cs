@@ -44,8 +44,13 @@ namespace IL2CXX.Tests
                 typeof(Foo)
             });
         }
-        [TestCase(nameof(Deserialize))]
-        [TestCase(nameof(Serialize))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Deserialize),
+                nameof(Serialize)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

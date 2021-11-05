@@ -42,9 +42,14 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(GetBytes))]
-        [TestCase(nameof(GetString))]
-        [TestCase(nameof(Convert))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(GetBytes),
+                nameof(GetString),
+                nameof(Convert)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

@@ -39,11 +39,16 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(Equality))]
-        [TestCase(nameof(Concatenation))]
-        [TestCase(nameof(Format))]
-        [TestCase(nameof(Substring))]
-        [TestCase(nameof(ToLowerInvariant))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Equality),
+                nameof(Concatenation),
+                nameof(Format),
+                nameof(Substring),
+                nameof(ToLowerInvariant)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

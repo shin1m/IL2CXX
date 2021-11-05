@@ -218,13 +218,18 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(Weak))]
-        [TestCase(nameof(WeakTrackResurrection))]
-        [TestCase(nameof(WeakHandles))]
-        [TestCase(nameof(Normal))]
-        [TestCase(nameof(Pinned))]
-        [TestCase(nameof(IsAllocated))]
-        [TestCase(nameof(IntPtr))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Weak),
+                nameof(WeakTrackResurrection),
+                nameof(WeakHandles),
+                nameof(Normal),
+                nameof(Pinned),
+                nameof(IsAllocated),
+                nameof(IntPtr)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

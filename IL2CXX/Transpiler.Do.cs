@@ -91,6 +91,7 @@ inline {returns}
             }
             var body = method.GetMethodBody();
             bytes = body?.GetILAsByteArray();
+            var inline = false;
             if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.NoInlining))
             {
                 writer = writerForType(method.DeclaringType, false);
@@ -100,7 +101,7 @@ inline {returns}
             else
             {
                 var aggressive = method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining);
-                var inline = aggressive || bytes?.Length <= 64;
+                inline = aggressive || bytes?.Length <= 64;
                 writer = writerForType(method.DeclaringType, inline);
                 writer.WriteLine(description);
                 if (aggressive && bytes?.Length <= 128) writer.Write("RECYCLONE__ALWAYS_INLINE ");
@@ -171,6 +172,7 @@ inline {returns}
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
+            if (!inline) writer.WriteLine("\tf_epoch_point();");
             var writers = new Stack<TextWriter>();
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
             var index = 0;
@@ -205,12 +207,14 @@ inline {returns}
                             case ExceptionHandlingClauseOptions.Clause:
                                 writer.WriteLine($@"// catch {clause.CatchType}
 }} catch (t__object* e) {{
+{'\t'}f_epoch_point();
 {'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;
 {'\t'}{s.Variable} = e;");
                                 break;
                             case ExceptionHandlingClauseOptions.Filter:
                                 writer.WriteLine($@"// filter
 }} catch (t__object* e) {{
+{'\t'}f_epoch_point();
 {'\t'}{s.Variable} = e;");
                                 break;
                             case ExceptionHandlingClauseOptions.Finally:
@@ -218,8 +222,9 @@ inline {returns}
                                 writer = new StringWriter();
                                 break;
                             case ExceptionHandlingClauseOptions.Fault:
-                                writer.WriteLine(@"// fault
-} catch (...) {");
+                                writer.WriteLine($@"// fault
+}} catch (...) {{
+{'\t'}f_epoch_point();");
                                 break;
                         }
                     }
@@ -384,14 +389,17 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
 }
 {'\t'}) -> {UnmanagedReturn(m.ReturnType)}
 {'\t'}{{
-{'\t'}{'\t'}return {Escape(m)}({string.Join(",", m.GetParameters().Select((x, i) =>
+{'\t'}{'\t'}return f_epoch_noiger([&]
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return {Escape(m)}({string.Join(",", m.GetParameters().Select((x, i) =>
         {
             if (x.ParameterType.IsByRef) return $"reinterpret_cast<{EscapeForStacked(x.ParameterType)}>(a_{i})";
             if (x.ParameterType == typeofString) return $"f__new_string(a_{i})";
             return $"a_{i}";
-        }).Select(x => $"\n\t\t\t{x}"))
+        }).Select(x => $"\n\t\t\t\t{x}"))
 }
-{'\t'}{'\t'});
+{'\t'}{'\t'}{'\t'});
+{'\t'}{'\t'}}});
 {'\t'}}})}}"))
 }
 }};

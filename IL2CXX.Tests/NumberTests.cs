@@ -159,20 +159,25 @@ namespace IL2CXX.Tests
         public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
             typeof(Names)
         });
-        [TestCase(nameof(Unchecked))]
-        [TestCase(nameof(CheckedBinary))]
-        [TestCase(nameof(CheckedCast))]
-        [TestCase(nameof(CheckedBinaryUnsigned))]
-        [TestCase(nameof(CheckedCastUnsigned))]
-        [TestCase(nameof(Single))]
-        [TestCase(nameof(Double))]
-        [TestCase(nameof(Unordered))]
-        [TestCase(nameof(ToInt32))]
-        [TestCase(nameof(ToPointer))]
-        [TestCase(nameof(EnumGetNames))]
-        [TestCase(nameof(EnumGetValues))]
-        [TestCase(nameof(EnumToStringDefault))]
-        [TestCase(nameof(EnumToStringG))]
-        public void Test(string name) => Utilities.Run(build, name);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Unchecked),
+                nameof(CheckedBinary),
+                nameof(CheckedCast),
+                nameof(CheckedBinaryUnsigned),
+                nameof(CheckedCastUnsigned),
+                nameof(Single),
+                nameof(Double),
+                nameof(Unordered),
+                nameof(ToInt32),
+                nameof(ToPointer),
+                nameof(EnumGetNames),
+                nameof(EnumGetValues),
+                nameof(EnumToStringDefault),
+                nameof(EnumToStringG)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
     }
 }

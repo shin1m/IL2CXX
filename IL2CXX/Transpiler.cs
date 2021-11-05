@@ -270,7 +270,8 @@ namespace IL2CXX
                 Array.Copy(gas, ro, gas.Length);
                 return ro;
             }
-            return Activator.CreateInstance(typeofTypeContext, BindingFlags.Instance | BindingFlags.NonPublic, null, new[] {
+            return Activator.CreateInstance(typeofTypeContext, BindingFlags.Instance | BindingFlags.NonPublic, null, new[]
+            {
                 rogas(tas),
                 rogas(mas)
             }, null);
@@ -799,10 +800,12 @@ namespace IL2CXX
                 }
             writer.Write($@"{'\t'}{(
     @return == typeofVoid ? string.Empty : "auto result = "
-)}reinterpret_cast<{UnmanagedReturn(@return)}({(callingConvention == CallingConvention.StdCall ? "__stdcall " : string.Empty)}*)({
-    string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet).Select(x => $"\n\t\t{x}"))
+)}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return reinterpret_cast<{UnmanagedReturn(@return)}({(callingConvention == CallingConvention.StdCall ? "__stdcall " : string.Empty)}*)({
+    string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet).Select(x => $"\n\t\t\t{x}"))
 }
-{'\t'})>({function})(");
+{'\t'}{'\t'})>({function})(");
             writer.WriteLine(string.Join(",", parameters.Select(xi =>
             {
                 var x = xi.Parameter.ParameterType;
@@ -826,8 +829,8 @@ namespace IL2CXX
                     if (x.IsArray) return $"a_{i} ? a_{i}->f_data() : nullptr";
                 }
                 return $"a_{i}";
-            }).Select(x => $"\n\t\t{x}")));
-            writer.WriteLine("\t);");
+            }).Select(x => $"\n\t\t\t{x}")));
+            writer.WriteLine("\t\t);\n\t});");
             if (setLastError) writer.WriteLine($"\tv_last_unmanaged_error = {(Target == PlatformID.Win32NT ? "GetLastError()" : "errno")};");
             foreach (var (x, i) in parameters)
                 if (x.ParameterType == typeofStringBuilder)

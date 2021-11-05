@@ -355,26 +355,36 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run);
-        [TestCase(nameof(Foreground))]
-        [TestCase(nameof(SpinLockEnter))]
-        [TestCase(nameof(Mutex))]
-        [TestCase(nameof(Event))]
-        [TestCase(nameof(AutoResetEvent))]
-        [TestCase(nameof(ManualResetEvent))]
-        [TestCase(nameof(Semaphore))]
-        [TestCase(nameof(WaitAll))]
-        [TestCase(nameof(WaitAny))]
-        [TestCase(nameof(SignalAndWait))]
-        [TestCase(nameof(Lock))]
-        [TestCase(nameof(WaitAndPulse))]
-        [TestCase(nameof(WaitAndPulseAll))]
-        [TestCase(nameof(WaitTimeout))]
-        [TestCase(nameof(TryEnter))]
-        [TestCase(nameof(IsEntered), Ignore="Not implemented")]
-        public void Test(string name) => Utilities.Run(build, name);
-        [TestCase(nameof(Background))]
-        [TestCase(nameof(QueueUserWorkItem))]
-        [TestCase(nameof(ParallelFor))]
-        public void TestNoVerify(string name) => Utilities.Run(build, name, false);
+        [Test]
+        public void Test(
+            [Values(
+                nameof(Foreground),
+                nameof(SpinLockEnter),
+                nameof(Mutex),
+                nameof(Event),
+                nameof(AutoResetEvent),
+                nameof(ManualResetEvent),
+                nameof(Semaphore),
+                nameof(WaitAll),
+                nameof(WaitAny),
+                nameof(SignalAndWait),
+                nameof(Lock),
+                nameof(WaitAndPulse),
+                nameof(WaitAndPulseAll),
+                nameof(WaitTimeout),
+                nameof(TryEnter)
+                //nameof(IsEntered) //Not implemented
+            )] string name,
+            [Values(false, true)] bool cooperative
+        ) => Utilities.Run(build, cooperative, name);
+        [Test]
+        public void TestNoVerify(
+            [Values(
+                nameof(Background),
+                nameof(QueueUserWorkItem),
+                nameof(ParallelFor)
+            )] string name,
+            [Values] bool cooperative
+        ) => Utilities.Run(build, cooperative, name, false);
     }
 }

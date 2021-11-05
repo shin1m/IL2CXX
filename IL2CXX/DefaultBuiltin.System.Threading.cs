@@ -67,22 +67,34 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}a_0->f_extension()->v_mutex.lock();
+                transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}a_0->f_extension()->v_mutex.lock();
+{'\t'}}});
 {'\t'}*a_1 = true;
 ", 1)
             );
             code.For(
                 type.GetMethod("ReliableEnterTimeout", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\t*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));\n", 1)
+                transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));
+{'\t'}}});
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Monitor.Enter), new[] { get(typeof(object)) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.lock();\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}a_0->f_extension()->v_mutex.lock();
+{'\t'}}});
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Monitor.Exit)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.unlock();\n", 1)
             );
+            // TODO
             code.For(
                 type.GetMethod("IsEnteredNative", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto p = a_0->f_extension();
@@ -99,15 +111,18 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = a_1->f_extension();
-{'\t'}std::unique_lock lock(p->v_mutex, std::adopt_lock);
-{'\t'}auto finally = f__finally([&]
+                transpiler => ($@"{'\t'}return f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}lock.release();
+{'\t'}{'\t'}auto p = a_1->f_extension();
+{'\t'}{'\t'}std::unique_lock lock(p->v_mutex, std::adopt_lock);
+{'\t'}{'\t'}auto finally = f__finally([&]
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}lock.release();
+{'\t'}{'\t'}}});
+{'\t'}{'\t'}if (a_0 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_0)) == std::cv_status::no_timeout;
+{'\t'}{'\t'}p->v_condition.wait(lock);
+{'\t'}{'\t'}return true;
 {'\t'}}});
-{'\t'}if (a_0 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_0)) == std::cv_status::no_timeout;
-{'\t'}p->v_condition.wait(lock);
-{'\t'}return true;
 ", 0)
             );
         })
@@ -171,11 +186,19 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Thread.Sleep), new[] { get(typeof(int)) }),
-                transpiler => ("\tstd::this_thread::sleep_for(a_0 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_0));\n", 1)
+                transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}std::this_thread::sleep_for(a_0 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_0));
+{'\t'}}});
+", 1)
             );
             code.For(
                 type.GetMethod(nameof(Thread.SpinWait)),
-                transpiler => ("\tfor (; a_0 > 0; --a_0) std::this_thread::yield();\n", 0)
+                transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}for (; a_0 > 0; --a_0) std::this_thread::yield();
+{'\t'}}});
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(Thread.Yield)),
@@ -306,37 +329,59 @@ namespace IL2CXX
                 // TODO
                 code.For(
                     type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\treturn SignalObjectAndWait(a_0, a_1, a_2, TRUE);\n", 0)
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return SignalObjectAndWait(a_0, a_1, a_2, TRUE);
+{'\t'}}});
+", 0)
                 );
                 code.For(
                     type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\treturn WaitForSingleObjectEx(a_0, a_1, TRUE);\n", 0)
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return WaitForSingleObjectEx(a_0, a_1, TRUE);
+{'\t'}}});
+", 0)
                 );
                 code.For(
                     type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int)) }, null),
-                    transpiler => ("\treturn WaitForMultipleObjectsEx(a_1, reinterpret_cast<const HANDLE*>(a_0), a_2, a_3, TRUE);\n", 0)
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return WaitForMultipleObjectsEx(a_1, reinterpret_cast<const HANDLE*>(a_0), a_2, a_3, TRUE);
+{'\t'}}});
+", 0)
                 );
             }
             else
             {
                 code.For(
                     type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ($@"{'\t'}static_cast<t__waitable*>(a_0.v__5fvalue)->f_signal();
-{'\t'}return static_cast<t__waitable*>(a_1.v__5fvalue)->f_wait(a_2 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_2)) ? 0 : 0x102;
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}static_cast<t__waitable*>(a_0.v__5fvalue)->f_signal();
+{'\t'}{'\t'}return static_cast<t__waitable*>(a_1.v__5fvalue)->f_wait(a_2 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_2)) ? 0 : 0x102;
+{'\t'}}});
 ", 0)
                 );
                 code.For(
                     type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\treturn static_cast<t__waitable*>(a_0.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return static_cast<t__waitable*>(a_0.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;
+{'\t'}}});
+", 0)
                 );
                 code.For(
                     type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int)) }, null),
-                    transpiler => ($@"{'\t'}if (a_2) {{
-{'\t'}{'\t'}return t__waitable::f_wait_all(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3)) ? 0 : 0x102;
-{'\t'}}} else {{
-{'\t'}{'\t'}auto i = t__waitable::f_wait_any(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3));
-{'\t'}{'\t'}return i < a_1 ? i : 0x102;
-{'\t'}}}
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]() -> int32_t
+{'\t'}{{
+{'\t'}{'\t'}if (a_2) {{
+{'\t'}{'\t'}{'\t'}return t__waitable::f_wait_all(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3)) ? 0 : 0x102;
+{'\t'}{'\t'}}} else {{
+{'\t'}{'\t'}{'\t'}auto i = t__waitable::f_wait_any(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3));
+{'\t'}{'\t'}{'\t'}return i < a_1 ? i : 0x102;
+{'\t'}{'\t'}}}
+{'\t'}}});
 ", 0)
                 );
             }
@@ -346,7 +391,11 @@ namespace IL2CXX
             if (target != PlatformID.Win32NT)
                 code.For(
                     type.GetMethod("WaitNative", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\treturn static_cast<t__waitable*>(a_0->v_handle.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;\n", 0)
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return static_cast<t__waitable*>(a_0->v_handle.v__5fvalue)->f_wait(a_1 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_1)) ? 0 : 0x102;
+{'\t'}}});
+", 0)
                 );
         })
         .For(get(Type.GetType("System.Threading.OverlappedData")), (type, code) =>

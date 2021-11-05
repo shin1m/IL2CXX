@@ -127,7 +127,11 @@ public:
 template<typename T>
 T* t__lazy<T>::f_initialize()
 {
-	std::lock_guard lock(v_mutex);
+	f_epoch_region([this]
+	{
+		v_mutex.lock();
+	});
+	std::lock_guard lock(v_mutex, std::adopt_lock);
 	if (v_initializing) return &v_p;
 	v_initializing = true;
 	v_p.f_initialize();

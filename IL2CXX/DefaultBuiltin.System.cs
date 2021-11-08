@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 
@@ -833,6 +834,11 @@ namespace IL2CXX
             );
             // TODO
             code.For(
+                type.GetMethod("InternalHasFlag", declaredAndInstance),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            // TODO
+            code.For(
                 type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(typeof(string)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType() }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );
@@ -850,8 +856,13 @@ namespace IL2CXX
         {
             code.For(
                 type.GetProperty(nameof(Environment.CurrentManagedThreadId)).GetMethod,
+                // TODO: emscripten
                 transpiler => ($@"#ifdef __unix__
+#ifdef __EMSCRIPTEN__
+{'\t'}return pthread_self();
+#else
 {'\t'}return gettid();
+#endif
 #endif
 #ifdef _WIN32
 {'\t'}return GetCurrentThreadId();
@@ -1118,6 +1129,19 @@ namespace IL2CXX
             code.ForGeneric(
                 type.GetMethod("ThrowForUnsupportedIntrinsicsVectorBaseType", BindingFlags.Static | BindingFlags.NonPublic),
                 (transpiler, types) => (string.Empty, 1)
+            );
+        })
+        .For(get(typeof(Stream)), (type, code) =>
+        {
+            // TODO
+            code.For(
+                type.GetMethod("HasOverriddenBeginEndRead", declaredAndInstance),
+                transpiler => ("\treturn false;\n", 1)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("HasOverriddenBeginEndWrite", declaredAndInstance),
+                transpiler => ("\treturn false;\n", 1)
             );
         });
     }

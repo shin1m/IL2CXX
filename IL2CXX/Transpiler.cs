@@ -542,7 +542,7 @@ namespace IL2CXX
         };
         private void ThrowIfInvalid(Type type)
         {
-            if (invalids.Contains(type.FullName)) throw new Exception($"{type}");
+            if (invalids.Contains(type.FullName)) throw new Exception($"{type} in {method.DeclaringType} :: {method}");
         }
         private void Enqueue(Type type)
         {

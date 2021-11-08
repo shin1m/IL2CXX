@@ -5,11 +5,23 @@
 #include <random>
 #include <regex>
 #include <climits>
+#include <clocale>
+#ifdef __EMSCRIPTEN__
+#include <uchar.h>
+namespace std
+{
+	using ::mbstate_t;
+	using ::mbrtoc16;
+	using ::c16rtomb;
+}
+#else
 #include <cuchar>
-
+#endif
 #ifdef __unix__
 #include <dlfcn.h>
+#ifndef __EMSCRIPTEN__
 #include <gnu/lib-names.h>
+#endif
 #endif
 
 namespace il2cxx
@@ -144,7 +156,11 @@ inline void* f_load_symbol(const std::string& a_path, const char* a_name)
 #ifdef __unix__
 	auto handle = dlopen(a_path.c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
 	if (handle == NULL) {
+#ifdef __EMSCRIPTEN__
+		handle = dlopen((a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
+#else
 		handle = dlopen(a_path == "libc" ? LIBC_SO : (a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
+#endif
 		if (handle == NULL) throw std::runtime_error("unable to dlopen " + a_path + ": " + dlerror());
 	}
 	return dlsym(handle, a_name);

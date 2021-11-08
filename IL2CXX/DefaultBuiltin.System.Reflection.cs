@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Reflection.Metadata;
 
 namespace IL2CXX
 {
@@ -121,6 +122,15 @@ namespace IL2CXX
         .For(get(typeof(TypeBuilder)), (type, code) =>
         {
             code.Members = transpiler => (string.Empty, false, null);
+            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+        })
+        .For(get(typeof(MetadataUpdater)), (type, code) =>
+        {
+            code.Members = transpiler => (string.Empty, false, null);
+            code.For(
+                type.GetProperty(nameof(MetadataUpdater.IsSupported)).GetMethod,
+                transpiler => ("\treturn false;\n", 1)
+            );
             code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
         });
     }

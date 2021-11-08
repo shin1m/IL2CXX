@@ -15,14 +15,15 @@ namespace IL2CXX.Console
         {
             [Option(Required = true)]
             public PlatformID Target { get; set; }
-            [Option(Group = "is64", Default = true)]
-            public bool Is64 { get; set; }
             [Option(Group = "is32", Default = false)]
-            public bool Is32 { get => !Is64; set => Is64 = !value; }
+            public bool Is32 { get; set; }
+            public bool Is64 => !Is32;
             [Option(Default = "out")]
             public string Out { get; set; }
             [Value(0, Required = true)]
             public string Source { get; set; }
+            [Option]
+            public IEnumerable<string> Assemblies { get; set; }
             [Option]
             public IEnumerable<string> Bundle { get; set; }
             [Option]
@@ -32,22 +33,40 @@ namespace IL2CXX.Console
         {
             var names = new SortedSet<string>();
             var type2path = new Dictionary<Type, string>();
-            using (var context = new MetadataLoadContext(new PathAssemblyResolver(Directory.EnumerateFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll").Append(typeof(Builtin).Assembly.Location).Concat(Directory.EnumerateFiles(Path.GetDirectoryName(options.Source), "*.dll")))))
+            using (var context = new MetadataLoadContext(new PathAssemblyResolver(options.Assemblies.Prepend(RuntimeEnvironment.GetRuntimeDirectory()).Append(Path.GetDirectoryName(options.Source)).SelectMany(x => Directory.EnumerateFiles(x, "*.dll")).Prepend(typeof(Builtin).Assembly.Location))))
             {
                 var assembly = context.LoadFromAssemblyPath(options.Source);
                 var entry = assembly.EntryPoint ?? throw new InvalidOperationException();
                 if (Directory.Exists(options.Out)) Directory.Delete(options.Out, true);
                 Directory.CreateDirectory(options.Out);
                 Type get(Type x) => context.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
+                var builtin = DefaultBuiltin.Create(get, options.Target);
+                try
+                {
+                    builtin.For(context.LoadFromAssemblyName("Microsoft.JSInterop.WebAssembly").GetType("WebAssembly.JSInterop.InternalCalls", true), (type, code) => code.ForGeneric(
+                        type.GetMethod("InvokeJS"),
+                        (transpiler, types) => ($@"{'\t'}std::cerr << ""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>:n"" << std::endl;
+{'\t'}auto s = a_1->v_FunctionIdentifier.v;
+{'\t'}std::cerr << ""\\tFunctionIdentifier: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
+{'\t'}std::cerr << ""\\tResultType: "" << a_1->v_ResultType.v << std::endl;
+{'\t'}s = a_1->v_MarshalledCallArgsJson.v;
+{'\t'}std::cerr << ""\\tMarshalledCallArgsJson: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
+{'\t'}std::cerr << ""\\tMarshalledCallAsyncHandle: "" << a_1->v_MarshalledCallAsyncHandle.v << std::endl;
+{'\t'}std::cerr << ""\\tTargetInstanceId: "" << a_1->v_TargetInstanceId.v << std::endl;
+{'\t'}return {{}};
+", 0)
+                    ));
+                }
+                catch (FileNotFoundException) { }
                 Type load(string x)
                 {
                     var xs = x.Split(':');
                     return context.LoadFromAssemblyName(xs[0]).GetType(xs[1], true);
                 }
-                var reflection = options.Reflection?.Select(load).ToHashSet() ?? new HashSet<Type>();
-                var transpiler = new Transpiler(get, DefaultBuiltin.Create(get, options.Target), /*Console.Error.WriteLine*/_ => { }, options.Target, options.Is64, false)
+                var reflection = options.Reflection.Select(load).ToHashSet();
+                var transpiler = new Transpiler(get, builtin, /*Console.Error.WriteLine*/_ => { }, options.Target, options.Is64, false)
                 {
-                    Bundle = options.Bundle?.Select(load) ?? Enumerable.Empty<Type>(),
+                    Bundle = options.Bundle.Select(load),
                     GenerateReflection = reflection.Contains
                 };
                 var definition = TextWriter.Null;

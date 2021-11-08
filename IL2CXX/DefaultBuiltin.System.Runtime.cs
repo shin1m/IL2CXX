@@ -330,6 +330,10 @@ namespace IL2CXX
         .For(get(typeof(AssemblyLoadContext)), (type, code) =>
         {
             code.For(
+                type.GetMethod("GetLoadedAssemblies", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(AssemblyLoadContext.LoadFromStream), new[] { get(typeof(Stream)), get(typeof(Stream)) }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
             );

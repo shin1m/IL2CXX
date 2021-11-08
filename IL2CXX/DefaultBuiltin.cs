@@ -17,12 +17,12 @@ namespace IL2CXX
                 ["System.SR"] = new()
                 {
                     ["System.String GetResourceString(System.String)"] = (transpiler, method) => ("\treturn a_0;\n", 0),
-                    ["System.Boolean UsingResourceKeys()"] = (transpiler, method) => ("\treturn false;\n", 0)
+                    ["System.Boolean UsingResourceKeys()"] = (transpiler, method) => ("\treturn false;\n", 1)
                 }
             },
             MethodNameToBody =
             {
-                ["System.Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType.Namespace == "System.Runtime.Intrinsics.X86" ? ("\treturn false;\n", 0) : default
+                ["System.Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType.Namespace == "System.Runtime.Intrinsics.X86" ? ("\treturn false;\n", 1) : default
             }
         }
         .SetupInterop(get, target)

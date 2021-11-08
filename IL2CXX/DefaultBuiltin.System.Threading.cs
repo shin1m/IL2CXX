@@ -247,7 +247,11 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetCurrentProcessorNumber", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"#ifdef __unix__
+#ifdef __EMSCRIPTEN__
+{'\t'}return -1;
+#else
 {'\t'}return sched_getcpu();
+#endif
 #endif
 #ifdef _WIN32
 {'\t'}return GetCurrentProcessorNumber();

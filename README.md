@@ -28,20 +28,20 @@ Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 ## Transpile and Build .NET Core Executable
 
 	cd IL2CXX.Console
-	dotnet run .../Foo.dll out-Foo
+	dotnet run --target Unix --out out-Foo .../Foo.dll
 
 	mkdir out-Foo/build
 	cd out-Foo/build
-	cmake -DCMAKE_BUILD_TYPE=Release ..
-	cmake --build . -j6 # or whatever
+	CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 ..
+	cmake --build . -j8 # or whatever
 
 	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/6.0.x ./Foo
 
 `cmake --build .` takes really long time.
 
-Below are build durations on my Core i7-8550U laptop:
-* [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples) Platformer2D - 25 minutes
-* [bepuphysics2](https://github.com/bepu/bepuphysics2) Demos.GL - 100 minutes
+Below are build durations running the above commands on my Core i7-8550U laptop:
+* [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples) Platformer2D - 5 minutes
+* [bepuphysics2](https://github.com/bepu/bepuphysics2) Demos.GL - 12 minutes
 
 # Comparing GC Pauses
 

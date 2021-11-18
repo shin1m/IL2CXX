@@ -96,7 +96,7 @@ inline auto f__marshal_in(T& a_x, const t_slot_of<U>& a_y) -> decltype(a_x.f_in(
 template<typename T, typename U>
 inline auto f__marshal_out(const T& a_x, t_slot_of<U>& a_y) -> decltype(a_x.f_out(a_y))
 {
-	auto p = f__new_zerod<U>();
+	auto RECYCLONE__SPILL p = f__new_zerod<U>();
 	a_x.f_out(p);
 	f__store(a_y, p);
 }

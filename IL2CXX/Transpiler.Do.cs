@@ -43,7 +43,7 @@ namespace IL2CXX
                 Prefix: $"{attributes("\t", x)}\n\t// {x}", Type: x.ParameterType
             ));
             if (!method.IsStatic && !(method.IsConstructor && builtin.body != null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
-            string argument(Type t, int i) => $"\n\t{EscapeForStacked(t)} a_{i}";
+            string argument(Type t, int i) => $"\n\t{EscapeForArgument(t)} a_{i}";
             var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
             string returns;
             if (method is MethodInfo m)
@@ -64,7 +64,7 @@ namespace IL2CXX
                 functionDeclarations.WriteLine($"{description}\n{attributes}{prototype};");
                 if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
 inline {returns}
-{identifier}__v({string.Join(",", arguments.Skip(1).Prepend($"\n\t{Escape(method.DeclaringType)}* a_0"))}
+{identifier}__v({string.Join(",", arguments.Skip(1).Prepend($"\n\t{Escape(method.DeclaringType)}* RECYCLONE__SPILL a_0"))}
 )
 {{
 {'\t'}{(returns == "void" ? string.Empty : "return ")}{identifier}({
@@ -409,7 +409,7 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
             if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))
             {
                 arguments0 = $@"
-{'\t'}{'\t'}auto arguments = f__new_array<{Escape(typeofString.MakeArrayType())}, il2cxx::{EscapeForMember(typeofString)}>(argc);
+{'\t'}{'\t'}auto RECYCLONE__SPILL arguments = f__new_array<{Escape(typeofString.MakeArrayType())}, il2cxx::{EscapeForMember(typeofString)}>(argc);
 {'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f_data()[i] = f__new_string(argv[i]);";
                 arguments1 = "arguments";
             }

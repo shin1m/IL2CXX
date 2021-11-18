@@ -208,7 +208,7 @@ namespace IL2CXX
                     Definitions.WriteLine($@"
 t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{transpiler.Escape(type)}>::v__instance, u""{constructor.Name}""sv, {(int)constructor.Attributes}, [](auto, auto, auto, auto, auto) -> t__object*
 {{
-{'\t'}auto p = f__new_zerod<{identifier}>();
+{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{identifier}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}return p;
 }}}};");
@@ -222,7 +222,7 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                     string generate(Type t, string body) => $@"reinterpret_cast<void*>(+[]({
-    string.Join(",", parameters.Prepend(t).Select((x, i) => $"\n\t\t{transpiler.EscapeForStacked(x)} a_{i}"))
+    string.Join(",", parameters.Prepend(t).Select((x, i) => $"\n\t\t{transpiler.EscapeForArgument(x)} a_{i}"))
 }
 {'\t'}) -> {transpiler.EscapeForStacked(@return)}
 {'\t'}{{

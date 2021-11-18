@@ -16,7 +16,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(MemberInfo.GetCustomAttributes), new[] { get(typeof(bool)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(0);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(0);
 {'\t'}return p;
 ", 0)
             );
@@ -24,7 +24,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(MemberInfo.GetCustomAttributes), new[] { get(typeof(Type)), get(typeof(bool)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(0);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(0);
 {'\t'}return p;
 ", 0)
             );
@@ -40,7 +40,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(MethodBase.GetParameters)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(ParameterInfo[])))}, {transpiler.Escape(get(typeof(ParameterInfo)))}>(0);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(ParameterInfo[])))}, {transpiler.Escape(get(typeof(ParameterInfo)))}>(0);
 {'\t'}return p;
 ", 0)
             );
@@ -83,14 +83,14 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(FieldInfo.GetValue)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_1 && !a_1->f_type()->f_is(a_0->v__declaring_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
-{'\t'}return a_0->v__field_type->f_box(a_0->f_address(a_0->v__declaring_type->f_unbox(a_1)));
+{'\t'}return a_0->v__field_type->f_box(a_0->f_address(a_0->v__declaring_type->f_unbox(const_cast<t__object*&>(a_1))));
 ", 0)
             );
             code.For(
                 type.GetMethod(nameof(FieldInfo.SetValue), new[] { get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CultureInfo)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_1 && !a_1->f_type()->f_is(a_0->v__declaring_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}if (a_2 && !a_2->f_type()->f_is(a_0->v__field_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
-{'\t'}a_0->v__field_type->f_copy(a_0->v__field_type->f_unbox(a_2), 1, a_0->f_address(a_0->v__declaring_type->f_unbox(a_1)));
+{'\t'}a_0->v__field_type->f_copy(a_0->v__field_type->f_unbox(const_cast<t__object*&>(a_2)), 1, a_0->f_address(a_0->v__declaring_type->f_unbox(const_cast<t__object*&>(a_1))));
 ", 0)
             );
         })
@@ -115,7 +115,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(PropertyInfo.SetValue), new[] { get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__set) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}auto n = a_5 ? a_5->v__length : 0;
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(n + 1);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(n + 1);
 {'\t'}*std::copy_n(a_5->f_data(), n, p->f_data()) = a_2;
 {'\t'}a_0->v__set->v__invoke(a_1, a_3, a_4, p, a_6);
 ", 0)
@@ -143,7 +143,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod(nameof(Type.GetConstructors), new[] { get(typeof(BindingFlags)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(ConstructorInfo[])))}, {transpiler.Escape(get(typeof(ConstructorInfo)))}>(a_0->v__default_constructor ? 1 : 0);
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(ConstructorInfo[])))}, {transpiler.Escape(get(typeof(ConstructorInfo)))}>(a_0->v__default_constructor ? 1 : 0);
 {'\t'}if (a_0->v__default_constructor) p->f_data()[0] = a_0->v__default_constructor;
 {'\t'}return p;
 ", 0)
@@ -153,7 +153,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.Escape(get(typeof(string)))}>(n);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.Escape(get(typeof(string)))}>(n);
 {'\t'}for (size_t i = 0; i < n; ++i) p->f_data()[i] = f__new_string(a_0->v__fields[i]->v__name);
 {'\t'}return p;
 ", 0)
@@ -204,7 +204,7 @@ namespace IL2CXX
 {'\t'}{'\t'}++n;
 {'\t'}{'\t'}return true;
 {'\t'}}});
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(FieldInfo[])))}, {transpiler.Escape(get(typeof(FieldInfo)))}>(n);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(FieldInfo[])))}, {transpiler.Escape(get(typeof(FieldInfo)))}>(n);
 {'\t'}auto q = p->f_data();
 {'\t'}a_0->f_each_field(a_1, [&](auto a_x)
 {'\t'}{{
@@ -219,7 +219,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""not generic type"");
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
 {'\t'}for (size_t i = 0; i < n; ++i) p->f_data()[i] = a_0->v__generic_arguments[i];
 {'\t'}return p;
 ", 0)
@@ -232,7 +232,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetInterfaces)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(a_0->v__interface_to_methods.size());
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(a_0->v__interface_to_methods.size());
 {'\t'}size_t i = 0;
 {'\t'}for (const auto& x : a_0->v__interface_to_methods) p->f_data()[i++] = x.first;
 {'\t'}return p;
@@ -246,7 +246,7 @@ namespace IL2CXX
 {'\t'}{'\t'}++n;
 {'\t'}{'\t'}return true;
 {'\t'}}});
-{'\t'}auto p = f__new_array<{transpiler.Escape(get(typeof(PropertyInfo[])))}, {transpiler.Escape(get(typeof(PropertyInfo)))}>(n);
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(PropertyInfo[])))}, {transpiler.Escape(get(typeof(PropertyInfo)))}>(n);
 {'\t'}auto q = p->f_data();
 {'\t'}a_0->f_each_property(a_1, [&](auto a_x)
 {'\t'}{{

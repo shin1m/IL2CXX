@@ -5,7 +5,7 @@ namespace il2cxx
 
 RECYCLONE__THREAD t__thread* t_engine::v_current_thread;
 
-void t_engine::f_background__(t__thread* a_thread, bool a_value)
+void t_engine::f_background__(t__thread* RECYCLONE__SPILL a_thread, bool a_value)
 {
 	f_epoch_region([this]
 	{
@@ -20,7 +20,7 @@ void t_engine::f_background__(t__thread* a_thread, bool a_value)
 	internal->v_background = a_thread->v__background;
 }
 
-void t_engine::f_priority__(t__thread* a_thread, int32_t a_value)
+void t_engine::f_priority__(t__thread* RECYCLONE__SPILL a_thread, int32_t a_value)
 {
 	if (a_value < 0 || a_value > 4) throw std::runtime_error("invalid priority.");
 	f_epoch_region([this]

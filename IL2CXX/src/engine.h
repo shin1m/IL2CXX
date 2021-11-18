@@ -31,16 +31,16 @@ struct t_engine : recyclone::t_engine<t__type>
 		return static_cast<t__object*>(recyclone::t_engine<t__type>::f_allocate(a_size));
 	}
 	template<typename T>
-	void f_start(t__thread* a_thread, T a_main);
-	void f_background__(t__thread* a_thread, bool a_value);
-	void f_priority__(t__thread* a_thread, int32_t a_value);
+	void f_start(t__thread* RECYCLONE__SPILL a_thread, T a_main);
+	void f_background__(t__thread* RECYCLONE__SPILL a_thread, bool a_value);
+	void f_priority__(t__thread* RECYCLONE__SPILL a_thread, int32_t a_value);
 	template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
 	int f_run(void(*a_finalize)(t_object<t__type>*), T_main a_main);
 	size_t f_load_count() const;
 };
 
 template<typename T>
-void t_engine::f_start(t__thread* a_thread, T a_main)
+void t_engine::f_start(t__thread* RECYCLONE__SPILL a_thread, T a_main)
 {
 	recyclone::t_engine<t__type>::f_start(a_thread, [a_thread, main = std::move(a_main)]
 	{
@@ -91,10 +91,10 @@ template<typename T_thread, typename T_static, typename T_thread_static, typenam
 int t_engine::f_run(void(*a_finalize)(t_object<t__type>*), T_main a_main)
 {
 	// Preventing optimized out.
-	volatile auto thread = v_current_thread = f__new_zerod<T_thread>();
+	auto volatile thread = v_current_thread = f__new_zerod<T_thread>();
 	thread->v_internal = v_thread__main;
 	{
-		auto finalizer = f__new_zerod<T_thread>();
+		auto RECYCLONE__SPILL finalizer = f__new_zerod<T_thread>();
 		std::unique_lock lock(v_finalizer__conductor.v_mutex);
 		f_start(finalizer, [this, a_finalize]
 		{

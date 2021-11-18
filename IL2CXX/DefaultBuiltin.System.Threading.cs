@@ -30,8 +30,9 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(object)).MakeByRefType(), get(typeof(object)), get(typeof(object)) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}f__compare_exchange(*a_0, a_2, a_1);
-{'\t'}return a_2;
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = a_2;
+{'\t'}f__compare_exchange(*a_0, p, a_1);
+{'\t'}return p;
 ", 1)
             );
             code.For(

@@ -81,7 +81,7 @@ namespace IL2CXX
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    return ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
+                    return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}if (a_0) {{
 {'\t'}{'\t'}p->v__5ftarget = a_0;
 {'\t'}{'\t'}p->v__5fmethodPtr = a_1;

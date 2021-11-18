@@ -169,7 +169,7 @@ namespace IL2CXX
                 x.Estimate = (index, stack) => (index, stack.Push(GetArgumentType(i)));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = a_{i};");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = const_cast<std::remove_volatile_t<decltype(a_{i})>&>(a_{i});");
                     return index;
                 };
             }));
@@ -213,7 +213,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseU1(ref index);
-                    writer.WriteLine($" {i}\n\t{indexToStack[index].Variable} = a_{i};");
+                    writer.WriteLine($" {i}\n\t{indexToStack[index].Variable} = const_cast<std::remove_volatile_t<decltype(a_{i})>&>(a_{i});");
                     return index;
                 };
             });
@@ -227,7 +227,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseU1(ref index);
-                    writer.WriteLine($" {i}\n\t{indexToStack[index].Variable} = &a_{i};");
+                    writer.WriteLine($" {i}\n\t{indexToStack[index].Variable} = const_cast<std::remove_volatile_t<decltype(a_{i})>*>(&a_{i});");
                     return index;
                 };
             });

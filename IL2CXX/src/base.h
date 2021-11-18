@@ -36,7 +36,7 @@ struct t_stacked : T
 	template<typename U>
 	t_stacked(U&& a_value)
 	{
-		std::memcpy(this, &a_value, sizeof(T));
+		std::memcpy(this, const_cast<std::remove_volatile_t<std::remove_reference_t<U>>*>(&a_value), sizeof(T));
 	}
 	t_stacked(const t_stacked& a_value) : t_stacked(static_cast<const T&>(a_value))
 	{
@@ -44,7 +44,7 @@ struct t_stacked : T
 	template<typename U>
 	t_stacked& operator=(U&& a_value)
 	{
-		std::memcpy(this, &a_value, sizeof(T));
+		std::memcpy(this, const_cast<std::remove_volatile_t<std::remove_reference_t<U>>*>(&a_value), sizeof(T));
 		return *this;
 	}
 	t_stacked& operator=(const t_stacked& a_value)
@@ -56,7 +56,7 @@ struct t_stacked : T
 template<typename T_field, typename T_value>
 inline RECYCLONE__ALWAYS_INLINE void f__copy(T_field& a_field, T_value&& a_value)
 {
-	std::memcpy(&a_field, &a_value, sizeof(T_field));
+	std::memcpy(&a_field, const_cast<std::remove_volatile_t<std::remove_reference_t<T_value>>*>(&a_value), sizeof(T_field));
 }
 
 template<typename T>
@@ -76,7 +76,7 @@ inline RECYCLONE__ALWAYS_INLINE void f__store(T_field& a_field, T_value&& a_valu
 {
 	auto p = &a_field;
 	if (t_thread<t__type>::f_current()->f_on_stack(p))
-		std::memcpy(p, &a_value, sizeof(T_field));
+		std::memcpy(p, const_cast<std::remove_volatile_t<std::remove_reference_t<T_value>>*>(&a_value), sizeof(T_field));
 	else
 		f__assign(a_field, std::forward<T_value>(a_value));
 }

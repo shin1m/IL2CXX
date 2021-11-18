@@ -605,6 +605,17 @@ namespace IL2CXX
         public string EscapeForMember(Type type) => EscapeForValue(type, "t_slot_of<{0}>");
         public string EscapeForRoot(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"t_root<{EscapeForValue(type)}>" : EscapeForValue(type, "t_root<t_slot_of<{0}>>");
         public string EscapeForStacked(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"{Escape(type)}::t_stacked" : EscapeForValue(type);
+        public string EscapeForArgument(Type type)
+        {
+            bool spill(Type t)
+            {
+                if (!IsComposite(t)) return false;
+                if (!t.IsValueType) return true;
+                var fields = t.GetFields(declaredAndInstance);
+                return fields.Length == 1 && spill(fields[0].FieldType);
+            }
+            return $"{EscapeForStacked(type)} {(spill(type) ? "RECYCLONE__SPILL" : string.Empty)}";
+        }
         public string Escape(FieldInfo field) => $"v_{Escape(field.Name)}{(!field.IsStatic && field.GetCustomAttributesData().Any(x => x.AttributeType == typeofFieldOffsetAttribute) ? ".v" : string.Empty)}";
         public string Escape(MethodBase method)
         {
@@ -894,7 +905,7 @@ namespace IL2CXX
         private string GenerateInvokeFunction(MethodBase method)
         {
             using var writer = new StringWriter();
-            writer.WriteLine("[](t__object* a_this, int32_t, t__object*, t__object* a_parameters, t__object*) -> t__object*\n{");
+            writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
             var @return = GetReturnType(method);
             if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic)
             {

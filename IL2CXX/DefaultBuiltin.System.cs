@@ -321,7 +321,7 @@ namespace IL2CXX
 {'\t'}{'\t'}element->f_clear(value, 1);
 {'\t'}}} else {{
 {'\t'}{'\t'}if (!a_1->f_type()->f_is(element) && !a_1->f_type()->f_implementation(element)) throw std::runtime_error(""InvalidCastException"");
-{'\t'}{'\t'}element->f_copy(element->f_unbox(a_1), 1, value);
+{'\t'}{'\t'}element->f_copy(element->f_unbox(const_cast<t__object*&>(a_1)), 1, value);
 {'\t'}}}
 ", 0)
             );
@@ -589,7 +589,7 @@ namespace IL2CXX
                     var constructor = t.GetConstructor(Type.EmptyTypes);
                     return (constructor == null
                         ? "\tthrow std::runtime_error(\"no parameterless constructor\");\n"
-                        : $@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(t)}>();
+                        : $@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(t)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}return p;
 ", 0);

@@ -11,7 +11,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetConstructor(new[] { get(typeof(string)), get(typeof(Assembly)) }),
-                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(type)}>();
+                transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}return p;
 ", 0)
             );

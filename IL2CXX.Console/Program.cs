@@ -45,15 +45,18 @@ namespace IL2CXX.Console
                 {
                     builtin.For(context.LoadFromAssemblyName("Microsoft.JSInterop.WebAssembly").GetType("WebAssembly.JSInterop.InternalCalls", true), (type, code) => code.ForGeneric(
                         type.GetMethod("InvokeJS"),
-                        (transpiler, types) => ($@"{'\t'}std::cerr << ""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>:n"" << std::endl;
-{'\t'}auto s = a_1->v_FunctionIdentifier.v;
-{'\t'}std::cerr << ""\\tFunctionIdentifier: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
-{'\t'}std::cerr << ""\\tResultType: "" << a_1->v_ResultType.v << std::endl;
-{'\t'}s = a_1->v_MarshalledCallArgsJson.v;
-{'\t'}std::cerr << ""\\tMarshalledCallArgsJson: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
-{'\t'}std::cerr << ""\\tMarshalledCallAsyncHandle: "" << a_1->v_MarshalledCallAsyncHandle.v << std::endl;
-{'\t'}std::cerr << ""\\tTargetInstanceId: "" << a_1->v_TargetInstanceId.v << std::endl;
-{'\t'}return {{}};
+                        (transpiler, types) => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}std::cerr << ""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>:"" << std::endl;
+{'\t'}{'\t'}auto s = a_1->v_FunctionIdentifier.v;
+{'\t'}{'\t'}std::cerr << ""\tFunctionIdentifier: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
+{'\t'}{'\t'}std::cerr << ""\tResultType: "" << a_1->v_ResultType.v << std::endl;
+{'\t'}{'\t'}s = a_1->v_MarshalledCallArgsJson.v;
+{'\t'}{'\t'}std::cerr << ""\tMarshalledCallArgsJson: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
+{'\t'}{'\t'}std::cerr << ""\tMarshalledCallAsyncHandle: "" << a_1->v_MarshalledCallAsyncHandle.v << std::endl;
+{'\t'}{'\t'}std::cerr << ""\tTargetInstanceId: "" << a_1->v_TargetInstanceId.v << std::endl;
+{'\t'}{'\t'}return ({transpiler.EscapeForStacked(types[3])}){{}};
+{'\t'}}});
 ", 0)
                     ));
                 }
@@ -129,7 +132,6 @@ namespace il2cxx
             var name = Path.GetFileNameWithoutExtension(options.Source);
             File.WriteAllText(Path.Combine(options.Out, "CMakeLists.txt"), $@"cmake_minimum_required(VERSION 3.16)
 project({name})
-option(COOPERATIVE ""Use cooperative suspension"")
 
 add_subdirectory(src/recyclone EXCLUDE_FROM_ALL)
 
@@ -142,11 +144,13 @@ add_executable({name}
 }{'\t'}main.cc
 {'\t'})
 target_include_directories({name} PRIVATE src)
-if(COOPERATIVE)
-{'\t'}target_compile_definitions({name} PRIVATE RECYCLONE__COOPERATIVE)
-endif()
+target_compile_options({name} PRIVATE ""-fno-rtti"")
 target_link_libraries({name} recyclone dl)
 target_precompile_headers({name} PRIVATE declarations.h)
+if(EMSCRIPTEN)
+{'\t'}target_compile_definitions({name} PRIVATE RECYCLONE__STACK_LIMIT=0x400000)
+{'\t'}target_link_options({name} PRIVATE ""-O0"")
+endif()
 file(COPY resources DESTINATION .)
 ");
             return 0;

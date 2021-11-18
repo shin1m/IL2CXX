@@ -29,21 +29,21 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("CreateEventEx", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
+                transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
 {'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor(new[] { get(typeof(IntPtr)), get(typeof(bool)) }))}(p, new t__event(a_2 & 1, a_2 & 2), true);
 {'\t'}return p;
 ", 0)
             );
             code.For(
                 type.GetMethod("CreateMutexEx", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
+                transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
 {'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor(new[] { get(typeof(IntPtr)), get(typeof(bool)) }))}(p, new t__mutex(a_2 & 1), true);
 {'\t'}return p;
 ", 0)
             );
             code.For(
                 type.GetMethod("CreateSemaphoreEx", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
+                transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
 {'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor(new[] { get(typeof(IntPtr)), get(typeof(bool)) }))}(p, new t__semaphore(a_2, a_1), true);
 {'\t'}return p;
 ", 0)

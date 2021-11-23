@@ -57,6 +57,8 @@ namespace IL2CXX.Tests
             public int Y;
             public string Z { get; set; }
             public int W { get; set; }
+            public string Do(string x) => $"{X}, {x}!";
+            public int Do(int x) => Y + x;
         }
         static int GetField()
         {
@@ -79,6 +81,20 @@ namespace IL2CXX.Tests
             if (typeof(Zot).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Length != 2) return 3;
             if (typeof(Zot).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length != 4) return 4;
             if (typeof(Zot).GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 5;
+            return 0;
+        }
+        static int GetMethod()
+        {
+            var zot = new Zot { X = "Hello", Y = 1 };
+            if (!(typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).Invoke(zot, new[] { "World" }) is string x && x == "Hello, World!")) return 1;
+            return typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(int) }).Invoke(zot, new object[] { 2 }) is int y && y == 3 ? 0 : 2;
+        }
+        static int GetMethods()
+        {
+            if (typeof(Zot).GetMethods().Length != 6) return 1;
+            if (typeof(Zot).GetMethods(BindingFlags.Instance | BindingFlags.Public).Length != 6) return 2;
+            if (typeof(Zot).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).Length != 0) return 3;
+            if (typeof(Zot).GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 4;
             return 0;
         }
         static int GetProperty()
@@ -116,6 +132,8 @@ namespace IL2CXX.Tests
             nameof(GetField) => GetField(),
             nameof(SetField) => SetField(),
             nameof(GetFields) => GetFields(),
+            nameof(GetMethod) => GetMethod(),
+            nameof(GetMethods) => GetMethods(),
             nameof(GetProperty) => GetProperty(),
             nameof(SetProperty) => SetProperty(),
             nameof(GetProperties) => GetProperties(),
@@ -142,6 +160,8 @@ namespace IL2CXX.Tests
                 nameof(GetField),
                 nameof(SetField),
                 nameof(GetFields),
+                nameof(GetMethod),
+                nameof(GetMethods),
                 nameof(GetProperty),
                 nameof(SetProperty),
                 nameof(GetProperties)

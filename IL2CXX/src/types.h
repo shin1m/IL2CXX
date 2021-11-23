@@ -73,11 +73,19 @@ struct t__runtime_field_info : t__field_info
 	void* (*f_address)(void*);
 };
 
+struct t__runtime_parameter_info
+{
+	static constexpr t__runtime_parameter_info* v__empty_parameters[] = {nullptr};
+
+	t__type* v__parameter_type;
+};
+
 struct t__method_base : t__member_info
 {
+	t__runtime_parameter_info* const* v__parameters;
 	t__object*(*v__invoke)(t__object*, int32_t, t__object*, t__object*, t__object*);
 
-	t__method_base(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*)) : t__member_info(a_type, a_declaring_type, a_name, a_attributes), v__invoke(a_invoke)
+	t__method_base(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*)) : t__member_info(a_type, a_declaring_type, a_name, a_attributes), v__parameters(a_parameters), v__invoke(a_invoke)
 	{
 	}
 };
@@ -110,10 +118,11 @@ struct t__property_info : t__member_info
 struct t__runtime_property_info : t__property_info
 {
 	t__type* v__property_type;
+	t__runtime_parameter_info* const* v__parameters;
 	t__runtime_method_info* v__get;
 	t__runtime_method_info* v__set;
 
-	t__runtime_property_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_property_type, t__runtime_method_info* a_get, t__runtime_method_info* a_set) : t__property_info(a_type, a_declaring_type, a_name, a_attributes), v__property_type(a_property_type), v__get(a_get), v__set(a_set)
+	t__runtime_property_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_property_type, t__runtime_parameter_info* const* a_parameters, t__runtime_method_info* a_get, t__runtime_method_info* a_set) : t__property_info(a_type, a_declaring_type, a_name, a_attributes), v__property_type(a_property_type), v__parameters(a_parameters), v__get(a_get), v__set(a_set)
 	{
 	}
 };
@@ -139,6 +148,7 @@ struct t__abstract_type : t__member_info
 struct t__type : t__abstract_type
 {
 	static constexpr t__runtime_field_info* v__empty_fields[] = {nullptr};
+	static constexpr t__runtime_method_info* v__empty_methods[] = {nullptr};
 	static constexpr t__runtime_property_info* v__empty_properties[] = {nullptr};
 	static void f_be(t__object* a_p, t__type* a_type)
 	{
@@ -176,13 +186,14 @@ struct t__type : t__abstract_type
 			void* v__invoke_unmanaged;
 		};
 	};
+	t__type* v__underlying = nullptr;
 	t__type* v__generic_type_definition = nullptr;
 	t__type* const* v__generic_arguments = nullptr;
 	t__type* const* v__constructed_generic_types = nullptr;
 	t__runtime_field_info* const* v__fields = v__empty_fields;
+	t__runtime_method_info* const* v__methods = v__empty_methods;
 	t__runtime_property_info* const* v__properties = v__empty_properties;
 	t__runtime_constructor_info* v__default_constructor = nullptr;
-	t__type* v__nullable_value = nullptr;
 
 	t__type(
 		t__type* a_type, t__type* a_base,
@@ -297,6 +308,36 @@ struct t__type : t__abstract_type
 		}
 	}
 	template<typename T>
+	void f_each_method(int32_t a_flags, T a_do)
+	{
+		constexpr int32_t ma_private_scope = 0;
+		constexpr int32_t ma_private = 1;
+		constexpr int32_t ma_public = 6;
+		constexpr int32_t ma_access_mask = 7;
+		constexpr int32_t ma_static = 16;
+		auto type = this;
+		while (a_flags & (bf_instance | bf_static)) {
+			for (auto p = type->v__methods; *p; ++p) {
+				auto x = *p;
+				auto staticc = x->v__attributes & ma_static;
+				if (!(a_flags & bf_instance) && !staticc) continue;
+				if (!(a_flags & bf_static) && staticc) continue;
+				auto publicc = (x->v__attributes & ma_access_mask) >= ma_public;
+				if (!(a_flags & bf_public) && publicc) continue;
+				if (a_flags & bf_non_public) {
+					if (type != this && staticc && (x->v__attributes & ma_access_mask) <= ma_private) continue;
+				} else {
+					if (!publicc) continue;
+				}
+				if (!a_do(x)) return;
+			}
+			type = type->v__base;
+			if (!type) break;
+			if (a_flags & bf_declared_only) a_flags &= ~bf_instance;
+			if (!(a_flags & bf_flatten_hierarchy)) a_flags &= ~bf_static;
+		}
+	}
+	template<typename T>
 	void f_each_property(int32_t a_flags, T a_do)
 	{
 		constexpr int32_t ma_private_scope = 0;
@@ -311,9 +352,9 @@ struct t__type : t__abstract_type
 				auto get = x->v__get;
 				auto set = x->v__set;
 				auto staticc = (get ? get : set)->v__attributes & ma_static;
-				auto publicc = std::max(get ? get->v__attributes & ma_access_mask : ma_private_scope, set ? set->v__attributes & ma_access_mask : ma_private_scope) >= ma_public;
 				if (!(a_flags & bf_instance) && !staticc) continue;
 				if (!(a_flags & bf_static) && staticc) continue;
+				auto publicc = std::max(get ? get->v__attributes & ma_access_mask : ma_private_scope, set ? set->v__attributes & ma_access_mask : ma_private_scope) >= ma_public;
 				if (!(a_flags & bf_public) && publicc) continue;
 				if (a_flags & bf_non_public) {
 					if (type != this && staticc && std::min(get ? get->v__attributes & ma_access_mask : ma_public, set ? set->v__attributes & ma_access_mask : ma_public) <= ma_private) continue;

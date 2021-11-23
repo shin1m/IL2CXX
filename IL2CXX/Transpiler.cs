@@ -614,7 +614,7 @@ namespace IL2CXX
                 var fields = t.GetFields(declaredAndInstance);
                 return fields.Length == 1 && spill(fields[0].FieldType);
             }
-            return $"{EscapeForStacked(type)} {(spill(type) ? "RECYCLONE__SPILL" : string.Empty)}";
+            return $"{EscapeForStacked(type)}{(spill(type) ? " RECYCLONE__SPILL" : string.Empty)}";
         }
         public string Escape(FieldInfo field) => $"v_{Escape(field.Name)}{(!field.IsStatic && field.GetCustomAttributesData().Any(x => x.AttributeType == typeofFieldOffsetAttribute) ? ".v" : string.Empty)}";
         public string Escape(MethodBase method)

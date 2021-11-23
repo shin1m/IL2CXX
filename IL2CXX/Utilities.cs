@@ -19,6 +19,8 @@ namespace IL2CXX
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowAmbiguousMatch() => throw new AmbiguousMatchException();
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowArgument() => throw new ArgumentException();
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowArgumentNull() => throw new ArgumentNullException();

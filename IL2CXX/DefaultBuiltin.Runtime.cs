@@ -97,6 +97,10 @@ namespace IL2CXX
         .For(get(typeof(RuntimeMethodInfo)), (type, code) =>
         {
             SetupMethodBase(get, type, code);
+            code.For(
+                type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__invoke(a_1, a_2, a_3, a_4, a_5);\n", 0)
+            );
         })
         .For(get(typeof(RuntimePropertyInfo)), (type, code) =>
         {
@@ -186,7 +190,7 @@ namespace IL2CXX
 {'\t'}t__runtime_field_info* p = nullptr;
 {'\t'}a_0->f_each_field(a_2, [&](auto a_x)
 {'\t'}{{
-{'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
+{'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? !std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
 {'\t'}{'\t'}}}) : a_x->v__name != name) return true;
@@ -239,6 +243,24 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
+                type.GetMethod(nameof(Type.GetMethods), new[] { get(typeof(BindingFlags)) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
+{'\t'}a_0->f_each_method(a_1, [&](auto)
+{'\t'}{{
+{'\t'}{'\t'}++n;
+{'\t'}{'\t'}return true;
+{'\t'}}});
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(MethodInfo[])))}, {transpiler.Escape(get(typeof(MethodInfo)))}>(n);
+{'\t'}auto q = p->f_data();
+{'\t'}a_0->f_each_method(a_1, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}*q++ = a_x;
+{'\t'}{'\t'}return true;
+{'\t'}}});
+{'\t'}return p;
+", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(Type.GetProperties), new[] { get(typeof(BindingFlags)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
 {'\t'}a_0->f_each_property(a_1, [&](auto)
@@ -256,28 +278,11 @@ namespace IL2CXX
 {'\t'}return p;
 ", 0)
             );
-            // TODO
-            code.For(
-                type.GetMethod("GetPropertyImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(Type)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
-{'\t'}t__runtime_property_info* p = nullptr;
-{'\t'}a_0->f_each_property(a_2, [&](auto a_x)
-{'\t'}{{
-{'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
-{'\t'}{'\t'}}}) : a_x->v__name != name) return true;
-{'\t'}{'\t'}p = a_x;
-{'\t'}{'\t'}return false;
-{'\t'}}});
-{'\t'}return p;
-", 0)
-            );
             code.For(
                 type.GetMethod(nameof(Type.IsAssignableFrom)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_1) return false;
 {'\t'}auto p = static_cast<t__type*>(a_1);
-{'\t'}return p->f_is(a_0) || p->f_implementation(a_0) || a_0->v__nullable_value == p;
+{'\t'}return p->f_is(a_0) || p->f_implementation(a_0) || !a_0->v__enum && a_0->v__underlying == p;
 ", 0)
             );
             code.For(
@@ -336,6 +341,50 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetConstructorImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_4") + "\treturn a_4->v__length > 0 ? nullptr : a_0->v__default_constructor;\n", 0)
+            );
+            code.For(
+                type.GetMethod("GetMethodImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}t__runtime_method_info* p = nullptr;
+{'\t'}a_0->f_each_method(a_2, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? !std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
+{'\t'}{'\t'}}}) : a_x->v__name != name) return true;
+{'\t'}{'\t'}if (a_5) {{
+{'\t'}{'\t'}{'\t'}auto p = a_x->v__parameters;
+{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < a_5->v__length; ++i, ++p) if (!*p || (*p)->v__parameter_type != a_5->f_data()[i]) return true;
+{'\t'}{'\t'}{'\t'}if (*p) return true;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}if (p) {transpiler.GenerateThrow("AmbiguousMatch")};
+{'\t'}{'\t'}p = a_x;
+{'\t'}{'\t'}return true;
+{'\t'}}});
+{'\t'}return p;
+", 0)
+            );
+            code.For(
+                type.GetMethod("GetPropertyImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}t__runtime_property_info* p = nullptr;
+{'\t'}a_0->f_each_property(a_2, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? !std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
+{'\t'}{'\t'}}}) : a_x->v__name != name) return true;
+{'\t'}{'\t'}if (a_5) {{
+{'\t'}{'\t'}{'\t'}auto p = a_x->v__parameters;
+{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < a_5->v__length; ++i, ++p) if (!*p || (*p)->v__parameter_type != a_5->f_data()[i]) return true;
+{'\t'}{'\t'}{'\t'}if (*p) return true;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}if (p) {transpiler.GenerateThrow("AmbiguousMatch")};
+{'\t'}{'\t'}p = a_x;
+{'\t'}{'\t'}return true;
+{'\t'}}});
+{'\t'}return p;
+", 0)
             );
         });
     }

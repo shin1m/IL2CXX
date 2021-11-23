@@ -126,8 +126,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)), get(typeof(bool)) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"
-{'\t'}auto p = f__find_type(v__name_to_type, {{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}});
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__find_type(v__name_to_type, {{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}});
 {'\t'}if (!p && a_1) throw std::runtime_error(""TypeLoadException"");
 {'\t'}return p;
 ", 0)
@@ -327,7 +326,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("GetCorElementTypeOfElementType", declaredAndInstance),
-                transpiler => ("\treturn a_0->f_type()->v__cor_element_type;\n", 1)
+                transpiler => ("\treturn a_0->f_type()->v__element->v__cor_element_type;\n", 1)
             );
         })
         .For(get(typeof(SZArrayHelper<>)), (type, code) =>

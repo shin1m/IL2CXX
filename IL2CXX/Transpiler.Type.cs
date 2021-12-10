@@ -105,11 +105,13 @@ namespace IL2CXX
             TypeCode.Double => 0xd,
             //TypeCode.String => 0xe,
             _ =>
+                type == typeofVoid ? 0x1 :
                 type.IsPointer ? 0xf :
-                type.IsArray ? 0x14 :
                 type == typeofIntPtr ? 0x18 :
                 type == typeofUIntPtr ? 0x19 :
-                type.IsSZArray ? 0x1d : 0x1c
+                type.IsValueType ? 0x11 :
+                type.IsSZArray ? 0x1d :
+                type.IsArray ? 0x14 : 0x1c
         });
 
         public class RuntimeDefinition : IEqualityComparer<Type[]>
@@ -157,6 +159,7 @@ namespace IL2CXX
             public readonly string Delegate;
             public bool HasFields;
             public readonly bool HasDefaultConstructor;
+            public List<bool> ExplicitMap;
 
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
             {
@@ -571,6 +574,7 @@ struct {Escape(type)}__unmanaged
                                         for (; i < j; ++i) map[i] = reference;
                                     }
                                     td.UnmanagedSize = map.Count;
+                                    td.ExplicitMap = map;
                                     mergedFields = new();
                                     var ss = new List<(Type, string)>();
                                     for (var i = 0; i < map.Count;)
@@ -720,11 +724,15 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
                     fieldDeclarations.WriteLine($"extern t__runtime_method_info {variable};");
                     var parameters = x.GetParameters();
                     if (parameters.Length > 0) definition.Definitions.WriteLine($@"
-{string.Join(string.Empty, parameters.Select(x => $"\tt__runtime_parameter_info v__parameter_{method}__{Escape(x.Name)}{{&t__type_of<{Escape(x.ParameterType)}>::v__instance}};\n"))}
+{string.Join(string.Empty, parameters.Select(x => $"t__runtime_parameter_info v__parameter_{method}__{Escape(x.Name)}{{&t__type_of<{Escape(x.ParameterType)}>::v__instance}};\n"))}
 t__runtime_parameter_info* v__parameters_{method}[] = {{
 {string.Join(string.Empty, parameters.Select(x => $"\t&v__parameter_{method}__{Escape(x.Name)},\n"))}{'\t'}nullptr
 }};");
-                    definition.Definitions.WriteLine($"t__runtime_method_info {variable}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, {(parameters.Length > 0 ? $"v__parameters_{method}" : "t__runtime_parameter_info::v__empty_parameters")}, {GenerateInvokeFunction(x)}}};");
+                    definition.Definitions.WriteLine($@"t__runtime_method_info {variable}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {(parameters.Length > 0 ? $"v__parameters_{method}" : "t__runtime_parameter_info::v__empty_parameters")}, {GenerateInvokeFunction(x)}
+#ifdef __EMSCRIPTEN__
+{'\t'}, {GenerateWASMInvokeFunction(x)}
+#endif
+}};");
                 }
                 foreach (var x in GetProperties(type))
                 {

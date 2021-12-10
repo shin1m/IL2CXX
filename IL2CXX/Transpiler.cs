@@ -79,13 +79,13 @@ namespace IL2CXX
                 }
                 else if (!Type.IsValueType)
                 {
-                    VariableType = "t__object*";
+                    VariableType = "t__object* RECYCLONE__SPILL";
                     prefix = "o";
                 }
                 else
                 {
                     var t = transpiler.Escape(Type);
-                    VariableType = $"{t}::t_stacked";
+                    VariableType = $"{t}::t_stacked{(transpiler.ToBeSpilled(Type) ? " RECYCLONE__SPILL" : string.Empty)}";
                     prefix = $"v{t}__";
                 }
                 Indices.TryGetValue(VariableType, out var index);
@@ -595,27 +595,32 @@ namespace IL2CXX
             }
             return EscapeType(type);
         }
-        public string EscapeForValue(Type type, string tag = "{0}*") =>
+        private string Escape(Type type, string @object = "{0}*", string value = "{0}::t_value") =>
             type.IsByRef || type.IsPointer ? $"{EscapeForValue(GetElementType(type))}*" :
-            type.IsInterface ? EscapeForValue(typeofObject, tag) :
+            type.IsInterface ? Escape(typeofObject, @object, value) :
             primitives.TryGetValue(type, out var x) ? x :
             type.IsEnum ? primitives[type.GetEnumUnderlyingType()] :
-            type.IsValueType ? $"{Escape(type)}::t_value" :
-            string.Format(tag, Escape(type));
-        public string EscapeForMember(Type type) => EscapeForValue(type, "t_slot_of<{0}>");
-        public string EscapeForRoot(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"t_root<{EscapeForValue(type)}>" : EscapeForValue(type, "t_root<t_slot_of<{0}>>");
-        public string EscapeForStacked(Type type) => type.IsValueType && !primitives.ContainsKey(type) && !type.IsEnum ? $"{Escape(type)}::t_stacked" : EscapeForValue(type);
-        public string EscapeForArgument(Type type)
+            string.Format(type.IsValueType ? value : @object, Escape(type));
+        public string EscapeForValue(Type type) => Escape(type, "{0}*", "{0}::t_value");
+        public string EscapeForMember(Type type) => Escape(type, "t_slot_of<{0}>", "{0}::t_value");
+        public string EscapeForRoot(Type type) => Escape(type, "t_root<t_slot_of<{0}>>", "t_root<{0}::t_value>");
+        public string EscapeForStacked(Type type) => Escape(type, "{0}*", "{0}::t_stacked");
+        private bool ToBeSpilled(Type type)
         {
-            bool spill(Type t)
+            if (!IsComposite(type)) return false;
+            if (!type.IsValueType) return true;
+            if (type.StructLayoutAttribute?.Value == LayoutKind.Explicit)
             {
-                if (!IsComposite(t)) return false;
-                if (!t.IsValueType) return true;
-                var fields = t.GetFields(declaredAndInstance);
-                return fields.Length == 1 && spill(fields[0].FieldType);
+                var map = ((TypeDefinition)Define(type)).ExplicitMap;
+                return map[0] && map.Count == Define(typeofIntPtr).UnmanagedSize;
             }
-            return $"{EscapeForStacked(type)}{(spill(type) ? " RECYCLONE__SPILL" : string.Empty)}";
+            else
+            {
+                var fields = type.GetFields(declaredAndInstance);
+                return fields.Length == 1 && ToBeSpilled(fields[0].FieldType);
+            }
         }
+        public string EscapeForArgument(Type type) => $"{EscapeForStacked(type)}{(ToBeSpilled(type) ? " RECYCLONE__SPILL" : string.Empty)}";
         public string Escape(FieldInfo field) => $"v_{Escape(field.Name)}{(!field.IsStatic && field.GetCustomAttributesData().Any(x => x.AttributeType == typeofFieldOffsetAttribute) ? ".v" : string.Empty)}";
         public string Escape(MethodBase method)
         {
@@ -655,9 +660,9 @@ namespace IL2CXX
         }
         public string CastValue(Type type, string variable) =>
             type == typeofBoolean ? $"{variable} != 0" :
-            type == typeofVoidPointer ? variable :
+            type.IsPrimitive || type == typeofVoidPointer ? variable :
             type.IsByRef || type.IsPointer ? $"reinterpret_cast<{EscapeForValue(type)}>({variable})" :
-            type.IsPrimitive || type.IsValueType ? variable :
+            type.IsValueType ? $"const_cast<std::remove_volatile_t<decltype({variable})>&>({variable})" :
             $"static_cast<{EscapeForValue(type)}>({variable})";
         private string GenerateCall(MethodBase method, string function, IEnumerable<string> variables)
         {
@@ -902,46 +907,10 @@ namespace IL2CXX
                     writer.Write(c);
             writer.WriteLine("\"sv)");
         }
-        private string GenerateInvokeFunction(MethodBase method)
+        private void GenerateInvokeFunction(MethodBase method, IEnumerable<string> arguments, TextWriter writer)
         {
-            using var writer = new StringWriter();
-            writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
             var @return = GetReturnType(method);
-            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic)
-            {
-                writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
-                return writer.ToString();
-            }
-            var parameters = method.GetParameters();
-            writer.WriteLine($@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
-{'\t'}if ({(parameters.Length > 0 ? $"parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};");
-            void writeCheck(Type type, string x, string condition, string exception) => writer.WriteLine($"\tif ({condition} !{x}->f_type()->f_is(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {GenerateThrow(exception)};");
-            var arguments = new List<string>();
             var @this = GetVirtualThisType(method.DeclaringType);
-            if (!method.IsStatic)
-            {
-                writeCheck(@this, "a_this", "!a_this ||", "Target");
-                arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
-            }
-            arguments.AddRange(method.GetParameters().Select((x, i) =>
-            {
-                writer.WriteLine($"\tauto& p{i} = parameters->f_data()[{i}];");
-                string f(Type type)
-                {
-                    if (type.IsValueType)
-                    {
-                        writeCheck(type, $"p{i}", $"!p{i} ||", "Argument");
-                        return $"static_cast<{Escape(type)}*>(p{i})->v__value";
-                    }
-                    else
-                    {
-                        writeCheck(type, $"p{i}", $"p{i} &&", "Argument");
-                        return $"p{i}";
-                    }
-                }
-                var type = x.ParameterType;
-                return type.IsByRef || type.IsPointer ? $"&{f(GetElementType(type))}" : f(type);
-            }));
             string construct(string call) => @return == typeofVoid ? $"\t{call};\n\treturn nullptr;\n" : $"\treturn {(@return.IsValueType ? $"f__new_constructed<{Escape(@return)}>({call})" : call)};\n";
             var isConcrete = !method.DeclaringType.IsInterface && (!method.IsVirtual || method.IsFinal);
             if (isConcrete)
@@ -957,6 +926,71 @@ namespace IL2CXX
             {
                 writer.Write(GenerateVirtualCall(GetBaseDefinition((MethodInfo)method), "a_this", arguments.Skip(1), construct));
             }
+        }
+        private string GenerateCheck(Type type, string x, string condition, string exception) => $"\tif ({condition} !{x}->f_type()->f_is(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {GenerateThrow(exception)};\n";
+        private string GenerateInvokeFunction(MethodBase method)
+        {
+            using var writer = new StringWriter();
+            writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
+            var @return = GetReturnType(method);
+            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic)
+            {
+                writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
+                return writer.ToString();
+            }
+            var parameters = method.GetParameters();
+            writer.WriteLine($@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
+{'\t'}if ({(parameters.Length > 0 ? $"parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};");
+            var arguments = new List<string>();
+            var @this = GetVirtualThisType(method.DeclaringType);
+            if (!method.IsStatic)
+            {
+                writer.Write(GenerateCheck(@this, "a_this", "!a_this ||", "Target"));
+                arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
+            }
+            arguments.AddRange(method.GetParameters().Select((x, i) =>
+            {
+                writer.WriteLine($"\tauto& p{i} = parameters->f_data()[{i}];");
+                string f(Type type)
+                {
+                    if (type.IsValueType)
+                    {
+                        writer.Write(GenerateCheck(type, $"p{i}", $"!p{i} ||", "Argument"));
+                        return $"static_cast<{Escape(type)}*>(p{i})->v__value";
+                    }
+                    else
+                    {
+                        writer.Write(GenerateCheck(type, $"p{i}", $"p{i} &&", "Argument"));
+                        return $"p{i}";
+                    }
+                }
+                var type = x.ParameterType;
+                return type.IsByRef || type.IsPointer ? $"&{f(GetElementType(type))}" : f(type);
+            }));
+            GenerateInvokeFunction(method, arguments, writer);
+            writer.Write('}');
+            return writer.ToString();
+        }
+        private string GenerateWASMInvokeFunction(MethodBase method)
+        {
+            using var writer = new StringWriter();
+            writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, void** a_parameters) -> t__object*\n{");
+            var @return = GetReturnType(method);
+            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic)
+            {
+                writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
+                return writer.ToString();
+            }
+            var parameters = method.GetParameters();
+            var arguments = new List<string>();
+            var @this = GetVirtualThisType(method.DeclaringType);
+            if (!method.IsStatic)
+            {
+                writer.Write(GenerateCheck(@this, "a_this", "!a_this ||", "Target"));
+                arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
+            }
+            arguments.AddRange(method.GetParameters().Select((x, i) => x.ParameterType.IsValueType ? $"*static_cast<{EscapeForValue(x.ParameterType)}*>(a_parameters[{i}])" : $"a_parameters[{i}]"));
+            GenerateInvokeFunction(method, arguments, writer);
             writer.Write('}');
             return writer.ToString();
         }

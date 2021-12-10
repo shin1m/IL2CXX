@@ -46,7 +46,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("ComputePublicKeyToken", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(CustomAttributeData)), (type, code) =>
@@ -62,12 +62,12 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetProperty(nameof(CustomAttributeData.ConstructorArguments)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             // TODO
             code.For(
                 type.GetProperty(nameof(CustomAttributeData.NamedArguments)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(LocalVariableInfo)), (type, code) =>
@@ -81,11 +81,11 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod(nameof(MethodBase.GetMethodFromHandle), new[] { get(typeof(RuntimeMethodHandle)) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\treturn a_0.v__method;\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(MethodBase.GetMethodFromHandle), new[] { get(typeof(RuntimeMethodHandle)), get(typeof(RuntimeTypeHandle)) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\treturn a_0.v__method;\n", 1)
             );
         })
         .For(get(typeof(AssemblyBuilder)), (type, code) =>

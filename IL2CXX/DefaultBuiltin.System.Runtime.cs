@@ -14,14 +14,6 @@ namespace IL2CXX
     {
         private static Builtin ForIf(this Builtin @this, Type type, Action<Type, Builtin.Code> action) => type == null ? @this : @this.For(type, action);
         private static Builtin SetupSystemRuntime(this Builtin @this, Func<Type, Type> get) => @this
-        .For(get(typeof(ExceptionDispatchInfo)), (type, code) =>
-        {
-            // TODO
-            code.For(
-                type.GetMethod(nameof(ExceptionDispatchInfo.Capture)),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
-            );
-        })
         .For(get(typeof(GCHandle)), (type, code) =>
         {
             code.For(
@@ -39,7 +31,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("InternalSet", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(GCSettings)), (type, code) =>
@@ -94,7 +86,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod(nameof(Marshal.GetExceptionForHR), new[] { get(typeof(int)), get(typeof(IntPtr)) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetMethod("IsPinnable", BindingFlags.Static | BindingFlags.NonPublic),
@@ -134,7 +126,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("LoadLibraryByName", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(RuntimeFeature)), (type, code) =>
@@ -262,7 +254,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("GetValueInternal", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(Type.GetType("Internal.Runtime.CompilerServices.Unsafe", true)), (type, code) =>
@@ -331,11 +323,11 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("GetLoadedAssemblies", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(AssemblyLoadContext.LoadFromStream), new[] { get(typeof(Stream)), get(typeof(Stream)) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         });
     }

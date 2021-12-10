@@ -21,7 +21,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("_LoadObjectV1", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         // TODO
@@ -29,7 +29,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("GetString", new[] { get(typeof(string)), get(typeof(bool)) }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         });
     }

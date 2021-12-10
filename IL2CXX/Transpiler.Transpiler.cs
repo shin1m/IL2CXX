@@ -266,7 +266,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var i = ParseU1(ref index);
-                    writer.WriteLine($" {i}\n\t{indexToStack[index].Variable} = &l{i};");
+                    writer.WriteLine($" {i}\n\t{indexToStack[index].Variable} = const_cast<std::remove_volatile_t<decltype(l{i})>*>(&l{i});");
                     return index;
                 };
             });
@@ -852,9 +852,9 @@ namespace IL2CXX
 {'\t'}{after.Variable} = p;}}");
                     else if (t.IsValueType)
                         writer.WriteLine($@"{'\t'}{after.Variable} = {EscapeForValue(t)}{{}};
-{'\t'}{call(arguments.Prepend($"\n\t\t&{after.Variable}"))};");
+{'\t'}{call(arguments.Prepend($"\n\t\tconst_cast<std::remove_volatile_t<decltype({after.Variable})>*>(&{after.Variable})"))};");
                     else
-                        writer.WriteLine($@"{'\t'}{{auto p = f__new_zerod<{Escape(t)}>();
+                        writer.WriteLine($@"{'\t'}{{auto RECYCLONE__SPILL p = f__new_zerod<{Escape(t)}>();
 {'\t'}{call(arguments.Prepend("\n\t\tp"))};
 {'\t'}{after.Variable} = p;}}");
                     return index;
@@ -933,7 +933,7 @@ namespace IL2CXX
                         GenerateCheckNull(stack);
                         writer.Write($"\t{indexToStack[index].Variable} = ");
                         writer.Write(stack.Type.IsValueType
-                            ? $"{stack.Variable}."
+                            ? $"const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable})."
                             : $"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
                         );
                         writer.WriteLine($"{Escape(f)};");
@@ -1078,7 +1078,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {(t.IsValueType ? $"f__new_constructed<{Escape(t)}>({stack.Variable})" : stack.Variable)};");
+                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {(t.IsValueType ? $"f__new_constructed<{Escape(t)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}))" : stack.Variable)};");
                     return index;
                 };
             });

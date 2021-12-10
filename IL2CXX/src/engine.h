@@ -34,8 +34,8 @@ struct t_engine : recyclone::t_engine<t__type>
 	void f_start(t__thread* RECYCLONE__SPILL a_thread, T a_main);
 	void f_background__(t__thread* RECYCLONE__SPILL a_thread, bool a_value);
 	void f_priority__(t__thread* RECYCLONE__SPILL a_thread, int32_t a_value);
-	template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
-	int f_run(void(*a_finalize)(t_object<t__type>*), T_main a_main);
+	template<typename T_thread, typename T_thread_static>
+	T_thread* f_initialize(void(*a_finalize)(t_object<t__type>*));
 	size_t f_load_count() const;
 };
 
@@ -87,29 +87,20 @@ T* f__new_zerod()
 	return p;
 }
 
-template<typename T_thread, typename T_static, typename T_thread_static, typename T_main>
-int t_engine::f_run(void(*a_finalize)(t_object<t__type>*), T_main a_main)
+template<typename T_thread, typename T_thread_static>
+T_thread* t_engine::f_initialize(void(*a_finalize)(t_object<t__type>*))
 {
-	// Preventing optimized out.
-	auto volatile thread = v_current_thread = f__new_zerod<T_thread>();
+	auto RECYCLONE__SPILL thread = f__new_zerod<T_thread>();
 	thread->v_internal = v_thread__main;
+	v_current_thread = thread;
+	auto RECYCLONE__SPILL finalizer = f__new_zerod<T_thread>();
+	f_start(finalizer, [this, a_finalize]
 	{
-		auto RECYCLONE__SPILL finalizer = f__new_zerod<T_thread>();
-		std::unique_lock lock(v_finalizer__conductor.v_mutex);
-		f_start(finalizer, [this, a_finalize]
-		{
-			T_thread_static ts;
-			f_finalizer(a_finalize);
-		});
-		v_thread__finalizer = finalizer->v_internal;
-		f_epoch_region([&]
-		{
-			v_finalizer__conductor.f_wait(lock);
-		});
-	}
-	auto s = std::make_unique<T_static>();
-	auto ts = std::make_unique<T_thread_static>();
-	return f_exit(a_main());
+		auto ts = std::make_unique<T_thread_static>();
+		f_finalizer(a_finalize);
+	});
+	v_thread__finalizer = finalizer->v_internal;
+	return thread;
 }
 
 }

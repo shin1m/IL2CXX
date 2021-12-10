@@ -16,10 +16,8 @@ namespace std
 }
 #else
 #include <cuchar>
-#endif
 #ifdef __unix__
 #include <dlfcn.h>
-#ifndef __EMSCRIPTEN__
 #include <gnu/lib-names.h>
 #endif
 #endif
@@ -50,6 +48,20 @@ struct t_stacked : T
 	t_stacked& operator=(const t_stacked& a_value)
 	{
 		return *this = static_cast<const T&>(a_value);
+	}
+	template<typename U>
+	t_stacked volatile& operator=(U&& a_value) volatile
+	{
+		std::memcpy(const_cast<t_stacked*>(this), const_cast<std::remove_volatile_t<std::remove_reference_t<U>>*>(&a_value), sizeof(T));
+		return *this;
+	}
+	t_stacked volatile& operator=(const t_stacked& a_value) volatile
+	{
+		return *this = static_cast<const T&>(a_value);
+	}
+	t_stacked volatile& operator=(const volatile t_stacked& a_value) volatile
+	{
+		return *this = const_cast<const t_stacked&>(a_value);
 	}
 };
 
@@ -151,16 +163,15 @@ T* t__lazy<T>::f_initialize()
 	return &v_p;
 }
 
+#ifdef __EMSCRIPTEN__
+void* f_load_symbol(const std::string& a_path, const char* a_name);
+#else
 inline void* f_load_symbol(const std::string& a_path, const char* a_name)
 {
 #ifdef __unix__
 	auto handle = dlopen(a_path.c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
 	if (handle == NULL) {
-#ifdef __EMSCRIPTEN__
-		handle = dlopen((a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
-#else
 		handle = dlopen(a_path == "libc" ? LIBC_SO : (a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
-#endif
 		if (handle == NULL) throw std::runtime_error("unable to dlopen " + a_path + ": " + dlerror());
 	}
 	return dlsym(handle, a_name);
@@ -174,6 +185,7 @@ inline void* f_load_symbol(const std::string& a_path, const char* a_name)
 	return GetProcAddress(handle, a_name);
 #endif
 }
+#endif
 
 #ifdef _MSC_VER
 template<typename S, typename T, typename U>
@@ -228,3 +240,5 @@ inline std::enable_if_t<std::is_signed_v<U>, bool> __builtin_mul_overflow(S a_x,
 #endif
 
 }
+
+#define IL2CXX__AT() (__FILE__ ":" + std::to_string(__LINE__))

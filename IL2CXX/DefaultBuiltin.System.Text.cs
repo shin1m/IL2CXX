@@ -15,7 +15,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("Compile", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         });
     }

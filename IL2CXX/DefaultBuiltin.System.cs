@@ -152,7 +152,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Type.IsVisible)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
@@ -175,8 +175,22 @@ namespace IL2CXX
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__field;
 {'\t'}{'\t'}t_value() = default;
+{'\t'}{'\t'}t_value(const t_value& a_value) = default;
+{'\t'}{'\t'}t_value(const volatile t_value& a_value) : v__field(a_value.v__field)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
 {'\t'}{'\t'}t_value(void* a_field) : v__field(a_field)
 {'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value& operator=(const t_value& a_value) = default;
+{'\t'}{'\t'}t_value volatile& operator=(const t_value& a_value) volatile
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__field = a_value.v__field;
+{'\t'}{'\t'}{'\t'}return *this;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value volatile& operator=(const volatile t_value& a_value) volatile
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return *this = const_cast<const t_value&>(a_value);
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
@@ -190,12 +204,63 @@ namespace IL2CXX
                 transpiler => ($"\treturn {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{a_0->v__field}};\n", 1)
             );
         })
+        .For(get(typeof(RuntimeMethodHandle)), (type, code) =>
+        {
+            code.Members = transpiler => ($@"{'\t'}{'\t'}t__method_base* v__method;
+{'\t'}{'\t'}t_value() = default;
+{'\t'}{'\t'}t_value(const t_value& a_value) = default;
+{'\t'}{'\t'}t_value(const volatile t_value& a_value) : v__method(a_value.v__method)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value(t__method_base* a_method) : v__method(a_method)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value& operator=(const t_value& a_value) = default;
+{'\t'}{'\t'}t_value volatile& operator=(const t_value& a_value) volatile
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__method = a_value.v__method;
+{'\t'}{'\t'}{'\t'}return *this;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value volatile& operator=(const volatile t_value& a_value) volatile
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return *this = const_cast<const t_value&>(a_value);
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f_destruct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+", false, null);
+            code.For(
+                type.GetMethod(nameof(GetHashCode)),
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0->v__method);\n", 1)
+            );
+            code.For(
+                type.GetProperty(nameof(RuntimeMethodHandle.Value)).GetMethod,
+                transpiler => ("\treturn a_0->v__method;\n", 1)
+            );
+        })
         .For(get(typeof(RuntimeTypeHandle)), (type, code) =>
         {
             code.Members = transpiler => ($@"{'\t'}{'\t'}t__type* v__type;
 {'\t'}{'\t'}t_value() = default;
+{'\t'}{'\t'}t_value(const t_value& a_value) = default;
+{'\t'}{'\t'}t_value(const volatile t_value& a_value) : v__type(a_value.v__type)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
 {'\t'}{'\t'}t_value(t__type* a_type) : v__type(a_type)
 {'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value& operator=(const t_value& a_value) = default;
+{'\t'}{'\t'}t_value volatile& operator=(const t_value& a_value) volatile
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}v__type = a_value.v__type;
+{'\t'}{'\t'}{'\t'}return *this;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}t_value volatile& operator=(const volatile t_value& a_value) volatile
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return *this = const_cast<const t_value&>(a_value);
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
@@ -259,7 +324,7 @@ namespace IL2CXX
 {'\t'}{'\t'}auto n = element->v__size;
 {'\t'}{'\t'}element->f_copy(reinterpret_cast<char*>(a_0->f_bounds() + rank) + a_1 * n, a_4, reinterpret_cast<char*>(a_2->f_bounds() + rank) + a_3 * n);
 {'\t'}}} else {{
-{'\t'}{'\t'}throw std::runtime_error(""NotImplementedException"");
+{'\t'}{'\t'}throw std::runtime_error(""NotImplementedException "" + IL2CXX__AT());
 {'\t'}}}
 ", 0)
             );
@@ -378,7 +443,7 @@ namespace IL2CXX
                 new[] { get(typeof(ParameterInfo)) }
             }) code.For(
                 type.GetMethod("GetParentDefinition", BindingFlags.Static | BindingFlags.NonPublic, ts),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(Exception)), (type, code) =>
@@ -394,7 +459,12 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetProperty(nameof(Exception.TargetSite)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("CaptureDispatchState", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\treturn {};\n", 0)
             );
             // TODO
             code.For(
@@ -414,7 +484,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("RestoreDispatchState", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => (string.Empty, 0)
             );
             // TODO
             code.For(
@@ -478,7 +548,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod(nameof(GC.GetTotalAllocatedBytes)),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(WeakReference)), (type, code) =>
@@ -532,7 +602,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod(nameof(Delegate.DynamicInvoke)),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetMethod("InternalEqualTypes", BindingFlags.Static | BindingFlags.NonPublic),
@@ -560,7 +630,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("GetMethodImpl", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(MulticastDelegate)), (type, code) =>
@@ -568,12 +638,12 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("GetTarget", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             // TODO
             code.For(
                 type.GetMethod("GetMethodImpl", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(Activator)), (type, code) =>
@@ -834,12 +904,12 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("InternalHasFlag", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             // TODO
             code.For(
                 type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(typeof(string)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType() }),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(TypedReference)), (type, code) =>
@@ -871,12 +941,12 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetProperty(nameof(Environment.ExitCode)).GetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             // TODO
             code.For(
                 type.GetProperty(nameof(Environment.ExitCode)).SetMethod,
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetMethod("GetProcessorCount", BindingFlags.Static | BindingFlags.NonPublic),
@@ -920,7 +990,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("GetCommandLineArgsNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(Type.GetType("System.ByReference`1", true)), (type, code) =>
@@ -1094,7 +1164,7 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod("FormatSignature", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException\");\n", 0)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(Type.GetType("System.Marvin", true)), (type, code) =>
@@ -1141,6 +1211,17 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("HasOverriddenBeginEndWrite", declaredAndInstance),
                 transpiler => ("\treturn false;\n", 1)
+            );
+        })
+        .For(get(Type.GetType("System.Globalization.GlobalizationMode", true)), (type, code) =>
+        {
+            code.For(
+                type.GetProperty("Invariant", BindingFlags.Static | BindingFlags.NonPublic).GetMethod,
+                transpiler => ("\treturn true;\n", 1)
+            );
+            code.For(
+                type.GetProperty("PredefinedCulturesOnly", BindingFlags.Static | BindingFlags.NonPublic).GetMethod,
+                transpiler => ("\treturn true;\n", 1)
             );
         });
     }

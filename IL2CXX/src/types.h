@@ -107,7 +107,15 @@ struct t__method_info : t__method_base
 
 struct t__runtime_method_info : t__method_info
 {
+#ifdef __EMSCRIPTEN__
+	t__object*(*v__wasm_invoke)(t__object*, void**);
+
+	t__runtime_method_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), t__object*(*a_wasm_invoke)(t__object*, void**)) : t__method_info(a_type, a_declaring_type, a_name, a_attributes, a_parameters, a_invoke), v__wasm_invoke(a_wasm_invoke)
+	{
+	}
+#else
 	using t__method_info::t__method_info;
+#endif
 };
 
 struct t__property_info : t__member_info

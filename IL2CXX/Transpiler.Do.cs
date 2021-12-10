@@ -125,7 +125,7 @@ inline {returns}
 //{'\t'}SetLastError: {setLastError}");
                 writer.WriteLine($@"{prototype}
 {{
-{'\t'}static void* symbol = f_load_symbol(""{value}""s, ""{entryPoint}"");");
+{'\t'}static auto symbol = f_load_symbol(""{value}""s, ""{entryPoint}"");");
                 GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, callingConvention, charSet, setLastError);
                 writer.WriteLine('}');
                 return;
@@ -168,7 +168,7 @@ inline {returns}
             log("\n");
             writer.WriteLine($"\t// init locals: {body.InitLocals}");
             foreach (var x in body.LocalVariables)
-                writer.WriteLine($"\t{EscapeForStacked(x.LocalType)} l{x.LocalIndex}{(body.InitLocals ? "{}" : string.Empty)};");
+                writer.WriteLine($"\t{EscapeForArgument(x.LocalType)} l{x.LocalIndex}{(body.InitLocals ? "{}" : string.Empty)};");
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
@@ -207,15 +207,15 @@ inline {returns}
                             case ExceptionHandlingClauseOptions.Clause:
                                 writer.WriteLine($@"// catch {clause.CatchType}
 }} catch (t__object* e) {{
-{'\t'}f_epoch_point();
 {'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;
-{'\t'}{s.Variable} = e;");
+{'\t'}{s.Variable} = e;
+{'\t'}f_epoch_point();");
                                 break;
                             case ExceptionHandlingClauseOptions.Filter:
                                 writer.WriteLine($@"// filter
 }} catch (t__object* e) {{
-{'\t'}f_epoch_point();
-{'\t'}{s.Variable} = e;");
+{'\t'}{s.Variable} = e;
+{'\t'}f_epoch_point();");
                                 break;
                             case ExceptionHandlingClauseOptions.Finally:
                                 writers.Push(writer);
@@ -308,14 +308,9 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                     var escaped = name = Escape(assembly.GetName().Name);
                     for (var i = 0; !assemblyIdentifiers.Add(name); ++i) name = $"{escaped}__{i}";
                     assemblyToIdentifier.Add(assembly, name);
-                    var entry = assembly.EntryPoint;
-                    if (entry == method)
-                    {
-                        writerForDeclarations.WriteLine($"\nextern t__runtime_method_info v__assembly_{name}__entry_point;");
-                        writer.WriteLine($"\nt__runtime_method_info v__assembly_{name}__entry_point{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(entry.DeclaringType)}>::v__instance, u\"{entry.Name}\"sv, {(int)entry.Attributes}, nullptr}};");
-                    }
                     writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
-                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(entry == method ? $"&v__assembly_{name}__entry_point" : "nullptr")}}};");
+                    var entry = method == assembly.EntryPoint && GenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "nullptr";
+                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {entry}}};");
                     var names = assembly.GetManifestResourceNames();
                     if (names.Length > 0)
                     {
@@ -402,8 +397,7 @@ const std::map<void*, void*> v__managed_method_to_unmanaged{{{
 {'\t'}{'\t'}}});
 {'\t'}}})}}"))
 }
-}};
-");
+}};");
             var arguments0 = string.Empty;
             var arguments1 = string.Empty;
             if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))
@@ -418,8 +412,30 @@ t_static* t_static::v_instance;
 
 RECYCLONE__THREAD t_thread_static* t_thread_static::v_instance;
 
+void f__finalize(t_object<t__type>* a_p)
+{{
+{'\t'}{GenerateVirtualCall(finalizeOfObject, "a_p", Enumerable.Empty<string>(), x => x)};
 }}
 
+void f__startup()
+{{
+{'\t'}std::setlocale(LC_ALL, """");
+{'\t'}auto options = new t_engine::t_options;
+{'\t'}options->v_verbose = std::getenv(""IL2CXX_VERBOSE"");
+{'\t'}options->v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
+{'\t'}t_slot thread((new t_engine(*options, &options))->f_initialize<{Escape(typeofThread)}, t_thread_static>(f__finalize));
+{'\t'}new t_static;
+{'\t'}new t_thread_static;
+}}
+
+{EscapeForStacked(typeofString)} f__to_string(t__object* a_p)
+{{
+{'\t'}{GenerateVirtualCall(typeofObject.GetMethod(nameof(object.ToString)), "a_p", Enumerable.Empty<string>(), x => $"return {x};")}
+}}
+
+}}
+
+#ifndef __EMSCRIPTEN__
 int main(int argc, char* argv[])
 {{
 {'\t'}using namespace il2cxx;
@@ -428,19 +444,23 @@ int main(int argc, char* argv[])
 {'\t'}options.v_verbose = std::getenv(""IL2CXX_VERBOSE"");
 {'\t'}options.v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
 {'\t'}il2cxx::t_engine engine(options);
-{'\t'}return engine.f_run<{Escape(typeofThread)}, t_static, t_thread_static>([](auto a_p)
+{'\t'}return [&]() RECYCLONE__NOINLINE
 {'\t'}{{
-{'\t'}{'\t'}{GenerateVirtualCall(finalizeOfObject, "a_p", Enumerable.Empty<string>(), x => x)};
-{'\t'}}}, [&]
-{'\t'}{{{arguments0}
+{'\t'}{'\t'}// Preventing optimized out.
+{'\t'}{'\t'}auto volatile thread = engine.f_initialize<{Escape(typeofThread)}, t_thread_static>(f__finalize);
+{'\t'}{'\t'}auto s = std::make_unique<t_static>();
+{'\t'}{'\t'}auto ts = std::make_unique<t_thread_static>();{arguments0}
 {'\t'}{'\t'}try {{
-{'\t'}{'\t'}{'\t'}{(method.ReturnType == typeofVoid ? $"{Escape(method)}({arguments1});\n\t\t\treturn 0" : $"return {Escape(method)}({arguments1})")};
-{'\t'}{'\t'}}} catch (t_object<t__type>* p) {{
-{'\t'}{'\t'}{'\t'}{GenerateVirtualCall(typeofObject.GetMethod(nameof(object.ToString)), "p", Enumerable.Empty<string>(), x => $"auto s = {x};")}
+{'\t'}{'\t'}{'\t'}{(method.ReturnType == typeofVoid
+    ? $"{Escape(method)}({arguments1});\n\t\t\treturn engine.f_exit(0)"
+    : $"return engine.f_exit({Escape(method)}({arguments1}))")};
+{'\t'}{'\t'}}} catch (t__object* p) {{
+{'\t'}{'\t'}{'\t'}auto s = f__to_string(p);
 {'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}));
 {'\t'}{'\t'}}}
-{'\t'}}});
-}}");
+{'\t'}}}();
+}}
+#endif");
         }
     }
 }

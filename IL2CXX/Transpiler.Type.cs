@@ -158,7 +158,7 @@ namespace IL2CXX
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new();
             public readonly string Delegate;
             public bool HasFields;
-            public readonly bool HasDefaultConstructor;
+            public bool HasConstructors;
             public List<bool> ExplicitMap;
 
             public TypeDefinition(Type type, Transpiler transpiler) : base(type)
@@ -197,27 +197,20 @@ namespace IL2CXX
                     else
                         Methods[i] = x;
                 }
-                foreach (var x in Type.GetInterfaces())
+                // TODO: Work around for szarray bug.
+                var interfaces = Type.GetInterfaces();
+                if (Type.IsSZArray)
+                {
+                    var roc = transpiler.getType(typeof(IReadOnlyCollection<>)).MakeGenericType(new[] { transpiler.GetElementType(Type) });
+                    if (!interfaces.Contains(roc)) interfaces = interfaces.Append(roc).ToArray();
+                }
+                foreach (var x in interfaces)
                 {
                     var definition = (InterfaceDefinition)transpiler.Define(x);
                     var methods = new MethodInfo[definition.Methods.Count];
                     var map = transpiler.GetInterfaceMap(Type.IsArray && x.IsGenericType ? transpiler.typeofSZArrayHelper.MakeGenericType(transpiler.GetElementType(Type)) : Type, x);
                     foreach (var (i, t) in map.InterfaceMethods.Zip(map.TargetMethods, (i, t) => (i, t))) methods[definition.GetIndex(i)] = t;
                     InterfaceToMethods.Add(x, methods);
-                }
-                var constructor = type.GetConstructor(Type.EmptyTypes);
-                if (constructor != null)
-                {
-                    var identifier = transpiler.Escape(Type);
-                    Definitions.WriteLine($@"
-t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{transpiler.Escape(type)}>::v__instance, u""{constructor.Name}""sv, {(int)constructor.Attributes}, t__runtime_parameter_info::v__empty_parameters, [](auto, auto, auto, auto, auto) -> t__object*
-{{
-{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{identifier}>();
-{'\t'}{transpiler.Escape(constructor)}(p);
-{'\t'}return p;
-}}}};");
-                    HasDefaultConstructor = true;
-                    transpiler.Enqueue(constructor);
                 }
                 if (Type.IsSubclassOf(transpiler.typeofDelegate) && Type != transpiler.typeofMulticastDelegate)
                 {
@@ -277,6 +270,27 @@ t__runtime_constructor_info v__default_constructor_{identifier}{{&t__type_of<t__
                     Enqueue(gtd);
                     foreach (var x in type.GetGenericArguments()) Enqueue(x);
                 }
+            }
+            string writeParameters(ParameterInfo[] parameters, string name)
+            {
+                if (parameters.Length <= 0) return "t__runtime_parameter_info::v__empty_parameters";
+                definition.Definitions.WriteLine();
+                string parameterName(ParameterInfo x) => $"v__parameter_{name}__{Escape(x.Name)}";
+                foreach (var x in parameters)
+                {
+                    var pname = parameterName(x);
+                    var @default = "nullptr";
+                    if (x.HasDefaultValue)
+                    {
+                        @default = $"{pname}__default";
+                        definition.Definitions.WriteLine($"uint8_t {@default}[] = {{{string.Join(", ", GetDefaultValue(x).Select(y => $"0x{y:x02}"))}}};");
+                    }
+                    definition.Definitions.WriteLine($"t__runtime_parameter_info {pname}{{{(int)x.Attributes}, &t__type_of<{Escape(x.ParameterType)}>::v__instance, {@default}}};");
+                }
+                definition.Definitions.WriteLine($@"t__runtime_parameter_info* v__parameters_{name}[] = {{
+{string.Join(string.Empty, parameters.Select(x => $"\t&{parameterName(x)},\n"))}{'\t'}nullptr
+}};");
+                return $"v__parameters_{name}";
             }
             if (type.ContainsGenericParameters)
             {
@@ -505,6 +519,7 @@ struct {Escape(type)}__unmanaged
                                             if (value == UnmanagedType.ByValTStr)
                                             {
                                                 if (unicode) pad(align(Math.Min(2, td.Alignment)));
+                                                // TODO: Work around for ByValTStr bug.
                                                 //var size = (int)marshalAs.NamedArguments.First(x => x.MemberName == nameof(MarshalAsAttribute.SizeConst)).TypedValue.Value;
                                                 var size = GetSizeConst(x);
                                                 sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {f}[{size}];");
@@ -707,6 +722,13 @@ struct {Escape(type)}__unmanaged
 t__runtime_field_info* v__fields_{identifier}[] = {{
 {string.Join(string.Empty, fields.Select(x => $"\t&v__field_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
 }};");
+                        foreach (var x in type.GetConstructors(declaredAndInstance))
+                        {
+                            td.HasConstructors = true;
+                            var name = Escape(x);
+                            fieldDeclarations.WriteLine($"extern t__runtime_constructor_info v__method_{name};");
+                            definition.Definitions.WriteLine($"t__runtime_constructor_info v__method_{name}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}}};");
+                        }
                     }
                 }
                 this.staticDefinitions.Write(staticDefinitions);
@@ -719,16 +741,9 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
                 foreach (var x in GetMethods(type))
                 {
                     definition.HasMethods = true;
-                    var method = Escape(x);
-                    var variable = $"v__method_{method}";
-                    fieldDeclarations.WriteLine($"extern t__runtime_method_info {variable};");
-                    var parameters = x.GetParameters();
-                    if (parameters.Length > 0) definition.Definitions.WriteLine($@"
-{string.Join(string.Empty, parameters.Select(x => $"t__runtime_parameter_info v__parameter_{method}__{Escape(x.Name)}{{&t__type_of<{Escape(x.ParameterType)}>::v__instance}};\n"))}
-t__runtime_parameter_info* v__parameters_{method}[] = {{
-{string.Join(string.Empty, parameters.Select(x => $"\t&v__parameter_{method}__{Escape(x.Name)},\n"))}{'\t'}nullptr
-}};");
-                    definition.Definitions.WriteLine($@"t__runtime_method_info {variable}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {(parameters.Length > 0 ? $"v__parameters_{method}" : "t__runtime_parameter_info::v__empty_parameters")}, {GenerateInvokeFunction(x)}
+                    var name = Escape(x);
+                    fieldDeclarations.WriteLine($"extern t__runtime_method_info v__method_{name};");
+                    definition.Definitions.WriteLine($@"t__runtime_method_info v__method_{name}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}
 #ifdef __EMSCRIPTEN__
 {'\t'}, {GenerateWASMInvokeFunction(x)}
 #endif
@@ -739,15 +754,9 @@ t__runtime_parameter_info* v__parameters_{method}[] = {{
                     definition.HasProperties = true;
                     var variable = Escape(x);
                     fieldDeclarations.WriteLine($"extern t__runtime_property_info {variable};");
-                    var parameters = x.GetIndexParameters();
-                    if (parameters.Length > 0) definition.Definitions.WriteLine($@"
-{string.Join(string.Empty, parameters.Select(x => $"\tt__runtime_parameter_info v__parameter_{variable}__{Escape(x.Name)}{{&t__type_of<{Escape(x.ParameterType)}>::v__instance}};\n"))}
-t__runtime_parameter_info* v__parameters_{variable}[] = {{
-{string.Join(string.Empty, parameters.Select(x => $"\t&v__parameter_{variable}__{Escape(x.Name)},\n"))}{'\t'}nullptr
-}};");
                     var get = x.GetMethod;
                     var set = x.SetMethod;
-                    definition.Definitions.WriteLine($"t__runtime_property_info {variable}{{&t__type_of<t__runtime_property_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, &t__type_of<{Escape(x.PropertyType)}>::v__instance, {(parameters.Length > 0 ? $"v__parameters_{variable}" : "t__runtime_parameter_info::v__empty_parameters")}, {(get == null ? "nullptr" : $"&v__method_{Escape(get)}")}, {(set == null ? "nullptr" : $"&v__method_{Escape(set)}")}}};");
+                    definition.Definitions.WriteLine($"t__runtime_property_info {variable}{{&t__type_of<t__runtime_property_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, &t__type_of<{Escape(x.PropertyType)}>::v__instance, {writeParameters(x.GetIndexParameters(), variable)}, {(get == null ? "nullptr" : $"&v__method_{Escape(get)}")}, {(set == null ? "nullptr" : $"&v__method_{Escape(set)}")}}};");
                 }
             }
             runtimeDefinitions.Add(definition);
@@ -779,6 +788,11 @@ t__type* v__constructed_generic_types_{Escape(type)}[] = {{
                 }
             }
             writerForDefinitions.Write(definition.Definitions);
+            if ((definition as TypeDefinition)?.HasConstructors ?? false) writerForDefinitions.Write($@"
+t__runtime_constructor_info* v__constructors_{identifier}[] = {{
+{string.Join(string.Empty, type.GetConstructors(declaredAndInstance).Select(x => $"\t&v__method_{Escape(x)},\n"))}{'\t'}nullptr
+}};
+");
             if (definition.HasMethods) writerForDefinitions.Write($@"
 t__runtime_method_info* v__methods_{identifier}[] = {{
 {string.Join(string.Empty, GetMethods(type).Select(x => $"\t&v__method_{Escape(x)},\n"))}{'\t'}nullptr
@@ -874,16 +888,19 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 )}, {(
     type.IsEnum ? "true" : "false"
 )}, {(
+    type.IsByRef ? "true" : "false"
+)}, {(
     type.IsPointer ? "true" : "false"
 )}, {(
-    type.HasElementType ? "true" : "false"
-)}, {(
     type.IsByRefLike ? "true" : "false"
+)}, {(
+    type.IsGenericType ? "true" : "false"
 )}, {(
     type == typeofVoid || type.ContainsGenericParameters ? "0" : $"sizeof({EscapeForValue(type)})"
 )}, {szarray})
 {{");
-            writerForDefinitions.WriteLine($"\tv__cor_element_type = {GetCorElementType(type)};");
+            writerForDefinitions.WriteLine($@"{'\t'}v__cor_element_type = {GetCorElementType(type)};
+{'\t'}v__type_code = {(int)Type.GetTypeCode(type)};");
             if (definition is TypeDefinition) writerForDefinitions.WriteLine($"\tv__managed_size = sizeof({Escape(type)});");
             if (definition.HasUnmanaged)
                 writerForDefinitions.WriteLine($@"{'\t'}v__unmanaged_size = sizeof({Escape(type)}__unmanaged);
@@ -895,8 +912,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}f_to_unmanaged = f_do_to_unmanaged_blittable;
 {'\t'}f_from_unmanaged = f_do_from_unmanaged_blittable;
 {'\t'}f_destroy_unmanaged = f_do_destroy_unmanaged_blittable;");
-            if (type.IsArray) writerForDefinitions.WriteLine($@"{'\t'}v__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;
-{'\t'}v__rank = {type.GetArrayRank()};");
+            if (type.HasElementType) writerForDefinitions.WriteLine($"\tv__element = &t__type_of<{Escape(GetElementType(type))}>::v__instance;");
+            if (type.IsArray) writerForDefinitions.WriteLine($"\tv__rank = {type.GetArrayRank()};");
             if (type.IsEnum)
             {
                 writerForDefinitions.WriteLine($"\tv__underlying = &t__type_of<{Escape(Enum.GetUnderlyingType(type))}>::v__instance;");
@@ -916,10 +933,13 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                     if (type.IsGenericTypeDefinition) writerForDefinitions.WriteLine($"\tv__constructed_generic_types = v__constructed_generic_types_{Escape(type)};");
                 }
             }
-            if (td?.HasFields ?? false) writerForDefinitions.WriteLine($"\tv__fields = v__fields_{identifier};");
-            if (td?.HasDefaultConstructor ?? false) writerForDefinitions.WriteLine($"\tv__default_constructor = &v__default_constructor_{identifier};");
-            if (definition.HasMethods) writerForDefinitions.WriteLine($"\tv__methods = v__methods_{identifier};");
-            if (definition.HasProperties) writerForDefinitions.WriteLine($"\tv__properties = v__properties_{identifier};");
+            if (GenerateReflection(type))
+            {
+                writerForDefinitions.WriteLine($"\tv__fields = {(td?.HasFields ?? false ? $"v__fields_{identifier}" : "v__empty_fields")};");
+                writerForDefinitions.WriteLine($"\tv__constructors = {(td?.HasConstructors ?? false ? $"v__constructors_{identifier}" : "v__empty_constructors")};");
+                writerForDefinitions.WriteLine($"\tv__methods = {(definition.HasMethods ? $"v__methods_{identifier}" : "v__empty_methods")};");
+                writerForDefinitions.WriteLine($"\tv__properties = {(definition.HasProperties ? $"v__properties_{identifier}" : "v__empty_properties")};");
+            }
             writerForDefinitions.Write(td?.Delegate);
             if (definition is TypeDefinition)
             {

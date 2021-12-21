@@ -77,7 +77,9 @@ struct t__runtime_parameter_info
 {
 	static constexpr t__runtime_parameter_info* v__empty_parameters[] = {nullptr};
 
+	int32_t v__attributes;
 	t__type* v__parameter_type;
+	void* v__default_value;
 };
 
 struct t__method_base : t__member_info
@@ -156,6 +158,7 @@ struct t__abstract_type : t__member_info
 struct t__type : t__abstract_type
 {
 	static constexpr t__runtime_field_info* v__empty_fields[] = {nullptr};
+	static constexpr t__runtime_constructor_info* v__empty_constructors[] = {nullptr};
 	static constexpr t__runtime_method_info* v__empty_methods[] = {nullptr};
 	static constexpr t__runtime_property_info* v__empty_properties[] = {nullptr};
 	static void f_be(t__object* a_p, t__type* a_type)
@@ -169,14 +172,16 @@ struct t__type : t__abstract_type
 	std::u16string_view v__namespace;
 	std::u16string_view v__full_name;
 	std::u16string_view v__display_name;
-	bool v__managed;
-	bool v__value_type;
+	uint8_t v__managed : 1;
+	uint8_t v__value_type : 1;
 	uint8_t v__array : 1;
 	uint8_t v__enum : 1;
+	uint8_t v__by_ref : 1;
 	uint8_t v__pointer : 1;
-	uint8_t v__has_element_type : 1;
 	uint8_t v__by_ref_like : 1;
+	uint8_t v__generic_type : 1;
 	uint8_t v__cor_element_type;
+	uint8_t v__type_code;
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
@@ -198,10 +203,10 @@ struct t__type : t__abstract_type
 	t__type* v__generic_type_definition = nullptr;
 	t__type* const* v__generic_arguments = nullptr;
 	t__type* const* v__constructed_generic_types = nullptr;
-	t__runtime_field_info* const* v__fields = v__empty_fields;
-	t__runtime_method_info* const* v__methods = v__empty_methods;
-	t__runtime_property_info* const* v__properties = v__empty_properties;
-	t__runtime_constructor_info* v__default_constructor = nullptr;
+	t__runtime_field_info* const* v__fields = nullptr;
+	t__runtime_constructor_info* const* v__constructors = nullptr;
+	t__runtime_method_info* const* v__methods = nullptr;
+	t__runtime_property_info* const* v__properties = nullptr;
 
 	t__type(
 		t__type* a_type, t__type* a_base,
@@ -209,14 +214,14 @@ struct t__type : t__abstract_type
 		t__runtime_assembly* a_assembly,
 		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
 		int32_t a_attribute_flags,
-		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_pointer, bool a_has_element_type, bool a_by_ref_like,
+		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_by_ref, bool a_pointer, bool a_by_ref_like, bool a_generic_type,
 		size_t a_size,
 		t__type* a_szarray
 	) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags), v__base(a_base),
 	v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
-	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__pointer(a_pointer), v__has_element_type(a_has_element_type), v__by_ref_like(a_by_ref_like),
+	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__by_ref(a_by_ref), v__pointer(a_pointer), v__by_ref_like(a_by_ref_like), v__generic_type(a_generic_type),
 	v__size(a_size),
 	v__szarray(a_szarray)
 	{
@@ -282,6 +287,7 @@ struct t__type : t__abstract_type
 		auto i = v__interface_to_methods.find(a_interface);
 		return i == v__interface_to_methods.end() ? nullptr : i->second.first;
 	}
+	t__object* f_new_zerod();
 	static constexpr int32_t bf_declared_only = 2;
 	static constexpr int32_t bf_instance = 4;
 	static constexpr int32_t bf_static = 8;
@@ -297,7 +303,7 @@ struct t__type : t__abstract_type
 		constexpr int32_t fa_static = 16;
 		auto type = this;
 		while (a_flags & (bf_instance | bf_static)) {
-			for (auto p = type->v__fields; *p; ++p) {
+			if (auto p = type->v__fields) for (; *p; ++p) {
 				auto x = *p;
 				if (!(a_flags & bf_instance) && !(x->v__attributes & fa_static)) continue;
 				if (!(a_flags & bf_static) && x->v__attributes & fa_static) continue;
@@ -315,17 +321,31 @@ struct t__type : t__abstract_type
 			if (!(a_flags & bf_flatten_hierarchy)) a_flags &= ~bf_static;
 		}
 	}
+	static constexpr int32_t ma_public = 6;
+	static constexpr int32_t ma_access_mask = 7;
+	static constexpr int32_t ma_static = 16;
+	template<typename T>
+	void f_each_constructor(int32_t a_flags, T a_do)
+	{
+		if (auto p = v__constructors) for (; *p; ++p) {
+			auto x = *p;
+			auto staticc = x->v__attributes & ma_static;
+			if (!(a_flags & bf_instance) && !staticc) continue;
+			if (!(a_flags & bf_static) && staticc) continue;
+			auto publicc = (x->v__attributes & ma_access_mask) >= ma_public;
+			if (!(a_flags & bf_public) && publicc) continue;
+			if (!(a_flags & bf_non_public) && !publicc) continue;
+			if (!a_do(x)) return;
+		}
+	}
 	template<typename T>
 	void f_each_method(int32_t a_flags, T a_do)
 	{
 		constexpr int32_t ma_private_scope = 0;
 		constexpr int32_t ma_private = 1;
-		constexpr int32_t ma_public = 6;
-		constexpr int32_t ma_access_mask = 7;
-		constexpr int32_t ma_static = 16;
 		auto type = this;
 		while (a_flags & (bf_instance | bf_static)) {
-			for (auto p = type->v__methods; *p; ++p) {
+			if (auto p = type->v__methods) for (; *p; ++p) {
 				auto x = *p;
 				auto staticc = x->v__attributes & ma_static;
 				if (!(a_flags & bf_instance) && !staticc) continue;
@@ -355,7 +375,7 @@ struct t__type : t__abstract_type
 		constexpr int32_t ma_static = 16;
 		auto type = this;
 		while (a_flags & (bf_instance | bf_static)) {
-			for (auto p = type->v__properties; *p; ++p) {
+			if (auto p = type->v__properties) for (; *p; ++p) {
 				auto x = *p;
 				auto get = x->v__get;
 				auto set = x->v__set;

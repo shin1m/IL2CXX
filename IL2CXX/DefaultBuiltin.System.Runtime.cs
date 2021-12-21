@@ -145,11 +145,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.GetUninitializedObject)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
-{'\t'}auto type = static_cast<t__type*>(a_0);
-{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
-{'\t'}std::memset(p + 1, 0, type->v__unmanaged_size - sizeof(t_object<t__type>));
-{'\t'}type->f_finish(p);
-{'\t'}return p;
+{'\t'}return static_cast<t__type*>(a_0)->f_new_zerod();
 ", 0)
             );
             code.For(

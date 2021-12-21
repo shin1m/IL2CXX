@@ -656,9 +656,9 @@ namespace IL2CXX
                     var t = types[0];
                     if (t.IsValueType) return ("\treturn {};\n", 1);
                     var constructor = t.GetConstructor(Type.EmptyTypes);
-                    return (constructor == null
-                        ? "\tthrow std::runtime_error(\"no parameterless constructor\");\n"
-                        : $@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(t)}>();
+                    if (constructor == null) return ("\tthrow std::runtime_error(\"no parameterless constructor\");\n", 0);
+                    transpiler.Enqueue(constructor);
+                    return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(t)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}return p;
 ", 0);
@@ -668,16 +668,19 @@ namespace IL2CXX
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(bool)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_0);
-{'\t'}if (type->v__value_type) {{
-{'\t'}{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
-{'\t'}{'\t'}std::memset(p + 1, 0, type->v__managed_size - sizeof(t__object));
-{'\t'}{'\t'}type->f_finish(p);
-{'\t'}{'\t'}return p;
-{'\t'}}}
-{'\t'}auto constructor = type->v__default_constructor;
+{'\t'}if (type->v__value_type) return type->f_new_zerod();
+{'\t'}if (!type->v__constructors) std::cerr << ""no constructors: "" << f__string(type->v__full_name) << std::endl;
+{'\t'}t__runtime_constructor_info* constructor = nullptr;
+{'\t'}type->f_each_constructor(a_1 ? {(int)(BindingFlags.Instance | BindingFlags.NonPublic)} : {(int)(BindingFlags.Instance | BindingFlags.Public)}, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}if (*a_x->v__parameters) return true;
+{'\t'}{'\t'}constructor = a_x;
+{'\t'}{'\t'}return false;
+{'\t'}}});
 {'\t'}if (!constructor) throw std::runtime_error(""no parameterless constructor"");
-{'\t'}if (!a_1 && (constructor->v__attributes & {(int)MethodAttributes.MemberAccessMask}) != {(int)MethodAttributes.Public}) throw std::runtime_error(""no public parameterless constructor"");
-{'\t'}return constructor->v__invoke(nullptr, 0, nullptr, nullptr, nullptr);
+{'\t'}auto p = type->f_new_zerod();
+{'\t'}constructor->v__invoke(p, 0, nullptr, nullptr, nullptr);
+{'\t'}return p;
 ", 0)
             );
             // TODO

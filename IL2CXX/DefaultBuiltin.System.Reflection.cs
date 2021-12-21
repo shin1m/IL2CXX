@@ -88,6 +88,17 @@ namespace IL2CXX
                 transpiler => ("\treturn a_0.v__method;\n", 1)
             );
         })
+        .For(get(typeof(ParameterInfo)), (type, code) =>
+        {
+            code.For(
+                type.GetProperty(nameof(ParameterInfo.DefaultValue)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v_DefaultValueImpl;\n", 0)
+            );
+            code.For(
+                type.GetProperty(nameof(ParameterInfo.HasDefaultValue)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v_AttrsImpl & {(int)ParameterAttributes.HasDefault};\n", 0)
+            );
+        })
         .For(get(typeof(AssemblyBuilder)), (type, code) =>
         {
             code.Members = transpiler => (string.Empty, false, null);

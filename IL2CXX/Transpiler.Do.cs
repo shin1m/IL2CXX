@@ -172,6 +172,7 @@ inline {returns}
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
+            //writer.WriteLine($"\tprintf(\"{Escape(method)}\\n\");");
             if (!inline) writer.WriteLine("\tf_epoch_point();");
             var writers = new Stack<TextWriter>();
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));

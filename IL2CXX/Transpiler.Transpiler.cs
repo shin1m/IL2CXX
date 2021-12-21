@@ -447,6 +447,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     writer.Write("\n\treturn");
+                    //writer.Write($"\n\tprintf(\"return {Escape(method)}\\n\");\n\treturn");
                     var @return = GetReturnType(method);
                     if (@return != typeofVoid)
                     {

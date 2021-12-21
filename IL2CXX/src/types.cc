@@ -95,6 +95,15 @@ void t__type::f_do_destroy_unmanaged_blittable(void* a_p)
 {
 }
 
+t__object* t__type::f_new_zerod()
+{
+	auto p = f_engine()->f_allocate(v__managed_size);
+	std::memset(p + 1, 0, v__managed_size - sizeof(t__object));
+	f_register_finalize(p);
+	p->f_be(this);
+	return p;
+}
+
 void t__type_finalizee::f_do_register_finalize(t__object* a_this)
 {
 	a_this->f_finalizee__(true);

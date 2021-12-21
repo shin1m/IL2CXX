@@ -33,16 +33,35 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 0)
             );
         }
+        private static (string body, int inline) GetParameters(Func<Type, Type> get, Transpiler transpiler)
+        {
+            var identifier = transpiler.Escape(get(typeof(ParameterInfo)));
+            return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
+{'\t'}for (auto p = a_0->v__parameters; *p; ++p) ++n;
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(ParameterInfo[])))}, {identifier}>(n);
+{'\t'}for (size_t i = 0; i < n; ++i) {{
+{'\t'}{'\t'}auto q = a_0->v__parameters[i];
+{'\t'}{'\t'}auto RECYCLONE__SPILL pi = f__new_zerod<{identifier}>();
+{'\t'}{'\t'}pi->v_AttrsImpl = q->v__attributes;
+{'\t'}{'\t'}pi->v_ClassImpl = q->v__parameter_type;
+{'\t'}{'\t'}if (q->v__default_value) pi->v_DefaultValueImpl = q->v__parameter_type->f_box(q->v__default_value);
+{'\t'}{'\t'}pi->v_MemberImpl = a_0;
+{'\t'}{'\t'}pi->v_PositionImpl = i;
+{'\t'}{'\t'}p->f_data()[i] = pi;
+{'\t'}}}
+{'\t'}return p;
+", 0);
+        }
         private static void SetupMethodBase(Func<Type, Type> get, Type type, Builtin.Code code)
         {
             SetupMemberInfo(get, type, code);
-            // TODO
+            code.For(
+                type.GetProperty(nameof(MethodBase.Attributes)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__attributes;\n", 0)
+            );
             code.For(
                 type.GetMethod(nameof(MethodBase.GetParameters)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}
-{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(ParameterInfo[])))}, {transpiler.Escape(get(typeof(ParameterInfo)))}>(0);
-{'\t'}return p;
-", 0)
+                transpiler => GetParameters(get, transpiler)
             );
         }
         private static Builtin SetupRuntime(this Builtin @this, Func<Type, Type> get) => @this
@@ -66,7 +85,10 @@ namespace IL2CXX
             SetupMethodBase(get, type, code);
             code.For(
                 type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__invoke(nullptr, 0, nullptr, nullptr, nullptr);\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto p = a_0->v__declaring_type->f_new_zerod();
+{'\t'}a_0->v__invoke(p, a_1, a_2, a_3 && a_3->v__length > 0 ? a_3 : nullptr, a_4);
+{'\t'}return p;
+", 0)
             );
         })
         .For(get(typeof(RuntimeFieldInfo)), (type, code) =>
@@ -110,10 +132,22 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__attributes;\n", 0)
             );
             code.For(
+                type.GetMethod(nameof(PropertyInfo.GetIndexParameters)),
+                transpiler => GetParameters(get, transpiler)
+            );
+            code.For(
+                type.GetProperty(nameof(PropertyInfo.GetMethod)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__get;\n", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(PropertyInfo.GetValue), new[] { get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__get) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}return a_0->v__get->v__invoke(a_1, a_2, a_3, a_4, a_5);
 ", 0)
+            );
+            code.For(
+                type.GetProperty(nameof(PropertyInfo.SetMethod)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__set;\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(PropertyInfo.SetValue), new[] { get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
@@ -144,13 +178,34 @@ namespace IL2CXX
                 type.GetProperty(nameof(Type.FullName)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__full_name);\n", 0)
             );
-            // TODO
+            code.For(
+                type.GetMethod(nameof(Type.GetArrayRank)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__array) {transpiler.GenerateThrow("Argument")};
+{'\t'}return a_0->v__rank;
+", 0)
+            );
             code.For(
                 type.GetMethod(nameof(Type.GetConstructors), new[] { get(typeof(BindingFlags)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(ConstructorInfo[])))}, {transpiler.Escape(get(typeof(ConstructorInfo)))}>(a_0->v__default_constructor ? 1 : 0);
-{'\t'}if (a_0->v__default_constructor) p->f_data()[0] = a_0->v__default_constructor;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__constructors) std::cerr << ""no constructors: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}size_t n = 0;
+{'\t'}a_0->f_each_constructor(a_1, [&](auto)
+{'\t'}{{
+{'\t'}{'\t'}++n;
+{'\t'}{'\t'}return true;
+{'\t'}}});
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(ConstructorInfo[])))}, {transpiler.Escape(get(typeof(ConstructorInfo)))}>(n);
+{'\t'}auto q = p->f_data();
+{'\t'}a_0->f_each_constructor(a_1, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}*q++ = a_x;
+{'\t'}{'\t'}return true;
+{'\t'}}});
 {'\t'}return p;
 ", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(Type.GetElementType)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__array || a_0->v__by_ref || a_0->v__pointer ? a_0->v__element : nullptr;\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.GetEnumNames)),
@@ -186,7 +241,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetField), new[] { get(typeof(string)), get(typeof(BindingFlags)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__fields) std::cerr << ""no fields: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
 {'\t'}t__runtime_field_info* p = nullptr;
 {'\t'}a_0->f_each_field(a_2, [&](auto a_x)
 {'\t'}{{
@@ -202,7 +258,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetFields), new[] { get(typeof(BindingFlags)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__fields) std::cerr << ""no fields: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}size_t n = 0;
 {'\t'}a_0->f_each_field(a_1, [&](auto)
 {'\t'}{{
 {'\t'}{'\t'}++n;
@@ -220,7 +277,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetGenericArguments)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""not generic type"");
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) return f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(0);
+{'\t'}if (!a_0->v__generic_type_definition) std::cerr << ""no generic data: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
@@ -230,7 +288,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetGenericTypeDefinition)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""not generic type"");
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) {transpiler.GenerateThrow("InvalidOperation")};
+{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
 {'\t'}return a_0->v__generic_type_definition;
 ", 0)
             );
@@ -244,7 +303,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetMethods), new[] { get(typeof(BindingFlags)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}size_t n = 0;
 {'\t'}a_0->f_each_method(a_1, [&](auto)
 {'\t'}{{
 {'\t'}{'\t'}++n;
@@ -262,7 +322,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetProperties), new[] { get(typeof(BindingFlags)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t n = 0;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__properties) std::cerr << ""no properties: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}size_t n = 0;
 {'\t'}a_0->f_each_property(a_1, [&](auto)
 {'\t'}{{
 {'\t'}{'\t'}++n;
@@ -291,23 +352,37 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Type.IsConstructedGenericType)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition != a_0;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) return false;
+{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
+{'\t'}return a_0->v__generic_type_definition != a_0;
+", 0)
+            );
+            code.For(
+                type.GetProperty(nameof(Type.IsGenericType)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.IsGenericTypeDefinition)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition == a_0;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) return false;
+{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
+{'\t'}return a_0->v__generic_type_definition == a_0;
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.MakeGenericType)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""not generic type"");
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__generic_type) {transpiler.GenerateThrow("InvalidOperation")};
+{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
+{'\t'}if (a_0->v__generic_type_definition != a_0) {transpiler.GenerateThrow("InvalidOperation")};
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
-{'\t'}if (a_1->v__length != n) throw std::runtime_error(""not same number of types"");
+{'\t'}if (a_1->v__length != n) throw std::runtime_error(""not same number of types: "" + f__string(a_0->v__full_name));
 {'\t'}for (auto p = a_0->v__constructed_generic_types; *p; ++p) {{
 {'\t'}{'\t'}auto q = (*p)->v__generic_arguments;
 {'\t'}{'\t'}if (std::equal(q, q + n, a_1->f_data())) return *p;
 {'\t'}}}
-{'\t'}throw std::runtime_error(""not supported"");
+{'\t'}auto s = f__string(static_cast<t__type*>(a_1->f_data()[0])->v__full_name);
+{'\t'}for (size_t i = 1; i < n; ++i) s += "", "" + f__string(static_cast<t__type*>(a_1->f_data()[i])->v__full_name);
+{'\t'}throw std::runtime_error(""not bundled: "" + f__string(a_0->v__full_name) + ""["" + s + ""]"");
 ", 0)
             );
             code.For(
@@ -323,28 +398,28 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn {a_0};\n", 0)
             );
             code.For(
-                type.GetMethod("HasElementTypeImpl", declaredAndInstance),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__has_element_type;\n", 0)
-            );
-            code.For(
-                type.GetMethod("IsArrayImpl", declaredAndInstance),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__array;\n", 0)
-            );
-            code.For(
-                type.GetMethod("IsPointerImpl", declaredAndInstance),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__pointer;\n", 0)
-            );
-            code.For(
                 type.GetMethod("GetAttributeFlagsImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__attributes;\n", 0)
             );
             code.For(
                 type.GetMethod("GetConstructorImpl", declaredAndInstance),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_4") + "\treturn a_4->v__length > 0 ? nullptr : a_0->v__default_constructor;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_4") + $@"{'\t'}if (!a_0->v__constructors) std::cerr << ""no constructors: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}t__runtime_constructor_info* p = nullptr;
+{'\t'}a_0->f_each_constructor(a_1, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}auto q = a_x->v__parameters;
+{'\t'}{'\t'}for (size_t i = 0; i < a_4->v__length; ++i, ++q) if (!*q || (*q)->v__parameter_type != a_4->f_data()[i]) return true;
+{'\t'}{'\t'}if (*q) return true;
+{'\t'}{'\t'}p = a_x;
+{'\t'}{'\t'}return false;
+{'\t'}}});
+{'\t'}return p;
+", 0)
             );
             code.For(
                 type.GetMethod("GetMethodImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
 {'\t'}t__runtime_method_info* p = nullptr;
 {'\t'}a_0->f_each_method(a_2, [&](auto a_x)
 {'\t'}{{
@@ -366,7 +441,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("GetPropertyImpl", declaredAndInstance),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__properties) std::cerr << ""no properties: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
 {'\t'}t__runtime_property_info* p = nullptr;
 {'\t'}a_0->f_each_property(a_2, [&](auto a_x)
 {'\t'}{{
@@ -385,6 +461,22 @@ namespace IL2CXX
 {'\t'}}});
 {'\t'}return p;
 ", 0)
+            );
+            code.For(
+                type.GetMethod("GetTypeCodeImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__type_code;\n", 0)
+            );
+            code.For(
+                type.GetMethod("HasElementTypeImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__array || a_0->v__by_ref || a_0->v__pointer;\n", 0)
+            );
+            code.For(
+                type.GetMethod("IsArrayImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__array;\n", 0)
+            );
+            code.For(
+                type.GetMethod("IsPointerImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__pointer;\n", 0)
             );
         });
     }

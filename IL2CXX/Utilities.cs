@@ -31,6 +31,8 @@ namespace IL2CXX
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowInvalidCast() => throw new InvalidCastException();
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowInvalidOperation() => throw new InvalidOperationException();
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowNullReference() => throw new NullReferenceException();
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowNotSupported() => throw new NotSupportedException();

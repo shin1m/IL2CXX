@@ -471,7 +471,10 @@ namespace IL2CXX
         }
         private static readonly Type typeofEcmaField = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaField, System.Reflection.MetadataLoadContext", true);
         private static readonly FieldInfo ecmaFieldHandle = typeofEcmaField.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly Type typeofEcmaParameter = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaFatMethodParameter, System.Reflection.MetadataLoadContext", true);
+        private static readonly FieldInfo ecmaParameterHandle = typeofEcmaParameter.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly PropertyInfo ecmaModulePEReader = typeofEcmaModule.GetProperty("PEReader", BindingFlags.Instance | BindingFlags.NonPublic);
+        // TODO: Work around for ByValTStr bug.
         private int GetSizeConst(FieldInfo field)
         {
             var reader = GetMetadataReader(field.Module);
@@ -487,6 +490,12 @@ namespace IL2CXX
             var size = field.FieldType.StructLayoutAttribute?.Size ?? 0;
             if (size <= 0) size = Marshal.SizeOf(Type.GetType(field.FieldType.ToString(), true));
             return ((PEReader)ecmaModulePEReader.GetValue(field.Module)).GetSectionData(rva).GetContent(0, size);
+        }
+        private IEnumerable<byte> GetDefaultValue(ParameterInfo parameter)
+        {
+            var handle = (ParameterHandle)ecmaParameterHandle.GetValue(parameter);
+            var reader = GetMetadataReader(parameter.Member.Module);
+            return reader.GetBlobContent(reader.GetConstant(reader.GetParameter(handle).GetDefaultValue()).Value);
         }
         private Type GetVirtualThisType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeofSZArrayHelper ? type.GetGenericArguments()[0].MakeArrayType() : type;
         private Type GetThisType(MethodBase method)
@@ -927,25 +936,45 @@ namespace IL2CXX
                 writer.Write(GenerateVirtualCall(GetBaseDefinition((MethodInfo)method), "a_this", arguments.Skip(1), construct));
             }
         }
-        private string GenerateCheck(Type type, string x, string condition, string exception) => $"\tif ({condition} !{x}->f_type()->f_is(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {GenerateThrow(exception)};\n";
+        //private string GenerateCheck(Type type, string x, string condition, string exception) => $"\tif ({condition} !{x}->f_type()->{(type.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {GenerateThrow(exception)};\n";
+        private string GenerateCheck(MethodBase method, Type type, string x, string condition, string exception) => $@"{'\t'}if ({condition} !{x}->f_type()->{(type.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {{
+{'\t'}{'\t'}std::cerr << ""{method.DeclaringType}::[{method}]::[{type} {x}]: "";
+{'\t'}{'\t'}if ({x})
+{'\t'}{'\t'}{'\t'}std::cerr << f__string({x}->f_type()->v__full_name);
+{'\t'}{'\t'}else
+{'\t'}{'\t'}{'\t'}std::cerr << ""null"";
+{'\t'}{'\t'}std::cerr << std::endl;
+{'\t'}{'\t'}{GenerateThrow(exception)};
+{'\t'}}}
+";
         private string GenerateInvokeFunction(MethodBase method)
         {
             using var writer = new StringWriter();
             writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
             var @return = GetReturnType(method);
-            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic)
+            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
             {
                 writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
                 return writer.ToString();
             }
             var parameters = method.GetParameters();
+            /*writer.WriteLine($@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
+{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};");*/
             writer.WriteLine($@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
-{'\t'}if ({(parameters.Length > 0 ? $"parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};");
+{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {{
+{'\t'}{'\t'}std::cerr << ""invalid parameter count for {method.DeclaringType}::[{method}]: "";
+{'\t'}{'\t'}if (parameters)
+{'\t'}{'\t'}{'\t'}std::cerr << parameters->v__length;
+{'\t'}{'\t'}else
+{'\t'}{'\t'}{'\t'}std::cerr << ""null"";
+{'\t'}{'\t'}std::cerr << std::endl;
+{'\t'}{'\t'}{GenerateThrow("TargetParameterCount")};
+{'\t'}}}");
             var arguments = new List<string>();
             var @this = GetVirtualThisType(method.DeclaringType);
             if (!method.IsStatic)
             {
-                writer.Write(GenerateCheck(@this, "a_this", "!a_this ||", "Target"));
+                writer.Write(GenerateCheck(method, @this, "a_this", "!a_this ||", "Target"));
                 arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
             }
             arguments.AddRange(method.GetParameters().Select((x, i) =>
@@ -955,12 +984,12 @@ namespace IL2CXX
                 {
                     if (type.IsValueType)
                     {
-                        writer.Write(GenerateCheck(type, $"p{i}", $"!p{i} ||", "Argument"));
+                        writer.Write(GenerateCheck(method, type, $"p{i}", $"!p{i} ||", "Argument"));
                         return $"static_cast<{Escape(type)}*>(p{i})->v__value";
                     }
                     else
                     {
-                        writer.Write(GenerateCheck(type, $"p{i}", $"p{i} &&", "Argument"));
+                        writer.Write(GenerateCheck(method, type, $"p{i}", $"p{i} &&", "Argument"));
                         return $"p{i}";
                     }
                 }
@@ -976,7 +1005,7 @@ namespace IL2CXX
             using var writer = new StringWriter();
             writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, void** a_parameters) -> t__object*\n{");
             var @return = GetReturnType(method);
-            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic)
+            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
             {
                 writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
                 return writer.ToString();
@@ -986,7 +1015,7 @@ namespace IL2CXX
             var @this = GetVirtualThisType(method.DeclaringType);
             if (!method.IsStatic)
             {
-                writer.Write(GenerateCheck(@this, "a_this", "!a_this ||", "Target"));
+                writer.Write(GenerateCheck(method, @this, "a_this", "!a_this ||", "Target"));
                 arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
             }
             arguments.AddRange(method.GetParameters().Select((x, i) => x.ParameterType.IsValueType ? $"*static_cast<{EscapeForValue(x.ParameterType)}*>(a_parameters[{i}])" : $"a_parameters[{i}]"));

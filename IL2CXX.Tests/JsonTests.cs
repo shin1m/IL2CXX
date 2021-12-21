@@ -37,11 +37,13 @@ namespace IL2CXX.Tests
         public void OneTimeSetUp()
         {
             var type = Type.GetType("System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1,System.Text.Json", true);
+            var typeOfFoo = type.MakeGenericType(typeof(Foo));
             build = Utilities.Build(Run, new[] {
-                type.MakeGenericType(typeof(Foo))
+                typeOfFoo
             }, new[] {
                 type,
-                typeof(Foo)
+                typeof(Foo),
+                typeOfFoo
             });
         }
         [Test]

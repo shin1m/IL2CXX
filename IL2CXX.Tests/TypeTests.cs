@@ -59,6 +59,8 @@ namespace IL2CXX.Tests
             public int W { get; set; }
             public string Do(string x) => $"{X}, {x}!";
             public int Do(int x) => Y + x;
+            public Zot() { }
+            public Zot(string x) => X = x;
         }
         static int GetField()
         {
@@ -81,6 +83,20 @@ namespace IL2CXX.Tests
             if (typeof(Zot).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Length != 2) return 3;
             if (typeof(Zot).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length != 4) return 4;
             if (typeof(Zot).GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 5;
+            return 0;
+        }
+        static int GetConstructor()
+        {
+            var c = typeof(Zot).GetConstructor(new[] { typeof(string) });
+            if (c == null) return 1;
+            return c.Invoke(new[] { "foo" }) is Zot zot && zot.X == "foo" ? 0 : 2;
+        }
+        static int GetConstructors()
+        {
+            if (typeof(Zot).GetConstructors().Length != 2) return 1;
+            if (typeof(Zot).GetConstructors(BindingFlags.Instance | BindingFlags.Public).Length != 2) return 2;
+            if (typeof(Zot).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Length != 0) return 3;
+            if (typeof(Zot).GetConstructors(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 4;
             return 0;
         }
         static int GetMethod()
@@ -132,6 +148,8 @@ namespace IL2CXX.Tests
             nameof(GetField) => GetField(),
             nameof(SetField) => SetField(),
             nameof(GetFields) => GetFields(),
+            nameof(GetConstructor) => GetConstructor(),
+            nameof(GetConstructors) => GetConstructors(),
             nameof(GetMethod) => GetMethod(),
             nameof(GetMethods) => GetMethods(),
             nameof(GetProperty) => GetProperty(),
@@ -160,6 +178,8 @@ namespace IL2CXX.Tests
                 nameof(GetField),
                 nameof(SetField),
                 nameof(GetFields),
+                nameof(GetConstructor),
+                nameof(GetConstructors),
                 nameof(GetMethod),
                 nameof(GetMethods),
                 nameof(GetProperty),

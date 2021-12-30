@@ -45,6 +45,7 @@ namespace IL2CXX
             typeofRuntimeConstructorInfo = get(typeof(RuntimeConstructorInfo));
             typeofRuntimeMethodInfo = get(typeof(RuntimeMethodInfo));
             typeofRuntimePropertyInfo = get(typeof(RuntimePropertyInfo));
+            typeofType = get(typeof(Type));
             typeofRuntimeType = get(typeof(RuntimeType));
             typeofBoolean = get(typeof(bool));
             typeofByte = get(typeof(byte));
@@ -70,6 +71,7 @@ namespace IL2CXX
             typeofDelegate = get(typeof(Delegate));
             typeofMulticastDelegate = get(typeof(MulticastDelegate));
             typeofSafeHandle = get(typeof(SafeHandle));
+            typeofAttribute = get(typeof(Attribute));
             typeofOutAttribute = get(typeof(OutAttribute));
             typeofDllImportAttribute = get(typeof(DllImportAttribute));
             typeofFieldOffsetAttribute = get(typeof(FieldOffsetAttribute));
@@ -95,7 +97,7 @@ namespace IL2CXX
                 [typeofRuntimeMethodInfo] = "t__runtime_method_info",
                 [get(typeof(PropertyInfo))] = "t__property_info",
                 [typeofRuntimePropertyInfo] = "t__runtime_property_info",
-                [get(typeof(Type))] = "t__abstract_type",
+                [typeofType] = "t__abstract_type",
                 [typeofRuntimeType] = "t__type",
                 [get(typeof(CriticalFinalizerObject))] = "t__critical_finalizer_object"
             };

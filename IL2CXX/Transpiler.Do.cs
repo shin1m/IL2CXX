@@ -310,7 +310,7 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                     for (var i = 0; !assemblyIdentifiers.Add(name); ++i) name = $"{escaped}__{i}";
                     assemblyToIdentifier.Add(assembly, name);
                     writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
-                    var entry = method == assembly.EntryPoint && GenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "nullptr";
+                    var entry = method == assembly.EntryPoint && ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "nullptr";
                     writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {entry}}};");
                     var names = assembly.GetManifestResourceNames();
                     if (names.Length > 0)

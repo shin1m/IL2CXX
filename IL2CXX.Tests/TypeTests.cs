@@ -1,4 +1,6 @@
 using System;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 
@@ -51,6 +53,23 @@ namespace IL2CXX.Tests
         }
         static int MakeGenericType() => typeof(Bar<>).MakeGenericType(typeof(Foo)) == typeof(Bar<Foo>) ? 0 : 1;
 
+        enum Answer { Yes, No }
+        class FooAttribute : Attribute
+        {
+            public readonly Answer C0;
+            public readonly string[] C1;
+            public readonly Type C2;
+            public FooAttribute(Answer c0, string[] c1, Type c2)
+            {
+                C0 = c0;
+                C1 = c1;
+                C2 = c2;
+            }
+            public Answer[] N0 { get; set; }
+            public string N1 { get; set; }
+            public Type[] N2 { get; set; }
+        }
+        [Foo(Answer.Yes, new[] { "foo" }, typeof(IFoo), N0 = new[] { Answer.No }, N1 = "bar", N2 = new[] { typeof(Bar) })]
         class Zot
         {
             public string X;
@@ -135,6 +154,62 @@ namespace IL2CXX.Tests
             if (typeof(Zot).GetProperties(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 4;
             return 0;
         }
+        static int GetCustomAttributesData()
+        {
+            var cas = typeof(Zot).GetCustomAttributesData();
+            if (cas.Count != 1) return 1;
+            var ca = cas[0];
+            if (ca.AttributeType != typeof(FooAttribute)) return 2;
+            if (ca.ConstructorArguments.Count != 3) return 3;
+            {
+                var a = ca.ConstructorArguments[0];
+                if (a.ArgumentType != typeof(Answer)) return 4;
+                if (!(a.Value is int x && x == (int)Answer.Yes)) return 5;
+            }
+            {
+                var a = ca.ConstructorArguments[1];
+                if (a.ArgumentType != typeof(string[])) return 6;
+                if (!(a.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (string)xs[0].Value == "foo")) return 7;
+            }
+            {
+                var a = ca.ConstructorArguments[2];
+                if (a.ArgumentType != typeof(Type)) return 8;
+                if (!(a.Value is Type x && x == typeof(IFoo))) return 9;
+            }
+            if (ca.NamedArguments.Count != 3) return 10;
+            {
+                var a = ca.NamedArguments[0];
+                if (a.MemberName != nameof(FooAttribute.N0)) return 11;
+                if (a.TypedValue.ArgumentType != typeof(Answer[])) return 12;
+                if (!(a.TypedValue.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (int)xs[0].Value == (int)Answer.No)) return 13;
+            }
+            {
+                var a = ca.NamedArguments[1];
+                if (a.MemberName != nameof(FooAttribute.N1)) return 14;
+                if (a.TypedValue.ArgumentType != typeof(string)) return 15;
+                if (!(a.TypedValue.Value is string x && x == "bar")) return 16;
+            }
+            {
+                var a = ca.NamedArguments[2];
+                if (a.MemberName != nameof(FooAttribute.N2)) return 17;
+                if (a.TypedValue.ArgumentType != typeof(Type[])) return 18;
+                if (!(a.TypedValue.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (Type)xs[0].Value == typeof(Bar))) return 19;
+            }
+            return 0;
+        }
+        static int GetCustomAttributes()
+        {
+            var cas = typeof(Zot).GetCustomAttributes().ToList();
+            if (cas.Count != 1) return 1;
+            if (!(cas[0] is FooAttribute foo)) return 2;
+            if (foo.C0 != Answer.Yes) return 3;
+            if (!(foo.C1.Length == 1 && foo.C1[0] == "foo")) return 4;
+            if (foo.C2 != typeof(IFoo)) return 5;
+            if (!(foo.N0.Length == 1 && foo.N0[0] == Answer.No)) return 6;
+            if (foo.N1 != "bar") return 7;
+            if (!(foo.N2.Length == 1 && foo.N2[0] == typeof(Bar))) return 8;
+            return 0;
+        }
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -155,6 +230,8 @@ namespace IL2CXX.Tests
             nameof(GetProperty) => GetProperty(),
             nameof(SetProperty) => SetProperty(),
             nameof(GetProperties) => GetProperties(),
+            nameof(GetCustomAttributesData) => GetCustomAttributesData(),
+            nameof(GetCustomAttributes) => GetCustomAttributes(),
             _ => -1
         };
 
@@ -184,7 +261,9 @@ namespace IL2CXX.Tests
                 nameof(GetMethods),
                 nameof(GetProperty),
                 nameof(SetProperty),
-                nameof(GetProperties)
+                nameof(GetProperties),
+                nameof(GetCustomAttributesData),
+                nameof(GetCustomAttributes)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

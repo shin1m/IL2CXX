@@ -369,6 +369,19 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->v__rank;\n", 1)
             );
             code.For(
+                type.GetMethod("GetFlattenedIndex", declaredAndInstance),
+                transpiler => ($@"{'\t'}auto bounds = a_0->f_bounds();
+{'\t'}auto indices = static_cast<int32_t*>(a_1.v__5fpointer.v__5fvalue.v__5fvalue);
+{'\t'}auto n = a_1.v__5flength;
+{'\t'}size_t i = 0;
+{'\t'}for (size_t j = 0; j < n; ++j) {{
+{'\t'}{'\t'}auto& b = a_0->f_bounds()[j];
+{'\t'}{'\t'}i = i * b.v_length + (indices[j] - b.v_lower);
+{'\t'}}}
+{'\t'}return i;
+", 0)
+            );
+            code.For(
                 type.GetMethod("InternalGetValue", declaredAndInstance),
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto element = type->v__element;

@@ -131,6 +131,7 @@ namespace IL2CXX
             public readonly StringWriter Definitions = new();
             public bool HasMethods;
             public bool HasProperties;
+            public string Attributes;
 
             public RuntimeDefinition(Type type) => Type = type;
             protected void Add(MethodInfo method, Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex)
@@ -265,29 +266,92 @@ namespace IL2CXX
             if (type.IsGenericType)
             {
                 var gtd = type.GetGenericTypeDefinition();
-                if (GenerateReflection(gtd))
+                if (ShouldGenerateReflection(gtd))
                 {
                     Enqueue(gtd);
                     foreach (var x in type.GetGenericArguments()) Enqueue(x);
                 }
             }
+            byte[] getBytes(object value) => value switch
+            {
+                byte b => new[] { b },
+                sbyte b => new[] { (byte)b },
+                _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), new[] { value.GetType() }).Invoke(null, new[] { value })
+            };
+            string writeAttributes(MemberInfo member, string name)
+            {
+                var attributes = member.GetCustomAttributesData();
+                if (attributes.Count <= 0) return "t__custom_attribute::v_empty_attributes";
+                string attributeName(int i) => $"v__attributes_{name}__a{i}";
+                string attributeData(CustomAttributeTypedArgument a, string name)
+                {
+                    var type = a.ArgumentType;
+                    if (type == typeofString) return $"const_cast<char16_t*>({ToLiteral((string)a.Value)})";
+                    if (type == typeofType) return $"&t__type_of<{Escape((Type)a.Value)}>::v__instance";
+                    if (type.IsSZArray)
+                    {
+                        var elements = (IReadOnlyCollection<CustomAttributeTypedArgument>)a.Value;
+                        var e = type.GetElementType();
+                        if (e == typeofString)
+                            definition.Definitions.WriteLine($@"static const char16_t* {name}__elements[] = {{{string.Join(", ", elements.Select(x => ToLiteral((string)x.Value)))}}};
+static std::pair<size_t, const char16_t**> {name}__data{{{elements.Count}, {name}__elements}};");
+                        else if (e == typeofType)
+                            definition.Definitions.WriteLine($@"static t__type* {name}__elements[] = {{{string.Join(", ", elements.Select(x => $"&t__type_of<{Escape((Type)x.Value)}>::v__instance"))}}};
+static std::pair<size_t, t__type**> {name}__data{{{elements.Count}, {name}__elements}};");
+                        else
+                            definition.Definitions.WriteLine($@"static uint8_t {name}__elements[] = {{{string.Join(", ", elements.SelectMany(x => getBytes(x.Value)).Select(x => $"0x{x:x02}"))}}};
+static std::pair<size_t, uint8_t*> {name}__data{{{elements.Count}, {name}__elements}};");
+                        return $"&{name}__data";
+                    }
+                    definition.Definitions.WriteLine($"static uint8_t {name}__data[] = {{{string.Join(", ", getBytes(a.Value).Select(x => $"0x{x:x02}"))}}};");
+                    return $"{name}__data";
+                }
+                foreach (var (x, i) in attributes.Select((x, i) => (x, i)))
+                {
+                    Enqueue(x.AttributeType);
+                    var aname = attributeName(i);
+                    var cas = "t__custom_attribute::v_empty_cas";
+                    if (x.ConstructorArguments.Count > 0)
+                    {
+                        cas = $"{aname}__cas";
+                        foreach (var (y, j) in x.ConstructorArguments.Select((x, i) => (x, i))) definition.Definitions.WriteLine($"static t__custom_attribute::t_typed {cas}{j}{{&t__type_of<{Escape(y.ArgumentType)}>::v__instance, {attributeData(y, $"{cas}{j}")}}};");
+                        definition.Definitions.WriteLine($@"static t__custom_attribute::t_typed* {cas}[] = {{
+{string.Join(string.Empty, x.ConstructorArguments.Select((_, i) => $"\t&{cas}{i},\n"))}{'\t'}nullptr
+}};");
+                    }
+                    var nas = "t__custom_attribute::v_empty_nas";
+                    if (x.NamedArguments.Count > 0)
+                    {
+                        nas = $"{aname}__nas";
+                        foreach (var (y, j) in x.NamedArguments.Select((x, i) => (x, i))) definition.Definitions.WriteLine($"static t__custom_attribute::t_named {nas}{j}{{&t__type_of<{Escape(y.TypedValue.ArgumentType)}>::v__instance, {attributeData(y.TypedValue, $"{nas}{j}")}, &v__{(y.IsField ? "field" : "property")}_{Escape(y.MemberInfo.DeclaringType)}__{Escape(y.MemberInfo.Name)}}};");
+                        definition.Definitions.WriteLine($@"static t__custom_attribute::t_named* {nas}[] = {{
+{string.Join(string.Empty, x.NamedArguments.Select((_, i) => $"\t&{nas}{i},\n"))}{'\t'}nullptr
+}};");
+                    }
+                    definition.Definitions.WriteLine($"static t__custom_attribute {aname}{{&v__method_{Escape(x.Constructor)}, {cas}, {nas}}};");
+                }
+                definition.Definitions.WriteLine($@"static t__custom_attribute* v__attributes_{name}[] = {{
+{string.Join(string.Empty, attributes.Select((x, i) => $"\t&{attributeName(i)},\n"))}{'\t'}nullptr
+}};");
+                return $"v__attributes_{name}";
+            }
             string writeParameters(ParameterInfo[] parameters, string name)
             {
                 if (parameters.Length <= 0) return "t__runtime_parameter_info::v__empty_parameters";
                 definition.Definitions.WriteLine();
-                string parameterName(ParameterInfo x) => $"v__parameter_{name}__{Escape(x.Name)}";
+                string parameterName(ParameterInfo x) => $"v__parameter_{name}__{(x.Name == null ? $"p{x.Position}" : Escape(x.Name))}";
                 foreach (var x in parameters)
                 {
                     var pname = parameterName(x);
                     var @default = "nullptr";
-                    if (x.HasDefaultValue)
+                    if (x.HasDefaultValue && x.RawDefaultValue != null)
                     {
                         @default = $"{pname}__default";
-                        definition.Definitions.WriteLine($"uint8_t {@default}[] = {{{string.Join(", ", GetDefaultValue(x).Select(y => $"0x{y:x02}"))}}};");
+                        definition.Definitions.WriteLine($"static uint8_t {@default}[] = {{{string.Join(", ", GetDefaultValue(x).Select(y => $"0x{y:x02}"))}}};");
                     }
-                    definition.Definitions.WriteLine($"t__runtime_parameter_info {pname}{{{(int)x.Attributes}, &t__type_of<{Escape(x.ParameterType)}>::v__instance, {@default}}};");
+                    definition.Definitions.WriteLine($"static t__runtime_parameter_info {pname}{{{(int)x.Attributes}, &t__type_of<{Escape(x.ParameterType)}>::v__instance, {@default}}};");
                 }
-                definition.Definitions.WriteLine($@"t__runtime_parameter_info* v__parameters_{name}[] = {{
+                definition.Definitions.WriteLine($@"static t__runtime_parameter_info* v__parameters_{name}[] = {{
 {string.Join(string.Empty, parameters.Select(x => $"\t&{parameterName(x)},\n"))}{'\t'}nullptr
 }};");
                 return $"v__parameters_{name}";
@@ -356,8 +420,9 @@ struct {Escape(type)}
                 {
                     foreach (var x in fields)
                     {
-                        fieldDeclarations.WriteLine($"extern t__runtime_field_info v__field_{identifier}__{Escape(x.Name)};");
-                        td.Definitions.WriteLine($@"t__runtime_field_info v__field_{identifier}__{Escape(x.Name)}{{&t__type_of<t__runtime_field_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, &t__type_of<{Escape(x.FieldType)}>::v__instance, +[](void* a_this) -> void*
+                        var name = $"field_{identifier}__{Escape(x.Name)}";
+                        fieldDeclarations.WriteLine($"extern t__runtime_field_info v__{name};");
+                        td.Definitions.WriteLine($@"t__runtime_field_info v__{name}{{&t__type_of<t__runtime_field_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {writeAttributes(x, name)}, &t__type_of<{Escape(x.FieldType)}>::v__instance, +[](void* a_this) -> void*
 {{
 {address(x)}}}}};");
                     }
@@ -372,13 +437,7 @@ struct t__static_{identifier}
                         if (x.Attributes.HasFlag(FieldAttributes.Literal) && x.GetRawConstantValue() is object value && value.GetType().IsPrimitive)
                         {
                             fieldDeclarations.WriteLine($"extern uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[];");
-                            var bytes = value switch
-                            {
-                                byte b => new[] { b },
-                                sbyte b => new[] { (byte)b },
-                                _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), new[] { value.GetType() }).Invoke(null, new[] { value })
-                            };
-                            td.Definitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{string.Join(", ", bytes.Select(y => $"0x{y:x02}"))}}};");
+                            td.Definitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{string.Join(", ", getBytes(value).Select(y => $"0x{y:x02}"))}}};");
                         }
                         else if (x.Attributes.HasFlag(FieldAttributes.HasFieldRVA))
                         {
@@ -407,7 +466,7 @@ struct t__static_{identifier}
                     staticDefinitions.WriteLine($@"{'\t'}}}
 }};");
                     staticMembers.WriteLine($"\tt__lazy<t__static_{identifier}> v_{identifier};");
-                    if (GenerateReflection(type))
+                    if (ShouldGenerateReflection(type))
                         writeFields(staticFields, x =>
                             x.Attributes.HasFlag(FieldAttributes.Literal) && (x.GetRawConstantValue()?.GetType().IsPrimitive ?? false) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__literal;\n" :
                             x.Attributes.HasFlag(FieldAttributes.HasFieldRVA) ? $"\treturn v__field_{identifier}__{Escape(x.Name)}__data;\n" :
@@ -422,7 +481,7 @@ struct t__static_{identifier}
                     threadStaticMembers.WriteLine("\tstruct\n\t{");
                     foreach (var x in threadStaticFields) threadStaticMembers.WriteLine($"\t\t{EscapeForRoot(x.FieldType)} {Escape(x)}{{}};");
                     threadStaticMembers.WriteLine($"\t}} v_{identifier};");
-                    if (GenerateReflection(type)) writeFields(threadStaticFields, x => $"\treturn &t_thread_static::v_instance->v_{identifier}.{Escape(x)};\n");
+                    if (ShouldGenerateReflection(type)) writeFields(threadStaticFields, x => $"\treturn &t_thread_static::v_instance->v_{identifier}.{Escape(x)};\n");
                 }
                 var declaration = $"// {type.AssemblyQualifiedName}";
                 if (builtinTypes.TryGetValue(type, out var builtinName))
@@ -712,14 +771,14 @@ struct {Escape(type)}__unmanaged
 {declaration}{@base}
 {{
 {members}}};");
-                    if (GenerateReflection(type))
+                    if (ShouldGenerateReflection(type))
                     {
                         writeFields(fields, x => GenerateCheckNull("a_this") + $@"{'\t'}auto p = {(type.IsValueType ? string.Empty : "*")}static_cast<{EscapeForValue(type)}*>(a_this);
 {'\t'}return &p->{Escape(x)};
 ");
                         fields = fields.Concat(staticFields).Concat(threadStaticFields);
                         if (td.HasFields = fields.Any()) td.Definitions.WriteLine($@"
-t__runtime_field_info* v__fields_{identifier}[] = {{
+static t__runtime_field_info* v__fields_{identifier}[] = {{
 {string.Join(string.Empty, fields.Select(x => $"\t&v__field_{identifier}__{Escape(x.Name)},\n"))}{'\t'}nullptr
 }};");
                         foreach (var x in type.GetConstructors(declaredAndInstance))
@@ -727,7 +786,7 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
                             td.HasConstructors = true;
                             var name = Escape(x);
                             fieldDeclarations.WriteLine($"extern t__runtime_constructor_info v__method_{name};");
-                            definition.Definitions.WriteLine($"t__runtime_constructor_info v__method_{name}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}}};");
+                            definition.Definitions.WriteLine($"t__runtime_constructor_info v__method_{name}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, {writeAttributes(x, name)}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}}};");
                         }
                     }
                 }
@@ -735,7 +794,7 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
                 this.staticMembers.Write(staticMembers);
                 this.threadStaticMembers.Write(threadStaticMembers);
             }
-            if ((definition is InterfaceDefinition || definition is TypeDefinition) && GenerateReflection(type))
+            if ((definition is InterfaceDefinition || definition is TypeDefinition) && ShouldGenerateReflection(type))
             {
                 var identifier = Escape(type);
                 foreach (var x in GetMethods(type))
@@ -743,7 +802,7 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
                     definition.HasMethods = true;
                     var name = Escape(x);
                     fieldDeclarations.WriteLine($"extern t__runtime_method_info v__method_{name};");
-                    definition.Definitions.WriteLine($@"t__runtime_method_info v__method_{name}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}
+                    definition.Definitions.WriteLine($@"t__runtime_method_info v__method_{name}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {writeAttributes(x, name)}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}
 #ifdef __EMSCRIPTEN__
 {'\t'}, {GenerateWASMInvokeFunction(x)}
 #endif
@@ -756,11 +815,12 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
                     fieldDeclarations.WriteLine($"extern t__runtime_property_info {variable};");
                     var get = x.GetMethod;
                     var set = x.SetMethod;
-                    definition.Definitions.WriteLine($"t__runtime_property_info {variable}{{&t__type_of<t__runtime_property_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, &t__type_of<{Escape(x.PropertyType)}>::v__instance, {writeParameters(x.GetIndexParameters(), variable)}, {(get == null ? "nullptr" : $"&v__method_{Escape(get)}")}, {(set == null ? "nullptr" : $"&v__method_{Escape(set)}")}}};");
+                    definition.Definitions.WriteLine($"t__runtime_property_info {variable}{{&t__type_of<t__runtime_property_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, {writeAttributes(x, variable)}, &t__type_of<{Escape(x.PropertyType)}>::v__instance, {writeParameters(x.GetIndexParameters(), variable)}, {(get == null ? "nullptr" : $"&v__method_{Escape(get)}")}, {(set == null ? "nullptr" : $"&v__method_{Escape(set)}")}}};");
                 }
+                definition.Attributes = writeAttributes(type, identifier);
             }
             runtimeDefinitions.Add(definition);
-            if (type.IsEnum && GenerateReflection(type))
+            if (type.IsEnum && ShouldGenerateReflection(type))
                 try
                 {
                     Enqueue(type.MakeArrayType());
@@ -775,7 +835,7 @@ t__runtime_field_info* v__fields_{identifier}[] = {{
             if (type.IsGenericType)
             {
                 var gtd = type.GetGenericTypeDefinition();
-                if (GenerateReflection(gtd))
+                if (ShouldGenerateReflection(gtd))
                 {
                     writerForDefinitions.WriteLine($@"
 t__type* v__generic_arguments_{Escape(type)}[] = {{
@@ -789,17 +849,17 @@ t__type* v__constructed_generic_types_{Escape(type)}[] = {{
             }
             writerForDefinitions.Write(definition.Definitions);
             if ((definition as TypeDefinition)?.HasConstructors ?? false) writerForDefinitions.Write($@"
-t__runtime_constructor_info* v__constructors_{identifier}[] = {{
+static t__runtime_constructor_info* v__constructors_{identifier}[] = {{
 {string.Join(string.Empty, type.GetConstructors(declaredAndInstance).Select(x => $"\t&v__method_{Escape(x)},\n"))}{'\t'}nullptr
 }};
 ");
             if (definition.HasMethods) writerForDefinitions.Write($@"
-t__runtime_method_info* v__methods_{identifier}[] = {{
+static t__runtime_method_info* v__methods_{identifier}[] = {{
 {string.Join(string.Empty, GetMethods(type).Select(x => $"\t&v__method_{Escape(x)},\n"))}{'\t'}nullptr
 }};
 ");
             if (definition.HasProperties) writerForDefinitions.Write($@"
-t__runtime_property_info* v__properties_{identifier}[] = {{
+static t__runtime_property_info* v__properties_{identifier}[] = {{
 {string.Join(string.Empty, GetProperties(type).Select(x => $"\t&{Escape(x)},\n"))}{'\t'}nullptr
 }};
 ");
@@ -879,6 +939,8 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 }};");
             writerForDefinitions.WriteLine($@"}}, &{assembly}, u""{(type.IsGenericParameter ? string.Empty : type.Namespace)}""sv, u""{type.Name}""sv, u""{type.FullName}""sv, u""{type}""sv, {
     (int)type.Attributes
+}, {
+    definition.Attributes ?? "nullptr"
 }, {(
     definition.IsManaged ? "true" : "false"
 )}, {(
@@ -926,14 +988,14 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             if (type.IsGenericType)
             {
                 var gtd = type.GetGenericTypeDefinition();
-                if (GenerateReflection(gtd))
+                if (ShouldGenerateReflection(gtd))
                 {
                     writerForDefinitions.WriteLine($@"{'\t'}v__generic_type_definition = &t__type_of<{Escape(gtd)}>::v__instance;
 {'\t'}v__generic_arguments = v__generic_arguments_{Escape(type)};");
                     if (type.IsGenericTypeDefinition) writerForDefinitions.WriteLine($"\tv__constructed_generic_types = v__constructed_generic_types_{Escape(type)};");
                 }
             }
-            if (GenerateReflection(type))
+            if (ShouldGenerateReflection(type))
             {
                 writerForDefinitions.WriteLine($"\tv__fields = {(td?.HasFields ?? false ? $"v__fields_{identifier}" : "v__empty_fields")};");
                 writerForDefinitions.WriteLine($"\tv__constructors = {(td?.HasConstructors ?? false ? $"v__constructors_{identifier}" : "v__empty_constructors")};");

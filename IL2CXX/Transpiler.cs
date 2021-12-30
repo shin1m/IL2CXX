@@ -139,6 +139,7 @@ namespace IL2CXX
         public readonly bool CheckRange;
         public IEnumerable<Type> Bundle = Enumerable.Empty<Type>();
         public Func<Type, bool> GenerateReflection = _ => false;
+        private bool ShouldGenerateReflection(Type type) => type.IsSubclassOf(typeofAttribute) || GenerateReflection(type);
         private readonly Func<Type, Type> getType;
         public Type TypeOf<T>() => getType(typeof(T));
         public readonly Type typeofObject;
@@ -147,6 +148,7 @@ namespace IL2CXX
         public readonly Type typeofRuntimeConstructorInfo;
         public readonly Type typeofRuntimeMethodInfo;
         public readonly Type typeofRuntimePropertyInfo;
+        public readonly Type typeofType;
         public readonly Type typeofRuntimeType;
         public readonly Type typeofBoolean;
         public readonly Type typeofByte;
@@ -172,6 +174,7 @@ namespace IL2CXX
         public readonly Type typeofDelegate;
         public readonly Type typeofMulticastDelegate;
         public readonly Type typeofSafeHandle;
+        public readonly Type typeofAttribute;
         public readonly Type typeofOutAttribute;
         public readonly Type typeofDllImportAttribute;
         public readonly Type typeofFieldOffsetAttribute;
@@ -904,9 +907,9 @@ namespace IL2CXX
             ['\t'] = "\\t",
             ['\v'] = "\\v"
         };
-        private static void WriteNewString(TextWriter writer, string value)
+        private static void WriteLiteral(TextWriter writer, string value)
         {
-            writer.Write("f__new_string(u\"");
+            writer.Write("u\"");
             foreach (var c in value)
                 if (escapes.TryGetValue(c, out var e))
                     writer.Write(e);
@@ -914,7 +917,20 @@ namespace IL2CXX
                     writer.Write($"\\x{(ushort)c:X}");
                 else
                     writer.Write(c);
-            writer.WriteLine("\"sv)");
+            writer.Write('"');
+        }
+        private static void WriteNewString(TextWriter writer, string value)
+        {
+            writer.Write("f__new_string(");
+            WriteLiteral(writer, value);
+            writer.Write("sv)");
+        }
+        private static string ToLiteral(string value)
+        {
+            if (value == null) return "nullptr";
+            using var writer = new StringWriter();
+            WriteLiteral(writer, value);
+            return writer.ToString();
         }
         private void GenerateInvokeFunction(MethodBase method, IEnumerable<string> arguments, TextWriter writer)
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 
@@ -12,21 +13,38 @@ namespace IL2CXX
                 type.GetProperty(nameof(MemberInfo.DeclaringType)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__declaring_type;\n", 0)
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(MemberInfo.GetCustomAttributes), new[] { get(typeof(bool)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}
-{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(0);
-{'\t'}return p;
-", 0)
+                transpiler =>
+                {
+                    var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
+                    transpiler.Enqueue(method);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, false);\n", 0);
+                }
             );
-            // TODO
             code.For(
                 type.GetMethod(nameof(MemberInfo.GetCustomAttributes), new[] { get(typeof(Type)), get(typeof(bool)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}
-{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(0);
-{'\t'}return p;
-", 0)
+                transpiler =>
+                {
+                    var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
+                    transpiler.Enqueue(method);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 0);
+                }
+            );
+            code.For(
+                type.GetMethod(nameof(MemberInfo.GetCustomAttributesData)),
+                transpiler =>
+                {
+                    var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.Get));
+                    transpiler.Enqueue(method);
+                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__custom_attributes) {{
+{'\t'}{'\t'}std::cerr << ""no custom attributes: "";
+{'\t'}{'\t'}if (a_0->v__declaring_type) std::cerr << f__string(a_0->v__declaring_type->v__full_name) << ""::"";
+{'\t'}{'\t'}std::cerr << '[' << f__string(a_0->{(type == transpiler.typeofRuntimeType ? "v__full_name" : "v__name")}) << ']' << std::endl;
+{'\t'}}}
+{'\t'}return {transpiler.Escape(method)}(a_0);
+", 0);
+                }
             );
             code.For(
                 type.GetProperty(nameof(MemberInfo.Name)).GetMethod,
@@ -89,6 +107,75 @@ namespace IL2CXX
 {'\t'}a_0->v__invoke(p, a_1, a_2, a_3 && a_3->v__length > 0 ? a_3 : nullptr, a_4);
 {'\t'}return p;
 ", 0)
+            );
+        })
+        .For(get(typeof(RuntimeCustomAttributeData)), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(RuntimeCustomAttributeData.Get)),
+                transpiler =>
+                {
+                    string escape(ConstructorInfo x)
+                    {
+                        transpiler.Enqueue(x);
+                        return transpiler.Escape(x);
+                    }
+                    var typeofROC = get(typeof(ReadOnlyCollection<CustomAttributeTypedArgument>));
+                    var typeofCATA = get(typeof(CustomAttributeTypedArgument));
+                    var constructCATA = escape(typeofCATA.GetConstructor(new[] { transpiler.typeofType, transpiler.typeofObject }));
+                    var newCATAs = $"f__new_array<{transpiler.Escape(get(typeof(CustomAttributeTypedArgument[])))}, {transpiler.EscapeForMember(typeofCATA)}>";
+                    var typeofCANA = get(typeof(CustomAttributeNamedArgument));
+                    var typeofCAD = get(typeof(RuntimeCustomAttributeData));
+                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto value = [](auto a) -> t__object*
+{'\t'}{{
+{'\t'}{'\t'}if (a->v_type == &t__type_of<{transpiler.Escape(transpiler.typeofString)}>::v__instance) return a->v_value ? f__new_string(static_cast<const char16_t*>(a->v_value)) : nullptr;
+{'\t'}{'\t'}if (a->v_type == &t__type_of<{transpiler.Escape(transpiler.typeofType)}>::v__instance) return static_cast<t__type*>(a->v_value);
+{'\t'}{'\t'}if (!a->v_type->v__array) return a->v_type->f_box(a->v_value);
+{'\t'}{'\t'}auto e = a->v_type->v__element;
+{'\t'}{'\t'}auto [n, p] = *static_cast<std::pair<size_t, void*>*>(a->v_value);
+{'\t'}{'\t'}auto RECYCLONE__SPILL vs = {newCATAs}(n);
+{'\t'}{'\t'}if (e == &t__type_of<{transpiler.Escape(transpiler.typeofString)}>::v__instance) {{
+{'\t'}{'\t'}{'\t'}auto ss = static_cast<const char16_t**>(p);
+{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) {constructCATA}(&vs->f_data()[i], e, ss[i] ? f__new_string(ss[i]) : nullptr);
+{'\t'}{'\t'}}} else if (e == &t__type_of<{transpiler.Escape(transpiler.typeofType)}>::v__instance) {{
+{'\t'}{'\t'}{'\t'}auto ts = static_cast<t__type**>(p);
+{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) {constructCATA}(&vs->f_data()[i], e, ts[i]);
+{'\t'}{'\t'}}} else {{
+{'\t'}{'\t'}{'\t'}auto ps = static_cast<uint8_t*>(p);
+{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < n; ++i, ps += e->v__size) {constructCATA}(&vs->f_data()[i], e, e->f_box(ps));
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}auto RECYCLONE__SPILL roc = f__new_zerod<{transpiler.Escape(typeofROC)}>();
+{'\t'}{'\t'}{escape(typeofROC.GetConstructors()[0])}(roc, vs);
+{'\t'}{'\t'}return roc;
+{'\t'}}};
+{'\t'}size_t n = 0;
+{'\t'}if (auto p = a_0->v__custom_attributes) for (; *p; ++p) ++n;
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(CustomAttributeData[])))}, {transpiler.Escape(get(typeof(CustomAttributeData)))}>(n);
+{'\t'}for (size_t i = 0; i < n; ++i) {{
+{'\t'}{'\t'}auto ca = a_0->v__custom_attributes[i];
+{'\t'}{'\t'}size_t ncas = 0;
+{'\t'}{'\t'}if (auto p = ca->v_constructor_arguments) for (; *p; ++p) ++ncas;
+{'\t'}{'\t'}auto RECYCLONE__SPILL cas = {newCATAs}(ncas);
+{'\t'}{'\t'}for (size_t i = 0; i < ncas; ++i) {{
+{'\t'}{'\t'}{'\t'}auto a = ca->v_constructor_arguments[i];
+{'\t'}{'\t'}{'\t'}{constructCATA}(&cas->f_data()[i], a->v_type, value(a));
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}size_t nnas = 0;
+{'\t'}{'\t'}if (auto p = ca->v_named_arguments) for (; *p; ++p) ++nnas;
+{'\t'}{'\t'}auto RECYCLONE__SPILL nas = f__new_array<{transpiler.Escape(get(typeof(CustomAttributeNamedArgument[])))}, {transpiler.Escape(typeofCANA)}>(nnas);
+{'\t'}{'\t'}for (size_t i = 0; i < nnas; ++i) {{
+{'\t'}{'\t'}{'\t'}auto a = ca->v_named_arguments[i];
+{'\t'}{'\t'}{'\t'}{transpiler.EscapeForStacked(typeofCATA)} ta{{}};
+{'\t'}{'\t'}{'\t'}{constructCATA}(&ta, a->v_type, value(a));
+{'\t'}{'\t'}{'\t'}{escape(typeofCANA.GetConstructor(new[] { get(typeof(MemberInfo)), typeofCATA }))}(&nas->f_data()[i], a->v_member, ta);
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}auto RECYCLONE__SPILL cad = f__new_zerod<{transpiler.Escape(typeofCAD)}>();
+{'\t'}{'\t'}{escape(typeofCAD.GetConstructors()[0])}(cad, ca->v_constructor, cas, nas);
+{'\t'}{'\t'}p->f_data()[i] = cad;
+{'\t'}}}
+{'\t'}return p;
+", 0);
+                }
             );
         })
         .For(get(typeof(RuntimeFieldInfo)), (type, code) =>

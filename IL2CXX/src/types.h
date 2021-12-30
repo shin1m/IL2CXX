@@ -49,13 +49,16 @@ struct t__thread : t__critical_finalizer_object
 	}
 };
 
+struct t__custom_attribute;
+
 struct t__member_info : t__object
 {
 	t__type* v__declaring_type;
 	std::u16string_view v__name;
 	int32_t v__attributes;
+	t__custom_attribute* const* v__custom_attributes = nullptr;
 
-	t__member_info(t__type* a_type, t__type* a_declaring_type = nullptr, std::u16string_view a_name = {}, int32_t a_attributes = 0);
+	t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes);
 };
 
 struct t__field_info : t__member_info
@@ -67,7 +70,7 @@ struct t__runtime_field_info : t__field_info
 {
 	t__type* v__field_type;
 
-	t__runtime_field_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_field_type, void*(*a_address)(void*)) : t__field_info(a_type, a_declaring_type, a_name, a_attributes), v__field_type(a_field_type), f_address(a_address)
+	t__runtime_field_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__type* a_field_type, void*(*a_address)(void*)) : t__field_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes), v__field_type(a_field_type), f_address(a_address)
 	{
 	}
 	void* (*f_address)(void*);
@@ -87,7 +90,7 @@ struct t__method_base : t__member_info
 	t__runtime_parameter_info* const* v__parameters;
 	t__object*(*v__invoke)(t__object*, int32_t, t__object*, t__object*, t__object*);
 
-	t__method_base(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*)) : t__member_info(a_type, a_declaring_type, a_name, a_attributes), v__parameters(a_parameters), v__invoke(a_invoke)
+	t__method_base(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*)) : t__member_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes), v__parameters(a_parameters), v__invoke(a_invoke)
 	{
 	}
 };
@@ -112,7 +115,7 @@ struct t__runtime_method_info : t__method_info
 #ifdef __EMSCRIPTEN__
 	t__object*(*v__wasm_invoke)(t__object*, void**);
 
-	t__runtime_method_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), t__object*(*a_wasm_invoke)(t__object*, void**)) : t__method_info(a_type, a_declaring_type, a_name, a_attributes, a_parameters, a_invoke), v__wasm_invoke(a_wasm_invoke)
+	t__runtime_method_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), t__object*(*a_wasm_invoke)(t__object*, void**)) : t__method_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__wasm_invoke(a_wasm_invoke)
 	{
 	}
 #else
@@ -132,7 +135,7 @@ struct t__runtime_property_info : t__property_info
 	t__runtime_method_info* v__get;
 	t__runtime_method_info* v__set;
 
-	t__runtime_property_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__type* a_property_type, t__runtime_parameter_info* const* a_parameters, t__runtime_method_info* a_get, t__runtime_method_info* a_set) : t__property_info(a_type, a_declaring_type, a_name, a_attributes), v__property_type(a_property_type), v__parameters(a_parameters), v__get(a_get), v__set(a_set)
+	t__runtime_property_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__type* a_property_type, t__runtime_parameter_info* const* a_parameters, t__runtime_method_info* a_get, t__runtime_method_info* a_set) : t__property_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes), v__property_type(a_property_type), v__parameters(a_parameters), v__get(a_get), v__set(a_set)
 	{
 	}
 };
@@ -214,10 +217,11 @@ struct t__type : t__abstract_type
 		t__runtime_assembly* a_assembly,
 		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
 		int32_t a_attribute_flags,
+		t__custom_attribute* const* a_custom_attributes,
 		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_by_ref, bool a_pointer, bool a_by_ref_like, bool a_generic_type,
 		size_t a_size,
 		t__type* a_szarray
-	) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags), v__base(a_base),
+	) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags, a_custom_attributes), v__base(a_base),
 	v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
@@ -399,7 +403,28 @@ struct t__type : t__abstract_type
 	}
 };
 
-inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes) : t__object(-1), v__declaring_type(a_declaring_type), v__name(a_name), v__attributes(a_attributes)
+struct t__custom_attribute
+{
+	struct t_typed
+	{
+		t__type* v_type;
+		void* v_value;
+	};
+	struct t_named : t_typed
+	{
+		t__member_info* v_member;
+	};
+
+	static constexpr t__custom_attribute* v_empty_attributes[] = {nullptr};
+	static constexpr t_typed* v_empty_cas[] = {nullptr};
+	static constexpr t_named* v_empty_nas[] = {nullptr};
+
+	t__runtime_constructor_info* v_constructor;
+	t_typed* const* v_constructor_arguments;
+	t_named* const* v_named_arguments;
+};
+
+inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes) : t__object(-1), v__declaring_type(a_declaring_type), v__name(a_name), v__attributes(a_attributes), v__custom_attributes(a_custom_attributes)
 {
 	t__type::f_be(this, a_type);
 }

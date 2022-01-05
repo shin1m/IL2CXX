@@ -11,7 +11,7 @@ There are a lot of missing pieces in .NET runtime support as they are implemente
 * .NET 6
 * C++17 or later
 
-Currently, it is built and tested only by using GCC 11.x on Linux x86-64.
+Currently, it is built and tested only on Linux x86-64.
 
 # How to
 
@@ -79,7 +79,7 @@ I think it is possible to change the cycle collection to finish early leaving th
 
 The MIT License (MIT)
 
-Copyright (c) 2021 Shin-ichi MORITA
+Copyright (c) 2021-2022 Shin-ichi MORITA
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

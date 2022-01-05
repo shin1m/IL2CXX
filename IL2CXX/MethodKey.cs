@@ -23,7 +23,10 @@ namespace IL2CXX
             );
         }
         // TODO: Work around for equality bug.
-        public static bool operator ==(MethodKey x, MethodKey y) => x.Method == y.Method && x.Method.Name == y.Method.Name;
+        //public static bool operator ==(MethodKey x, MethodKey y) => x.Method == y.Method;
+        public static bool operator ==(MethodKey x, MethodKey y) => x.Method.DeclaringType.IsArray && (x.Method.Name == "Get" || x.Method.Name == "Set" || x.Method.Name == "Address")
+            ? x.Method.DeclaringType == y.Method.DeclaringType && x.Method.Name == y.Method.Name
+            : x.Method == y.Method;
         public static bool operator !=(MethodKey x, MethodKey y) => !(x == y);
         public bool Equals(MethodKey x) => this == x;
         public override bool Equals(object x) => x is MethodKey y && this == y;

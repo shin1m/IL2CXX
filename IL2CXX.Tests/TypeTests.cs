@@ -210,6 +210,7 @@ namespace IL2CXX.Tests
             if (!(foo.N2.Length == 1 && foo.N2[0] == typeof(Bar))) return 8;
             return 0;
         }
+        static int GetCustomAttributesOfT() => typeof(Zot).GetCustomAttributes<FooAttribute>().Count() == 1 ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -232,6 +233,7 @@ namespace IL2CXX.Tests
             nameof(GetProperties) => GetProperties(),
             nameof(GetCustomAttributesData) => GetCustomAttributesData(),
             nameof(GetCustomAttributes) => GetCustomAttributes(),
+            nameof(GetCustomAttributesOfT) => GetCustomAttributesOfT(),
             _ => -1
         };
 
@@ -263,7 +265,8 @@ namespace IL2CXX.Tests
                 nameof(SetProperty),
                 nameof(GetProperties),
                 nameof(GetCustomAttributesData),
-                nameof(GetCustomAttributes)
+                nameof(GetCustomAttributes),
+                nameof(GetCustomAttributesOfT)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

@@ -286,11 +286,20 @@ struct t__type : t__abstract_type
 		} while (p);
 		return false;
 	}
+	bool f_value_assignable_to(t__type* a_type) const
+	{
+		return this == a_type || !a_type->v__enum && this == a_type->v__underlying;
+	}
+	bool f_array_assignable_to(t__type* a_type) const
+	{
+		return v__array && v__rank == a_type->v__rank && v__element->f_is(a_type->v__element);
+	}
 	void** f_implementation(t__type* a_interface) const
 	{
 		auto i = v__interface_to_methods.find(a_interface);
 		return i == v__interface_to_methods.end() ? nullptr : i->second.first;
 	}
+	bool f_assignable_to(t__type* a_type) const;
 	t__object* f_new_zerod();
 	static constexpr int32_t bf_declared_only = 2;
 	static constexpr int32_t bf_instance = 4;

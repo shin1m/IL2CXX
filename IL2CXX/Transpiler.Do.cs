@@ -208,7 +208,7 @@ inline {returns}
                             case ExceptionHandlingClauseOptions.Clause:
                                 writer.WriteLine($@"// catch {clause.CatchType}
 }} catch (t__object* e) {{
-{'\t'}if (!(e && e->f_type()->{(clause.CatchType.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(clause.CatchType)}>::v__instance))) throw;
+{'\t'}if (!e->f_type()->f_is(&t__type_of<{Escape(clause.CatchType)}>::v__instance)) throw;
 {'\t'}{s.Variable} = e;
 {'\t'}f_epoch_point();");
                                 break;

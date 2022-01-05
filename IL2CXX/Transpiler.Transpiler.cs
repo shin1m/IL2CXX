@@ -873,7 +873,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(t)}>::v__instance)) {GenerateThrow("InvalidCast")};");
+                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) {GenerateThrow("InvalidCast")};");
                     return index;
                 };
             });
@@ -889,7 +889,7 @@ namespace IL2CXX
                     var t = ParseType(ref index);
                     var after = indexToStack[index];
                     Trace.Assert(after.Variable == stack.Variable);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(t)}>::v__instance)) {after.Variable} = nullptr;");
+                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) {after.Variable} = nullptr;");
                     return index;
                 };
             });
@@ -906,7 +906,7 @@ namespace IL2CXX
                     Trace.Assert(t.IsValueType);
                     writer.WriteLine($" {t}");
                     GenerateCheckNull(stack);
-                    writer.WriteLine($@"{'\t'}if (!{stack.Variable}->f_type()->f_is(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] {GenerateThrow("InvalidCast")};
+                    writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type() != &t__type_of<{Escape(t)}>::v__instance) [[unlikely]] {GenerateThrow("InvalidCast")};
 {'\t'}{indexToStack[index].Variable} = &static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
                     return index;
                 };
@@ -1245,7 +1245,7 @@ namespace IL2CXX
                     {
                         GenerateCheckNull(stack);
                         var after = indexToStack[index];
-                        writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type()->f_is(&t__type_of<{Escape(t)}>::v__instance))
+                        writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type() == &t__type_of<{Escape(t)}>::v__instance)
 {'\t'}{'\t'}{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
                         if (t.IsPrimitive && t != typeofSingle && t != typeofDouble)
                             writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->v__enum)
@@ -1267,7 +1267,7 @@ namespace IL2CXX
                     }
                     else
                     {
-                        writer.WriteLine($"\tif ({stack.Variable} && !{stack.Variable}->f_type()->{(t.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(t)}>::v__instance)) [[unlikely]] {GenerateThrow("InvalidCast")};");
+                        writer.WriteLine($"\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) [[unlikely]] {GenerateThrow("InvalidCast")};");
                     }
                     return index;
                 };

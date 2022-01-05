@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 
 namespace IL2CXX
@@ -119,36 +120,25 @@ namespace IL2CXX
     public class RuntimeCustomAttributeData : CustomAttributeData
     {
         public static IList<CustomAttributeData> Get(MemberInfo member) => throw new NotImplementedException();
-        public static object[] GetAttributes(MemberInfo member, bool inherit)
+        public static object[] GetAttributes(MemberInfo member, Type attributeType, bool inherit)
         {
-            var data = member.GetCustomAttributesData();
+            IEnumerable<CustomAttributeData> get(MemberInfo m) => m.GetCustomAttributesData().Where(x => attributeType.IsAssignableFrom(x.AttributeType));
+            var data = get(member);
             if (inherit)
                 switch (member)
                 {
                     case Type t:
-                        {
-                            var xs = new List<CustomAttributeData>(data);
-                            for (t = t.BaseType; t != null; t = t.BaseType) xs.AddRange(t.GetCustomAttributesData());
-                            data = xs;
-                        }
+                        for (t = t.BaseType; t != null; t = t.BaseType) data = data.Concat(get(t));
                         break;
                     case MethodInfo m:
+                        for (var bd = m.GetBaseDefinition(); m != bd;)
                         {
-                            var bd = m.GetBaseDefinition();
-                            if (bd != m)
-                            {
-                                var xs = new List<CustomAttributeData>(data);
-                                do
-                                {
-                                    m = Array.Find(m.DeclaringType.BaseType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), x => x.GetBaseDefinition() == bd);
-                                    xs.AddRange(m.GetCustomAttributesData());
-                                }
-                                while (m != bd);
-                                data = xs;
-                            }
+                            m = Array.Find(m.DeclaringType.BaseType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), x => x.GetBaseDefinition() == bd);
+                            data = data.Concat(get(m));
                         }
                         break;
                 }
+            var cads = data.ToList();
             object value(CustomAttributeTypedArgument x)
             {
                 var type = x.ArgumentType;
@@ -163,10 +153,10 @@ namespace IL2CXX
                     for (var i = 0; i < ys.Length; ++i) ys.SetValue(xs[i].Value, i);
                 return ys;
             }
-            var attributes = new Attribute[data.Count];
-            for (var i = 0; i < attributes.Length; ++i)
+            var attributes = Array.CreateInstance(attributeType, cads.Count);
+            for (var i = 0; i < cads.Count; ++i)
             {
-                var cad = data[i];
+                var cad = cads[i];
                 var cas = new object[cad.ConstructorArguments.Count];
                 for (var j = 0; j < cas.Length; ++j) cas[j] = value(cad.ConstructorArguments[j]);
                 var a = cad.Constructor.Invoke(cas);
@@ -175,9 +165,9 @@ namespace IL2CXX
                         f.SetValue(a, value(x.TypedValue));
                     else
                         ((PropertyInfo)x.MemberInfo).SetValue(a, value(x.TypedValue));
-                attributes[i] = (Attribute)a;
+                attributes.SetValue(a, i);
             }
-            return attributes;
+            return (object[])attributes;
         }
 
         public RuntimeCustomAttributeData(ConstructorInfo constructor, IList<CustomAttributeTypedArgument> constructorArguments, IList<CustomAttributeNamedArgument> namedArguments)

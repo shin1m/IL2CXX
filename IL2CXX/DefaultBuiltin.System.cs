@@ -108,7 +108,7 @@ namespace IL2CXX
                 (transpiler, actual) =>
                 {
                     var identifier = transpiler.Escape(actual);
-                    return ($"\treturn a_1 && a_1->f_type()->f_is(&t__type_of<{identifier}>::v__instance) && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({identifier})) == 0;\n", 1);
+                    return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({identifier})) == 0;\n", 1);
                 }
             );
         })
@@ -335,13 +335,14 @@ namespace IL2CXX
                 {
                     var array = transpiler.Escape(get(typeof(Array)));
                     return (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
-{'\t'}auto element = static_cast<t__type*>(a_0);
-{'\t'}auto n = element->v__size * a_1;
+{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__szarray) throw std::runtime_error(""no szarray: "" + f__string(type->v__full_name));
+{'\t'}auto n = type->v__size * a_1;
 {'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + n));
 {'\t'}p->v__length = a_1;
 {'\t'}p->f_bounds()[0] = {{static_cast<size_t>(a_1), 0}};
 {'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
-{'\t'}element->v__szarray->f_finish(p);
+{'\t'}type->v__szarray->f_finish(p);
 {'\t'}return p;
 ", 0);
                 }
@@ -397,7 +398,7 @@ namespace IL2CXX
 {'\t'}if (!a_1) {{
 {'\t'}{'\t'}element->f_clear(value, 1);
 {'\t'}}} else {{
-{'\t'}{'\t'}if (!a_1->f_type()->f_is(element) && !a_1->f_type()->f_implementation(element)) throw std::runtime_error(""InvalidCastException"");
+{'\t'}{'\t'}if (!a_1->f_type()->f_assignable_to(element)) {transpiler.GenerateThrow("InvalidCast")};
 {'\t'}{'\t'}element->f_copy(element->f_unbox(const_cast<t__object*&>(a_1)), 1, value);
 {'\t'}}}
 ", 0)

@@ -188,7 +188,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("ObjectHasComponentSize", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}auto type = a_0->f_type();
-{'\t'}return type == &t__type_of<{transpiler.Escape(get(typeof(string)))}>::v__instance || type->f_is(&t__type_of<{transpiler.Escape(get(typeof(Array)))}>::v__instance);
+{'\t'}return type == &t__type_of<{transpiler.Escape(get(typeof(string)))}>::v__instance || type->v__array;
 ", 1)
             );
         })

@@ -820,7 +820,7 @@ static t__runtime_field_info* v__fields_{identifier}[] = {{
                 definition.Attributes = writeAttributes(type, identifier);
             }
             runtimeDefinitions.Add(definition);
-            if (type.IsEnum && ShouldGenerateReflection(type))
+            if (type.IsEnum && ShouldGenerateReflection(type) || typeofAttribute.IsAssignableFrom(type))
                 try
                 {
                     Enqueue(type.MakeArrayType());
@@ -928,12 +928,11 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                 td = null;
             }
             var szarray = "nullptr";
-            if (!type.IsArray)
-                try
-                {
-                    var sza = type.MakeArrayType();
-                    if (typeToRuntime.ContainsKey(sza)) szarray = $"&t__type_of<{Escape(sza)}>::v__instance";
-                } catch { }
+            try
+            {
+                var sza = type.MakeArrayType();
+                if (typeToRuntime.ContainsKey(sza)) szarray = $"&t__type_of<{Escape(sza)}>::v__instance";
+            } catch { }
             writerForDeclarations.WriteLine($@"{'\t'}t__type_of();
 {'\t'}static t__type_of v__instance;
 }};");

@@ -952,8 +952,13 @@ namespace IL2CXX
                 writer.Write(GenerateVirtualCall(GetBaseDefinition((MethodInfo)method), "a_this", arguments.Skip(1), construct));
             }
         }
-        //private string GenerateCheck(Type type, string x, string condition, string exception) => $"\tif ({condition} !{x}->f_type()->{(type.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {GenerateThrow(exception)};\n";
-        private string GenerateCheck(MethodBase method, Type type, string x, string condition, string exception) => $@"{'\t'}if ({condition} !{x}->f_type()->{(type.IsInterface ? "f_implementation" : "f_is")}(&t__type_of<{Escape(type)}>::v__instance)) [[unlikely]] {{
+        private string GenerateIsAssignableTo(string x, Type t) => $@"{x}->f_type()->{(
+            t.IsValueType ? "f_value_assignable_to" :
+            t.IsArray ? "f_array_assignable_to" :
+            t.IsInterface ? "f_implementation" : "f_is"
+        )}(&t__type_of<{Escape(t)}>::v__instance)";
+        //private string GenerateCheck(Type type, string x, string condition, string exception) => $"\tif ({condition} !{GenerateIsAssignableTo(x, type)}) [[unlikely]] {GenerateThrow(exception)};\n";
+        private string GenerateCheck(MethodBase method, Type type, string x, string condition, string exception) => $@"{'\t'}if ({condition} !{GenerateIsAssignableTo(x, type)}) [[unlikely]] {{
 {'\t'}{'\t'}std::cerr << ""{method.DeclaringType}::[{method}]::[{type} {x}]: "";
 {'\t'}{'\t'}if ({x})
 {'\t'}{'\t'}{'\t'}std::cerr << f__string({x}->f_type()->v__full_name);
@@ -968,9 +973,9 @@ namespace IL2CXX
             using var writer = new StringWriter();
             writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
             var @return = GetReturnType(method);
-            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
+            if (@return.IsByRef || @return.IsPointer || method is ConstructorInfo && method.DeclaringType.IsArray || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
             {
-                writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
+                writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
                 return writer.ToString();
             }
             var parameters = method.GetParameters();
@@ -1023,7 +1028,7 @@ namespace IL2CXX
             var @return = GetReturnType(method);
             if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
             {
-                writer.WriteLine($"\t{GenerateThrow("NotSupported")};\n}}");
+                writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
                 return writer.ToString();
             }
             var parameters = method.GetParameters();

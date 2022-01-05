@@ -95,6 +95,15 @@ void t__type::f_do_destroy_unmanaged_blittable(void* a_p)
 {
 }
 
+bool t__type::f_assignable_to(t__type* a_type) const
+{
+	if (a_type->v__value_type) return f_value_assignable_to(a_type);
+	if (a_type->v__array) return f_array_assignable_to(a_type);
+	constexpr int32_t ta_class_semantics_mask = 32;
+	constexpr int32_t ta_interface = 32;
+	return (v__attributes & ta_class_semantics_mask) == ta_interface ? static_cast<bool>(f_implementation(a_type)) : f_is(a_type);
+}
+
 t__object* t__type::f_new_zerod()
 {
 	auto p = f_engine()->f_allocate(v__managed_size);

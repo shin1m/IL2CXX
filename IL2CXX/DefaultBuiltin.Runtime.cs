@@ -19,7 +19,7 @@ namespace IL2CXX
                 {
                     var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
                     transpiler.Enqueue(method);
-                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, false);\n", 0);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, &t__type_of<{transpiler.Escape(transpiler.typeofAttribute)}>::v__instance, a_1);\n", 0);
                 }
             );
             code.For(
@@ -28,7 +28,7 @@ namespace IL2CXX
                 {
                     var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
                     transpiler.Enqueue(method);
-                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 0);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, a_1, a_2);\n", 0);
                 }
             );
             code.For(
@@ -103,10 +103,37 @@ namespace IL2CXX
             SetupMethodBase(get, type, code);
             code.For(
                 type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto p = a_0->v__declaring_type->f_new_zerod();
+                transpiler =>
+                {
+                    var typeofInt32 = $"t__type_of<{transpiler.Escape(transpiler.typeofInt32)}>::v__instance";
+                    var array = transpiler.Escape(get(typeof(Array)));
+                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto type = a_0->v__declaring_type;
+{'\t'}if (type->v__array) {{
+{'\t'}{'\t'}if (!a_3 || a_3->v__length != type->v__rank) [[unlikely]] {transpiler.GenerateThrow("TargetParameterCount")};
+{'\t'}{'\t'}size_t length = 0;
+{'\t'}{'\t'}for (size_t i = 0; i < type->v__rank; ++i) {{
+{'\t'}{'\t'}{'\t'}t__object* p = a_3->f_data()[i];
+{'\t'}{'\t'}{'\t'}if (!p || p->f_type() != &{typeofInt32}) {transpiler.GenerateThrow("Argument")};
+{'\t'}{'\t'}{'\t'}auto n = *static_cast<int32_t*>({typeofInt32}.f_unbox(p));
+{(transpiler.CheckRange ? $"\t\t\tif (n < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty)}{'\t'}{'\t'}{'\t'}length += n;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound) * type->v__rank;
+{'\t'}{'\t'}auto n = type->v__element->v__size * length;
+{'\t'}{'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + n));
+{'\t'}{'\t'}p->v__length = length;
+{'\t'}{'\t'}for (size_t i = 0; i < type->v__rank; ++i) {{
+{'\t'}{'\t'}{'\t'}t__object* q = a_3->f_data()[i];
+{'\t'}{'\t'}{'\t'}p->f_bounds()[i] = {{static_cast<size_t>(*static_cast<int32_t*>({typeofInt32}.f_unbox(q))), 0}};
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
+{'\t'}{'\t'}type->f_finish(p);
+{'\t'}{'\t'}return p;
+{'\t'}}}
+{'\t'}auto p = type->f_new_zerod();
 {'\t'}a_0->v__invoke(p, a_1, a_2, a_3 && a_3->v__length > 0 ? a_3 : nullptr, a_4);
 {'\t'}return p;
-", 0)
+", 0);
+                }
             );
         })
         .For(get(typeof(RuntimeCustomAttributeData)), (type, code) =>
@@ -198,7 +225,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(FieldInfo.SetValue), new[] { get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CultureInfo)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_1 && !a_1->f_type()->f_is(a_0->v__declaring_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
-{'\t'}if (a_2 && !a_2->f_type()->f_is(a_0->v__field_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
+{'\t'}if (a_2 && !a_2->f_type()->f_assignable_to(a_0->v__field_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}a_0->v__field_type->f_copy(a_0->v__field_type->f_unbox(const_cast<t__object*&>(a_2)), 1, a_0->f_address(a_0->v__declaring_type->f_unbox(const_cast<t__object*&>(a_1))));
 ", 0)
             );
@@ -428,10 +455,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.IsAssignableFrom)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_1) return false;
-{'\t'}auto p = static_cast<t__type*>(a_1);
-{'\t'}return p->f_is(a_0) || p->f_implementation(a_0) || !a_0->v__enum && a_0->v__underlying == p;
-", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_1 && static_cast<t__type*>(a_1)->f_assignable_to(a_0);\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.IsByRefLike)).GetMethod,

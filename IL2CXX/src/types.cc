@@ -95,13 +95,68 @@ void t__type::f_do_destroy_unmanaged_blittable(void* a_p)
 {
 }
 
+bool t__type::f_is(t__type* a_type) const
+{
+	auto p = this;
+	do {
+		if (p == a_type) return true;
+		p = p->v__base;
+	} while (p);
+	return false;
+}
+
+bool t__type::f_assignable_to_variant(t__type* a_type) const
+{
+	assert(a_type->v__generic_type_definition);
+	if (v__generic_type_definition != a_type->v__generic_type_definition) return false;
+	constexpr int32_t gpa_covariant = 1;
+	constexpr int32_t gpa_contravariant = 2;
+	constexpr int32_t gpa_variance_mask = 3;
+	for (auto a = a_type->v__generic_type_definition->v__generic_arguments, a0 = v__generic_arguments, a1 = a_type->v__generic_arguments; *a; ++a, ++a0, ++a1) {
+		if (*a0 == *a1) continue;
+		if ((*a0)->v__value_type || (*a1)->v__value_type) return false;
+		switch ((*a)->v__generic_parameter_attributes & gpa_variance_mask) {
+		case gpa_covariant:
+			if ((*a0)->f_assignable_to(*a1)) continue;
+			break;
+		case gpa_contravariant:
+			if ((*a1)->f_assignable_to(*a0)) continue;
+			break;
+		}
+		return false;
+	}
+	return true;
+}
+
+const std::pair<void**, void**>* t__type::f_implementation(t__type* a_interface) const
+{
+	auto i = v__interface_to_methods.find(a_interface);
+	if (i != v__interface_to_methods.end()) return &i->second;
+	if (a_interface->v__generic_type_definition)
+		for (auto p = v__interfaces; *p; ++p)
+			if ((*p)->f_assignable_to_variant(a_interface)) return &v__interface_to_methods.at(*p);
+	return nullptr;
+}
+
+bool t__type::f_assignable_to_variant_interface(t__type* a_type) const
+{
+	assert(a_type->v__generic_type_definition);
+	auto p = this;
+	do {
+		if (p == a_type || f_assignable_to_variant(a_type)) return true;
+		p = p->v__base;
+	} while (p);
+	return f_implementation(a_type);
+}
+
 bool t__type::f_assignable_to(t__type* a_type) const
 {
-	if (a_type->v__value_type) return f_value_assignable_to(a_type);
-	if (a_type->v__array) return f_array_assignable_to(a_type);
+	if (a_type->v__value_type) return f_assignable_to_value(a_type);
+	if (a_type->v__array) return f_assignable_to_array(a_type);
 	constexpr int32_t ta_class_semantics_mask = 32;
 	constexpr int32_t ta_interface = 32;
-	return (v__attributes & ta_class_semantics_mask) == ta_interface ? static_cast<bool>(f_implementation(a_type)) : f_is(a_type);
+	if ((a_type->v__attributes & ta_class_semantics_mask) == ta_interface) return a_type->v__generic_type_definition ? f_assignable_to_variant_interface(a_type) : f_assignable_to_interface(a_type);
+	return a_type->v__multicast_invoke && a_type->v__generic_type_definition && f_assignable_to_variant(a_type) || f_is(a_type);
 }
 
 t__object* t__type::f_new_zerod()

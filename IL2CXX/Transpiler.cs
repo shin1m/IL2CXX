@@ -194,7 +194,7 @@ namespace IL2CXX
         private readonly MethodInfo finalizeOfObject;
         private readonly Instruction[] instructions1 = new Instruction[256];
         private readonly Instruction[] instructions2 = new Instruction[256];
-        private readonly Dictionary<string, Type> genericParameters = new();
+        private readonly Dictionary<(string, GenericParameterAttributes), Type> genericParameters = new();
         private readonly HashSet<string> identifiers = new();
         private readonly Dictionary<Type, string> typeToIdentifier = new();
         private readonly Dictionary<MethodKey, string> methodToIdentifier = new();
@@ -207,6 +207,14 @@ namespace IL2CXX
         {
             var t = type.GetElementType();
             return t == typeofTypedReferenceTag ? typeofTypedReference : t;
+        }
+        private Type[] GetInterfaces(Type type)
+        {
+            var interfaces = type.GetInterfaces();
+            if (!type.IsSZArray) return interfaces;
+            // TODO: Work around for szarray bug.
+            var roc = getType(typeof(IReadOnlyCollection<>)).MakeGenericType(new[] { GetElementType(type) });
+            return interfaces.Contains(roc) ? interfaces : interfaces.Append(roc).ToArray();
         }
         private byte ParseU1(ref int index) => bytes[index++];
         private sbyte ParseI1(ref int index) => (sbyte)bytes[index++];
@@ -572,9 +580,9 @@ namespace IL2CXX
         private Type Normalize(Type type)
         {
             if (!type.IsGenericParameter) return type;
-            var name = type.ToString();
-            if (genericParameters.TryGetValue(name, out var x)) return x;
-            genericParameters.Add(name, type);
+            var key = (type.ToString(), type.GenericParameterAttributes);
+            if (genericParameters.TryGetValue(key, out var x)) return x;
+            genericParameters.Add(key, type);
             return type;
         }
         private string Identifier(string name)
@@ -731,15 +739,25 @@ namespace IL2CXX
         }
         private string GetInterfaceFunction(MethodBase method, Func<string, string> normal, Func<string, string> generic)
         {
-            var concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(x => x.InterfaceToMethods.TryGetValue(method.DeclaringType, out var ms) ? ms : null).Where(x => x != null);
-            if (method.IsGenericMethod)
+            var type = method.DeclaringType;
+            IEnumerable<IReadOnlyList<MethodInfo>> concretes;
+            if (type.IsGenericType)
             {
-                var (i, j) = EnqueueGenericIndexOf(method, concretes);
-                return generic($"{Escape(method.DeclaringType)}, {i}, {j}");
+                var gtd = type.GetGenericTypeDefinition();
+                concretes = runtimeDefinitions.OfType<TypeDefinition>().SelectMany(x => x.InterfaceToMethods.Where(y => y.Key.IsGenericType && y.Key.GetGenericTypeDefinition() == gtd && type.IsAssignableFrom(y.Key)).Select(y => y.Value));
             }
             else
             {
-                return normal($"{Escape(method.DeclaringType)}, {EnqueueIndexOf(method, concretes)}");
+                concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(x => x.InterfaceToMethods.TryGetValue(type, out var ms) ? ms : null).Where(x => x != null);
+            }
+            if (method.IsGenericMethod)
+            {
+                var (i, j) = EnqueueGenericIndexOf(method, concretes);
+                return generic($"{Escape(type)}, {i}, {j}");
+            }
+            else
+            {
+                return normal($"{Escape(type)}, {EnqueueIndexOf(method, concretes)}");
             }
         }
         public string GenerateVirtualCall(MethodBase method, string target, IEnumerable<string> variables, Func<string, string> construct)
@@ -953,9 +971,10 @@ namespace IL2CXX
             }
         }
         private string GenerateIsAssignableTo(string x, Type t) => $@"{x}->f_type()->{(
-            t.IsValueType ? "f_value_assignable_to" :
-            t.IsArray ? "f_array_assignable_to" :
-            t.IsInterface ? "f_implementation" : "f_is"
+            t.IsValueType ? "f_assignable_to_value" :
+            t.IsArray ? "f_assignable_to_array" :
+            t.IsInterface ? t.IsGenericType ? "f_assignable_to_variant_interface" : "f_assignable_to_interface" :
+            t.IsSubclassOf(typeofDelegate) && t.IsGenericType ? "f_assignable_to_variant" : "f_is"
         )}(&t__type_of<{Escape(t)}>::v__instance)";
         //private string GenerateCheck(Type type, string x, string condition, string exception) => $"\tif ({condition} !{GenerateIsAssignableTo(x, type)}) [[unlikely]] {GenerateThrow(exception)};\n";
         private string GenerateCheck(MethodBase method, Type type, string x, string condition, string exception) => $@"{'\t'}if ({condition} !{GenerateIsAssignableTo(x, type)}) [[unlikely]] {{

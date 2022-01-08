@@ -391,8 +391,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetGenericArguments)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) return f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(0);
-{'\t'}if (!a_0->v__generic_type_definition) std::cerr << ""no generic data: "" << f__string(a_0->v__full_name) << std::endl;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type_definition) return f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(0);
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
@@ -402,8 +401,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetGenericTypeDefinition)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) {transpiler.GenerateThrow("InvalidOperation")};
-{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type_definition) {transpiler.GenerateThrow("InvalidOperation")};
 {'\t'}return a_0->v__generic_type_definition;
 ", 0)
             );
@@ -463,27 +461,19 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Type.IsConstructedGenericType)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) return false;
-{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
-{'\t'}return a_0->v__generic_type_definition != a_0;
-", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition != a_0;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.IsGenericType)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.IsGenericTypeDefinition)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type) return false;
-{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
-{'\t'}return a_0->v__generic_type_definition == a_0;
-", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition == a_0;\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.MakeGenericType)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__generic_type) {transpiler.GenerateThrow("InvalidOperation")};
-{'\t'}if (!a_0->v__generic_type_definition) throw std::runtime_error(""no generic data: "" + f__string(a_0->v__full_name));
-{'\t'}if (a_0->v__generic_type_definition != a_0) {transpiler.GenerateThrow("InvalidOperation")};
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__generic_type_definition || a_0->v__generic_type_definition != a_0) {transpiler.GenerateThrow("InvalidOperation")};
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
 {'\t'}if (a_1->v__length != n) throw std::runtime_error(""not same number of types: "" + f__string(a_0->v__full_name));

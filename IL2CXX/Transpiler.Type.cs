@@ -198,14 +198,7 @@ namespace IL2CXX
                     else
                         Methods[i] = x;
                 }
-                // TODO: Work around for szarray bug.
-                var interfaces = Type.GetInterfaces();
-                if (Type.IsSZArray)
-                {
-                    var roc = transpiler.getType(typeof(IReadOnlyCollection<>)).MakeGenericType(new[] { transpiler.GetElementType(Type) });
-                    if (!interfaces.Contains(roc)) interfaces = interfaces.Append(roc).ToArray();
-                }
-                foreach (var x in interfaces)
+                foreach (var x in transpiler.GetInterfaces(Type))
                 {
                     var definition = (InterfaceDefinition)transpiler.Define(x);
                     var methods = new MethodInfo[definition.Methods.Count];
@@ -265,12 +258,8 @@ namespace IL2CXX
             if (processed) throw new InvalidOperationException($"{type}");
             if (type.IsGenericType)
             {
-                var gtd = type.GetGenericTypeDefinition();
-                if (ShouldGenerateReflection(gtd))
-                {
-                    Enqueue(gtd);
-                    foreach (var x in type.GetGenericArguments()) Enqueue(x);
-                }
+                Enqueue(type.GetGenericTypeDefinition());
+                foreach (var x in type.GetGenericArguments()) Enqueue(x);
             }
             byte[] getBytes(object value) => value switch
             {
@@ -399,11 +388,18 @@ struct {Escape(type)}
                         Enqueue(concrete);
                 }
                 foreach (var m in td.Methods.Where(x => !x.IsAbstract)) enqueue(GetBaseDefinition(m), m);
-                foreach (var p in td.InterfaceToMethods)
-                {
-                    var id = typeToRuntime[p.Key];
-                    foreach (var m in id.Methods) enqueue(m, p.Value[id.GetIndex(m)]);
-                }
+                foreach (var (i, ms) in td.InterfaceToMethods)
+                    if (i.IsGenericType)
+                    {
+                        var gtd = i.GetGenericTypeDefinition();
+                        foreach (var id in runtimeDefinitions.Where(x => x is InterfaceDefinition && x.Type.IsGenericType && x.Type.GetGenericTypeDefinition() == gtd && x.Type.IsAssignableFrom(i)))
+                            foreach (var m in id.Methods) enqueue(m, ms[id.GetIndex(m)]);
+                    }
+                    else
+                    {
+                        var id = typeToRuntime[i];
+                        foreach (var m in id.Methods) enqueue(m, ms[id.GetIndex(m)]);
+                    }
                 typeToRuntime[type] = definition = td;
                 var identifier = Escape(type);
                 var builtinStaticMembers = builtin.GetStaticMembers(this, type);
@@ -829,46 +825,52 @@ static t__runtime_field_info* v__fields_{identifier}[] = {{
         }
         private void WriteRuntimeDefinition(RuntimeDefinition definition, string assembly, IReadOnlyDictionary<Type, IEnumerable<Type>> genericTypeDefinitionToConstructeds, TextWriter writerForDeclarations, TextWriter writerForDefinitions)
         {
+            writerForDefinitions.Write(definition.Definitions);
             var type = definition.Type;
             var @base = definition is TypeDefinition && FinalizeOf(type) != null ? "t__type_finalizee" : "t__type";
             var identifier = Escape(type);
+            var interfaces = "v__empty_types";
+            if (definition is TypeDefinition)
+            {
+                var xs = GetInterfaces(type);
+                if (xs.Length > 0)
+                {
+                    writerForDefinitions.Write($@"
+static t__type* v__interfaces_{identifier}[] = {{
+{string.Join(string.Empty, xs.Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
+}};");
+                    interfaces = $"v__interfaces_{identifier}";
+                }
+            }
             if (type.IsGenericType)
             {
-                var gtd = type.GetGenericTypeDefinition();
-                if (ShouldGenerateReflection(gtd))
-                {
-                    writerForDefinitions.WriteLine($@"
+                writerForDefinitions.Write($@"
 t__type* v__generic_arguments_{Escape(type)}[] = {{
 {string.Join(string.Empty, type.GetGenericArguments().Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
 }};");
-                    if (type.IsGenericTypeDefinition) writerForDefinitions.WriteLine($@"
+                if (type.IsGenericTypeDefinition) writerForDefinitions.Write($@"
 t__type* v__constructed_generic_types_{Escape(type)}[] = {{
 {string.Join(string.Empty, (genericTypeDefinitionToConstructeds.TryGetValue(type, out var xs) ? xs : Enumerable.Empty<Type>()).Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
 }};");
-                }
             }
-            writerForDefinitions.Write(definition.Definitions);
             if ((definition as TypeDefinition)?.HasConstructors ?? false) writerForDefinitions.Write($@"
 static t__runtime_constructor_info* v__constructors_{identifier}[] = {{
 {string.Join(string.Empty, type.GetConstructors(declaredAndInstance).Select(x => $"\t&v__method_{Escape(x)},\n"))}{'\t'}nullptr
-}};
-");
+}};");
             if (definition.HasMethods) writerForDefinitions.Write($@"
 static t__runtime_method_info* v__methods_{identifier}[] = {{
 {string.Join(string.Empty, GetMethods(type).Select(x => $"\t&v__method_{Escape(x)},\n"))}{'\t'}nullptr
-}};
-");
+}};");
             if (definition.HasProperties) writerForDefinitions.Write($@"
 static t__runtime_property_info* v__properties_{identifier}[] = {{
 {string.Join(string.Empty, GetProperties(type).Select(x => $"\t&{Escape(x)},\n"))}{'\t'}nullptr
-}};
-");
+}};");
             writerForDeclarations.WriteLine($@"
 template<>
 struct t__type_of<{identifier}> : {@base}
 {{");
             writerForDefinitions.Write($@"
-t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {{");
+t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {interfaces}, {{");
             if (definition is TypeDefinition td)
             {
                 void writeMethods(IEnumerable<MethodInfo> methods, Func<int, MethodInfo, string, string> pointer, Func<int, int, MethodInfo, string, string> genericPointer, Func<MethodInfo, MethodInfo> origin, string indent)
@@ -955,7 +957,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 )}, {(
     type.IsByRefLike ? "true" : "false"
 )}, {(
-    type.IsGenericType ? "true" : "false"
+    type.IsGenericTypeParameter ? "true" : "false"
 )}, {(
     type == typeofVoid || type.ContainsGenericParameters ? "0" : $"sizeof({EscapeForValue(type)})"
 )}, {szarray})
@@ -986,14 +988,11 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             }
             if (type.IsGenericType)
             {
-                var gtd = type.GetGenericTypeDefinition();
-                if (ShouldGenerateReflection(gtd))
-                {
-                    writerForDefinitions.WriteLine($@"{'\t'}v__generic_type_definition = &t__type_of<{Escape(gtd)}>::v__instance;
+                writerForDefinitions.WriteLine($@"{'\t'}v__generic_type_definition = &t__type_of<{Escape(type.GetGenericTypeDefinition())}>::v__instance;
 {'\t'}v__generic_arguments = v__generic_arguments_{Escape(type)};");
-                    if (type.IsGenericTypeDefinition) writerForDefinitions.WriteLine($"\tv__constructed_generic_types = v__constructed_generic_types_{Escape(type)};");
-                }
+                if (type.IsGenericTypeDefinition) writerForDefinitions.WriteLine($"\tv__constructed_generic_types = v__constructed_generic_types_{Escape(type)};");
             }
+            if (type.IsGenericTypeParameter) writerForDefinitions.WriteLine($"\tv__generic_parameter_attributes = {(int)type.GenericParameterAttributes};");
             if (ShouldGenerateReflection(type))
             {
                 writerForDefinitions.WriteLine($"\tv__fields = {(td?.HasFields ?? false ? $"v__fields_{identifier}" : "v__empty_fields")};");

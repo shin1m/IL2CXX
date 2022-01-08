@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
@@ -52,6 +53,12 @@ namespace IL2CXX.Tests
             return xs[0] == typeof(Foo) ? 0 : 2;
         }
         static int MakeGenericType() => typeof(Bar<>).MakeGenericType(typeof(Foo)) == typeof(Bar<Foo>) ? 0 : 1;
+        static int Covariant()
+        {
+            IEnumerable<object> xs = new[] { new Foo() };
+            foreach (var x in xs) Console.WriteLine(x);
+            return 0;
+        }
 
         enum Answer { Yes, No }
         class FooAttribute : Attribute
@@ -221,6 +228,7 @@ namespace IL2CXX.Tests
             nameof(GetGenericTypeDefinition) => GetGenericTypeDefinition(),
             nameof(GetGenericArguments) => GetGenericArguments(),
             nameof(MakeGenericType) => MakeGenericType(),
+            nameof(Covariant) => Covariant(),
             nameof(GetField) => GetField(),
             nameof(SetField) => SetField(),
             nameof(GetFields) => GetFields(),
@@ -241,7 +249,6 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
-            typeof(Bar<>),
             typeof(Zot)
         });
         [Test]
@@ -254,6 +261,7 @@ namespace IL2CXX.Tests
                 nameof(GetGenericTypeDefinition),
                 nameof(GetGenericArguments),
                 nameof(MakeGenericType),
+                nameof(Covariant),
                 nameof(GetField),
                 nameof(SetField),
                 nameof(GetFields),

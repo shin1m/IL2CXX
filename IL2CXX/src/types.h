@@ -160,6 +160,7 @@ struct t__abstract_type : t__member_info
 
 struct t__type : t__abstract_type
 {
+	static constexpr t__type* v__empty_types[] = {nullptr};
 	static constexpr t__runtime_field_info* v__empty_fields[] = {nullptr};
 	static constexpr t__runtime_constructor_info* v__empty_constructors[] = {nullptr};
 	static constexpr t__runtime_method_info* v__empty_methods[] = {nullptr};
@@ -170,6 +171,7 @@ struct t__type : t__abstract_type
 	}
 
 	t__type* v__base;
+	t__type* const* v__interfaces;
 	std::map<t__type*, std::pair<void**, void**>> v__interface_to_methods;
 	t__runtime_assembly* v__assembly;
 	std::u16string_view v__namespace;
@@ -182,9 +184,10 @@ struct t__type : t__abstract_type
 	uint8_t v__by_ref : 1;
 	uint8_t v__pointer : 1;
 	uint8_t v__by_ref_like : 1;
-	uint8_t v__generic_type : 1;
+	uint8_t v__generic_type_parameter : 1;
 	uint8_t v__cor_element_type;
 	uint8_t v__type_code;
+	uint8_t v__generic_parameter_attributes;
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
@@ -201,11 +204,11 @@ struct t__type : t__abstract_type
 			void* v__multicast_invoke;
 			void* v__invoke_unmanaged;
 		};
+		t__type* v__underlying = nullptr;
 	};
-	t__type* v__underlying = nullptr;
 	t__type* v__generic_type_definition = nullptr;
-	t__type* const* v__generic_arguments = nullptr;
-	t__type* const* v__constructed_generic_types = nullptr;
+	t__type* const* v__generic_arguments;
+	t__type* const* v__constructed_generic_types;
 	t__runtime_field_info* const* v__fields = nullptr;
 	t__runtime_constructor_info* const* v__constructors = nullptr;
 	t__runtime_method_info* const* v__methods = nullptr;
@@ -213,19 +216,19 @@ struct t__type : t__abstract_type
 
 	t__type(
 		t__type* a_type, t__type* a_base,
-		std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods,
+		t__type* const* a_interfaces, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods,
 		t__runtime_assembly* a_assembly,
 		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
 		int32_t a_attribute_flags,
 		t__custom_attribute* const* a_custom_attributes,
-		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_by_ref, bool a_pointer, bool a_by_ref_like, bool a_generic_type,
+		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_by_ref, bool a_pointer, bool a_by_ref_like, bool a_generic_type_parameter,
 		size_t a_size,
 		t__type* a_szarray
 	) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags, a_custom_attributes), v__base(a_base),
-	v__interface_to_methods(std::move(a_interface_to_methods)),
+	v__interfaces(a_interfaces), v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
-	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__by_ref(a_by_ref), v__pointer(a_pointer), v__by_ref_like(a_by_ref_like), v__generic_type(a_generic_type),
+	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__by_ref(a_by_ref), v__pointer(a_pointer), v__by_ref_like(a_by_ref_like), v__generic_type_parameter(a_generic_type_parameter),
 	v__size(a_size),
 	v__szarray(a_szarray)
 	{
@@ -277,28 +280,24 @@ struct t__type : t__abstract_type
 	static void f_do_destroy_unmanaged(void* a_p);
 	static void f_do_destroy_unmanaged_blittable(void* a_p);
 	void (*f_destroy_unmanaged)(void*) = f_do_destroy_unmanaged;
-	bool f_is(t__type* a_type) const
+	bool f_is(t__type* a_type) const;
+	bool f_assignable_to_value(t__type* a_type) const
 	{
-		auto p = this;
-		do {
-			if (p == a_type) return true;
-			p = p->v__base;
-		} while (p);
-		return false;
-	}
-	bool f_value_assignable_to(t__type* a_type) const
-	{
+		assert(a_type->v__value_type);
 		return this == a_type || !a_type->v__enum && this == a_type->v__underlying;
 	}
-	bool f_array_assignable_to(t__type* a_type) const
+	bool f_assignable_to_array(t__type* a_type) const
 	{
-		return v__array && v__rank == a_type->v__rank && v__element->f_is(a_type->v__element);
+		assert(a_type->v__array);
+		return v__array && v__rank == a_type->v__rank && v__element->f_assignable_to(a_type->v__element);
 	}
-	void** f_implementation(t__type* a_interface) const
+	bool f_assignable_to_variant(t__type* a_type) const;
+	const std::pair<void**, void**>* f_implementation(t__type* a_interface) const;
+	bool f_assignable_to_interface(t__type* a_type) const
 	{
-		auto i = v__interface_to_methods.find(a_interface);
-		return i == v__interface_to_methods.end() ? nullptr : i->second.first;
+		return f_is(a_type) || f_implementation(a_type);
 	}
+	bool f_assignable_to_variant_interface(t__type* a_type) const;
 	bool f_assignable_to(t__type* a_type) const;
 	t__object* f_new_zerod();
 	static constexpr int32_t bf_declared_only = 2;
@@ -446,7 +445,7 @@ inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_
 struct t__type_finalizee : t__type
 {
 	template<typename... T_n>
-	t__type_finalizee(t__type* a_type, t__type* a_base, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, T_n&&... a_n) : t__type(a_type, a_base, std::move(a_interface_to_methods), std::forward<T_n>(a_n)...)
+	t__type_finalizee(t__type* a_type, t__type* a_base, t__type* const* a_interfaces, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, T_n&&... a_n) : t__type(a_type, a_base, a_interfaces, std::move(a_interface_to_methods), std::forward<T_n>(a_n)...)
 	{
 		f_register_finalize = f_do_register_finalize;
 		f_suppress_finalize = f_do_suppress_finalize;
@@ -466,13 +465,13 @@ struct t__type_of;
 template<typename T_interface, size_t A_i>
 void* f__resolve(t__object* a_this)
 {
-	return a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).second[A_i];
+	return a_this->f_type()->f_implementation(&t__type_of<T_interface>::v__instance)->second[A_i];
 }
 
 template<typename T_interface, size_t A_i, typename T_r, typename... T_an>
 T_r f__invoke(t__object* a_this, T_an... a_n, void** a_site)
 {
-	auto p = a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).first[A_i];
+	auto p = a_this->f_type()->f_implementation(&t__type_of<T_interface>::v__instance)->first[A_i];
 	*a_site = p;
 	return reinterpret_cast<T_r(*)(t__object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
 }
@@ -486,13 +485,13 @@ T_r f__method(t__object* a_this, T_an... a_n, void** a_site)
 template<typename T_interface, size_t A_i, size_t A_j>
 void* f__generic_resolve(t__object* a_this)
 {
-	return reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).second[A_i])[A_j];
+	return reinterpret_cast<void**>(a_this->f_type()->f_implementation(&t__type_of<T_interface>::v__instance)->second[A_i])[A_j];
 }
 
 template<typename T_interface, size_t A_i, size_t A_j, typename T_r, typename... T_an>
 T_r f__generic_invoke(t__object* a_this, T_an... a_n, void** a_site)
 {
-	auto p = reinterpret_cast<void**>(a_this->f_type()->v__interface_to_methods.at(&t__type_of<T_interface>::v__instance).first[A_i])[A_j];
+	auto p = reinterpret_cast<void**>(a_this->f_type()->f_implementation(&t__type_of<T_interface>::v__instance)->first[A_i])[A_j];
 	*a_site = p;
 	return reinterpret_cast<T_r(*)(t__object*, T_an..., void**)>(p)(a_this, a_n..., a_site);
 }

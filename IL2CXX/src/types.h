@@ -102,7 +102,13 @@ struct t__constructor_info : t__method_base
 
 struct t__runtime_constructor_info : t__constructor_info
 {
-	using t__constructor_info::t__constructor_info;
+	static t__object* f_create(t__runtime_constructor_info* RECYCLONE__SPILL a_this, int32_t a_binding_flags, t__object* RECYCLONE__SPILL a_binder, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL a_culture);
+
+	t__object*(*v__create)(t__runtime_constructor_info*, int32_t, t__object*, t__object*, t__object*);
+
+	t__runtime_constructor_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), t__object*(*a_create)(t__runtime_constructor_info*, int32_t, t__object*, t__object*, t__object*)) : t__constructor_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__create(a_create)
+	{
+	}
 };
 
 struct t__method_info : t__method_base
@@ -246,7 +252,7 @@ struct t__type : t__abstract_type
 	void f_own()
 	{
 	}
-	RECYCLONE__ALWAYS_INLINE void f_finish(t_object<t__type>* a_p)
+	RECYCLONE__ALWAYS_INLINE void f_finish(t_object<t__type>* RECYCLONE__SPILL a_p)
 	{
 		a_p->f_be(this);
 	}
@@ -280,7 +286,7 @@ struct t__type : t__abstract_type
 	static void f_do_destroy_unmanaged(void* a_p);
 	static void f_do_destroy_unmanaged_blittable(void* a_p);
 	void (*f_destroy_unmanaged)(void*) = f_do_destroy_unmanaged;
-	bool f_is(t__type* a_type) const;
+	bool f_is(t__abstract_type* a_type) const;
 	bool f_assignable_to_value(t__type* a_type) const
 	{
 		assert(a_type->v__value_type);

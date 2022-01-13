@@ -52,6 +52,12 @@ namespace IL2CXX.Tests
             if (xs.Length != 1) return 1;
             return xs[0] == typeof(Foo) ? 0 : 2;
         }
+        static int IsGenericTypeParameter()
+        {
+            var xs = typeof(Bar<>).GetGenericArguments();
+            if (xs.Length != 1) return 1;
+            return xs[0].IsGenericTypeParameter ? 0 : 2;
+        }
         static int MakeGenericType() => typeof(Bar<>).MakeGenericType(typeof(Foo)) == typeof(Bar<Foo>) ? 0 : 1;
         static int Covariant()
         {
@@ -116,6 +122,18 @@ namespace IL2CXX.Tests
             var c = typeof(Zot).GetConstructor(new[] { typeof(string) });
             if (c == null) return 1;
             return c.Invoke(new[] { "foo" }) is Zot zot && zot.X == "foo" ? 0 : 2;
+        }
+        static int GetConstructorOfString()
+        {
+            var c = typeof(string).GetConstructor(new[] { typeof(char[]) });
+            if (c == null) return 1;
+            return c.Invoke(new[] { "foo".ToCharArray() }) is string x && x == "foo" ? 0 : 2;
+        }
+        static int GetConstructorOfArray()
+        {
+            var c = typeof(string[]).GetConstructor(new[] { typeof(int) });
+            if (c == null) return 1;
+            return c.Invoke(new object[] { 10 }) is string[] xs && xs.Length == 10 ? 0 : 2;
         }
         static int GetConstructors()
         {
@@ -218,6 +236,7 @@ namespace IL2CXX.Tests
             return 0;
         }
         static int GetCustomAttributesOfT() => typeof(Zot).GetCustomAttributes<FooAttribute>().Count() == 1 ? 0 : 1;
+        static int IsDefined() => typeof(Zot).IsDefined(typeof(FooAttribute)) ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -227,12 +246,15 @@ namespace IL2CXX.Tests
             nameof(IsConstructedGenericType) => IsConstructedGenericType(),
             nameof(GetGenericTypeDefinition) => GetGenericTypeDefinition(),
             nameof(GetGenericArguments) => GetGenericArguments(),
+            nameof(IsGenericTypeParameter) => IsGenericTypeParameter(),
             nameof(MakeGenericType) => MakeGenericType(),
             nameof(Covariant) => Covariant(),
             nameof(GetField) => GetField(),
             nameof(SetField) => SetField(),
             nameof(GetFields) => GetFields(),
             nameof(GetConstructor) => GetConstructor(),
+            nameof(GetConstructorOfString) => GetConstructorOfString(),
+            nameof(GetConstructorOfArray) => GetConstructorOfArray(),
             nameof(GetConstructors) => GetConstructors(),
             nameof(GetMethod) => GetMethod(),
             nameof(GetMethods) => GetMethods(),
@@ -242,6 +264,7 @@ namespace IL2CXX.Tests
             nameof(GetCustomAttributesData) => GetCustomAttributesData(),
             nameof(GetCustomAttributes) => GetCustomAttributes(),
             nameof(GetCustomAttributesOfT) => GetCustomAttributesOfT(),
+            nameof(IsDefined) => IsDefined(),
             _ => -1
         };
 
@@ -249,6 +272,8 @@ namespace IL2CXX.Tests
 
         [OneTimeSetUp]
         public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
+            typeof(string),
+            typeof(string[]),
             typeof(Zot)
         });
         [Test]
@@ -260,12 +285,15 @@ namespace IL2CXX.Tests
                 nameof(IsConstructedGenericType),
                 nameof(GetGenericTypeDefinition),
                 nameof(GetGenericArguments),
+                nameof(IsGenericTypeParameter),
                 nameof(MakeGenericType),
                 nameof(Covariant),
                 nameof(GetField),
                 nameof(SetField),
                 nameof(GetFields),
                 nameof(GetConstructor),
+                nameof(GetConstructorOfString),
+                nameof(GetConstructorOfArray),
                 nameof(GetConstructors),
                 nameof(GetMethod),
                 nameof(GetMethods),
@@ -274,7 +302,8 @@ namespace IL2CXX.Tests
                 nameof(GetProperties),
                 nameof(GetCustomAttributesData),
                 nameof(GetCustomAttributes),
-                nameof(GetCustomAttributesOfT)
+                nameof(GetCustomAttributesOfT),
+                nameof(IsDefined)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

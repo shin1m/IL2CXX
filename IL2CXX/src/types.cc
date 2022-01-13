@@ -24,6 +24,13 @@ bool t__thread::f_priority(HANDLE a_handle, int32_t a_priority)
 }
 #endif
 
+t__object* t__runtime_constructor_info::f_create(t__runtime_constructor_info* RECYCLONE__SPILL a_this, int32_t a_binding_flags, t__object* RECYCLONE__SPILL a_binder, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL a_culture)
+{
+	auto p = a_this->v__declaring_type->f_new_zerod();
+	a_this->v__invoke(p, a_binding_flags, a_binder, a_parameters, a_culture);
+	return p;
+}
+
 void t__type::f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan)
 {
 }
@@ -95,7 +102,7 @@ void t__type::f_do_destroy_unmanaged_blittable(void* a_p)
 {
 }
 
-bool t__type::f_is(t__type* a_type) const
+bool t__type::f_is(t__abstract_type* a_type) const
 {
 	auto p = this;
 	do {
@@ -161,7 +168,7 @@ bool t__type::f_assignable_to(t__type* a_type) const
 
 t__object* t__type::f_new_zerod()
 {
-	auto p = f_engine()->f_allocate(v__managed_size);
+	auto RECYCLONE__SPILL p = f_engine()->f_allocate(v__managed_size);
 	std::memset(p + 1, 0, v__managed_size - sizeof(t__object));
 	f_register_finalize(p);
 	p->f_be(this);

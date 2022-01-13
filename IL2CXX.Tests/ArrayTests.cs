@@ -116,6 +116,8 @@ namespace IL2CXX.Tests
             Array.Reverse(xs);
             return AssertEquals(xs, new[] { "bar", "foo" });
         }
+        static int New1() => AssertEquals(new string[1], new string[] { null });
+        static int New2() => (new string[1, 1])[0, 0] == null ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -136,6 +138,8 @@ namespace IL2CXX.Tests
             nameof(Clone) => Clone(),
             nameof(Reverse) => Reverse(),
             nameof(ReverseT) => ReverseT(),
+            nameof(New1) => New1(),
+            nameof(New2) => New2(),
             _ => -1
         };
 
@@ -162,7 +166,9 @@ namespace IL2CXX.Tests
                 nameof(IListTIndexOf),
                 nameof(Clone),
                 nameof(Reverse),
-                nameof(ReverseT)
+                nameof(ReverseT),
+                nameof(New1),
+                nameof(New2)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 
 namespace IL2CXX
 {
@@ -678,32 +679,38 @@ namespace IL2CXX
 ", 0);
                 }
             );
+            var create = type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)), get(typeof(object[])) });
             code.For(
                 type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(bool)) }),
+                transpiler =>
+                {
+                    transpiler.Enqueue(create);
+                    return ($"\treturn {transpiler.Escape(create)}(a_0, a_1 ? {(int)(BindingFlags.Instance | BindingFlags.NonPublic)} : {(int)(BindingFlags.Instance | BindingFlags.Public)}, nullptr, nullptr, nullptr, nullptr);\n", 0);
+                }
+            );
+            code.For(
+                create,
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_0);
-{'\t'}if (type->v__value_type) return type->f_new_zerod();
+{'\t'}auto n = a_3 ? a_3->v__length : 0;
+{'\t'}if (type->v__value_type && n <= 0) return type->f_new_zerod();
 {'\t'}if (!type->v__constructors) std::cerr << ""no constructors: "" << f__string(type->v__full_name) << std::endl;
 {'\t'}t__runtime_constructor_info* constructor = nullptr;
-{'\t'}type->f_each_constructor(a_1 ? {(int)(BindingFlags.Instance | BindingFlags.NonPublic)} : {(int)(BindingFlags.Instance | BindingFlags.Public)}, [&](auto a_x)
+{'\t'}type->f_each_constructor(a_1, [&](auto a_x)
 {'\t'}{{
-{'\t'}{'\t'}if (*a_x->v__parameters) return true;
+{'\t'}{'\t'}auto p = a_x->v__parameters;
+{'\t'}{'\t'}for (size_t i = 0; i < n; ++i, ++p) {{
+{'\t'}{'\t'}{'\t'}if (!*p) return true;
+{'\t'}{'\t'}{'\t'}if (t__object* q = a_3->f_data()[i]) if (!q->f_type()->f_assignable_to((*p)->v__parameter_type)) return true;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}if (*p) return true;
 {'\t'}{'\t'}constructor = a_x;
 {'\t'}{'\t'}return false;
 {'\t'}}});
-{'\t'}if (!constructor) throw std::runtime_error(""no parameterless constructor"");
+{'\t'}if (!constructor) throw std::runtime_error(""no matching constructor found: "" + f__string(type->v__full_name));
 {'\t'}auto p = type->f_new_zerod();
-{'\t'}constructor->v__invoke(p, 0, nullptr, nullptr, nullptr);
+{'\t'}constructor->v__invoke(p, a_1, a_2, n > 0 ? a_3 : nullptr, a_4);
 {'\t'}return p;
-", 0)
-            );
-            // TODO
-            code.For(
-                type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)), get(typeof(object[])) }),
-                transpiler => ($@"{'\t'}if (!a_3 || a_3->v__length <= 0) return {transpiler.Escape(type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)) }))}(a_0);
-{transpiler.GenerateCheckArgumentNull("a_0")}{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
-{'\t'}auto type = static_cast<t__type*>(a_0);
-{'\t'}throw std::runtime_error(""not supported"");
 ", 0)
             );
         })
@@ -713,6 +720,26 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn f__new_string(a_0);\n", 2)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("SetTrailByte", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("TryGetTrailByte", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("Intern", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("IsInterned", BindingFlags.Instance | BindingFlags.NonPublic),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetConstructor(new[] { get(typeof(char*)) }),
@@ -748,6 +775,11 @@ namespace IL2CXX
             code.For(
                 type.GetConstructor(new[] { get(typeof(sbyte*)), get(typeof(int)), get(typeof(int)) }),
                 transpiler => ("\treturn f__new_string(std::string_view(reinterpret_cast<char*>(a_0) + a_1, a_2));\n", 1)
+            );
+            // TODO
+            code.For(
+                type.GetConstructor(new[] { get(typeof(sbyte*)), get(typeof(int)), get(typeof(int)), get(typeof(Encoding)) }),
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(string.Length)).GetMethod,

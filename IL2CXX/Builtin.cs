@@ -55,7 +55,7 @@ namespace IL2CXX
             {
                 var rank = type.GetArrayRank();
                 if (method == type.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, rank).ToArray())) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
-{'\t'}auto extra = sizeof({transpiler.Escape(type.GetElementType())}) * n;
+{'\t'}auto extra = sizeof({transpiler.EscapeForMember(type.GetElementType())}) * n;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = n;
 {string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tp->v__bounds[{i}] = {{static_cast<size_t>(a_{i}), 0}};\n"))

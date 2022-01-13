@@ -782,7 +782,7 @@ static t__runtime_field_info* v__fields_{identifier}[] = {{
                             td.HasConstructors = true;
                             var name = Escape(x);
                             fieldDeclarations.WriteLine($"extern t__runtime_constructor_info v__method_{name};");
-                            definition.Definitions.WriteLine($"t__runtime_constructor_info v__method_{name}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, {writeAttributes(x, name)}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}}};");
+                            definition.Definitions.WriteLine($"t__runtime_constructor_info v__method_{name}{{&t__type_of<t__runtime_constructor_info>::v__instance, &t__type_of<{identifier}>::v__instance, u\"{x.Name}\"sv, {(int)x.Attributes}, {writeAttributes(x, name)}, {writeParameters(x.GetParameters(), name)}, {GenerateInvokeFunction(x)}, {GenerateCreateFunction(x)}}};");
                         }
                     }
                 }

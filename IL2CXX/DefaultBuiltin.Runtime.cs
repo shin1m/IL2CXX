@@ -50,6 +50,15 @@ namespace IL2CXX
                 type.GetProperty(nameof(MemberInfo.Name)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 0)
             );
+            code.For(
+                type.GetMethod(nameof(MemberInfo.IsDefined)),
+                transpiler =>
+                {
+                    var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.InternalIsDefined));
+                    transpiler.Enqueue(method);
+                    return ($"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 0);
+                }
+            );
         }
         private static (string body, int inline) GetParameters(Func<Type, Type> get, Transpiler transpiler)
         {
@@ -103,37 +112,7 @@ namespace IL2CXX
             SetupMethodBase(get, type, code);
             code.For(
                 type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
-                transpiler =>
-                {
-                    var typeofInt32 = $"t__type_of<{transpiler.Escape(transpiler.typeofInt32)}>::v__instance";
-                    var array = transpiler.Escape(get(typeof(Array)));
-                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto type = a_0->v__declaring_type;
-{'\t'}if (type->v__array) {{
-{'\t'}{'\t'}if (!a_3 || a_3->v__length != type->v__rank) [[unlikely]] {transpiler.GenerateThrow("TargetParameterCount")};
-{'\t'}{'\t'}size_t length = 0;
-{'\t'}{'\t'}for (size_t i = 0; i < type->v__rank; ++i) {{
-{'\t'}{'\t'}{'\t'}t__object* p = a_3->f_data()[i];
-{'\t'}{'\t'}{'\t'}if (!p || p->f_type() != &{typeofInt32}) {transpiler.GenerateThrow("Argument")};
-{'\t'}{'\t'}{'\t'}auto n = *static_cast<int32_t*>({typeofInt32}.f_unbox(p));
-{(transpiler.CheckRange ? $"\t\t\tif (n < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty)}{'\t'}{'\t'}{'\t'}length += n;
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound) * type->v__rank;
-{'\t'}{'\t'}auto n = type->v__element->v__size * length;
-{'\t'}{'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + n));
-{'\t'}{'\t'}p->v__length = length;
-{'\t'}{'\t'}for (size_t i = 0; i < type->v__rank; ++i) {{
-{'\t'}{'\t'}{'\t'}t__object* q = a_3->f_data()[i];
-{'\t'}{'\t'}{'\t'}p->f_bounds()[i] = {{static_cast<size_t>(*static_cast<int32_t*>({typeofInt32}.f_unbox(q))), 0}};
-{'\t'}{'\t'}}}
-{'\t'}{'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
-{'\t'}{'\t'}type->f_finish(p);
-{'\t'}{'\t'}return p;
-{'\t'}}}
-{'\t'}auto p = type->f_new_zerod();
-{'\t'}a_0->v__invoke(p, a_1, a_2, a_3 && a_3->v__length > 0 ? a_3 : nullptr, a_4);
-{'\t'}return p;
-", 0);
-                }
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__create(a_0, a_1, a_2, a_3 && a_3->v__length > 0 ? a_3 : nullptr, a_4);\n", 0)
             );
         })
         .For(get(typeof(RuntimeCustomAttributeData)), (type, code) =>
@@ -203,6 +182,18 @@ namespace IL2CXX
 {'\t'}return p;
 ", 0);
                 }
+            );
+            code.For(
+                type.GetMethod(nameof(RuntimeCustomAttributeData.InternalIsDefined)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__custom_attributes) {{
+{'\t'}{'\t'}std::cerr << ""no custom attributes: "";
+{'\t'}{'\t'}if (a_0->v__declaring_type) std::cerr << f__string(a_0->v__declaring_type->v__full_name) << ""::"";
+{'\t'}{'\t'}std::cerr << '[' << f__string(a_0->f_type() == &t__type_of<t__type>::v__instance ? static_cast<t__type*>(a_0)->v__full_name : a_0->v__name) << ']' << std::endl;
+{'\t'}{'\t'}return false;
+{'\t'}}}
+{'\t'}for (auto p = a_0->v__custom_attributes; *p; ++p) if ((*p)->v_constructor->v__declaring_type->f_is(a_1)) return true;
+{'\t'}return false;
+", 0)
             );
         })
         .For(get(typeof(RuntimeFieldInfo)), (type, code) =>
@@ -470,6 +461,10 @@ namespace IL2CXX
             code.For(
                 type.GetProperty(nameof(Type.IsGenericTypeDefinition)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition == a_0;\n", 0)
+            );
+            code.For(
+                type.GetProperty(nameof(Type.IsGenericTypeParameter)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_parameter;\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.MakeGenericType)),

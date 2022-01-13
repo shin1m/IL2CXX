@@ -970,6 +970,24 @@ namespace IL2CXX
                 writer.Write(GenerateVirtualCall(GetBaseDefinition((MethodInfo)method), "a_this", arguments.Skip(1), construct));
             }
         }
+        private string GenerateCheckParameterCount(MethodBase method)
+        {
+            var parameters = method.GetParameters();
+            /*return $@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
+{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};
+";*/
+            return $@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
+{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {{
+{'\t'}{'\t'}std::cerr << ""invalid parameter count for {method.DeclaringType}::[{method}]: "";
+{'\t'}{'\t'}if (parameters)
+{'\t'}{'\t'}{'\t'}std::cerr << parameters->v__length;
+{'\t'}{'\t'}else
+{'\t'}{'\t'}{'\t'}std::cerr << ""null"";
+{'\t'}{'\t'}std::cerr << std::endl;
+{'\t'}{'\t'}{GenerateThrow("TargetParameterCount")};
+{'\t'}}}
+";
+        }
         private string GenerateIsAssignableTo(string x, Type t) => $@"{x}->f_type()->{(
             t.IsValueType ? "f_assignable_to_value" :
             t.IsArray ? "f_assignable_to_array" :
@@ -987,29 +1005,36 @@ namespace IL2CXX
 {'\t'}{'\t'}{GenerateThrow(exception)};
 {'\t'}}}
 ";
+        private string GenerateParameter(MethodBase method, Type type, int i, TextWriter writer)
+        {
+            writer.WriteLine($"\tauto& p{i} = parameters->f_data()[{i}];");
+            string f(Type type)
+            {
+                if (type.IsValueType)
+                {
+                    writer.Write(GenerateCheck(method, type, $"p{i}", $"!p{i} ||", "Argument"));
+                    return $"static_cast<{Escape(type)}*>(p{i})->v__value";
+                }
+                else
+                {
+                    writer.Write(GenerateCheck(method, type, $"p{i}", $"p{i} &&", "Argument"));
+                    return $"p{i}";
+                }
+            }
+            return type.IsByRef ? $"&{f(GetElementType(type))}" : f(type);
+        }
         private string GenerateInvokeFunction(MethodBase method)
         {
             using var writer = new StringWriter();
             writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
             var @return = GetReturnType(method);
-            if (@return.IsByRef || @return.IsPointer || method is ConstructorInfo && method.DeclaringType.IsArray || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
+            var parameters = method.GetParameters();
+            if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType.IsByRefLike && !method.IsStatic || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike) || method.ContainsGenericParameters || method is ConstructorInfo && builtin.GetBody(this, ToKey(method)).body != null)
             {
                 writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
                 return writer.ToString();
             }
-            var parameters = method.GetParameters();
-            /*writer.WriteLine($@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
-{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};");*/
-            writer.WriteLine($@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
-{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {{
-{'\t'}{'\t'}std::cerr << ""invalid parameter count for {method.DeclaringType}::[{method}]: "";
-{'\t'}{'\t'}if (parameters)
-{'\t'}{'\t'}{'\t'}std::cerr << parameters->v__length;
-{'\t'}{'\t'}else
-{'\t'}{'\t'}{'\t'}std::cerr << ""null"";
-{'\t'}{'\t'}std::cerr << std::endl;
-{'\t'}{'\t'}{GenerateThrow("TargetParameterCount")};
-{'\t'}}}");
+            writer.Write(GenerateCheckParameterCount(method));
             var arguments = new List<string>();
             var @this = GetVirtualThisType(method.DeclaringType);
             if (!method.IsStatic)
@@ -1017,27 +1042,29 @@ namespace IL2CXX
                 writer.Write(GenerateCheck(method, @this, "a_this", "!a_this ||", "Target"));
                 arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
             }
-            arguments.AddRange(method.GetParameters().Select((x, i) =>
-            {
-                writer.WriteLine($"\tauto& p{i} = parameters->f_data()[{i}];");
-                string f(Type type)
-                {
-                    if (type.IsValueType)
-                    {
-                        writer.Write(GenerateCheck(method, type, $"p{i}", $"!p{i} ||", "Argument"));
-                        return $"static_cast<{Escape(type)}*>(p{i})->v__value";
-                    }
-                    else
-                    {
-                        writer.Write(GenerateCheck(method, type, $"p{i}", $"p{i} &&", "Argument"));
-                        return $"p{i}";
-                    }
-                }
-                var type = x.ParameterType;
-                return type.IsByRef || type.IsPointer ? $"&{f(GetElementType(type))}" : f(type);
-            }));
+            arguments.AddRange(parameters.Select((x, i) => GenerateParameter(method, x.ParameterType, i, writer)));
             GenerateInvokeFunction(method, arguments, writer);
             writer.Write('}');
+            return writer.ToString();
+        }
+        private string GenerateCreateFunction(ConstructorInfo method)
+        {
+            if (builtin.GetBody(this, ToKey(method)).body == null) return "t__runtime_constructor_info::f_create";
+            using var writer = new StringWriter();
+            writer.WriteLine("[](t__runtime_constructor_info*, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
+            var type = method.DeclaringType;
+            var parameters = method.GetParameters();
+            if (type.IsByRefLike || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike))
+            {
+                writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
+                return writer.ToString();
+            }
+            writer.Write(GenerateCheckParameterCount(method));
+            Enqueue(method);
+            var call = $@"{Escape(method)}({
+    string.Join(",", parameters.Select((x, i) => $"\n\t\t{CastValue(x.ParameterType, GenerateParameter(method, x.ParameterType, i, writer))}"))
+}{(parameters.Length > 0 ? "\n\t" : string.Empty)})";
+            writer.Write($"\treturn {(type.IsValueType ? $"f__new_constructed<{Escape(type)}>({call})" : call)};\n}}");
             return writer.ToString();
         }
         private string GenerateWASMInvokeFunction(MethodBase method)
@@ -1045,7 +1072,7 @@ namespace IL2CXX
             using var writer = new StringWriter();
             writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, void** a_parameters) -> t__object*\n{");
             var @return = GetReturnType(method);
-            if (@return.IsByRef || @return.IsPointer || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
+            if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
             {
                 writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
                 return writer.ToString();
@@ -1058,7 +1085,7 @@ namespace IL2CXX
                 writer.Write(GenerateCheck(method, @this, "a_this", "!a_this ||", "Target"));
                 arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
             }
-            arguments.AddRange(method.GetParameters().Select((x, i) => x.ParameterType.IsValueType ? $"*static_cast<{EscapeForValue(x.ParameterType)}*>(a_parameters[{i}])" : $"a_parameters[{i}]"));
+            arguments.AddRange(parameters.Select((x, i) => x.ParameterType.IsValueType ? $"*static_cast<{EscapeForValue(x.ParameterType)}*>(a_parameters[{i}])" : $"a_parameters[{i}]"));
             GenerateInvokeFunction(method, arguments, writer);
             writer.Write('}');
             return writer.ToString();

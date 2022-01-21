@@ -55,6 +55,8 @@ namespace IL2CXX
     public abstract class RuntimeMethodInfo : MethodInfo
     {
         public override MethodAttributes Attributes => throw new NotImplementedException();
+        public override Delegate CreateDelegate(Type type) => throw new NotImplementedException();
+        public override Delegate CreateDelegate(Type type, object target) => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
         public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
@@ -62,6 +64,7 @@ namespace IL2CXX
         public override ParameterInfo[] GetParameters() => throw new NotImplementedException();
         public override object Invoke(object @this, BindingFlags bindingFlags, Binder binder, object[] parameters, CultureInfo culture) => throw new NotImplementedException();
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
+        public override MethodInfo MakeGenericMethod(params Type[] types) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
     }
     public abstract class RuntimePropertyInfo : PropertyInfo
@@ -83,7 +86,7 @@ namespace IL2CXX
     public abstract class RuntimeType : Type
     {
         public override Assembly Assembly => throw new NotImplementedException();
-        public override string AssemblyQualifiedName => IsGenericTypeParameter ? null : $"{FullName}, {Assembly.FullName}";
+        public override string AssemblyQualifiedName => $"{FullName}, {Assembly.FullName}";
         public override Type BaseType => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
         public override string FullName => throw new NotImplementedException();
@@ -103,6 +106,7 @@ namespace IL2CXX
         public override Type GetGenericTypeDefinition() => throw new NotImplementedException();
         public override Type[] GetInterfaces() => throw new NotImplementedException();
         protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
+        protected override MethodInfo GetMethodImpl(string name, int genericParameterCount, BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
         public override MethodInfo[] GetMethods(BindingFlags bindingFlags) => throw new NotImplementedException();
         public override PropertyInfo[] GetProperties(BindingFlags bindingFlags) => throw new NotImplementedException();
         protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingFlags, Binder binder, Type @return, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
@@ -115,7 +119,6 @@ namespace IL2CXX
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
         public override bool IsGenericType => throw new NotImplementedException();
         public override bool IsGenericTypeDefinition => throw new NotImplementedException();
-        public override bool IsGenericTypeParameter => throw new NotImplementedException();
         protected override bool IsPointerImpl() => throw new NotImplementedException();
         public override Type MakeGenericType(params Type[] arguments) => throw new NotImplementedException();
         public override string Namespace => throw new NotImplementedException();
@@ -123,6 +126,45 @@ namespace IL2CXX
         public override string ToString() => throw new NotImplementedException();
         public override RuntimeTypeHandle TypeHandle => throw new NotImplementedException();
         public override Type UnderlyingSystemType => this;
+    }
+    public abstract class RuntimeGenericParameter : Type
+    {
+        public override Assembly Assembly => throw new NotSupportedException();
+        public override string AssemblyQualifiedName => null;
+        public override Type BaseType => throw new NotImplementedException();
+        public override string FullName => throw new NotSupportedException();
+        protected override TypeAttributes GetAttributeFlagsImpl() => throw new NotImplementedException();
+        protected override ConstructorInfo GetConstructorImpl(BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => null;
+        public override ConstructorInfo[] GetConstructors(BindingFlags bindingFlags) => Array.Empty<ConstructorInfo>();
+        public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
+        public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
+        public override IList<CustomAttributeData> GetCustomAttributesData() => throw new NotImplementedException();
+        public override Type GetElementType() => null;
+        public override FieldInfo GetField(string name, BindingFlags bindingFlags) => throw new NotImplementedException();
+        public override FieldInfo[] GetFields(BindingFlags bindingFlags) => throw new NotImplementedException();
+        public override Type[] GetInterfaces() => throw new NotImplementedException();
+        protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
+        protected override MethodInfo GetMethodImpl(string name, int genericParameterCount, BindingFlags bindingFlags, Binder binder, CallingConventions callingConventions, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
+        public override MethodInfo[] GetMethods(BindingFlags bindingFlags) => throw new NotImplementedException();
+        public override PropertyInfo[] GetProperties(BindingFlags bindingFlags) => throw new NotImplementedException();
+        protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingFlags, Binder binder, Type @return, Type[] types, ParameterModifier[] modifiers) => throw new NotImplementedException();
+        protected override bool HasElementTypeImpl() => false;
+        protected override bool IsArrayImpl() => false;
+        public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
+        public override bool IsGenericParameter => true;
+        protected override bool IsPointerImpl() => false;
+        public override string Namespace => null;
+        public override string Name => throw new NotImplementedException();
+        public override string ToString() => Name;
+        public override Type UnderlyingSystemType => this;
+    }
+    public abstract class RuntimeGenericTypeParameter : RuntimeGenericParameter
+    {
+        public override bool IsGenericTypeParameter => true;
+    }
+    public abstract class RuntimeGenericMethodParameter : RuntimeGenericParameter
+    {
+        public override bool IsGenericMethodParameter => true;
     }
     public class RuntimeCustomAttributeData : CustomAttributeData
     {

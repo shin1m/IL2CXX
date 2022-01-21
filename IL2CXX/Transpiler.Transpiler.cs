@@ -47,6 +47,8 @@ namespace IL2CXX
             typeofRuntimePropertyInfo = get(typeof(RuntimePropertyInfo));
             typeofType = get(typeof(Type));
             typeofRuntimeType = get(typeof(RuntimeType));
+            typeofRuntimeGenericTypeParameter = get(typeof(RuntimeGenericTypeParameter));
+            typeofRuntimeGenericMethodParameter = get(typeof(RuntimeGenericMethodParameter));
             typeofBoolean = get(typeof(bool));
             typeofByte = get(typeof(byte));
             typeofSByte = get(typeof(sbyte));
@@ -99,6 +101,9 @@ namespace IL2CXX
                 [typeofRuntimePropertyInfo] = "t__runtime_property_info",
                 [typeofType] = "t__abstract_type",
                 [typeofRuntimeType] = "t__type",
+                [get(typeof(RuntimeGenericParameter))] = "t__generic_parameter",
+                [typeofRuntimeGenericTypeParameter] = "t__generic_type_parameter",
+                [typeofRuntimeGenericMethodParameter] = "t__generic_method_parameter",
                 [get(typeof(CriticalFinalizerObject))] = "t__critical_finalizer_object"
             };
             primitives = new Dictionary<Type, string>
@@ -1302,7 +1307,7 @@ namespace IL2CXX
                 x.Estimate = (index, stack) => ParseMember(ref index) switch
                 {
                     FieldInfo f => (index, stack.Push(typeofRuntimeFieldHandle)),
-                    MethodInfo m => (index, stack.Push(typeofRuntimeMethodHandle)),
+                    MethodBase m => (index, stack.Push(typeofRuntimeMethodHandle)),
                     Type t => (index, stack.Push(typeofRuntimeTypeHandle)),
                     _ => throw new Exception()
                 };
@@ -1313,9 +1318,7 @@ namespace IL2CXX
 {'\t'}{indexToStack[index].Variable} = {member switch
 {
     FieldInfo f => $"&v__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}",
-    // TODO
-    //MethodInfo m => $"{Escape(m)}::v__handle",
-    MethodInfo m => "{}",
+    MethodBase m => $"&v__method_{Escape(m)}",
     Type t => $"&t__type_of<{Escape(t)}>::v__instance",
     _ => throw new Exception()
 }};");

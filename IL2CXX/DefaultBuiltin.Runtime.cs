@@ -70,8 +70,9 @@ namespace IL2CXX
 {'\t'}{'\t'}auto q = a_0->v__parameters[i];
 {'\t'}{'\t'}auto RECYCLONE__SPILL pi = f__new_zerod<{identifier}>();
 {'\t'}{'\t'}pi->v_AttrsImpl = q->v__attributes;
-{'\t'}{'\t'}pi->v_ClassImpl = q->v__parameter_type;
-{'\t'}{'\t'}if (q->v__default_value) pi->v_DefaultValueImpl = q->v__parameter_type->f_box(q->v__default_value);
+{'\t'}{'\t'}auto t = q->v__parameter_type;
+{'\t'}{'\t'}pi->v_ClassImpl = t;
+{'\t'}{'\t'}if (q->v__default_value && t->f_type() == &t__type_of<t__type>::v__instance) pi->v_DefaultValueImpl = static_cast<t__type*>(t)->f_box(q->v__default_value);
 {'\t'}{'\t'}pi->v_MemberImpl = a_0;
 {'\t'}{'\t'}pi->v_PositionImpl = i;
 {'\t'}{'\t'}p->f_data()[i] = pi;
@@ -96,7 +97,9 @@ namespace IL2CXX
         {
             code.For(
                 type.GetProperty(nameof(Assembly.EntryPoint)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__entry_point;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_0->v__entry_point == reinterpret_cast<t__runtime_method_info*>(-1)) throw std::runtime_error(""no entry point: "" + f__string(a_0->v__full_name));
+{'\t'}return a_0->v__entry_point;
+", 0)
             );
             code.For(
                 type.GetProperty(nameof(Assembly.FullName)).GetMethod,
@@ -224,9 +227,50 @@ namespace IL2CXX
         .For(get(typeof(RuntimeMethodInfo)), (type, code) =>
         {
             SetupMethodBase(get, type, code);
+            // TODO: check signature.
+            code.For(
+                type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!(a_0->v__attributes & {(int)MethodAttributes.Static})) throw std::runtime_error(""must be static method"");
+{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_1);
+{'\t'}auto RECYCLONE__SPILL p = type->f_new_zerod();
+{'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
+{'\t'}q->v__5ftarget = p;
+{'\t'}q->v__5fmethodPtr = type->v__invoke_static;
+{'\t'}q->v__5fmethodPtrAux = a_0->v__function;
+{'\t'}return q;
+", 0)
+            );
+            // TODO: check signature.
+            code.For(
+                type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)), get(typeof(object)) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + transpiler.GenerateCheckArgumentNull("a_2") + $@"{'\t'}if (a_0->v__attributes & {(int)MethodAttributes.Static}) throw std::runtime_error(""must be instance method"");
+{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto RECYCLONE__SPILL p = static_cast<t__type*>(a_1)->f_new_zerod();
+{'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
+{'\t'}q->v__5ftarget = a_2;
+{'\t'}q->v__5fmethodPtr = a_0->v__function;
+{'\t'}return q;
+", 0)
+            );
             code.For(
                 type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__invoke(a_1, a_2, a_3, a_4, a_5);\n", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(MethodInfo.MakeGenericMethod)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__generic_definition || a_0->v__generic_definition != a_0) {transpiler.GenerateThrow("InvalidOperation")};
+{'\t'}size_t n = 0;
+{'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
+{'\t'}if (a_1->v__length != n) throw std::runtime_error(""not same number of types: "" + f__string(a_0->v__declaring_type->v__full_name) + ""::"" + f__string(a_0->v__name));
+{'\t'}for (auto p = a_0->v__generic_methods; *p; ++p) {{
+{'\t'}{'\t'}auto q = (*p)->v__generic_arguments;
+{'\t'}{'\t'}if (std::equal(q, q + n, a_1->f_data())) return *p;
+{'\t'}}}
+{'\t'}auto s = f__string(static_cast<t__type*>(a_1->f_data()[0])->v__full_name);
+{'\t'}for (size_t i = 1; i < n; ++i) s += "", "" + f__string(static_cast<t__type*>(a_1->f_data()[i])->v__full_name);
+{'\t'}throw std::runtime_error(""not bundled: "" + f__string(a_0->v__declaring_type->v__full_name) + ""::"" + f__string(a_0->v__name) + ""["" + s + ""]"");
+", 0)
             );
         })
         .For(get(typeof(RuntimePropertyInfo)), (type, code) =>
@@ -315,6 +359,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Type.GetEnumNames)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
+{'\t'}if (!a_0->v__fields) throw std::runtime_error(""no fields: "" + f__string(a_0->v__full_name));
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.Escape(get(typeof(string)))}>(n);
@@ -328,6 +373,7 @@ namespace IL2CXX
                 {
                     var array = transpiler.Escape(get(typeof(Array)));
                     return (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
+{'\t'}if (!a_0->v__fields) throw std::runtime_error(""no fields: "" + f__string(a_0->v__full_name));
 {'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
@@ -382,7 +428,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetGenericArguments)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type_definition) return f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(0);
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_definition) return f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(0);
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
@@ -392,8 +438,8 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetGenericTypeDefinition)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_type_definition) {transpiler.GenerateThrow("InvalidOperation")};
-{'\t'}return a_0->v__generic_type_definition;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__generic_definition) {transpiler.GenerateThrow("InvalidOperation")};
+{'\t'}return a_0->v__generic_definition;
 ", 0)
             );
             code.For(
@@ -452,27 +498,23 @@ namespace IL2CXX
             );
             code.For(
                 type.GetProperty(nameof(Type.IsConstructedGenericType)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition != a_0;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_definition && a_0->v__generic_definition != a_0;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.IsGenericType)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_definition;\n", 0)
             );
             code.For(
                 type.GetProperty(nameof(Type.IsGenericTypeDefinition)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_definition && a_0->v__generic_type_definition == a_0;\n", 0)
-            );
-            code.For(
-                type.GetProperty(nameof(Type.IsGenericTypeParameter)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_type_parameter;\n", 0)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_definition && a_0->v__generic_definition == a_0;\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.MakeGenericType)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__generic_type_definition || a_0->v__generic_type_definition != a_0) {transpiler.GenerateThrow("InvalidOperation")};
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__generic_definition || a_0->v__generic_definition != a_0) {transpiler.GenerateThrow("InvalidOperation")};
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
 {'\t'}if (a_1->v__length != n) throw std::runtime_error(""not same number of types: "" + f__string(a_0->v__full_name));
-{'\t'}for (auto p = a_0->v__constructed_generic_types; *p; ++p) {{
+{'\t'}for (auto p = a_0->v__generic_types; *p; ++p) {{
 {'\t'}{'\t'}auto q = (*p)->v__generic_arguments;
 {'\t'}{'\t'}if (std::equal(q, q + n, a_1->f_data())) return *p;
 {'\t'}}}
@@ -526,6 +568,40 @@ namespace IL2CXX
 {'\t'}{'\t'}if (a_5) {{
 {'\t'}{'\t'}{'\t'}auto p = a_x->v__parameters;
 {'\t'}{'\t'}{'\t'}for (size_t i = 0; i < a_5->v__length; ++i, ++p) if (!*p || (*p)->v__parameter_type != a_5->f_data()[i]) return true;
+{'\t'}{'\t'}{'\t'}if (*p) return true;
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}if (p) {transpiler.GenerateThrow("AmbiguousMatch")};
+{'\t'}{'\t'}p = a_x;
+{'\t'}{'\t'}return true;
+{'\t'}}});
+{'\t'}return p;
+", 0)
+            );
+            code.For(
+                type.GetMethod("GetMethodImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(int)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}t__runtime_method_info* p = nullptr;
+{'\t'}a_0->f_each_method(a_3, [&](auto a_x)
+{'\t'}{{
+{'\t'}{'\t'}size_t n = 0;
+{'\t'}{'\t'}if (a_x->v__generic_definition) for (auto p = a_x->v__generic_arguments; *p; ++p) ++n;
+{'\t'}{'\t'}if (n != a_2) return true;
+{'\t'}{'\t'}if (a_3 & {(int)BindingFlags.IgnoreCase} ? !std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
+{'\t'}{'\t'}}}) : a_x->v__name != name) return true;
+{'\t'}{'\t'}if (a_6) {{
+{'\t'}{'\t'}{'\t'}auto p = a_x->v__parameters;
+{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < a_6->v__length; ++i, ++p) {{
+{'\t'}{'\t'}{'\t'}{'\t'}if (!*p) return true;
+{'\t'}{'\t'}{'\t'}{'\t'}auto p0 = (*p)->v__parameter_type;
+{'\t'}{'\t'}{'\t'}{'\t'}auto& p1 = a_6->f_data()[i];
+{'\t'}{'\t'}{'\t'}{'\t'}if (p0 == p1) continue;
+{'\t'}{'\t'}{'\t'}{'\t'}if (p0->f_type() == &t__type_of<t__type>::v__instance) return true;
+{'\t'}{'\t'}{'\t'}{'\t'}if (p0->f_type() != p1->f_type()) return true;
+{'\t'}{'\t'}{'\t'}{'\t'}if (static_cast<t__generic_parameter*>(p0)->v__position != static_cast<t__generic_parameter*>(p1)->v__position) return true;
+{'\t'}{'\t'}{'\t'}}}
 {'\t'}{'\t'}{'\t'}if (*p) return true;
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}if (p) {transpiler.GenerateThrow("AmbiguousMatch")};

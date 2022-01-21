@@ -60,13 +60,12 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
-{'\t'}auto p = static_cast<t__type*>(a_1);
-{'\t'}auto q = static_cast<{transpiler.EscapeForValue(get(typeof(Delegate)))}>(f_engine()->f_allocate(sizeof({transpiler.Escape(get(typeof(MulticastDelegate)))})));
-{'\t'}q->v__5ftarget = q;
-{'\t'}q->v__5fmethodPtr = p->v__invoke_unmanaged;
-{'\t'}q->v__5fmethodPtrAux = a_0;
-{'\t'}p->f_finish(q);
-{'\t'}return q;
+{'\t'}auto type = static_cast<t__type*>(a_1);
+{'\t'}auto p = static_cast<{transpiler.EscapeForValue(get(typeof(Delegate)))}>(type->f_new_zerod());
+{'\t'}p->v__5ftarget = p;
+{'\t'}p->v__5fmethodPtr = type->v__invoke_unmanaged;
+{'\t'}p->v__5fmethodPtrAux = a_0;
+{'\t'}return p;
 ", 0)
             );
             code.For(

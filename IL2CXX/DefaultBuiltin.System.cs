@@ -159,6 +159,16 @@ namespace IL2CXX
                 type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
                 transpiler => ("\treturn true;\n", 1)
             );
+            code.For(
+                type.GetMethod(nameof(Type.MakeGenericMethodParameter)),
+                transpiler => ($@"{'\t'}auto p = f_engine()->f_allocate(sizeof(t__generic_method_parameter));
+{'\t'}std::memset(p + 1, 0, sizeof(t__generic_method_parameter) - sizeof(t__object));
+{'\t'}auto q = static_cast<t__generic_method_parameter*>(p);
+{'\t'}q->v__position = a_0;
+{'\t'}t__type_of<t__generic_method_parameter>::v__instance.f_finish(p);
+{'\t'}return q;
+", 0)
+            );
         })
         .For(get(typeof(ModuleHandle)), (type, code) =>
         {
@@ -625,13 +635,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("InternalAllocLike", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto type = a_0->f_type();
-{'\t'}auto n = sizeof({transpiler.Escape(get(typeof(MulticastDelegate)))});
-{'\t'}auto p = f_engine()->f_allocate(n);
-{'\t'}std::memset(p + 1, 0, n - sizeof(t__object));
-{'\t'}type->f_finish(p);
-{'\t'}return static_cast<{transpiler.EscapeForValue(get(typeof(MulticastDelegate)))}>(p);
-", 1)
+                transpiler => ($"\treturn static_cast<{transpiler.EscapeForStacked(transpiler.typeofMulticastDelegate)}>(a_0->f_type()->f_new_zerod());\n", 1)
             );
             // TODO
             code.For(
@@ -692,6 +696,7 @@ namespace IL2CXX
                 create,
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (type->v__generic_definition) for (auto p = type->v__generic_arguments; *p; ++p) if ((*p)->f_type() != &t__type_of<t__type>::v__instance) {transpiler.GenerateThrow("Argument")};
 {'\t'}auto n = a_3 ? a_3->v__length : 0;
 {'\t'}if (type->v__value_type && n <= 0) return type->f_new_zerod();
 {'\t'}if (!type->v__constructors) std::cerr << ""no constructors: "" << f__string(type->v__full_name) << std::endl;
@@ -701,7 +706,7 @@ namespace IL2CXX
 {'\t'}{'\t'}auto p = a_x->v__parameters;
 {'\t'}{'\t'}for (size_t i = 0; i < n; ++i, ++p) {{
 {'\t'}{'\t'}{'\t'}if (!*p) return true;
-{'\t'}{'\t'}{'\t'}if (t__object* q = a_3->f_data()[i]) if (!q->f_type()->f_assignable_to((*p)->v__parameter_type)) return true;
+{'\t'}{'\t'}{'\t'}if (t__object* q = a_3->f_data()[i]) if (!q->f_type()->f_assignable_to(static_cast<t__type*>((*p)->v__parameter_type))) return true;
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}if (*p) return true;
 {'\t'}{'\t'}constructor = a_x;
@@ -912,9 +917,14 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod(nameof(ToString), Type.EmptyTypes),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto n = a_0->f_type()->v__size;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
+{'\t'}auto n = type->v__size;
 {'\t'}auto v = a_0 + 1;
-{'\t'}for (auto p = a_0->f_type()->v__fields; *p; ++p) if (std::memcmp((*p)->f_address(nullptr), v, n) == 0) return f__new_string((*p)->v__name);
+{'\t'}if (type->v__fields) {{
+{'\t'}{'\t'}for (auto p = type->v__fields; *p; ++p) if (std::memcmp((*p)->f_address(nullptr), v, n) == 0) return f__new_string((*p)->v__name);
+{'\t'}}} else {{
+{'\t'}{'\t'}std::cerr << ""no fields: "" << f__string(type->v__full_name) << std::endl;
+{'\t'}}}
 {'\t'}switch (n) {{
 {'\t'}case 1:
 {'\t'}{'\t'}return f__new_string(std::to_string(*reinterpret_cast<uint8_t*>(v)));

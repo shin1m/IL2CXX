@@ -255,6 +255,19 @@ inline {returns}
                 }
             }
             writer.WriteLine('}');
+            if (method.IsGenericMethod && ShouldGenerateReflection(method.DeclaringType))
+            {
+                var definition = Define(method.DeclaringType);
+                definition.Definitions.WriteLine($@"static t__abstract_type* v__generic_arguments_{identifier}[] = {{
+{string.Join(string.Empty, method.GetGenericArguments().Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
+}};
+t__runtime_method_info v__method_{identifier}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(method.DeclaringType)}>::v__instance, u""{method.Name}""sv, {(int)method.Attributes}, {WriteAttributes(method, identifier, definition.Definitions)}, {WriteParameters(method.GetParameters(), identifier, definition.Definitions)}, {GenerateInvokeFunction(method)}, reinterpret_cast<void*>({identifier}),
+#ifdef __EMSCRIPTEN__
+{'\t'}{GenerateWASMInvokeFunction(method)},
+#endif
+{'\t'}&v__method_{identifier}, v__generic_arguments_{identifier}, nullptr
+}};");
+            }
         }
 
         public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType, string resources)
@@ -276,6 +289,7 @@ inline {returns}
             Define(method.DeclaringType);
             Enqueue(method);
             foreach (var x in Bundle) Enqueue(x);
+            foreach (var x in BundleMethods) Enqueue(x);
             do
             {
                 ProcessNextMethod(writerForType);
@@ -310,8 +324,7 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                     for (var i = 0; !assemblyIdentifiers.Add(name); ++i) name = $"{escaped}__{i}";
                     assemblyToIdentifier.Add(assembly, name);
                     writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
-                    var entry = method == assembly.EntryPoint && ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "nullptr";
-                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {entry}}};");
+                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}}};");
                     var names = assembly.GetManifestResourceNames();
                     if (names.Length > 0)
                     {
@@ -368,7 +381,7 @@ struct t_thread_static
 t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
 
 const std::map<std::string_view, t__type*> v__name_to_type{{{
-    string.Join(",", runtimeDefinitions.Select(x => $"\n\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))
+    string.Join(",", runtimeDefinitions.Where(x => !x.Type.IsGenericParameter).Select(x => $"\n\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))
 }
 }};
 

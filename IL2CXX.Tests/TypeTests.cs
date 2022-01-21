@@ -85,14 +85,17 @@ namespace IL2CXX.Tests
         [Foo(Answer.Yes, new[] { "foo" }, typeof(IFoo), N0 = new[] { Answer.No }, N1 = "bar", N2 = new[] { typeof(Bar) })]
         class Zot
         {
+            public static Zot Be(string x, string y) => new Zot($"{x}, {y}!");
+
             public string X;
             public int Y;
             public string Z { get; set; }
             public int W { get; set; }
-            public string Do(string x) => $"{X}, {x}!";
-            public int Do(int x) => Y + x;
             public Zot() { }
             public Zot(string x) => X = x;
+            public string Do(string x) => $"{X}, {x}!";
+            public int Do(int x) => Y + x;
+            public string Do<T, U>(T x, U y) => $"{X}, {x} {y}!";
         }
         static int GetField()
         {
@@ -151,11 +154,26 @@ namespace IL2CXX.Tests
         }
         static int GetMethods()
         {
-            if (typeof(Zot).GetMethods().Length != 6) return 1;
-            if (typeof(Zot).GetMethods(BindingFlags.Instance | BindingFlags.Public).Length != 6) return 2;
+            if (typeof(Zot).GetMethods().Length != 8) return 1;
+            if (typeof(Zot).GetMethods(BindingFlags.Instance | BindingFlags.Public).Length != 7) return 2;
             if (typeof(Zot).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).Length != 0) return 3;
-            if (typeof(Zot).GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 0) return 4;
+            if (typeof(Zot).GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 1) return 4;
             return 0;
+        }
+        static int CreateDelegate()
+        {
+            var f = typeof(Zot).GetMethod(nameof(Zot.Be)).CreateDelegate<Func<string, string, Zot>>();
+            return f("Hello", "World").X == "Hello, World!" ? 0 : 1;
+        }
+        static int CreateDelegateWithTarget()
+        {
+            var f = typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).CreateDelegate<Func<string, string>>(new Zot("Hello"));
+            return f("World") == "Hello, World!" ? 0 : 1;
+        }
+        static int MakeGenericMethod()
+        {
+            var f = typeof(Zot).GetMethod(nameof(Zot.Do), 2, new[] { Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1) }).MakeGenericMethod(typeof(string), typeof(int)).CreateDelegate<Func<string, int, string>>(new Zot("Hello"));
+            return f("World", 1) == "Hello, World 1!" ? 0 : 1;
         }
         static int GetProperty()
         {
@@ -258,6 +276,9 @@ namespace IL2CXX.Tests
             nameof(GetConstructors) => GetConstructors(),
             nameof(GetMethod) => GetMethod(),
             nameof(GetMethods) => GetMethods(),
+            nameof(CreateDelegate) => CreateDelegate(),
+            nameof(CreateDelegateWithTarget) => CreateDelegateWithTarget(),
+            nameof(MakeGenericMethod) => MakeGenericMethod(),
             nameof(GetProperty) => GetProperty(),
             nameof(SetProperty) => SetProperty(),
             nameof(GetProperties) => GetProperties(),
@@ -275,6 +296,8 @@ namespace IL2CXX.Tests
             typeof(string),
             typeof(string[]),
             typeof(Zot)
+        }, new[] {
+            typeof(Zot).GetMethod(nameof(Zot.Do), 2, new[] { Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1) }).MakeGenericMethod(typeof(string), typeof(int))
         });
         [Test]
         public void Test(
@@ -297,6 +320,9 @@ namespace IL2CXX.Tests
                 nameof(GetConstructors),
                 nameof(GetMethod),
                 nameof(GetMethods),
+                nameof(CreateDelegate),
+                nameof(CreateDelegateWithTarget),
+                nameof(MakeGenericMethod),
                 nameof(GetProperty),
                 nameof(SetProperty),
                 nameof(GetProperties),

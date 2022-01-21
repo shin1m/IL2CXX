@@ -61,6 +61,11 @@ struct t__member_info : t__object
 	t__member_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes);
 };
 
+struct t__abstract_type : t__member_info
+{
+	using t__member_info::t__member_info;
+};
+
 struct t__field_info : t__member_info
 {
 	using t__member_info::t__member_info;
@@ -81,7 +86,7 @@ struct t__runtime_parameter_info
 	static constexpr t__runtime_parameter_info* v__empty_parameters[] = {nullptr};
 
 	int32_t v__attributes;
-	t__type* v__parameter_type;
+	t__abstract_type* v__parameter_type;
 	void* v__default_value;
 };
 
@@ -118,15 +123,36 @@ struct t__method_info : t__method_base
 
 struct t__runtime_method_info : t__method_info
 {
+	void* v__function;
 #ifdef __EMSCRIPTEN__
 	t__object*(*v__wasm_invoke)(t__object*, void**);
+#endif
+	t__runtime_method_info* v__generic_definition;
+	t__abstract_type* const* v__generic_arguments;
+	t__runtime_method_info* const* v__generic_methods;
 
-	t__runtime_method_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), t__object*(*a_wasm_invoke)(t__object*, void**)) : t__method_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__wasm_invoke(a_wasm_invoke)
+	t__runtime_method_info(
+		t__type* a_type,
+		t__type* a_declaring_type, std::u16string_view a_name,
+		int32_t a_attributes,
+		t__custom_attribute* const* a_custom_attributes,
+		t__runtime_parameter_info* const* a_parameters,
+		t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), void* a_function,
+#ifdef __EMSCRIPTEN__
+		t__object*(*a_wasm_invoke)(t__object*, void**),
+#endif
+		t__runtime_method_info* a_generic_definition,
+		t__abstract_type* const* a_generic_arguments,
+		t__runtime_method_info* const* a_generic_methods
+	) : t__method_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__function(a_function),
+#ifdef __EMSCRIPTEN__
+		v__wasm_invoke(a_wasm_invoke),
+#endif
+		v__generic_definition(a_generic_definition),
+		v__generic_arguments(a_generic_arguments),
+		v__generic_methods(a_generic_methods)
 	{
 	}
-#else
-	using t__method_info::t__method_info;
-#endif
 };
 
 struct t__property_info : t__member_info
@@ -159,11 +185,6 @@ struct t__runtime_assembly : t__assembly
 	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point);
 };
 
-struct t__abstract_type : t__member_info
-{
-	using t__member_info::t__member_info;
-};
-
 struct t__type : t__abstract_type
 {
 	static constexpr t__type* v__empty_types[] = {nullptr};
@@ -190,10 +211,8 @@ struct t__type : t__abstract_type
 	uint8_t v__by_ref : 1;
 	uint8_t v__pointer : 1;
 	uint8_t v__by_ref_like : 1;
-	uint8_t v__generic_type_parameter : 1;
 	uint8_t v__cor_element_type;
 	uint8_t v__type_code;
-	uint8_t v__generic_parameter_attributes;
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
@@ -208,13 +227,14 @@ struct t__type : t__abstract_type
 		struct
 		{
 			void* v__multicast_invoke;
+			void* v__invoke_static;
 			void* v__invoke_unmanaged;
 		};
 		t__type* v__underlying = nullptr;
 	};
-	t__type* v__generic_type_definition = nullptr;
-	t__type* const* v__generic_arguments;
-	t__type* const* v__constructed_generic_types;
+	t__type* v__generic_definition = nullptr;
+	t__abstract_type* const* v__generic_arguments;
+	t__type* const* v__generic_types;
 	t__runtime_field_info* const* v__fields = nullptr;
 	t__runtime_constructor_info* const* v__constructors = nullptr;
 	t__runtime_method_info* const* v__methods = nullptr;
@@ -227,14 +247,14 @@ struct t__type : t__abstract_type
 		std::u16string_view a_namespace, std::u16string_view a_name, std::u16string_view a_full_name, std::u16string_view a_display_name,
 		int32_t a_attribute_flags,
 		t__custom_attribute* const* a_custom_attributes,
-		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_by_ref, bool a_pointer, bool a_by_ref_like, bool a_generic_type_parameter,
+		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_by_ref, bool a_pointer, bool a_by_ref_like,
 		size_t a_size,
 		t__type* a_szarray
 	) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags, a_custom_attributes), v__base(a_base),
 	v__interfaces(a_interfaces), v__interface_to_methods(std::move(a_interface_to_methods)),
 	v__assembly(a_assembly),
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
-	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__by_ref(a_by_ref), v__pointer(a_pointer), v__by_ref_like(a_by_ref_like), v__generic_type_parameter(a_generic_type_parameter),
+	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__by_ref(a_by_ref), v__pointer(a_pointer), v__by_ref_like(a_by_ref_like),
 	v__size(a_size),
 	v__szarray(a_szarray)
 	{
@@ -415,6 +435,26 @@ struct t__type : t__abstract_type
 			if (!(a_flags & bf_flatten_hierarchy)) a_flags &= ~bf_static;
 		}
 	}
+};
+
+struct t__generic_parameter : t__abstract_type
+{
+	int32_t v__parameter_attributes;
+	int32_t v__position;
+
+	t__generic_parameter(t__type* a_type, std::u16string_view a_name, int32_t a_attribute_flags, t__custom_attribute* const* a_custom_attributes, int32_t a_parameter_attributes, int32_t a_position) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags, a_custom_attributes), v__parameter_attributes(a_parameter_attributes), v__position(a_position)
+	{
+	}
+};
+
+struct t__generic_type_parameter : t__generic_parameter
+{
+	using t__generic_parameter::t__generic_parameter;
+};
+
+struct t__generic_method_parameter : t__generic_parameter
+{
+	using t__generic_parameter::t__generic_parameter;
 };
 
 struct t__custom_attribute

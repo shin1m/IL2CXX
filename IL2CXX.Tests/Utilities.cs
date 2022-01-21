@@ -37,7 +37,7 @@ namespace IL2CXX.Tests
             return process.ExitCode;
         }
 
-        public static string Build(MethodInfo method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null)
+        public static string Build(MethodInfo method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null, IEnumerable<MethodInfo> bundleMethods = null)
         {
             Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
@@ -68,6 +68,15 @@ namespace il2cxx
                 new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem)
                 {
                     Bundle = bundle?.Select(get) ?? Enumerable.Empty<Type>(),
+                    BundleMethods = bundleMethods?.Select(x =>
+                    {
+                        var gd = x.GetGenericMethodDefinition();
+                        return get(x.DeclaringType).GetMethod(
+                            gd.Name, gd.GetGenericArguments().Length,
+                            BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null,
+                            gd.GetParameters().Select(x => x.ParameterType).Select(x => x.IsGenericMethodParameter ? Type.MakeGenericMethodParameter(x.GenericParameterPosition) : get(x)).ToArray(), null
+                        ).MakeGenericMethod(x.GetGenericArguments().Select(get).ToArray());
+                    }) ?? Enumerable.Empty<MethodInfo>(),
                     GenerateReflection = reflection.Contains
                 }.Do(method, declarations, main, (type, inline) => inline ? inlines : definitions[
                     type.IsValueType || type.IsInterface || type.IsArray ? 0 :
@@ -106,8 +115,8 @@ target_compile_definitions(runco PRIVATE RECYCLONE__COOPERATIVE)
             Assert.AreEqual(0, Spawn(cmake, "--build .", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
             return build;
         }
-        public static string Build(Func<int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null) => Build(method.Method, bundle, generateReflection);
-        public static string Build(Func<string[], int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null) => Build(method.Method, bundle, generateReflection);
+        public static string Build(Func<int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null, IEnumerable<MethodInfo> bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
+        public static string Build(Func<string[], int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null, IEnumerable<MethodInfo> bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
         public static void Run(string build, bool cooperative, string arguments, bool verify = true)
         {
             IEnumerable<(string, string)> environment = new[]

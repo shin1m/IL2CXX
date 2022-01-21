@@ -26,6 +26,7 @@ namespace IL2CXX
             public readonly Dictionary<string, int> Indices;
             public readonly Type Type;
             public readonly string VariableType;
+            public readonly bool IsPointer;
             public readonly string Variable;
 
             public Stack(Transpiler transpiler)
@@ -43,6 +44,7 @@ namespace IL2CXX
                 if (Type.IsByRef || Type.IsPointer || Type == transpiler.typeofIntPtr || Type == transpiler.typeofUIntPtr)
                 {
                     VariableType = "void*";
+                    IsPointer = true;
                     prefix = "p";
                 }
                 else if (transpiler.primitives.ContainsKey(Type))
@@ -80,6 +82,7 @@ namespace IL2CXX
                 else if (!Type.IsValueType)
                 {
                     VariableType = "t__object* RECYCLONE__SPILL";
+                    IsPointer = true;
                     prefix = "o";
                 }
                 else
@@ -100,14 +103,14 @@ namespace IL2CXX
                 for (var x = this; x != null; x = x.Pop) yield return x;
             }
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-            public string AsSigned => VariableType.EndsWith("*") ? $"reinterpret_cast<intptr_t>({Variable})" : Variable;
+            public string AsSigned => IsPointer ? $"reinterpret_cast<intptr_t>({Variable})" : Variable;
             public string AsUnsigned => VariableType switch
             {
                 "int32_t" => $"static_cast<uint32_t>({Variable})",
                 "int64_t" => $"static_cast<uint64_t>({Variable})",
-                _ => VariableType.EndsWith("*") ? $"reinterpret_cast<uintptr_t>({Variable})" : Variable
+                _ => IsPointer ? $"reinterpret_cast<uintptr_t>({Variable})" : Variable
             };
-            public string Assign(string value) => $"{Variable} = {(VariableType.EndsWith("*") ? $"reinterpret_cast<{VariableType}>({value})" : value)}";
+            public string Assign(string value) => $"{Variable} = {(IsPointer ? $"reinterpret_cast<{VariableType}>({value})" : value)}";
         }
         class Instruction
         {
@@ -138,6 +141,7 @@ namespace IL2CXX
         public readonly bool CheckNull;
         public readonly bool CheckRange;
         public IEnumerable<Type> Bundle = Enumerable.Empty<Type>();
+        public IEnumerable<MethodInfo> BundleMethods = Enumerable.Empty<MethodInfo>();
         public Func<Type, bool> GenerateReflection = _ => false;
         private bool ShouldGenerateReflection(Type type) => type.IsSubclassOf(typeofAttribute) || GenerateReflection(type);
         private readonly Func<Type, Type> getType;
@@ -150,6 +154,8 @@ namespace IL2CXX
         public readonly Type typeofRuntimePropertyInfo;
         public readonly Type typeofType;
         public readonly Type typeofRuntimeType;
+        public readonly Type typeofRuntimeGenericTypeParameter;
+        public readonly Type typeofRuntimeGenericMethodParameter;
         public readonly Type typeofBoolean;
         public readonly Type typeofByte;
         public readonly Type typeofSByte;
@@ -194,7 +200,6 @@ namespace IL2CXX
         private readonly MethodInfo finalizeOfObject;
         private readonly Instruction[] instructions1 = new Instruction[256];
         private readonly Instruction[] instructions2 = new Instruction[256];
-        private readonly Dictionary<(string, GenericParameterAttributes), Type> genericParameters = new();
         private readonly HashSet<string> identifiers = new();
         private readonly Dictionary<Type, string> typeToIdentifier = new();
         private readonly Dictionary<MethodKey, string> methodToIdentifier = new();
@@ -577,14 +582,6 @@ namespace IL2CXX
             queuedMethods.Enqueue(method);
         }
         private static bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
-        private Type Normalize(Type type)
-        {
-            if (!type.IsGenericParameter) return type;
-            var key = (type.ToString(), type.GenericParameterAttributes);
-            if (genericParameters.TryGetValue(key, out var x)) return x;
-            genericParameters.Add(key, type);
-            return type;
-        }
         private string Identifier(string name)
         {
             var x = name;
@@ -593,7 +590,6 @@ namespace IL2CXX
         }
         public string EscapeType(Type type)
         {
-            type = Normalize(type);
             if (typeToIdentifier.TryGetValue(type, out var name)) return name;
             name = Identifier($"t_{Escape(type.ToString())}");
             typeToIdentifier.Add(type, name);

@@ -72,40 +72,24 @@ namespace IL2CXX
 "))}";
                 if (key == ToKey(type.GetMethod("Get"))) return (prepare() + "\treturn a_0->f_data()[i];\n", 1);
                 if (key == ToKey(type.GetMethod("Set"))) return (prepare() + $"\ta_0->f_data()[i] = a_{rank + 1};\n", 1);
-                if (key == ToKey(type.GetMethod("Address"))) return (prepare() + "\treturn a_0->f_data() + i;\n", 1);
+                var address = type.GetMethod("Address");
+                if (key == ToKey(address)) return (prepare() + $"\treturn reinterpret_cast<{transpiler.EscapeForStacked(address.ReturnType)}>(a_0->f_data() + i);\n", 1);
             }
             if (type.IsSubclassOf(transpiler.typeofDelegate) && type != transpiler.typeofMulticastDelegate)
             {
-                var invoke = type.GetMethod("Invoke");
-                if (method == type.GetConstructor(new[] { transpiler.typeofObject, transpiler.typeofIntPtr }))
-                {
-                    var @return = invoke.ReturnType;
-                    var parameters = invoke.GetParameters().Select(x => x.ParameterType);
-                    return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
+                if (method == type.GetConstructor(new[] { transpiler.typeofObject, transpiler.typeofIntPtr })) return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}if (a_0) {{
 {'\t'}{'\t'}p->v__5ftarget = a_0;
 {'\t'}{'\t'}p->v__5fmethodPtr = a_1;
 {'\t'}}} else {{
 {'\t'}{'\t'}p->v__5ftarget = p;
-{'\t'}{'\t'}p->v__5fmethodPtr = reinterpret_cast<void*>(+[]({
-    string.Join(",", parameters.Prepend(type).Select((x, i) => $"\n\t\t\t{transpiler.EscapeForStacked(x)} a_{i}"))
-}
-{'\t'}{'\t'}) -> {transpiler.EscapeForStacked(@return)}
-{'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}return reinterpret_cast<{
-    transpiler.EscapeForStacked(@return)
-}(*)({
-    string.Join(", ", parameters.Select(x => transpiler.EscapeForStacked(x)))
-})>(a_0->v__5fmethodPtrAux.v__5fvalue)({
-    string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")))
-});
-{'\t'}{'\t'}}});
+{'\t'}{'\t'}p->v__5fmethodPtr = t__type_of<{transpiler.Escape(type)}>::v__instance.v__invoke_static;
 {'\t'}{'\t'}p->v__5fmethodPtrAux = a_1;
 {'\t'}}}
 {'\t'}return p;
 ", 1);
-                }
-                else if (key == ToKey(invoke))
+                var invoke = type.GetMethod("Invoke");
+                if (key == ToKey(invoke))
                 {
                     var @return = invoke.ReturnType;
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);

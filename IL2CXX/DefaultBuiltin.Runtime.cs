@@ -54,9 +54,9 @@ namespace IL2CXX
                 type.GetMethod(nameof(MemberInfo.IsDefined)),
                 transpiler =>
                 {
-                    var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.InternalIsDefined));
+                    var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.IsDefined));
                     transpiler.Enqueue(method);
-                    return ($"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 0);
+                    return ($"\treturn {transpiler.Escape(method)}(a_0, a_1, a_2);\n", 0);
                 }
             );
         }
@@ -230,8 +230,7 @@ namespace IL2CXX
             // TODO: check signature.
             code.For(
                 type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!(a_0->v__attributes & {(int)MethodAttributes.Static})) throw std::runtime_error(""must be static method"");
-{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
 {'\t'}auto RECYCLONE__SPILL p = type->f_new_zerod();
 {'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
@@ -244,12 +243,18 @@ namespace IL2CXX
             // TODO: check signature.
             code.For(
                 type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)), get(typeof(object)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + transpiler.GenerateCheckArgumentNull("a_2") + $@"{'\t'}if (a_0->v__attributes & {(int)MethodAttributes.Static}) throw std::runtime_error(""must be instance method"");
-{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
-{'\t'}auto RECYCLONE__SPILL p = static_cast<t__type*>(a_1)->f_new_zerod();
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_1);
+{'\t'}auto RECYCLONE__SPILL p = type->f_new_zerod();
 {'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
-{'\t'}q->v__5ftarget = a_2;
-{'\t'}q->v__5fmethodPtr = a_0->v__function;
+{'\t'}if (a_2) {{
+{'\t'}{'\t'}q->v__5ftarget = a_2;
+{'\t'}{'\t'}q->v__5fmethodPtr = a_0->v__function;
+{'\t'}}} else {{
+{'\t'}{'\t'}q->v__5ftarget = p;
+{'\t'}{'\t'}q->v__5fmethodPtr = type->v__invoke_static;
+{'\t'}{'\t'}q->v__5fmethodPtrAux = a_0->v__function;
+{'\t'}}}
 {'\t'}return q;
 ", 0)
             );

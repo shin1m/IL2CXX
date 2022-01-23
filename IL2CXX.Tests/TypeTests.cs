@@ -165,10 +165,20 @@ namespace IL2CXX.Tests
             var f = typeof(Zot).GetMethod(nameof(Zot.Be)).CreateDelegate<Func<string, string, Zot>>();
             return f("Hello", "World").X == "Hello, World!" ? 0 : 1;
         }
+        static int CreateDelegateWithNull()
+        {
+            var f = typeof(Zot).GetMethod(nameof(Zot.Be)).CreateDelegate<Func<string, string, Zot>>(null);
+            return f("Hello", "World").X == "Hello, World!" ? 0 : 1;
+        }
         static int CreateDelegateWithTarget()
         {
             var f = typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).CreateDelegate<Func<string, string>>(new Zot("Hello"));
             return f("World") == "Hello, World!" ? 0 : 1;
+        }
+        static int CreateDelegateAsStatic()
+        {
+            var f = typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).CreateDelegate<Func<Zot, string, string>>();
+            return f(new Zot("Hello"), "World") == "Hello, World!" ? 0 : 1;
         }
         static int MakeGenericMethod()
         {
@@ -277,7 +287,9 @@ namespace IL2CXX.Tests
             nameof(GetMethod) => GetMethod(),
             nameof(GetMethods) => GetMethods(),
             nameof(CreateDelegate) => CreateDelegate(),
+            nameof(CreateDelegateWithNull) => CreateDelegateWithNull(),
             nameof(CreateDelegateWithTarget) => CreateDelegateWithTarget(),
+            nameof(CreateDelegateAsStatic) => CreateDelegateAsStatic(),
             nameof(MakeGenericMethod) => MakeGenericMethod(),
             nameof(GetProperty) => GetProperty(),
             nameof(SetProperty) => SetProperty(),
@@ -321,7 +333,9 @@ namespace IL2CXX.Tests
                 nameof(GetMethod),
                 nameof(GetMethods),
                 nameof(CreateDelegate),
+                nameof(CreateDelegateWithNull),
                 nameof(CreateDelegateWithTarget),
+                nameof(CreateDelegateAsStatic),
                 nameof(MakeGenericMethod),
                 nameof(GetProperty),
                 nameof(SetProperty),

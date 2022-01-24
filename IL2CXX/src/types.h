@@ -216,6 +216,7 @@ struct t__type : t__abstract_type
 	size_t v__size;
 	size_t v__managed_size = 0;
 	size_t v__unmanaged_size = 0;
+	size_t v__slots;
 	t__type* v__szarray;
 	union
 	{
@@ -249,6 +250,7 @@ struct t__type : t__abstract_type
 		t__custom_attribute* const* a_custom_attributes,
 		bool a_managed, bool a_value_type, bool a_array, bool a_enum, bool a_by_ref, bool a_pointer, bool a_by_ref_like,
 		size_t a_size,
+		size_t a_slots,
 		t__type* a_szarray
 	) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags, a_custom_attributes), v__base(a_base),
 	v__interfaces(a_interfaces), v__interface_to_methods(std::move(a_interface_to_methods)),
@@ -256,6 +258,7 @@ struct t__type : t__abstract_type
 	v__namespace(a_namespace), v__full_name(a_full_name), v__display_name(a_display_name),
 	v__managed(a_managed), v__value_type(a_value_type), v__array(a_array), v__enum(a_enum), v__by_ref(a_by_ref), v__pointer(a_pointer), v__by_ref_like(a_by_ref_like),
 	v__size(a_size),
+	v__slots(a_slots),
 	v__szarray(a_szarray)
 	{
 	}

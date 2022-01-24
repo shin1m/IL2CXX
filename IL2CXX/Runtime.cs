@@ -58,10 +58,20 @@ namespace IL2CXX
         public override Delegate CreateDelegate(Type type) => throw new NotImplementedException();
         public override Delegate CreateDelegate(Type type, object target) => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
+        public override MethodInfo GetBaseDefinition()
+        {
+            for (var @this = this;;)
+            {
+                var parent = @this.GetParentDefinition();
+                if (parent == null) return @this;
+                @this = parent;
+            }
+        }
         public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
         public override IList<CustomAttributeData> GetCustomAttributesData() => throw new NotImplementedException();
         public override ParameterInfo[] GetParameters() => throw new NotImplementedException();
+        public RuntimeMethodInfo GetParentDefinition() => throw new NotImplementedException();
         public override object Invoke(object @this, BindingFlags bindingFlags, Binder binder, object[] parameters, CultureInfo culture) => throw new NotImplementedException();
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
         public override MethodInfo MakeGenericMethod(params Type[] types) => throw new NotImplementedException();
@@ -76,6 +86,7 @@ namespace IL2CXX
         public override IList<CustomAttributeData> GetCustomAttributesData() => throw new NotImplementedException();
         public override ParameterInfo[] GetIndexParameters() => throw new NotImplementedException();
         public override MethodInfo GetMethod => throw new NotImplementedException();
+        public PropertyInfo GetParentDefinition(Type[] parameters) => ((RuntimeMethodInfo)(GetMethod ?? SetMethod)).GetParentDefinition()?.DeclaringType.GetProperty(Name, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, PropertyType, parameters, null);
         public override object GetValue(object @this, BindingFlags bindingFlags, Binder binder, object[] index, CultureInfo culture) => throw new NotImplementedException();
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
@@ -177,12 +188,18 @@ namespace IL2CXX
                 switch (member)
                 {
                     case Type t:
-                        for (t = t.BaseType; t != null; t = t.BaseType) data = data.Concat(get(t));
-                        break;
-                    case MethodInfo m:
-                        for (var bd = m.GetBaseDefinition(); m != bd;)
+                        while (true)
                         {
-                            m = Array.Find(m.DeclaringType.BaseType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), x => x.GetBaseDefinition() == bd);
+                            t = t.BaseType;
+                            if (t == null) break;
+                            data = data.Concat(get(t));
+                        }
+                        break;
+                    case RuntimeMethodInfo m:
+                        while (true)
+                        {
+                            m = m.GetParentDefinition();
+                            if (m == null) break;
                             data = data.Concat(get(m));
                         }
                         break;
@@ -226,12 +243,18 @@ namespace IL2CXX
             switch (member)
             {
                 case Type t:
-                    for (t = t.BaseType; t != null; t = t.BaseType) if (InternalIsDefined(t, attributeType)) return true;
-                    break;
-                case MethodInfo m:
-                    for (var bd = m.GetBaseDefinition(); m != bd;)
+                    while (true)
                     {
-                        m = Array.Find(m.DeclaringType.BaseType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), x => x.GetBaseDefinition() == bd);
+                        t = t.BaseType;
+                        if (t == null) break;
+                        if (InternalIsDefined(t, attributeType)) return true;
+                    }
+                    break;
+                case RuntimeMethodInfo m:
+                    while (true)
+                    {
+                        m = m.GetParentDefinition();
+                        if (m == null) break;
                         if (InternalIsDefined(m, attributeType)) return true;
                     }
                     break;

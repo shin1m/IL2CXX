@@ -1017,7 +1017,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
     type.IsByRefLike ? "true" : "false"
 )}, {(
     type == typeofVoid || type.ContainsGenericParameters ? "0" : $"sizeof({EscapeForValue(type)})"
-)}, {szarray})
+)}, {definition.Methods.Count}, {szarray})
 {{");
             writerForDefinitions.WriteLine($@"{'\t'}v__cor_element_type = {GetCorElementType(type)};
 {'\t'}v__type_code = {(int)Type.GetTypeCode(type)};");

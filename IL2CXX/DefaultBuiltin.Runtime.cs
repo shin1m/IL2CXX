@@ -277,6 +277,25 @@ namespace IL2CXX
 {'\t'}throw std::runtime_error(""not bundled: "" + f__string(a_0->v__declaring_type->v__full_name) + ""::"" + f__string(a_0->v__name) + ""["" + s + ""]"");
 ", 0)
             );
+            code.For(
+                type.GetMethod(nameof(RuntimeMethodInfo.GetParentDefinition)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!(a_0->v__attributes & {(int)MethodAttributes.Virtual})) return nullptr;
+{'\t'}auto type = a_0->v__declaring_type;
+{'\t'}size_t i = 0;
+{'\t'}while (reinterpret_cast<void**>(type + 1)[i] != a_0->v__function) ++i;
+{'\t'}type = type->v__base;
+{'\t'}if (!type || type->v__slots <= i) return nullptr;
+{'\t'}auto function = reinterpret_cast<void**>(type + 1)[i];
+{'\t'}while (auto base = type->v__base) {{
+{'\t'}{'\t'}if (base->v__slots <= i || reinterpret_cast<void**>(base + 1)[i] != function) break;
+{'\t'}{'\t'}type = base;
+{'\t'}}}
+{'\t'}auto p = type->v__methods;
+{'\t'}if (!p) throw std::runtime_error(""no methods: "" + f__string(type->v__full_name));
+{'\t'}while ((*p)->v__function != function) ++p;
+{'\t'}return *p;
+", 0)
+            );
         })
         .For(get(typeof(RuntimePropertyInfo)), (type, code) =>
         {
@@ -566,6 +585,7 @@ namespace IL2CXX
 {'\t'}t__runtime_method_info* p = nullptr;
 {'\t'}a_0->f_each_method(a_2, [&](auto a_x)
 {'\t'}{{
+{'\t'}{'\t'}if (p && a_x->v__declaring_type != p->v__declaring_type) return false;
 {'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? !std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);
@@ -589,6 +609,7 @@ namespace IL2CXX
 {'\t'}t__runtime_method_info* p = nullptr;
 {'\t'}a_0->f_each_method(a_3, [&](auto a_x)
 {'\t'}{{
+{'\t'}{'\t'}if (p && a_x->v__declaring_type != p->v__declaring_type) return false;
 {'\t'}{'\t'}size_t n = 0;
 {'\t'}{'\t'}if (a_x->v__generic_definition) for (auto p = a_x->v__generic_arguments; *p; ++p) ++n;
 {'\t'}{'\t'}if (n != a_2) return true;
@@ -623,6 +644,7 @@ namespace IL2CXX
 {'\t'}t__runtime_property_info* p = nullptr;
 {'\t'}a_0->f_each_property(a_2, [&](auto a_x)
 {'\t'}{{
+{'\t'}{'\t'}if (p && a_x->v__declaring_type != p->v__declaring_type) return false;
 {'\t'}{'\t'}if (a_2 & {(int)BindingFlags.IgnoreCase} ? !std::equal(a_x->v__name.begin(), a_x->v__name.end(), name.begin(), name.end(), [](auto a_x, auto a_y)
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}return std::toupper(a_x) == std::toupper(a_y);

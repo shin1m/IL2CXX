@@ -460,10 +460,18 @@ namespace IL2CXX
         })
         .For(get(typeof(Attribute)), (type, code) =>
         {
+            code.For(
+                type.GetMethod("GetParentDefinition", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(PropertyInfo)), get(typeof(Type[])) }),
+                transpiler =>
+                {
+                    var method = get(typeof(RuntimePropertyInfo)).GetMethod(nameof(RuntimePropertyInfo.GetParentDefinition));
+                    transpiler.Enqueue(method);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(static_cast<t__runtime_property_info*>(a_0), a_1);\n", 0);
+                }
+            );
             // TODO
             foreach (var ts in new[]
             {
-                new[] { get(typeof(PropertyInfo)), get(typeof(Type[])) },
                 new[] { get(typeof(EventInfo)) },
                 new[] { get(typeof(ParameterInfo)) }
             }) code.For(

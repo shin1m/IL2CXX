@@ -14,6 +14,7 @@ namespace IL2CXX
         public override string FullName => throw new NotImplementedException();
         public string Name => throw new NotImplementedException();
         public override object[] GetCustomAttributes(Type attributeType, bool inherit) => Array.Empty<Attribute>();
+        public override Type[] GetExportedTypes() => throw new NotImplementedException();
         public override Stream GetManifestResourceStream(string name)
         {
             try
@@ -130,6 +131,7 @@ namespace IL2CXX
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
         public override bool IsGenericType => throw new NotImplementedException();
         public override bool IsGenericTypeDefinition => throw new NotImplementedException();
+        protected override bool IsPrimitiveImpl() => throw new NotImplementedException();
         protected override bool IsPointerImpl() => throw new NotImplementedException();
         public override Type MakeGenericType(params Type[] arguments) => throw new NotImplementedException();
         public override string Namespace => throw new NotImplementedException();

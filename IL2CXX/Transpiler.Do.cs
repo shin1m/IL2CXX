@@ -172,7 +172,7 @@ inline {returns}
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
-            //writer.WriteLine($"\tprintf(\"{Escape(method)}\\n\");");
+            //if (!method.DeclaringType.Name.StartsWith("AllowedBmpCodePointsBitmap")) writer.WriteLine($"\tprintf(\"{Escape(method)}\\n\");");
             if (!inline) writer.WriteLine("\tf_epoch_point();");
             var writers = new Stack<TextWriter>();
             var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
@@ -311,7 +311,6 @@ extern t__runtime_assembly* const v__entry_assembly;
 extern const std::map<std::string_view, t__type*> v__name_to_type;
 extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
             writerForDeclarations.Write(functionDeclarations);
-            var assemblyIdentifiers = new HashSet<string>();
             var assemblyToIdentifier = new Dictionary<Assembly, string>();
             var genericTypeDefinitionToConstructeds = runtimeDefinitions.Select(x => x.Type).Where(x => x.IsGenericType).GroupBy(x => x.GetGenericTypeDefinition()).ToDictionary(x => x.Key, xs => xs.AsEnumerable());
             foreach (var definition in runtimeDefinitions)
@@ -320,11 +319,15 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
                 var assembly = definition.Type.Assembly;
                 if (!assemblyToIdentifier.TryGetValue(assembly, out var name))
                 {
-                    var escaped = name = Escape(assembly.GetName().Name);
-                    for (var i = 0; !assemblyIdentifiers.Add(name); ++i) name = $"{escaped}__{i}";
+                    name = Identifier(Escape(assembly.GetName().Name));
                     assemblyToIdentifier.Add(assembly, name);
                     writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
-                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}}};");
+                    var exportedTypes = assembly.ExportedTypes.Where(x => typeToRuntime.ContainsKey(x)).ToList();
+                    if (exportedTypes.Count > 0) writer.Write($@"
+static t__type* v__exported_{name}[] = {{
+{string.Join(string.Empty, exportedTypes.Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
+}};");
+                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}, {(exportedTypes.Count > 0 ? $"v__exported_{name}" : "t__type::v__empty_types")}}};");
                     var names = assembly.GetManifestResourceNames();
                     if (names.Length > 0)
                     {

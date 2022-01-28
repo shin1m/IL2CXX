@@ -138,6 +138,12 @@ namespace IL2CXX.Tests
             Console.WriteLine(x);
             return x == "Hello, World!" ? 0 : 1;
         }
+        static int Target()
+        {
+            Func<string> trim = " Hello ".Trim;
+            Console.WriteLine(trim());
+            return trim.Target is string x && x == " Hello " ? 0 : 1;
+        }
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -152,6 +158,7 @@ namespace IL2CXX.Tests
             nameof(CallInterfaceGeneric) => CallInterfaceGeneric(),
             nameof(Event) => Event(),
             nameof(Static) => Static(),
+            nameof(Target) => Target(),
             _ => -1
         };
 
@@ -172,7 +179,8 @@ namespace IL2CXX.Tests
                 nameof(CallInterface),
                 nameof(CallInterfaceGeneric),
                 nameof(Event),
-                nameof(Static)
+                nameof(Static),
+                nameof(Target)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

@@ -181,8 +181,9 @@ struct t__runtime_assembly : t__assembly
 	std::u16string_view v__full_name;
 	std::u16string_view v__name;
 	t__runtime_method_info* v__entry_point;
+	t__type* const* v__exported_types;
 
-	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point);
+	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types);
 };
 
 struct t__type : t__abstract_type
@@ -486,7 +487,7 @@ inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type
 	t__type::f_be(this, a_type);
 }
 
-inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point)
+inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point), v__exported_types(a_exported_types)
 {
 	t__type::f_be(this, a_type);
 }

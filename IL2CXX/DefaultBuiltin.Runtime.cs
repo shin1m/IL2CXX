@@ -106,6 +106,16 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__full_name);\n", 0)
             );
             code.For(
+                type.GetMethod(nameof(Assembly.GetExportedTypes)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}std::cerr << ""exported types: "" << f__string(a_0->v__full_name) << std::endl;
+{'\t'}size_t n = 0;
+{'\t'}for (auto p = a_0->v__exported_types; *p; ++p) ++n;
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
+{'\t'}std::copy_n(a_0->v__exported_types, n, p->f_data());
+{'\t'}return p;
+", 0)
+            );
+            code.For(
                 type.GetProperty(nameof(RuntimeAssembly.Name)).GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 1)
             );
@@ -672,6 +682,29 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("IsArrayImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__array;\n", 0)
+            );
+            code.For(
+                type.GetMethod("IsPrimitiveImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}switch (a_0->v__cor_element_type) {{
+{'\t'}case 2:
+{'\t'}case 3:
+{'\t'}case 4:
+{'\t'}case 5:
+{'\t'}case 6:
+{'\t'}case 7:
+{'\t'}case 8:
+{'\t'}case 9:
+{'\t'}case 10:
+{'\t'}case 11:
+{'\t'}case 12:
+{'\t'}case 13:
+{'\t'}case 24:
+{'\t'}case 25:
+{'\t'}{'\t'}return true;
+{'\t'}default:
+{'\t'}{'\t'}return false;
+{'\t'}}}
+", 0)
             );
             code.For(
                 type.GetMethod("IsPointerImpl", declaredAndInstance),

@@ -67,9 +67,10 @@ namespace IL2CXX
                 type.GetMethod(nameof(GetType)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type();\n", 1)
             );
-            code.ForTree(
+            // TODO
+            code.For(
                 type.GetMethod(nameof(Equals), new[] { type }),
-                (transpiler, actual) => ("\treturn a_0 == a_1;\n", 0)
+                transpiler => ("\treturn a_0 == a_1;\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(ToString)),
@@ -104,6 +105,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(ToString)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->f_type()->v__display_name);\n", 0)
             );
+            // TODO
             code.ForTree(
                 type.GetMethod(nameof(Equals)),
                 (transpiler, actual) =>
@@ -637,6 +639,15 @@ namespace IL2CXX
                 type.GetMethod(nameof(Delegate.DynamicInvoke)),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(Equals)),
+                transpiler =>
+                {
+                    var identifier = transpiler.Escape(type);
+                    return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && std::memcmp(static_cast<t__object*>(a_0) + 1, a_1 + 1, sizeof({identifier})) == 0;\n", 0);
+                }
+            );
             code.For(
                 type.GetMethod("InternalEqualTypes", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn a_0->f_type() == a_1->f_type();\n", 1)
@@ -664,13 +675,21 @@ namespace IL2CXX
         {
             // TODO
             code.For(
-                type.GetMethod("GetTarget", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+                type.GetMethod(nameof(Equals)),
+                transpiler =>
+                {
+                    var identifier = transpiler.Escape(type);
+                    return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && std::memcmp(static_cast<t__object*>(a_0) + 1, a_1 + 1, sizeof({identifier})) == 0;\n", 0);
+                }
             );
             // TODO
             code.For(
                 type.GetMethod("GetMethodImpl", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+            );
+            code.For(
+                type.GetMethod("InvocationListLogicallyNull", declaredAndInstance),
+                transpiler => ("\treturn !a_0->v__5finvocationList;\n", 1)
             );
         })
         .For(get(typeof(Activator)), (type, code) =>
@@ -801,48 +820,6 @@ namespace IL2CXX
             code.For(
                 type.GetProperty("Chars").GetMethod,
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->v__5fstringLength") + "\treturn (&a_0->v__5ffirstChar)[a_1];\n", 1)
-            );
-            // TODO
-            code.For(
-                type.GetMethod(nameof(Equals), new[] { get(typeof(object)) }),
-                transpiler => default
-            );
-            // TODO
-            code.For(
-                type.GetMethod(nameof(string.Equals), new[] { get(typeof(string)), get(typeof(StringComparison)) }),
-                transpiler =>
-                {
-                    var method = get(typeof(string)).GetMethod(nameof(string.Equals), new[] { get(typeof(string)) });
-                    transpiler.Enqueue(method);
-                    return ($"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 1);
-                }
-            );
-            // TODO
-            code.For(
-                type.GetMethod("IsAscii", declaredAndInstance),
-                transpiler => ("\treturn false;\n", 1)
-            );
-            // TODO
-            code.For(
-                type.GetMethod(nameof(string.Join), new[] { get(typeof(string)), get(typeof(object[])) }),
-                transpiler => ("\treturn f__new_string(u\"join\"sv);\n", 0)
-            );
-            // TODO
-            code.For(
-                type.GetMethod(nameof(string.Split), new[] { get(typeof(char)), get(typeof(StringSplitOptions)) }),
-                transpiler => ($"\treturn f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.EscapeForMember(get(typeof(string)))}>(0);\n", 0)
-            );
-            code.For(
-                type.GetMethod(nameof(string.ToLowerInvariant), Type.EmptyTypes),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto n = a_0->v__5fstringLength;
-{'\t'}auto p = f__new_string(n);
-{'\t'}auto q = &a_0->v__5ffirstChar;
-{'\t'}std::transform(q, q + n, &p->v__5ffirstChar, [](auto x)
-{'\t'}{{
-{'\t'}{'\t'}return x >= u'A' && x <= u'Z' ? x + (u'a' - u'A') : x;
-{'\t'}}});
-{'\t'}return p;
-", 0)
             );
         })
         .For(get(typeof(sbyte)), (type, code) => SetupPrimitive(get, type, code))

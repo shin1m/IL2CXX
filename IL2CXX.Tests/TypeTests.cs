@@ -7,6 +7,7 @@ using NUnit.Framework;
 
 namespace IL2CXX.Tests
 {
+    public class TypeTestsExported { }
     [Parallelizable]
     class TypeTests
     {
@@ -265,6 +266,12 @@ namespace IL2CXX.Tests
         }
         static int GetCustomAttributesOfT() => typeof(Zot).GetCustomAttributes<FooAttribute>().Count() == 1 ? 0 : 1;
         static int IsDefined() => typeof(Zot).IsDefined(typeof(FooAttribute)) ? 0 : 1;
+        static int ExportedTypes()
+        {
+            var exported = typeof(Zot).Assembly.ExportedTypes;
+            if (exported.Contains(typeof(Zot))) return 1;
+            return exported.Contains(typeof(TypeTestsExported)) ? 0 : 2;
+        }
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -298,6 +305,7 @@ namespace IL2CXX.Tests
             nameof(GetCustomAttributes) => GetCustomAttributes(),
             nameof(GetCustomAttributesOfT) => GetCustomAttributesOfT(),
             nameof(IsDefined) => IsDefined(),
+            nameof(ExportedTypes) => ExportedTypes(),
             _ => -1
         };
 
@@ -343,7 +351,8 @@ namespace IL2CXX.Tests
                 nameof(GetCustomAttributesData),
                 nameof(GetCustomAttributes),
                 nameof(GetCustomAttributesOfT),
-                nameof(IsDefined)
+                nameof(IsDefined),
+                nameof(ExportedTypes)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

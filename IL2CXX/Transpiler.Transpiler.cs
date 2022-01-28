@@ -453,8 +453,8 @@ namespace IL2CXX
                 };
                 x.Generate = (index, stack) =>
                 {
+                    //if (!method.DeclaringType.Name.StartsWith("AllowedBmpCodePointsBitmap")) writer.Write($"\n\tprintf(\"return {Escape(method)}\\n\");");
                     writer.Write("\n\treturn");
-                    //writer.Write($"\n\tprintf(\"return {Escape(method)}\\n\");\n\treturn");
                     var @return = GetReturnType(method);
                     if (@return != typeofVoid)
                     {

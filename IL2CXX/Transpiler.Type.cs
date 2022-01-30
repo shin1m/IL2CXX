@@ -503,6 +503,7 @@ struct t__static_{identifier}
                 else
                 {
                     declaration += $"\nstruct {identifier}";
+                    var pack = 0;
                     var @base = type.BaseType == null ? string.Empty : $" : {builtin.GetBase(type) ?? Escape(type.BaseType)}";
                     string members;
                     if (type == typeofVoid)
@@ -551,27 +552,27 @@ struct t__static_{identifier}
                                 if (type.IsValueType) td.IsManaged = fields.Select(x => x.FieldType).Any(x => IsComposite(x) && (!x.IsValueType || Define(x).IsManaged));
                                 var layout = type.StructLayoutAttribute;
                                 var kind = layout?.Value ?? LayoutKind.Auto;
+                                pack = layout?.Pack ?? 0;
                                 CustomAttributeData getMarshalAs(FieldInfo x) => x.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofMarshalAsAttribute);
                                 UnmanagedType? getMarshalAsValue(CustomAttributeData x) => (UnmanagedType?)(int?)x?.ConstructorArguments[0].Value;
                                 if (kind != LayoutKind.Auto)
                                 {
                                     td.IsBlittable = fields.All(x => Define(x.FieldType).IsBlittable);
-                                    var pack = layout.Pack == 0 ? Define(typeofIntPtr).Alignment : layout.Pack;
+                                    var defaultAlignment = pack > 0 ? pack : Define(typeofIntPtr).Alignment;
                                     var sizeofTChar = layout.CharSet == CharSet.Unicode ? 2 : 1;
                                     td.Alignment = Math.Min(fields.Select(x => x.FieldType == typeofString
                                         ? getMarshalAsValue(getMarshalAs(x)) == UnmanagedType.ByValTStr
                                             ? sizeofTChar
                                             : Define(typeofIntPtr).Alignment
                                         : Define(x.FieldType).Alignment
-                                    ).DefaultIfEmpty(pack).Max(), pack);
+                                    ).DefaultIfEmpty(defaultAlignment).Max(), defaultAlignment);
                                 }
                                 if (kind == LayoutKind.Sequential && !td.IsBlittable && fields.Select(x => x.FieldType).All(x => x == typeofString || Define(x).IsMarshallable))
                                 {
-                                    var sb = new StringBuilder($@"
-#pragma pack(push, 1)
-struct {Escape(type)}__unmanaged
-{{
-");
+                                    var sb = new StringBuilder().AppendLine();
+                                    if (pack > 0) sb.AppendLine($"#pragma pack(push, {pack})");
+                                    sb.AppendLine($@"struct {identifier}__unmanaged
+{{");
                                     var i = 0;
                                     int align(int n) => (i + n - 1) / n * n;
                                     void pad(int j)
@@ -630,7 +631,7 @@ struct {Escape(type)}__unmanaged
                                     pad(td.UnmanagedSize);
                                     var at = $"{Escape(type)}{(type.IsValueType ? "::t_value" : string.Empty)}*";
                                     var fs = fields.Select(Escape);
-                                    unmanaged = sb.AppendLine($@"{'\t'}void f_in(const {at} a_p)
+                                    sb.AppendLine($@"{'\t'}void f_in(const {at} a_p)
 {'\t'}{{
 {string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_in({x}, a_p->{x});\n"))}{'\t'}}}
 {'\t'}void f_out({at} a_p) const
@@ -639,8 +640,9 @@ struct {Escape(type)}__unmanaged
 {'\t'}void f_destroy()
 {'\t'}{{
 {string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_destroy({x});\n"))}{'\t'}}}
-}};
-#pragma pack(pop)").ToString();
+}};");
+                                    if (pack > 0) sb.AppendLine("#pragma pack(pop)");
+                                    unmanaged = sb.ToString();
                                 }
                                 var slots = fields.Where(x => IsComposite(x.FieldType)).Select(x => (Type: x.FieldType, Name: Escape(x)));
                                 var constructs = fields.Select(Escape);
@@ -685,8 +687,7 @@ struct {Escape(type)}__unmanaged
                                     string variable(FieldInfo x) => $"{EscapeForMember(x.FieldType)} {Escape(x)};";
                                     if (kind == LayoutKind.Explicit)
                                     {
-                                        sb.AppendLine($@"#pragma pack(push, 1)
-{indent}union
+                                        sb.AppendLine($@"{indent}union
 {indent}{{
 {indent}{'\t'}struct
 {indent}{'\t'}{{
@@ -697,7 +698,6 @@ struct {Escape(type)}__unmanaged
 {indent}{'\t'}{'\t'}{EscapeForMember(x.FieldType)} v;
 {indent}{'\t'}}} v_{Escape(x.Name)};");
                                         sb.AppendLine($@"{indent}}};
-#pragma pack(pop)
 
 {indent}t_value() = default;
 {indent}t_value(const t_value& a_x) : v__merged(a_x.v__merged)
@@ -711,7 +711,6 @@ struct {Escape(type)}__unmanaged
                                     }
                                     else if (td.IsBlittable)
                                     {
-                                        sb.AppendLine("#pragma pack(push, 1)");
                                         var i = 0;
                                         int align(int n) => (i + n - 1) / n * n;
                                         void pad(int j)
@@ -728,7 +727,6 @@ struct {Escape(type)}__unmanaged
                                         }
                                         pad(Math.Max(align(td.Alignment), layout?.Size ?? 0));
                                         td.UnmanagedSize = i;
-                                        sb.AppendLine("#pragma pack(pop)");
                                     }
                                     else
                                     {
@@ -760,9 +758,11 @@ struct {Escape(type)}__unmanaged
                         {
                             if (type.IsValueType) td.IsManaged = mm.managed;
                         }
-                        if (type.IsValueType) members = $@"{'\t'}struct t_value
+                        staticDefinitions.Write(unmanaged);
+                        td.HasUnmanaged = unmanaged?.Length > 0;
+                        if (type.IsValueType) members = $@"{(!td.HasUnmanaged && pack > 0 ? $"#pragma pack(push, {pack})\n" : string.Empty)}{'\t'}struct t_value
 {'\t'}{{
-{members}{'\t'}}};
+{members}{'\t'}}};{(!td.HasUnmanaged && pack > 0 ? "\n#pragma pack(pop)" : string.Empty)}
 {'\t'}using t_stacked = {(td.IsManaged ? "il2cxx::t_stacked<t_value>" : "t_value")};
 {'\t'}t_value v__value;
 {'\t'}template<typename T>
@@ -775,8 +775,6 @@ struct {Escape(type)}__unmanaged
 {'\t'}{'\t'}v__value.f__scan(a_scan);
 {'\t'}}}
 ";
-                        staticDefinitions.Write(unmanaged);
-                        td.HasUnmanaged = unmanaged?.Length > 0;
                     }
                     typeDeclarations.WriteLine($"{declaration};");
                     typeDefinitions.WriteLine($@"

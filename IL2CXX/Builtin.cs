@@ -25,7 +25,7 @@ namespace IL2CXX
             public void For(MethodBase method, Func<Transpiler, (string body, int inline)> body)
             {
                 if (method.ReflectedType != method.DeclaringType) throw new InvalidOperationException($"{method.ReflectedType} != {method.DeclaringType}");
-                MethodToBody.Add(ToKey(method), body);
+                MethodToBody[ToKey(method)] = body;
             }
             public void ForGeneric(MethodBase method, Func<Transpiler, Type[], (string body, int inline)> body) => GenericMethodToBody.Add(ToKey(method), body);
             public void ForTree(MethodInfo method, Func<Transpiler, Type, (string body, int inline)> body) => MethodTreeToBody.Add(ToKey(method), body);
@@ -37,8 +37,7 @@ namespace IL2CXX
 
         public Builtin For(Type type, Action<Type, Code> action)
         {
-            var code = new Code();
-            TypeToCode.Add(type, code);
+            if (!TypeToCode.TryGetValue(type, out var code)) TypeToCode.Add(type, code = new Code());
             action(type, code);
             return this;
         }

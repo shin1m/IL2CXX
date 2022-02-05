@@ -174,9 +174,20 @@ namespace IL2CXX
                     transpiler.Enqueue(run);
                     return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}f_engine()->f_start(a_0, [a_0]
 {'\t'}{{
-{'\t'}{'\t'}{transpiler.EscapeForRoot(helper)} p = std::move(a_0->v__5fstartHelper);
+{'\t'}{'\t'}{transpiler.EscapeForStacked(helper)} RECYCLONE__SPILL p = a_0->v__5fstartHelper;
+{'\t'}{'\t'}a_0->v__5fstartHelper = {{}};
 {'\t'}{'\t'}t_thread_static ts;
-{'\t'}{'\t'}{transpiler.Escape(run)}(p);
+{'\t'}{'\t'}try {{
+{'\t'}{'\t'}{'\t'}try {{
+{'\t'}{'\t'}{'\t'}{'\t'}{transpiler.Escape(run)}(p);
+{'\t'}{'\t'}{'\t'}}} catch (t__object* p) {{
+{'\t'}{'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string(f__to_string(p)));
+{'\t'}{'\t'}{'\t'}}}
+{'\t'}{'\t'}}} catch (std::exception& e) {{
+{'\t'}{'\t'}{'\t'}std::cerr << ""caught: "" << e.what() << std::endl;
+{'\t'}{'\t'}}} catch (...) {{
+{'\t'}{'\t'}{'\t'}std::cerr << ""caught unknown"" << std::endl;
+{'\t'}{'\t'}}}
 {'\t'}}});
 ", 0);
                 }

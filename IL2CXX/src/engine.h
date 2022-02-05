@@ -45,10 +45,7 @@ void t_engine::f_start(t__thread* RECYCLONE__SPILL a_thread, T a_main)
 	recyclone::t_engine<t__type>::f_start(a_thread, [a_thread, main = std::move(a_main)]
 	{
 		v_current_thread = a_thread;
-		try {
-			main();
-		} catch (t_object<t__type>*) {
-		}
+		main();
 	});
 }
 

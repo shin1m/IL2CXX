@@ -431,16 +431,26 @@ RECYCLONE__THREAD t_thread_static* t_thread_static::v_instance;
 
 void f__finalize(t_object<t__type>* a_p)
 {{
-{'\t'}{GenerateVirtualCall(finalizeOfObject, "a_p", Enumerable.Empty<string>(), x => x)};
+{'\t'}try {{
+{'\t'}{'\t'}try {{
+{'\t'}{'\t'}{'\t'}{GenerateVirtualCall(finalizeOfObject, "a_p", Enumerable.Empty<string>(), x => x)};
+{'\t'}{'\t'}}} catch (t__object* p) {{
+{'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string(f__to_string(p)));
+{'\t'}{'\t'}}}
+{'\t'}}} catch (std::exception& e) {{
+{'\t'}{'\t'}std::cerr << ""caught: "" << e.what() << std::endl;
+{'\t'}}} catch (...) {{
+{'\t'}{'\t'}std::cerr << ""caught unknown"" << std::endl;
+{'\t'}}}
 }}
 
-void f__startup()
+void f__startup(void* a_bottom)
 {{
 {'\t'}std::setlocale(LC_ALL, """");
 {'\t'}auto options = new t_engine::t_options;
 {'\t'}options->v_verbose = std::getenv(""IL2CXX_VERBOSE"");
 {'\t'}options->v_verify = std::getenv(""IL2CXX_VERIFY_LEAKS"");
-{'\t'}t_slot thread((new t_engine(*options, &options))->f_initialize<{Escape(typeofThread)}, t_thread_static>(f__finalize));
+{'\t'}t_slot thread((new t_engine(*options, a_bottom))->f_initialize<{Escape(typeofThread)}, t_thread_static>(f__finalize));
 {'\t'}new t_static;
 {'\t'}new t_thread_static;
 }}
@@ -472,8 +482,7 @@ int main(int argc, char* argv[])
     ? $"{Escape(method)}({arguments1});\n\t\t\treturn engine.f_exit(0)"
     : $"return engine.f_exit({Escape(method)}({arguments1}))")};
 {'\t'}{'\t'}}} catch (t__object* p) {{
-{'\t'}{'\t'}{'\t'}auto s = f__to_string(p);
-{'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}));
+{'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string(f__to_string(p)));
 {'\t'}{'\t'}}}
 {'\t'}}}();
 }}

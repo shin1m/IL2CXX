@@ -182,7 +182,7 @@ namespace IL2CXX
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
 ", false, null);
-            code.AnyToBody = (transpiler, method) => ("\tthrow std::runtime_error(\"NotSupportedException\");\n", 0);
+            code.AnyToBody = (transpiler, method) => ($"\t{transpiler.GenerateThrow("NotSupported")};\n", 0);
         })
         .For(get(typeof(RuntimeFieldHandle)), (type, code) =>
         {
@@ -1013,21 +1013,20 @@ namespace IL2CXX
             code.For(type.GetProperty(nameof(Environment.TickCount64)).GetMethod, transpiler => tick(transpiler, "64"));
             code.For(
                 type.GetMethod(nameof(Environment.FailFast), new[] { get(typeof(string)) }),
-                transpiler => ($@"{'\t'}std::cerr << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}) << std::endl;
+                transpiler => ($@"{'\t'}std::cerr << f__string(a_0) << std::endl;
 {'\t'}std::abort();
 ", 0)
             );
             code.For(
                 type.GetMethod(nameof(Environment.FailFast), new[] { get(typeof(string)), get(typeof(Exception)) }),
-                transpiler => ($@"{'\t'}std::cerr << f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}) << std::endl;
-{transpiler.GenerateVirtualCall(get(typeof(object)).GetMethod(nameof(ToString)), "a_1", Enumerable.Empty<string>(), x => $"auto s = {x};")}
-{'\t'}std::cerr << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
+                transpiler => ($@"{'\t'}std::cerr << f__string(a_0) << std::endl;
+{'\t'}std::cerr << f__string(f__to_string(a_1)) << std::endl;
 {'\t'}std::abort();
 ", 0)
             );
             code.For(
                 type.GetMethod(nameof(Environment.GetEnvironmentVariable), new[] { get(typeof(string)) }),
-                transpiler => ($@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
+                transpiler => ($@"{'\t'}auto p = std::getenv(f__string(a_0).c_str());
 {'\t'}return p ? f__new_string(p) : nullptr;
 ", 0)
             );

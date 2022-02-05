@@ -11,7 +11,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("GetEnvironmentVariable", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(string)), get(typeof(char)).MakeByRefType(), get(typeof(uint)) }, null),
-                transpiler => ($@"{'\t'}auto p = std::getenv(f__string({{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}}).c_str());
+                transpiler => ($@"{'\t'}auto p = std::getenv(f__string(a_0).c_str());
 {'\t'}if (!p) return 0;
 {'\t'}auto q = f__u16string(p);
 {'\t'}auto n = q.size();

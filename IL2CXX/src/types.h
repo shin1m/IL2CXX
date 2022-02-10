@@ -174,6 +174,7 @@ struct t__runtime_property_info : t__property_info
 
 struct t__assembly : t__object
 {
+	using t__object::t__object;
 };
 
 struct t__runtime_assembly : t__assembly
@@ -487,7 +488,7 @@ inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type
 	t__type::f_be(this, a_type);
 }
 
-inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types) : v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point), v__exported_types(a_exported_types)
+inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types) : t__assembly(-1), v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point), v__exported_types(a_exported_types)
 {
 	t__type::f_be(this, a_type);
 }

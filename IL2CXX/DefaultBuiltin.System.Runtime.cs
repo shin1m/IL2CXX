@@ -318,7 +318,12 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("GetLoadedAssemblies", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+                transpiler => ($@"{'\t'}size_t n = 0;
+{'\t'}for (auto p = v__assemblies; *p; ++p) ++n;
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Assembly[])))}, {transpiler.Escape(get(typeof(Assembly)))}>(n);
+{'\t'}std::copy_n(v__assemblies, n, p->f_data());
+{'\t'}return p;
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(AssemblyLoadContext.LoadFromStream), new[] { get(typeof(Stream)), get(typeof(Stream)) }),

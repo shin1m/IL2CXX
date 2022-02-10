@@ -272,6 +272,8 @@ namespace IL2CXX.Tests
             if (exported.Contains(typeof(Zot))) return 1;
             return exported.Contains(typeof(TypeTestsExported)) ? 0 : 2;
         }
+        static int AssemblyGetName() => typeof(Zot).Assembly.GetName().Name == "IL2CXX.Tests" ? 0 : 1;
+        static int AssemblyGetType() => typeof(Zot).Assembly.GetType(typeof(Zot).FullName) == typeof(Zot) ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -306,6 +308,8 @@ namespace IL2CXX.Tests
             nameof(GetCustomAttributesOfT) => GetCustomAttributesOfT(),
             nameof(IsDefined) => IsDefined(),
             nameof(ExportedTypes) => ExportedTypes(),
+            nameof(AssemblyGetName) => AssemblyGetName(),
+            nameof(AssemblyGetType) => AssemblyGetType(),
             _ => -1
         };
 
@@ -352,7 +356,9 @@ namespace IL2CXX.Tests
                 nameof(GetCustomAttributes),
                 nameof(GetCustomAttributesOfT),
                 nameof(IsDefined),
-                nameof(ExportedTypes)
+                nameof(ExportedTypes),
+                nameof(AssemblyGetName),
+                nameof(AssemblyGetType)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

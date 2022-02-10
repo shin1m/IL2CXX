@@ -48,6 +48,15 @@ namespace IL2CXX
                 type.GetMethod("ComputePublicKeyToken", declaredAndInstance),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
+            code.For(
+                type.GetMethod("nInit", declaredAndInstance),
+                transpiler =>
+                {
+                    var initialize = transpiler.typeofRuntimeAssembly.GetMethod(nameof(RuntimeAssembly.Initialize));
+                    transpiler.Enqueue(initialize);
+                    return ($"\t{transpiler.Escape(initialize)}(a_0);\n", 0);
+                }
+            );
         })
         .For(get(typeof(CustomAttributeData)), (type, code) =>
         {

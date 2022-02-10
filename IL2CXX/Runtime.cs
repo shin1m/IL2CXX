@@ -10,6 +10,33 @@ namespace IL2CXX
 {
     public class RuntimeAssembly : Assembly
     {
+        public static void Initialize(AssemblyName x)
+        {
+            var xs = x.Name.Split(",");
+            if (xs.Length < 2) return;
+            x.Name = xs[0].Trim();
+            for (var i = 1; i < xs.Length; ++i)
+            {
+                var ys = xs[i].Split("=", 2);
+                if (ys.Length < 2) continue;
+                var key = ys[0].Trim();
+                if (key == "Version")
+                    x.Version = new Version(ys[1]);
+                else if (key == "Culture")
+                    try
+                    {
+                        x.CultureInfo = new CultureInfo(ys[1]);
+                    }
+                    catch { }
+                else if (key == "PublicKeyToken")
+                    try
+                    {
+                        x.SetPublicKeyToken(Convert.FromHexString(ys[1]));
+                    }
+                    catch { }
+            }
+        }
+
         public override MethodInfo EntryPoint => throw new NotImplementedException();
         public override string FullName => throw new NotImplementedException();
         public string Name => throw new NotImplementedException();
@@ -26,7 +53,8 @@ namespace IL2CXX
                 return null;
             }
         }
-        public override AssemblyName GetName(bool copiedName) => new() { Name = FullName };
+        public override AssemblyName GetName(bool copiedName) => new(FullName);
+        public override Type GetType(string name, bool throwOnError, bool ignoreCase) => Type.GetType($"{name}, {FullName}", throwOnError, ignoreCase);
     }
     public abstract class RuntimeFieldInfo : FieldInfo
     {

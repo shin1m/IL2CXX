@@ -466,7 +466,7 @@ namespace IL2CXX
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__generic_arguments; *p; ++p) ++n;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
-{'\t'}for (size_t i = 0; i < n; ++i) p->f_data()[i] = a_0->v__generic_arguments[i];
+{'\t'}std::copy_n(a_0->v__generic_arguments, n, p->f_data());
 {'\t'}return p;
 ", 0)
             );

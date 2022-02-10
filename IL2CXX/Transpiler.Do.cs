@@ -306,8 +306,8 @@ namespace il2cxx
             writerForDeclarations.Write(typeDeclarations);
             writerForDeclarations.Write(typeDefinitions);
             writerForDeclarations.WriteLine(@"
+extern t__runtime_assembly* v__assemblies[];
 extern t__runtime_assembly* const v__entry_assembly;
-
 extern const std::map<std::string_view, t__type*> v__name_to_type;
 extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
             writerForDeclarations.Write(functionDeclarations);
@@ -380,6 +380,12 @@ struct t_thread_static
 {{
 
 #include ""utilities.cc""
+
+t__runtime_assembly* v__assemblies[] = {{
+{
+    string.Join(string.Empty, assemblyToIdentifier.Values.OrderBy(x => x).Select(x => $"\t&v__assembly_{x},\n"))
+}{'\t'}nullptr
+}};
 
 t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
 

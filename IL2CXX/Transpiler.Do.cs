@@ -168,7 +168,8 @@ inline {returns}
             log("\n");
             writer.WriteLine($"\t// init locals: {body.InitLocals}");
             foreach (var x in body.LocalVariables)
-                writer.WriteLine($"\t{EscapeForArgument(x.LocalType)} l{x.LocalIndex}{(body.InitLocals ? "{}" : string.Empty)};");
+                // TODO: uninitialized object references in value types might be copied into heap when compiled with SkipLocalsInit.
+                writer.WriteLine($"\t{EscapeForArgument(x.LocalType)} l{x.LocalIndex}{(body.InitLocals || x.LocalType.IsValueType && Define(x.LocalType).IsManaged ? "{}" : string.Empty)};");
             foreach (var x in definedIndices)
                 for (var i = 0; i < x.Value.Index; ++i)
                     writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");

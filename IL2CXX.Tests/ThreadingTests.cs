@@ -326,6 +326,24 @@ namespace IL2CXX.Tests
             lock (monitor) if (!Monitor.IsEntered(monitor)) return 1;
             return Monitor.IsEntered(monitor) ? 2 : 0;
         }
+        static int Timer()
+        {
+            var done = false;
+            using var timer = new Timer(x =>
+            {
+                lock (x)
+                {
+                    done = true;
+                    Monitor.Pulse(x);
+                }
+            });
+            lock (timer)
+            {
+                timer.Change(1000, Timeout.Infinite);
+                do Monitor.Wait(timer); while (!done);
+            }
+            return 0;
+        }
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -348,6 +366,7 @@ namespace IL2CXX.Tests
             nameof(WaitTimeout) => WaitTimeout(),
             nameof(TryEnter) => TryEnter(),
             //nameof(IsEntered) => IsEntered(),
+            nameof(Timer) => Timer(),
             _ => -1
         };
 
@@ -382,7 +401,8 @@ namespace IL2CXX.Tests
             [Values(
                 nameof(Background),
                 nameof(QueueUserWorkItem),
-                nameof(ParallelFor)
+                nameof(ParallelFor),
+                nameof(Timer)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name, false);

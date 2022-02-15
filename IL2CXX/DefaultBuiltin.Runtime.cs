@@ -403,26 +403,18 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetEnumValues)),
-                transpiler =>
-                {
-                    var array = transpiler.Escape(get(typeof(Array)));
-                    return (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
 {'\t'}if (!a_0->v__fields) throw std::runtime_error(""no fields: "" + f__string(a_0->v__full_name));
-{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
-{'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + a_0->v__size * n));
-{'\t'}p->v__length = n;
-{'\t'}p->f_bounds()[0] = {{n, 0}};
-{'\t'}auto q = reinterpret_cast<char*>(p) + a;
-{'\t'}for (size_t i = 0; i < n; ++i) {{
-{'\t'}{'\t'}std::memcpy(q, a_0->v__fields[i]->f_address(nullptr), a_0->v__size);
-{'\t'}{'\t'}q += a_0->v__size;
-{'\t'}}}
-{'\t'}a_0->v__szarray->f_finish(p);
-{'\t'}return p;
-", 0);
-                }
+{'\t'}return f__new_array(a_0, n, [&](auto a_p, auto a_n)
+{'\t'}{{
+{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) {{
+{'\t'}{'\t'}{'\t'}std::memcpy(a_p, a_0->v__fields[i]->f_address(nullptr), a_0->v__size);
+{'\t'}{'\t'}{'\t'}a_p += a_0->v__size;
+{'\t'}{'\t'}}}
+{'\t'}}});
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.GetField), new[] { get(typeof(string)), get(typeof(BindingFlags)) }),
@@ -709,6 +701,18 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("IsPointerImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__pointer;\n", 0)
+            );
+        })
+        .For(get(typeof(RuntimeTimer)), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(RuntimeTimer.Call)),
+                transpiler =>
+                {
+                    var m = get(Type.GetType("System.Threading.TimerQueue")).GetMethod("AppDomainTimerCallback", BindingFlags.Static | BindingFlags.NonPublic);
+                    transpiler.Enqueue(m);
+                    return ($"\t{transpiler.Escape(m)}(a_0);\n", 1);
+                }
             );
         });
     }

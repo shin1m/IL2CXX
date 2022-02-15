@@ -5,10 +5,11 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 
 namespace IL2CXX
 {
-    public class RuntimeAssembly : Assembly
+    class RuntimeAssembly : Assembly
     {
         public static void Initialize(AssemblyName x)
         {
@@ -56,7 +57,7 @@ namespace IL2CXX
         public override AssemblyName GetName(bool copiedName) => new(FullName);
         public override Type GetType(string name, bool throwOnError, bool ignoreCase) => Type.GetType($"{name}, {FullName}", throwOnError, ignoreCase);
     }
-    public abstract class RuntimeFieldInfo : FieldInfo
+    abstract class RuntimeFieldInfo : FieldInfo
     {
         public override FieldAttributes Attributes => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
@@ -69,7 +70,7 @@ namespace IL2CXX
         public override string Name => throw new NotImplementedException();
         public override void SetValue(object @this, object value, BindingFlags bindingFlags, Binder binder, CultureInfo culture) => throw new NotImplementedException();
     }
-    public abstract class RuntimeConstructorInfo : ConstructorInfo
+    abstract class RuntimeConstructorInfo : ConstructorInfo
     {
         public override MethodAttributes Attributes => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
@@ -81,7 +82,7 @@ namespace IL2CXX
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
     }
-    public abstract class RuntimeMethodInfo : MethodInfo
+    abstract class RuntimeMethodInfo : MethodInfo
     {
         public override MethodAttributes Attributes => throw new NotImplementedException();
         public override Delegate CreateDelegate(Type type) => throw new NotImplementedException();
@@ -106,7 +107,7 @@ namespace IL2CXX
         public override MethodInfo MakeGenericMethod(params Type[] types) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
     }
-    public abstract class RuntimePropertyInfo : PropertyInfo
+    abstract class RuntimePropertyInfo : PropertyInfo
     {
         public override PropertyAttributes Attributes => throw new NotImplementedException();
         public override Type DeclaringType => throw new NotImplementedException();
@@ -123,7 +124,7 @@ namespace IL2CXX
         public override MethodInfo SetMethod => throw new NotImplementedException();
         public override void SetValue(object @this, object value, BindingFlags bindingFlags, Binder binder, object[] index, CultureInfo culture) => throw new NotImplementedException();
     }
-    public abstract class RuntimeType : Type
+    abstract class RuntimeType : Type
     {
         public override Assembly Assembly => throw new NotImplementedException();
         public override string AssemblyQualifiedName => $"{FullName}, {Assembly.FullName}";
@@ -168,7 +169,7 @@ namespace IL2CXX
         public override RuntimeTypeHandle TypeHandle => throw new NotImplementedException();
         public override Type UnderlyingSystemType => this;
     }
-    public abstract class RuntimeGenericParameter : Type
+    abstract class RuntimeGenericParameter : Type
     {
         public override Assembly Assembly => throw new NotSupportedException();
         public override string AssemblyQualifiedName => null;
@@ -199,15 +200,15 @@ namespace IL2CXX
         public override string ToString() => Name;
         public override Type UnderlyingSystemType => this;
     }
-    public abstract class RuntimeGenericTypeParameter : RuntimeGenericParameter
+    abstract class RuntimeGenericTypeParameter : RuntimeGenericParameter
     {
         public override bool IsGenericTypeParameter => true;
     }
-    public abstract class RuntimeGenericMethodParameter : RuntimeGenericParameter
+    abstract class RuntimeGenericMethodParameter : RuntimeGenericParameter
     {
         public override bool IsGenericMethodParameter => true;
     }
-    public class RuntimeCustomAttributeData : CustomAttributeData
+    class RuntimeCustomAttributeData : CustomAttributeData
     {
         public static IList<CustomAttributeData> Get(MemberInfo member) => throw new NotImplementedException();
         public static object[] GetAttributes(MemberInfo member, Type attributeType, bool inherit)
@@ -303,5 +304,68 @@ namespace IL2CXX
         public override ConstructorInfo Constructor { get; }
         public override IList<CustomAttributeTypedArgument> ConstructorArguments { get; }
         public override IList<CustomAttributeNamedArgument> NamedArguments { get; }
+    }
+    static class RuntimeTimer
+    {
+        private static readonly Dictionary<int, DateTime> id2at = new();
+        private static Thread thread;
+
+        public static void Call(int id) => throw new NotImplementedException();
+        public static IntPtr Create(uint duration, int id)
+        {
+            lock (id2at)
+            {
+                if (thread == null)
+                {
+                    thread = new Thread(() =>
+                    {
+                        while (true)
+                        {
+                            int? id = null;
+                            lock (id2at) while (true)
+                            {
+                                var now = DateTime.Now;
+                                var next = now + TimeSpan.FromMilliseconds(int.MaxValue);
+                                foreach (var (key, value) in id2at)
+                                    if (value > now)
+                                    {
+                                        if (value < next) next = value;
+                                    }
+                                    else
+                                    {
+                                        id = key;
+                                        id2at.Remove(key);
+                                        break;
+                                    }
+                                if (id != null) break;
+                                Monitor.Wait(id2at, next - now);
+                            }
+                            Call(id.Value);
+                        }
+                    })
+                    {
+                        IsBackground = true
+                    };
+                    thread.Start();
+                }
+                id2at.Add(id, DateTime.Now + TimeSpan.FromMilliseconds(duration));
+                Monitor.Pulse(id2at);
+                return (IntPtr)id;
+            }
+        }
+        public static bool Change(IntPtr handle, uint duration)
+        {
+            lock (id2at)
+            {
+                id2at[(int)handle] = DateTime.Now + TimeSpan.FromMilliseconds(duration);
+                Monitor.Pulse(id2at);
+            }
+            return true;
+        }
+        public static bool Delete(IntPtr handle)
+        {
+            lock (id2at) id2at.Remove((int)handle);
+            return true;
+        }
     }
 }

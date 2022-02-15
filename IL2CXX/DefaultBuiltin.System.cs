@@ -353,21 +353,13 @@ namespace IL2CXX
             // TODO
             code.For(
                 type.GetMethod(nameof(Array.CreateInstance), new[] { get(typeof(Type)), get(typeof(int)) }),
-                transpiler =>
-                {
-                    var array = transpiler.Escape(get(typeof(Array)));
-                    return (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto a = sizeof({array}) + sizeof({array}::t__bound);
-{'\t'}auto type = static_cast<t__type*>(a_0);
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__szarray) throw std::runtime_error(""no szarray: "" + f__string(type->v__full_name));
-{'\t'}auto n = type->v__size * a_1;
-{'\t'}auto p = static_cast<{array}*>(f_engine()->f_allocate(a + n));
-{'\t'}p->v__length = a_1;
-{'\t'}p->f_bounds()[0] = {{static_cast<size_t>(a_1), 0}};
-{'\t'}std::memset(reinterpret_cast<char*>(p) + a, 0, n);
-{'\t'}type->v__szarray->f_finish(p);
-{'\t'}return p;
-", 0);
-                }
+{'\t'}return f__new_array(type, a_1, [&](auto a_p, auto a_n)
+{'\t'}{{
+{'\t'}{'\t'}std::memset(a_p, 0, a_n);
+{'\t'}}});
+", 0)
             );
             code.For(
                 type.GetMethod(nameof(Array.GetLength)),
@@ -568,19 +560,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("AllocateNewArray", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler =>
-                {
-                    var array = transpiler.Escape(get(typeof(Array)));
-                    return ($@"{'\t'}auto type = static_cast<t__type*>(static_cast<void*>(a_0));
-{'\t'}auto n = type->v__element->v__size * a_1;
-{'\t'}auto p = static_cast<{transpiler.EscapeForValue(get(typeof(Array)))}>(f_engine()->f_allocate(sizeof({array}) + sizeof({array}::t__bound) + n));
-{'\t'}p->v__length = a_1;
-{'\t'}p->f_bounds()[0] = {{size_t(a_1), 0}};
-{'\t'}if (!a_2) std::memset(p->f_bounds() + 1, 0, n);
-{'\t'}type->f_finish(p);
-{'\t'}return p;
-", 1);
-                }
+                transpiler => ($@"{'\t'}return f__new_array(static_cast<t__type*>(static_cast<void*>(a_0))->v__element, a_1, [&](auto a_p, auto a_n)
+{'\t'}{{
+{'\t'}{'\t'}if (!a_2) std::memset(a_p, 0, a_n);
+{'\t'}}});
+", 0)
             );
             // TODO
             code.For(

@@ -155,3 +155,16 @@ inline std::string f__string(t_System_2eString* a_p)
 	return f__string({&a_p->v__5ffirstChar, static_cast<size_t>(a_p->v__5fstringLength)});
 }
 t_System_2eString* f__to_string(t__object* a_p);
+
+template<typename T>
+t_System_2eArray* f__new_array(t__type* a_type, size_t a_length, T a_do)
+{
+	auto a = sizeof(t_System_2eArray) + sizeof(t_System_2eArray::t__bound);
+	auto n = a_type->v__size * a_length;
+	auto p = static_cast<t_System_2eArray*>(f_engine()->f_allocate(a + n));
+	p->v__length = a_length;
+	p->f_bounds()[0] = {a_length, 0};
+	a_do(reinterpret_cast<char*>(p) + a, n);
+	a_type->v__szarray->f_finish(p);
+	return p;
+}

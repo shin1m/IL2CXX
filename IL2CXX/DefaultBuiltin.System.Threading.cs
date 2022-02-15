@@ -431,6 +431,40 @@ namespace IL2CXX
                     transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
                 );
             }
+        })
+        .For(get(Type.GetType("System.Threading.TimerQueue")), (type, code) =>
+        {
+            code.For(
+                type.GetMethod("CreateAppDomainTimer", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler =>
+                {
+                    var m = get(typeof(RuntimeTimer)).GetMethod(nameof(RuntimeTimer.Create));
+                    transpiler.Enqueue(m);
+                    return ($@"{'\t'}auto value = {transpiler.Escape(m)}(a_0, a_1);
+{'\t'}auto RECYCLONE__SPILL handle = f__new_zerod<{transpiler.Escape(type.GetNestedType("AppDomainTimerSafeHandle", BindingFlags.NonPublic))}>();
+{'\t'}handle->v_handle = value;
+{'\t'}return handle;
+", 0);
+                }
+            );
+            code.For(
+                type.GetMethod("ChangeAppDomainTimer", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler =>
+                {
+                    var m = get(typeof(RuntimeTimer)).GetMethod(nameof(RuntimeTimer.Change));
+                    transpiler.Enqueue(m);
+                    return ($"\treturn {transpiler.Escape(m)}(a_0, a_1);\n", 1);
+                }
+            );
+            code.For(
+                type.GetMethod("DeleteAppDomainTimer", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler =>
+                {
+                    var m = get(typeof(RuntimeTimer)).GetMethod(nameof(RuntimeTimer.Delete));
+                    transpiler.Enqueue(m);
+                    return ($"\treturn {transpiler.Escape(m)}(a_0);\n", 1);
+                }
+            );
         });
     }
 }

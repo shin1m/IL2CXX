@@ -1091,6 +1091,10 @@ namespace IL2CXX
                 transpiler => ("\treturn std::log10(a_0);\n", 1)
             );
             code.For(
+                type.GetMethod(nameof(Math.Log2)),
+                transpiler => ("\treturn std::log2(a_0);\n", 1)
+            );
+            code.For(
                 type.GetMethod("ModF", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn std::modf(a_0, a_1);\n", 1)
             );
@@ -1156,6 +1160,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(MathF.Log10)),
                 transpiler => ("\treturn std::log10(a_0);\n", 1)
+            );
+            code.For(
+                type.GetMethod(nameof(MathF.Log2)),
+                transpiler => ("\treturn std::log2(a_0);\n", 1)
             );
             code.For(
                 type.GetMethod("ModF", BindingFlags.Static | BindingFlags.NonPublic),

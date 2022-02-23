@@ -717,7 +717,7 @@ namespace IL2CXX
             return (i, j);
         }
         private string GetVirtualFunctionPointer(MethodBase method) =>
-            $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", method.GetParameters().Select(x => EscapeForStacked(x.ParameterType)).Prepend($"{Escape(GetVirtualThisType(method.DeclaringType))}*"))})";
+            $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", method.GetParameters().Select(x => EscapeForStacked(x.ParameterType)).Prepend($"{Escape(GetVirtualThisType(method.DeclaringType.IsInterface ? typeofObject : method.DeclaringType))}*"))})";
         public string GetVirtualFunction(MethodBase method, string target)
         {
             if (!method.IsVirtual) return Escape(method);

@@ -79,7 +79,9 @@ namespace IL2CXX
                     if ((tms[i] = get(t, $"{prefix}.{m.Name}") ?? get(t, m.Name)) != null) break;
                 }
                 while ((t = t.BaseType) != null);
-                if (tms[i] == null) throw new Exception($"{type} -> {@interface} {m}");
+                if (tms[i] != null) continue;
+                if (m.IsAbstract) throw new Exception($"{type} -> {@interface} :: [{m}]");
+                tms[i] = m;
             }
             return new InterfaceMapping
             {

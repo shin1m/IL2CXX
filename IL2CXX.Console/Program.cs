@@ -2,6 +2,8 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Threading;
 using CommandLine;
 
 namespace IL2CXX.Console
@@ -33,7 +35,7 @@ namespace IL2CXX.Console
         {
             var names = new SortedSet<string>();
             var type2path = new Dictionary<Type, string>();
-            using (var context = new MetadataLoadContext(new PathAssemblyResolver(options.Assemblies.Prepend(RuntimeEnvironment.GetRuntimeDirectory()).Append(Path.GetDirectoryName(options.Source)).SelectMany(x => Directory.EnumerateFiles(x, "*.dll")).Prepend(typeof(Builtin).Assembly.Location))))
+            using (var context = new MetadataLoadContext(new PathAssemblyResolver(options.Assemblies.Prepend(Path.GetDirectoryName(options.Source)).Append(RuntimeEnvironment.GetRuntimeDirectory()).SelectMany(x => Directory.EnumerateFiles(x.Length > 0 ? x : ".", "*.dll")).Append(typeof(Builtin).Assembly.Location).UnionBy(Enumerable.Empty<string>(), Path.GetFileNameWithoutExtension))))
             {
                 var assembly = context.LoadFromAssemblyPath(options.Source);
                 var entry = assembly.EntryPoint ?? throw new InvalidOperationException();
@@ -43,33 +45,182 @@ namespace IL2CXX.Console
                 var builtin = DefaultBuiltin.Create(get, options.Target);
                 try
                 {
-                    builtin.For(context.LoadFromAssemblyName("Microsoft.JSInterop.WebAssembly").GetType("WebAssembly.JSInterop.InternalCalls", true), (type, code) => code.ForGeneric(
-                        type.GetMethod("InvokeJS"),
-                        (transpiler, types) => ($@"{'\t'}return f_epoch_region([&]
+                    builtin
+                    .For(context.LoadFromAssemblyName("System.Private.Runtime.InteropServices.JavaScript").GetType("Interop+Runtime", true), (type, code) =>
+                    {
+                        var typeofIntByRef = get(typeof(int).MakeByRefType());
+                        code.For(
+                            type.GetMethod("CompileFunction", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(string)), typeofIntByRef }),
+                            transpiler => ($@"{'\t'}*a_1 = 0;
+{'\t'}return f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}std::cerr << ""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>:"" << std::endl;
-{'\t'}{'\t'}auto s = a_1->v_FunctionIdentifier.v;
-{'\t'}{'\t'}std::cerr << ""\tFunctionIdentifier: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
-{'\t'}{'\t'}std::cerr << ""\tResultType: "" << a_1->v_ResultType.v << std::endl;
-{'\t'}{'\t'}s = a_1->v_MarshalledCallArgsJson.v;
-{'\t'}{'\t'}std::cerr << ""\tMarshalledCallArgsJson: "" << f__string({{&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}}) << std::endl;
-{'\t'}{'\t'}std::cerr << ""\tMarshalledCallAsyncHandle: "" << a_1->v_MarshalledCallAsyncHandle.v << std::endl;
-{'\t'}{'\t'}std::cerr << ""\tTargetInstanceId: "" << a_1->v_TargetInstanceId.v << std::endl;
-{'\t'}{'\t'}return ({transpiler.EscapeForStacked(types[3])}){{}};
+{'\t'}{'\t'}return mono_wasm_compile_function(a_0, a_1);
 {'\t'}}});
 ", 0)
+                        );
+                        code.For(
+                            type.GetMethod("InvokeJS", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(string)), typeofIntByRef }),
+                            transpiler => ($@"{'\t'}*a_1 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_invoke_js(a_0, a_1);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("InvokeJSWithArgs", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_3 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_invoke_js_with_args(a_0, a_1, a_2, a_3);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("GetObjectProperty", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_2 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_get_object_property(a_0, a_1, a_2);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("SetObjectProperty", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_5 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_set_object_property(a_0, a_1, a_2, a_3, a_4, a_5);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("GetByIndex", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_2 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_get_by_index(a_0, a_1, a_2);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("SetByIndex", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_3 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_set_by_index(a_0, a_1, a_2, a_3);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("GetGlobalObject", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(string)), typeofIntByRef }),
+                            transpiler => ($@"{'\t'}*a_1 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_get_global_object(a_0, a_1);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("ReleaseCSOwnedObject", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}return static_cast<t__object*>(f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_release_cs_owned_object(a_0);
+{'\t'}}}));
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("CreateCSOwnedObject", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_2 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_create_cs_owned_object(a_0, a_1, a_2);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("TypedArrayFrom", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_5 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_typed_array_from(a_0, a_1, a_2, a_3, a_4, a_5);
+{'\t'}}});
+", 0)
+                        );
+                        code.For(
+                            type.GetMethod("TypedArrayToArray", BindingFlags.Static | BindingFlags.NonPublic),
+                            transpiler => ($@"{'\t'}*a_1 = 0;
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_typed_array_to_array(a_0, a_1);
+{'\t'}}});
+", 0)
+                        );
+                    })
+                    .For(context.LoadFromAssemblyName("Microsoft.JSInterop.WebAssembly").GetType("WebAssembly.JSInterop.InternalCalls", true), (type, code) => code.ForGeneric(
+                        type.GetMethod("InvokeJS"),
+                        (transpiler, types) =>
+                        {
+                            string marshal(Type t, string x) =>
+                                t.IsByRef || t.IsPointer ? x :
+                                t.IsPrimitive || t.IsEnum ? $"reinterpret_cast<void*>({x})" :
+                                t.IsValueType ? $"&{x}" : x;
+                            return ($@"{'\t'}std::printf(""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>:\n"");
+{'\t'}std::printf(""\tFunctionIdentifier: %s\n"", f__string(a_1->v_FunctionIdentifier.v).c_str());
+{'\t'}std::printf(""\tResultType: %d\n"", a_1->v_ResultType.v);
+{'\t'}if (auto s = a_1->v_MarshalledCallArgsJson.v) std::printf(""\tMarshalledCallArgsJson: %s\n"", f__string(s).c_str());
+{'\t'}std::printf(""\tMarshalledCallAsyncHandle: %lld\n"", a_1->v_MarshalledCallAsyncHandle.v);
+{'\t'}std::printf(""\tTargetInstanceId: %lld\n"", a_1->v_TargetInstanceId.v);
+{'\t'}f__store(*a_0, nullptr);
+{'\t'}auto p = f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_invoke_js_blazor(a_0, a_1, {marshal(types[0], "a_2")}, {marshal(types[1], "a_3")}, {marshal(types[2], "a_4")});
+{'\t'}}});
+{'\t'}std::printf(""done: %p, %p\n"", p, *a_0);
+{'\t'}return reinterpret_cast<{transpiler.EscapeForStacked(types[3])}>(p);
+", 0);
+                        }
+                    ))
+                    .For(get(typeof(ThreadPool)), (type, code) => code.For(
+                        type.GetMethod("InitializeConfigAndDetermineUsePortableThreadPool", BindingFlags.Static | BindingFlags.NonPublic),
+                        transpiler =>
+                        {
+                            var set = get(typeof(AppContext)).GetMethod("SetData");
+                            transpiler.Enqueue(set);
+                            return ($@"{'\t'}{transpiler.Escape(set)}(f__new_string(u""System.Threading.ThreadPool.MinThreads""sv), f__new_constructed<{transpiler.Escape(get(typeof(int)))}>(1));
+{'\t'}{transpiler.Escape(set)}(f__new_string(u""System.Threading.ThreadPool.MaxThreads""sv), f__new_constructed<{transpiler.Escape(get(typeof(int)))}>(1));
+{'\t'}return true;
+", 1);
+                        }
                     ));
                 }
                 catch (FileNotFoundException) { }
-                Type load(string x)
+                Type load(string x) => Type.GetType(x, context.LoadFromAssemblyName, (assembly, name, ignoreCase) => int.TryParse(name, out var x) ? Type.MakeGenericMethodParameter(x) : assembly.GetType(name, false, ignoreCase), true);
+                var bundleTypes = new List<Type>();
+                var bundleMethods = new List<MethodInfo>();
+                var methodPattern = new Regex(@"(.*?)\s*:\s*(\w+)`(\d+)\((.+?)\)\s*(.+)", RegexOptions.Compiled);
+                foreach (var x in options.Bundle)
                 {
-                    var xs = x.Split(':');
-                    return context.LoadFromAssemblyName(xs[0]).GetType(xs[1], true);
+                    var match = methodPattern.Match(x);
+                    if (match.Success)
+                        bundleMethods.Add(load(match.Groups[1].Value).GetMethod(
+                            match.Groups[2].Value,
+                            int.Parse(match.Groups[3].Value),
+                            BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                            null,
+                            match.Groups[4].Value.Split(';').Select(load).ToArray(),
+                            null
+                        ).MakeGenericMethod(
+                            match.Groups[5].Value.Split(';').Select(load).ToArray()
+                        ));
+                    else
+                        bundleTypes.Add(load(x));
                 }
                 var reflection = options.Reflection.Select(load).ToHashSet();
                 var transpiler = new Transpiler(get, builtin, /*Console.Error.WriteLine*/_ => { }, options.Target, options.Is64, false)
                 {
-                    Bundle = options.Bundle.Select(load),
+                    Bundle = bundleTypes,
+                    BundleMethods = bundleMethods,
                     GenerateReflection = reflection.Contains
                 };
                 var definition = TextWriter.Null;
@@ -129,6 +280,7 @@ namespace il2cxx
                 foreach (var x in Directory.EnumerateFiles(source)) File.Copy(x, Path.Combine(destination, Path.GetFileName(x)));
             }
             copy("src");
+            copy("wasm");
             var name = Path.GetFileNameWithoutExtension(options.Source);
             File.WriteAllText(Path.Combine(options.Out, "CMakeLists.txt"), $@"cmake_minimum_required(VERSION 3.16)
 project({name})
@@ -143,13 +295,24 @@ add_executable({name}
 }{string.Join(string.Empty, names.Select(x => $"\t{x}\n"))
 }{'\t'}main.cc
 {'\t'})
-target_include_directories({name} PRIVATE src)
 target_compile_options({name} PRIVATE ""-fno-rtti"")
-target_link_libraries({name} recyclone dl)
 target_precompile_headers({name} PRIVATE declarations.h)
 if(EMSCRIPTEN)
-{'\t'}target_compile_definitions({name} PRIVATE RECYCLONE__STACK_LIMIT=0x400000)
-{'\t'}target_link_options({name} PRIVATE ""-O0"")
+{'\t'}set_target_properties({name} PROPERTIES OUTPUT_NAME dotnet)
+{'\t'}target_sources({name} PRIVATE wasm/driver.cc wasm/pinvoke.cc)
+{'\t'}target_include_directories({name} PRIVATE wasm src .)
+{'\t'}target_link_libraries({name} recyclone dl
+{'\t'}{'\t'}${{PROJECT_SOURCE_DIR}}/wasm/libzlib.a
+{'\t'}{'\t'}${{PROJECT_SOURCE_DIR}}/wasm/libSystem.Native.a
+{'\t'}{'\t'}${{PROJECT_SOURCE_DIR}}/wasm/libSystem.IO.Compression.Native.a
+{'\t'}{'\t'}#${{PROJECT_SOURCE_DIR}}/wasm/libicuuc.a
+{'\t'}{'\t'}#${{PROJECT_SOURCE_DIR}}/wasm/libicui18n.a
+{'\t'}{'\t'}#${{PROJECT_SOURCE_DIR}}/wasm/libSystem.Globalization.Native.a
+{'\t'}{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ArrayToString']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc']\"";-s STRICT_JS;-s PTHREAD_POOL_SIZE=2;--extern-pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime.iffe.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/library-dotnet.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/pal_random.js""
+{'\t'}{'\t'})
+else()
+{'\t'}target_include_directories({name} PRIVATE src .)
+{'\t'}target_link_libraries({name} recyclone dl)
 endif()
 file(COPY resources DESTINATION .)
 ");

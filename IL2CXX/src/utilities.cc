@@ -167,6 +167,8 @@ namespace
 {
 
 std::regex v__type_prefix{"^(:?[^,\\[\\\\\\]`]|\\\\.)+(:?(`\\d+)|\\[[^\\]]*\\])?"};
+std::string_view v__private_corelib = "System.Private.CoreLib"sv;
+std::string_view v__mscorlib = "mscorlib"sv;
 
 inline std::string_view f__sv(std::string_view::const_iterator a_first, std::string_view::const_iterator a_last)
 {
@@ -185,25 +187,31 @@ std::pair<std::string_view::const_iterator, std::string_view::const_iterator> f_
 	if (a_x.substr(0, n) != a_y.substr(0, n)) return fail();
 	auto i = a_x.begin() + n;
 	auto j = a_y.begin() + n;
-	if (match.length(1) > 0 && i != a_x.end() && *i == u'[') {
-		if (j == a_y.end() || *j != u'[') return fail();
+	if (match.length(1) > 0 && i != a_x.end() && *i == '[') {
+		if (j == a_y.end() || *j != '[') return fail();
 		auto equals = [&](auto i, auto j, char16_t c)
 		{
 			return i != a_x.end() && *i == c && j != a_y.end() && *j == c;
 		};
 		do {
-			if (!equals(++i, ++j, u'[')) return fail();
+			if (!equals(++i, ++j, '[')) return fail();
 			auto x = f__match_type(f__sv(++i, a_x.end()), f__sv(++j, a_y.end()));
 			i = x.first;
 			j = x.second;
-			if (!equals(i, j, u']')) return fail();
-		} while (equals(++i, ++j, u','));
-		if (!equals(i, j, u']')) return fail();
+			if (!equals(i, j, ']')) return fail();
+		} while (equals(++i, ++j, ','));
+		if (!equals(i, j, ']')) return fail();
 		++i;
 		++j;
 	}
-	for (; j != a_y.end() && *j != u']'; ++i, ++j) if (i == a_x.end() || *i != *j) return fail();
-	return {std::find(i, a_x.end(), u']'), j};
+	for (; j != a_y.end() && (*j == ' ' || *j == ','); ++i, ++j) if (i == a_x.end() || *i != *j) return fail();
+	if (f__sv(j, a_y.end()).substr(0, v__mscorlib.size()) == v__mscorlib) {
+		if (f__sv(i, a_x.end()).substr(0, v__private_corelib.size()) != v__private_corelib) return fail();
+		i += v__private_corelib.size();
+		j += v__mscorlib.size();
+	}
+	for (; j != a_y.end() && *j != ']'; ++i, ++j) if (i == a_x.end() || *i != *j) return fail();
+	return {std::find(i, a_x.end(), ']'), j};
 }
 
 }

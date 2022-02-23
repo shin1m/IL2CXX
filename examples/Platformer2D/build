@@ -1,0 +1,25 @@
+#!/bin/bash
+BASE=$(cd $(dirname $0) && pwd)
+cd $BASE
+dotnet build MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL -c Release || exit $?
+dotnet run --project ../../IL2CXX.Console --target Unix\
+ --out out MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL/bin/Release/netcoreapp3.1/Platformer2D.DesktopGL.dll\
+ --reflection\
+  'Microsoft.Xna.Framework.Content.CharReader, MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.Int32Reader, MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.ListReader`1[[System.Char, System.Private.CoreLib]], MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Rectangle, MonoGame.Framework]], MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Vector3, MonoGame.Framework]], MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.RectangleReader, MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.SongReader, MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.SoundEffectReader, MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.SpriteFontReader, MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.Texture2DReader, MonoGame.Framework'\
+  'Microsoft.Xna.Framework.Content.Vector3Reader, MonoGame.Framework'\
+  'Platformer2D.DesktopGL.Program, Platformer2D.DesktopGL'\
+ || exit $?
+mkdir out/build || exit $?
+cd out/build || exit $?
+CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 .. || exit $?
+cmake --build . -j8 || exit $?
+cp -a $BASE/MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL/bin/Release/netcoreapp3.1/Content . || exit $?

@@ -43,6 +43,12 @@ Below are build durations running the above commands on my Core i7-8550U laptop:
 * [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples) Platformer2D - 5 minutes
 * [bepuphysics2](https://github.com/bepu/bepuphysics2) Demos.GL - 12 minutes
 
+# Examples
+
+* [Platformer2D](examples/Platformer2D) - Platformer2D of [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples)
+* [Demos](examples/Demos) - Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
+* [BlazorWasm](examples/BlazorWasm) - Blazor WebAssembly Template Application
+
 # Comparing GC Pauses
 
 I compared GC pauses in IL2CXX to those in .NET 6 preview using the same way introduced by [this blog post](https://mattwarren.org/2017/01/13/Analysing-Pause-times-in-the-.NET-GC/).

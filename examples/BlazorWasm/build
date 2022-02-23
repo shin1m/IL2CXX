@@ -1,0 +1,161 @@
+#!/bin/bash
+DOTNET_ROOT=~/.local/dotnet
+BASE=$(cd $(dirname $0) && pwd)
+cd $BASE
+if [ "$1" == '' ]; then
+	dotnet publish -c Release || exit $?
+	rm -rf il2cxx || exit $?
+	mkdir -p il2cxx/source || exit $?
+	(cd bin/Release/net6.0 && cp\
+	 Microsoft.AspNetCore.Components.WebAssembly.dll\
+	 Microsoft.JSInterop.WebAssembly.dll\
+	 System.Net.Http.dll\
+	 System.Private.Runtime.InteropServices.JavaScript.dll\
+	 BlazorWasm.dll\
+	 $BASE/il2cxx/source\
+	) || exit $?
+	cp -a bin/Release/net6.0/publish/wwwroot il2cxx || exit $?
+	rm -rf il2cxx/wwwroot/_framework || exit $?
+	cd il2cxx || exit $?
+	ln -s ../out/build/_framework wwwroot/_framework || exit $?
+	dotnet run --project ../../IL2CXX.Console --target Other --is32\
+	 --assemblies $DOTNET_ROOT/shared/Microsoft.AspNetCore.App/6.0.1\
+	 --out out source/BlazorWasm.dll\
+	 --bundle\
+	  'System.Text.Json.Serialization.Converters.ArrayConverter`2[[System.Object[], System.Private.CoreLib], [System.Object, System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ArrayConverter`2[[Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web], [Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter, Microsoft.AspNetCore.Components.Web]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ArrayConverter`2[[BlazorWasm.Pages.FetchData+WeatherForecast[], BlazorWasm], [BlazorWasm.Pages.FetchData+WeatherForecast, BlazorWasm]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.DictionaryOfTKeyTValueConverter`3[[System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib], [System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib]], System.Private.CoreLib], [System.String, System.Private.CoreLib], [System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.DictionaryOfTKeyTValueConverter`3[[System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib], [Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web]], System.Private.CoreLib], [System.String, System.Private.CoreLib], [Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ListOfTConverter`2[[System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib], [System.String, System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[System.Threading.Tasks.VoidTaskResult, System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[Microsoft.JSInterop.DotNetObjectReference`1[[Microsoft.AspNetCore.Components.RenderTree.WebRenderer+WebRendererInteropMethods, Microsoft.AspNetCore.Components.Web]], Microsoft.JSInterop]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[Microsoft.JSInterop.Infrastructure.IJSVoidResult, Microsoft.JSInterop]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[BlazorWasm.Pages.FetchData+WeatherForecast, BlazorWasm]], System.Text.Json'\
+	  'System.Runtime.InteropServices.JavaScript.Runtime, System.Private.Runtime.InteropServices.JavaScript'\
+	  'Microsoft.Extensions.Options.OptionsCache`1[[Microsoft.Extensions.Logging.LoggerFilterOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.OptionsFactory`1[[Microsoft.Extensions.Logging.LoggerFactoryOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.OptionsFactory`1[[Microsoft.Extensions.Logging.LoggerFilterOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.OptionsMonitor`1[[Microsoft.Extensions.Logging.LoggerFilterOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.UnnamedOptionsManager`1[[Microsoft.Extensions.Logging.LoggerFactoryOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Logging.Logger`1[[Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager, Microsoft.AspNetCore.Components]], Microsoft.Extensions.Logging.Abstractions'\
+	  'Microsoft.JSInterop.Infrastructure.DotNetObjectReferenceJsonConverter`1[[Microsoft.AspNetCore.Components.RenderTree.WebRenderer+WebRendererInteropMethods, Microsoft.AspNetCore.Components.Web]], Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.TaskGenericsUtil+TaskResultGetter`1[[System.Threading.Tasks.VoidTaskResult, System.Private.CoreLib]], Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.TaskGenericsUtil+TcsResultSetter`1[[System.String, System.Private.CoreLib]], Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.TaskGenericsUtil+TcsResultSetter`1[[Microsoft.JSInterop.Infrastructure.IJSVoidResult, Microsoft.JSInterop]], Microsoft.JSInterop'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.LayoutView, Microsoft.AspNetCore.Components; System.Type, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.LayoutView, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.RenderFragment, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.RouteView, Microsoft.AspNetCore.Components; System.Type, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.RouteView, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.NavigationManager, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.RouteView, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.RouteData, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.FocusOnNavigate, Microsoft.AspNetCore.Components.Web; System.String, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.FocusOnNavigate, Microsoft.AspNetCore.Components.Web; Microsoft.JSInterop.IJSRuntime, Microsoft.JSInterop'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.FocusOnNavigate, Microsoft.AspNetCore.Components.Web; Microsoft.AspNetCore.Components.RouteData, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.NavLink, Microsoft.AspNetCore.Components.Web; System.String, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.NavLink, Microsoft.AspNetCore.Components.Web; System.Collections.Generic.IReadOnlyDictionary`2[[System.String, System.Private.CoreLib], [System.Object, System.Private.CoreLib]], System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.NavLink, Microsoft.AspNetCore.Components.Web; Microsoft.AspNetCore.Components.NavigationManager, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.NavLink, Microsoft.AspNetCore.Components.Web; Microsoft.AspNetCore.Components.RenderFragment, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.NavLink, Microsoft.AspNetCore.Components.Web; Microsoft.AspNetCore.Components.Routing.NavLinkMatch, Microsoft.AspNetCore.Components.Web'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; System.Boolean, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; System.Reflection.Assembly, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; System.Collections.Generic.IEnumerable`1[[System.Reflection.Assembly, System.Private.CoreLib]], System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; Microsoft.Extensions.Logging.ILoggerFactory, Microsoft.Extensions.Logging.Abstractions'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.EventCallback`1[[Microsoft.AspNetCore.Components.Routing.NavigationContext, Microsoft.AspNetCore.Components]], Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.NavigationManager, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.RenderFragment, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.RenderFragment`1[[Microsoft.AspNetCore.Components.RouteData, Microsoft.AspNetCore.Components]], Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.Routing.INavigationInterception, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Sections.SectionContent, Microsoft.AspNetCore.Components; System.Boolean, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Sections.SectionContent, Microsoft.AspNetCore.Components; System.String, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Sections.SectionContent, Microsoft.AspNetCore.Components; Microsoft.AspNetCore.Components.RenderFragment, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Sections.SectionOutlet, Microsoft.AspNetCore.Components; System.String, System.Private.CoreLib'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Web.HeadOutlet, Microsoft.AspNetCore.Components.Web; Microsoft.JSInterop.IJSRuntime, Microsoft.JSInterop'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) Microsoft.AspNetCore.Components.Web.PageTitle, Microsoft.AspNetCore.Components.Web; Microsoft.AspNetCore.Components.RenderFragment, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) BlazorWasm.Pages.FetchData, BlazorWasm; System.Net.Http.HttpClient, System.Net.Http'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) BlazorWasm.Shared.MainLayout, BlazorWasm; Microsoft.AspNetCore.Components.RenderFragment, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components: CallPropertySetter`2(System.Action`2[0, 1], System.Private.CoreLib; System.Object, System.Private.CoreLib; System.Object, System.Private.CoreLib) BlazorWasm.Shared.SurveyPrompt, BlazorWasm; System.String, System.Private.CoreLib'\
+	  'BlazorWasm.Pages.Counter, BlazorWasm'\
+	  'BlazorWasm.Pages.FetchData, BlazorWasm'\
+	  'BlazorWasm.Pages.Index, BlazorWasm'\
+	 --reflection\
+	  'System.Boolean, System.Private.CoreLib'\
+	  'System.Int32, System.Private.CoreLib'\
+	  'System.Object, System.Private.CoreLib'\
+	  'System.String, System.Private.CoreLib'\
+	  'System.Object[], System.Private.CoreLib'\
+	  'System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib], [System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib]], System.Private.CoreLib'\
+	  'System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib], [Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web]], System.Private.CoreLib'\
+	  'System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib'\
+	  'System.Text.Json.JsonElement, System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ArrayConverter`2[[System.Object[], System.Private.CoreLib], [System.Object, System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ArrayConverter`2[[Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web], [Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter, Microsoft.AspNetCore.Components.Web]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ArrayConverter`2[[BlazorWasm.Pages.FetchData+WeatherForecast[], BlazorWasm], [BlazorWasm.Pages.FetchData+WeatherForecast, BlazorWasm]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.DictionaryOfTKeyTValueConverter`3[[System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib], [System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib]], System.Private.CoreLib], [System.String, System.Private.CoreLib], [System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.DictionaryOfTKeyTValueConverter`3[[System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib], [Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web]], System.Private.CoreLib], [System.String, System.Private.CoreLib], [Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ListOfTConverter`2[[System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib], [System.String, System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[System.Threading.Tasks.VoidTaskResult, System.Private.CoreLib]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[Microsoft.JSInterop.DotNetObjectReference`1[[Microsoft.AspNetCore.Components.RenderTree.WebRenderer+WebRendererInteropMethods, Microsoft.AspNetCore.Components.Web]], Microsoft.JSInterop]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[Microsoft.JSInterop.Infrastructure.IJSVoidResult, Microsoft.JSInterop]], System.Text.Json'\
+	  'System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[[BlazorWasm.Pages.FetchData+WeatherForecast, BlazorWasm]], System.Text.Json'\
+	  'System.Threading.Tasks.Task`1, System.Private.CoreLib'\
+	  'System.Threading.Tasks.VoidTaskResult, System.Private.CoreLib'\
+	  'System.Runtime.InteropServices.JavaScript.Runtime, System.Private.Runtime.InteropServices.JavaScript'\
+	  'Microsoft.Extensions.Options.OptionsCache`1[[Microsoft.Extensions.Logging.LoggerFilterOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.OptionsFactory`1[[Microsoft.Extensions.Logging.LoggerFactoryOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.OptionsFactory`1[[Microsoft.Extensions.Logging.LoggerFilterOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.OptionsMonitor`1[[Microsoft.Extensions.Logging.LoggerFilterOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Options.UnnamedOptionsManager`1[[Microsoft.Extensions.Logging.LoggerFactoryOptions, Microsoft.Extensions.Logging]], Microsoft.Extensions.Options'\
+	  'Microsoft.Extensions.Logging.LoggerFactory, Microsoft.Extensions.Logging'\
+	  'Microsoft.Extensions.Logging.Logger`1[[Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager, Microsoft.AspNetCore.Components]], Microsoft.Extensions.Logging.Abstractions'\
+	  'Microsoft.JSInterop.DotNetObjectReference`1[[Microsoft.AspNetCore.Components.RenderTree.WebRenderer+WebRendererInteropMethods, Microsoft.AspNetCore.Components.Web]], Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.DotNetObjectReferenceJsonConverter`1[[Microsoft.AspNetCore.Components.RenderTree.WebRenderer+WebRendererInteropMethods, Microsoft.AspNetCore.Components.Web]], Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.IJSVoidResult, Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.TaskGenericsUtil+TaskResultGetter`1[[System.Threading.Tasks.VoidTaskResult, System.Private.CoreLib]], Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.TaskGenericsUtil+TcsResultSetter`1[[System.String, System.Private.CoreLib]], Microsoft.JSInterop'\
+	  'Microsoft.JSInterop.Infrastructure.TaskGenericsUtil+TcsResultSetter`1[[Microsoft.JSInterop.Infrastructure.IJSVoidResult, Microsoft.JSInterop]], Microsoft.JSInterop'\
+	  'Microsoft.AspNetCore.Components.ComponentBase, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.LayoutComponentBase, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.LayoutView, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Reflection.PropertySetter, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.RenderTree.RenderTreeFrameType, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.RenderTree.WebRenderer+WebRendererInteropMethods, Microsoft.AspNetCore.Components.Web'\
+	  'Microsoft.AspNetCore.Components.RouteView, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Routing.FocusOnNavigate, Microsoft.AspNetCore.Components.Web'\
+	  'Microsoft.AspNetCore.Components.Routing.NavLink, Microsoft.AspNetCore.Components.Web'\
+	  'Microsoft.AspNetCore.Components.Routing.Router, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Sections.SectionContent, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Sections.SectionOutlet, Microsoft.AspNetCore.Components'\
+	  'Microsoft.AspNetCore.Components.Web.HeadOutlet, Microsoft.AspNetCore.Components.Web'\
+	  'Microsoft.AspNetCore.Components.Web.JSComponentConfigurationStore+JSComponentParameter[], Microsoft.AspNetCore.Components.Web'\
+	  'Microsoft.AspNetCore.Components.Web.PageTitle, Microsoft.AspNetCore.Components.Web'\
+	  'Microsoft.AspNetCore.Components.WebAssembly.Infrastructure.JSInteropMethods, Microsoft.AspNetCore.Components.WebAssembly'\
+	  'Microsoft.AspNetCore.Components.WebAssembly.Services.DefaultWebAssemblyJSRuntime, Microsoft.AspNetCore.Components.WebAssembly'\
+	  'Microsoft.AspNetCore.Components.WebAssembly.Services.WebAssemblyConsoleLoggerProvider, Microsoft.AspNetCore.Components.WebAssembly'\
+	  'BlazorWasm.App, BlazorWasm'\
+	  'BlazorWasm.Pages.Counter, BlazorWasm'\
+	  'BlazorWasm.Pages.FetchData, BlazorWasm'\
+	  'BlazorWasm.Pages.FetchData+WeatherForecast, BlazorWasm'\
+	  'BlazorWasm.Pages.FetchData+WeatherForecast[], BlazorWasm'\
+	  'BlazorWasm.Pages.Index, BlazorWasm'\
+	  'BlazorWasm.Shared.MainLayout, BlazorWasm'\
+	  'BlazorWasm.Shared.NavMenu, BlazorWasm'\
+	  'BlazorWasm.Shared.SurveyPrompt, BlazorWasm'\
+	  'Program, BlazorWasm'\
+	 || exit $?
+	mkdir out/build || exit $?
+	cd out/build || exit $?
+	emcmake cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-s INITIAL_MEMORY=134217728 -Oz' .. || exit $?
+else
+	cd il2cxx/out/build || exit $?
+fi
+cmake --build . -j8 || exit $?
+rm -rf _framework || exit $?
+cp -a ../wasm/_framework . || exit $?
+cp dotnet.js dotnet.worker.js dotnet.wasm _framework || exit $?
+cd _framework || exit $?
+sed -i '/assert(runtimeInitialized,/d' dotnet.js || exit $?
+sed -i 's/"entryAssembly": ""/"entryAssembly": "BlazorWasm"/' blazor.boot.json || exit $?
+sed -i "s/\"dotnet\\.js\": \"sha256-.*\"/\"dotnet.js\": \"sha256-$(cat dotnet.js | openssl dgst -sha256 -binary | openssl base64 -A | sed 's/\//\\\//g')\"/" blazor.boot.json || exit $?
+sed -i "s/\"dotnet\\.worker\\.js\": \"sha256-.*\"/\"dotnet.worker.js\": \"sha256-$(cat dotnet.worker.js | openssl dgst -sha256 -binary | openssl base64 -A | sed 's/\//\\\//g')\"/" blazor.boot.json || exit $?
+sed -i "s/\"dotnet\\.wasm\": \"sha256-.*\"/\"dotnet.wasm\": \"sha256-$(cat dotnet.wasm | openssl dgst -sha256 -binary | openssl base64 -A | sed 's/\//\\\//g')\"/" blazor.boot.json || exit $?

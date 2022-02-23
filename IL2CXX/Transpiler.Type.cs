@@ -1070,6 +1070,11 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {'\t'}f_box = f_do_box;
 {'\t'}f_unbox = f_do_unbox_value;");
             }
+            else if (type.IsPointer)
+            {
+                writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear_pointer;
+{'\t'}f_copy = f_do_copy_pointer;");
+            }
             writerForDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
             if (definition is TypeDefinition)
@@ -1087,7 +1092,7 @@ t__object* t__type_of<{identifier}>::f_do_clone(const t__object* a_this)
 {'\t'}t__new<{identifier}> q(sizeof({element}) * p->v__length);
 {'\t'}q->v__length = p->v__length;
 {'\t'}std::memcpy(q->v__bounds, p->v__bounds, sizeof(p->v__bounds));
-{'\t'}auto p0 = reinterpret_cast<const {element}*>(p + 1);
+{'\t'}auto p0 = reinterpret_cast<{element} const*>(p + 1);
 {'\t'}auto p1 = q->f_data();
 {'\t'}for (size_t i = 0; i < p->v__length; ++i) new(p1 + i) {element}(p0[i]);
 {'\t'}return q;");

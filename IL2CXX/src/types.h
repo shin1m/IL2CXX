@@ -294,8 +294,10 @@ struct t__type : t__abstract_type
 	static void f_do_suppress_finalize(t__object* a_this);
 	void (*f_suppress_finalize)(t__object*) = f_do_suppress_finalize;
 	static void f_do_clear(void* a_p, size_t a_n);
+	static void f_do_clear_pointer(void* a_p, size_t a_n);
 	void (*f_clear)(void*, size_t) = f_do_clear;
 	static void f_do_copy(const void* a_from, size_t a_n, void* a_to);
+	static void f_do_copy_pointer(const void* a_from, size_t a_n, void* a_to);
 	void (*f_copy)(const void*, size_t, void*) = f_do_copy;
 	static t__object* f_do_box(void* a_p);
 	t__object* (*f_box)(void*) = f_do_box;

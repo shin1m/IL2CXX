@@ -1161,7 +1161,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine();
-                    GenerateArrayAccess(stack.Pop, stack, y => indexToStack[index].Assign($"static_cast<intptr_t>({y})"));
+                    GenerateArrayAccess(stack.Pop, stack, y => indexToStack[index].Assign($"{(stack.Pop.Type.GetElementType().IsPointer ? "reinterpret_cast" : "static_cast")}<intptr_t>({y})"));
                     return index;
                 };
             });
@@ -1175,9 +1175,18 @@ namespace IL2CXX
                     return index;
                 };
             });
+            instructions1[OpCodes.Stelem_I.Value].For(x =>
+            {
+                x.Estimate = (index, stack) => (index, stack.Pop.Pop.Pop);
+                x.Generate = (index, stack) =>
+                {
+                    writer.WriteLine();
+                    GenerateArrayAccess(stack.Pop.Pop, stack.Pop, y => $"{(stack.Pop.Pop.Type.GetElementType().IsPointer ? $"reinterpret_cast<intptr_t&>({y})" : y)} = reinterpret_cast<intptr_t>({stack.Variable})");
+                    return index;
+                };
+            });
             new[]
             {
-                (OpCode: OpCodes.Stelem_I, Type: typeofIntPtr),
                 (OpCode: OpCodes.Stelem_I1, Type: typeofSByte),
                 (OpCode: OpCodes.Stelem_I2, Type: typeofInt16),
                 (OpCode: OpCodes.Stelem_I4, Type: typeofInt32),

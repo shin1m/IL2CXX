@@ -1086,6 +1086,15 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
+                    if (t.IsValueType)
+                    {
+                        var next = instructions1[bytes[index]].OpCode;
+                        if (next == OpCodes.Brtrue_S || next == OpCodes.Brfalse_S || next == OpCodes.Brtrue || next == OpCodes.Brfalse)
+                        {
+                            writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = reinterpret_cast<t__object*>(1);");
+                            return index;
+                        }
+                    }
                     writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {(t.IsValueType ? $"f__new_constructed<{Escape(t)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}))" : stack.Variable)};");
                     return index;
                 };

@@ -20,6 +20,6 @@ dotnet run --project ../../IL2CXX.Console --target Unix\
  || exit $?
 mkdir out/build || exit $?
 cd out/build || exit $?
-CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 .. || exit $?
+CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-Oz' .. || exit $?
 cmake --build . -j8 || exit $?
 cp -a $BASE/MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL/bin/Release/netcoreapp3.1/Content . || exit $?

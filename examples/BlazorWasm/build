@@ -18,7 +18,7 @@ if [ "$1" == '' ]; then
 	rm -rf il2cxx/wwwroot/_framework || exit $?
 	cd il2cxx || exit $?
 	ln -s ../out/build/_framework wwwroot/_framework || exit $?
-	dotnet run --project ../../IL2CXX.Console --target Other --is32\
+	dotnet run --project $BASE/../../IL2CXX.Console --target Other --is32\
 	 --assemblies $DOTNET_ROOT/shared/Microsoft.AspNetCore.App/6.0.1\
 	 --out out source/BlazorWasm.dll\
 	 --bundle\

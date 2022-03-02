@@ -147,6 +147,7 @@ namespace IL2CXX
         private readonly Func<Type, Type> getType;
         public Type TypeOf<T>() => getType(typeof(T));
         public readonly Type typeofObject;
+        public readonly Type typeofValueType;
         public readonly Type typeofRuntimeAssembly;
         public readonly Type typeofRuntimeFieldInfo;
         public readonly Type typeofRuntimeConstructorInfo;
@@ -172,6 +173,7 @@ namespace IL2CXX
         public readonly Type typeofVoid;
         public readonly Type typeofIntPtr;
         public readonly Type typeofUIntPtr;
+        public readonly Type typeofNullable;
         public readonly Type typeofString;
         public readonly Type typeofStringBuilder;
         public readonly Type typeofException;
@@ -213,6 +215,8 @@ namespace IL2CXX
             var t = type.GetElementType();
             return t == typeofTypedReferenceTag ? typeofTypedReference : t;
         }
+        // TODO: Nullable.GetUnderlyingType() of MetadataLoadContext does not work.
+        public Type GetNullableUnderlyingType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeofNullable ? type.GetGenericArguments()[0] : null;
         private Type[] GetInterfaces(Type type)
         {
             var interfaces = type.GetInterfaces();

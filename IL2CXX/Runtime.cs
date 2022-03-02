@@ -168,6 +168,10 @@ namespace IL2CXX
         public override string ToString() => throw new NotImplementedException();
         public override RuntimeTypeHandle TypeHandle => throw new NotImplementedException();
         public override Type UnderlyingSystemType => this;
+
+        public static bool ValueEquals(RuntimeType type, IntPtr x, object y) => throw new NotImplementedException();
+        public static int ValueGetHashCode(RuntimeType type, IntPtr x) => throw new NotImplementedException();
+        public static string ValueToString(RuntimeType type, IntPtr x) => throw new NotImplementedException();
     }
     abstract class RuntimeGenericParameter : Type
     {

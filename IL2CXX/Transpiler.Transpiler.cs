@@ -40,6 +40,7 @@ namespace IL2CXX
             CheckRange = checkRange;
             getType = get;
             typeofObject = get(typeof(object));
+            typeofValueType = get(typeof(ValueType));
             typeofRuntimeAssembly = get(typeof(RuntimeAssembly));
             typeofRuntimeFieldInfo = get(typeof(RuntimeFieldInfo));
             typeofRuntimeConstructorInfo = get(typeof(RuntimeConstructorInfo));
@@ -65,6 +66,7 @@ namespace IL2CXX
             typeofVoid = get(typeof(void));
             typeofIntPtr = get(typeof(IntPtr));
             typeofUIntPtr = get(typeof(UIntPtr));
+            typeofNullable = get(typeof(Nullable<>));
             typeofString = get(typeof(string));
             typeofStringBuilder = get(typeof(StringBuilder));
             typeofException = get(typeof(Exception));
@@ -789,10 +791,28 @@ namespace IL2CXX
                         {
                             var cm = isConcrete ? m : GetConcrete(m, constrained);
                             if (cm.DeclaringType == constrained)
+                            {
                                 generateConcrete(cm);
+                            }
                             else
-                                writer.WriteLine($@"{'\t'}{{auto p = f__new_constructed<{Escape(constrained)}>(*{CastValue(MakePointerType(constrained), @this.Variable)});
+                            {
+                                void generateValueMethod(string name)
+                                {
+                                    var rm = typeofRuntimeType.GetMethod(name);
+                                    writer.WriteLine($"\t{after.Variable} = {GenerateCall(rm, Escape(rm), stack.Take(rm.GetParameters().Length - 2).Select(y => y.Variable).Append(@this.Variable).Append($"&t__type_of<{Escape(constrained)}>::v__instance").Reverse())};");
+                                }
+                                if (cm == typeofObject.GetMethod(nameof(GetType)))
+                                    writer.WriteLine($"\t{after.Variable} = &t__type_of<{Escape(constrained)}>::v__instance;");
+                                else if (cm == typeofValueType.GetMethod(nameof(Equals)))
+                                    generateValueMethod(nameof(RuntimeType.ValueEquals));
+                                else if (cm == typeofValueType.GetMethod(nameof(GetHashCode)))
+                                    generateValueMethod(nameof(RuntimeType.ValueGetHashCode));
+                                else if (cm == typeofValueType.GetMethod(nameof(ToString)))
+                                    generateValueMethod(nameof(RuntimeType.ValueToString));
+                                else
+                                    writer.WriteLine($@"{'\t'}{{auto p = f__new_constructed<{Escape(constrained)}>(*{CastValue(MakePointerType(constrained), @this.Variable)});
 {(isConcrete ? generate(m) : generateVirtual("p"))}{'\t'}}}");
+                            }
                         }
                         else
                         {
@@ -910,6 +930,7 @@ namespace IL2CXX
                     var t = ParseType(ref index);
                     Trace.Assert(t.IsValueType);
                     writer.WriteLine($" {t}");
+                    if (GetNullableUnderlyingType(t) != null) throw new NotSupportedException();
                     GenerateCheckNull(stack);
                     writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type() != &t__type_of<{Escape(t)}>::v__instance) [[unlikely]] {GenerateThrow("InvalidCast")};
 {'\t'}{indexToStack[index].Variable} = &static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
@@ -1086,16 +1107,17 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    if (t.IsValueType)
-                    {
-                        var next = instructions1[bytes[index]].OpCode;
-                        if (next == OpCodes.Brtrue_S || next == OpCodes.Brfalse_S || next == OpCodes.Brtrue || next == OpCodes.Brfalse)
-                        {
-                            writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = reinterpret_cast<t__object*>(1);");
-                            return index;
-                        }
-                    }
-                    writer.WriteLine($" {t}\n\t{indexToStack[index].Variable} = {(t.IsValueType ? $"f__new_constructed<{Escape(t)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}))" : stack.Variable)};");
+                    writer.WriteLine($" {t}");
+                    var after = indexToStack[index];
+                    var next = instructions1[bytes[index]].OpCode;
+                    if (t.IsValueType && (next == OpCodes.Brtrue_S || next == OpCodes.Brfalse_S || next == OpCodes.Brtrue || next == OpCodes.Brfalse))
+                        writer.WriteLine($"\t{after.Variable} = reinterpret_cast<t__object*>(1);");
+                    else if (next == OpCodes.Unbox_Any)
+                        constrained = t;
+                    else if (GetNullableUnderlyingType(t) is Type u)
+                        writer.WriteLine($"\t{after.Variable} = {stack.Variable}.v_hasValue ? f__new_constructed<{Escape(u)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}).v_value) : nullptr;");
+                    else if (t.IsValueType)
+                        writer.WriteLine($"\t{after.Variable} = f__new_constructed<{Escape(t)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}));");
                     return index;
                 };
             });
@@ -1264,31 +1286,49 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
+                    var after = indexToStack[index];
+                    if (constrained != null)
+                    {
+                        var s = constrained;
+                        constrained = null;
+                        if (t == s || s.IsEnum && t == s.GetEnumUnderlyingType()) return index;
+                        var before = indexToStack[index - 10];
+                        if (GetNullableUnderlyingType(t) == s)
+                        {
+                            writer.WriteLine($"\t{after.Variable} = {{true, {before.Variable}}};");
+                            return index;
+                        }
+                        if (s.IsAssignableTo(t))
+                        {
+                            if (s.IsValueType) writer.WriteLine($"\t{after.Variable} = f__new_constructed<{Escape(s)}>(const_cast<std::remove_volatile_t<decltype({before.Variable})>&>({before.Variable}));");
+                            return index;
+                        }
+                        if (s.IsValueType)
+                        {
+                            writer.WriteLine($"\t{GenerateThrow("InvalidCast")};");
+                            return index;
+                        }
+                    }
                     if (t.IsValueType)
                     {
-                        GenerateCheckNull(stack);
-                        var after = indexToStack[index];
-                        writer.WriteLine($@"{'\t'}if ({stack.Variable}->f_type() == &t__type_of<{Escape(t)}>::v__instance)
-{'\t'}{'\t'}{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
-                        if (t.IsPrimitive && t != typeofSingle && t != typeofDouble)
-                            writer.WriteLine($@"{'\t'}else if ({stack.Variable}->f_type()->v__enum)
-{'\t'}{'\t'}switch ({stack.Variable}->f_type()->v__size) {{
-{'\t'}{'\t'}case 1:
-{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int8_t*>({stack.Variable} + 1));
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}case 2:
-{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int16_t*>({stack.Variable} + 1));
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}case 4:
-{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int32_t*>({stack.Variable} + 1));
-{'\t'}{'\t'}{'\t'}break;
-{'\t'}{'\t'}default:
-{'\t'}{'\t'}{'\t'}{after.Variable} = static_cast<{EscapeForStacked(t)}>(*reinterpret_cast<int64_t*>({stack.Variable} + 1));
-{'\t'}{'\t'}}}");
+                        if (GetNullableUnderlyingType(t) is Type u)
+                        {
+                            writer.WriteLine($@"{'\t'}if (!{stack.Variable})
+{'\t'}{'\t'}{after.Variable} = {{false}};
+{'\t'}else if ({stack.Variable}->f_type() == &t__type_of<{Escape(u)}>::v__instance)
+{'\t'}{'\t'}{after.Variable} = {{true, static_cast<{Escape(u)}*>({stack.Variable})->v__value}};");
+                        }
+                        else
+                        {
+                            GenerateCheckNull(stack);
+                            writer.Write($"\tif ({stack.Variable}->f_type() == &t__type_of<{Escape(t)}>::v__instance");
+                            if (t == typeofByte || t == typeofSByte || t == typeofInt16 || t == typeofUInt16 || t == typeofInt32 || t == typeofUInt32 || t == typeofInt64 || t == typeofUInt64) writer.Write($" || {stack.Variable}->f_type()->v__enum && {stack.Variable}->f_type()->v__underlying == &t__type_of<{Escape(t)}>::v__instance");
+                            writer.WriteLine($")\n\t\t{after.Variable} = static_cast<{Escape(t)}*>({stack.Variable})->v__value;");
+                        }
                         writer.WriteLine($@"{'\t'}else
 {'\t'}{'\t'}[[unlikely]] {GenerateThrow("InvalidCast")};");
                     }
-                    else
+                    else if (t != typeofObject)
                     {
                         writer.WriteLine($"\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) [[unlikely]] {GenerateThrow("InvalidCast")};");
                     }

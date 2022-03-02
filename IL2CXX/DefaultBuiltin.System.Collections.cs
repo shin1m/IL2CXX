@@ -21,13 +21,9 @@ namespace IL2CXX
                 {
                     concrete = get(Type.GetType("System.Collections.Generic.GenericEqualityComparer`1", true)).MakeGenericType(types);
                 }
-                else if (t.IsGenericType)
+                else if (transpiler.GetNullableUnderlyingType(t) is Type nv)
                 {
-                    if (t.GetGenericTypeDefinition() == get(typeof(Nullable<>)))
-                    {
-                        var gas = t.GetGenericArguments();
-                        if (gas[0].IsAssignableTo(get(typeof(IEquatable<>)).MakeGenericType(gas))) concrete = get(Type.GetType("System.Collections.Generic.NullableEqualityComparer`1", true)).MakeGenericType(gas);
-                    }
+                    if (nv.IsAssignableTo(get(typeof(IEquatable<>)).MakeGenericType(nv))) concrete = get(Type.GetType("System.Collections.Generic.NullableEqualityComparer`1", true)).MakeGenericType(nv);
                 }
                 else if (t.IsEnum)
                 {

@@ -702,6 +702,31 @@ namespace IL2CXX
                 type.GetMethod("IsPointerImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__pointer;\n", 0)
             );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(RuntimeType.ValueEquals)),
+                transpiler => ("\treturn a_2 && a_2->f_type() == a_0 && std::memcmp(a_1, a_2 + 1, a_0->v__size) == 0;\n", 0)
+            );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(RuntimeType.ValueGetHashCode)),
+                transpiler =>
+                {
+                    var marvin = get(Type.GetType("System.Marvin", true));
+                    var seed = marvin.GetProperty("DefaultSeed").GetMethod;
+                    var compute = marvin.GetMethod("ComputeHash32", new[] { get(typeof(byte)).MakeByRefType(), get(typeof(uint)), get(typeof(uint)), get(typeof(uint)) });
+                    transpiler.Enqueue(seed);
+                    transpiler.Enqueue(compute);
+                    return ($@"{'\t'}auto seed = {transpiler.Escape(seed)}();
+{'\t'}return {transpiler.Escape(compute)}(static_cast<uint8_t*>(a_1.v__5fvalue), a_0->v__size, seed, seed >> 32);
+", 0);
+                }
+            );
+            // TODO
+            code.For(
+                type.GetMethod(nameof(RuntimeType.ValueToString)),
+                transpiler => ("\treturn f__new_string(a_0->v__display_name);\n", 0)
+            );
         })
         .For(get(typeof(RuntimeTimer)), (type, code) =>
         {

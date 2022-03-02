@@ -85,25 +85,30 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Equals)),
-                transpiler => ("\treturn a_0 == a_1;\n", 1)
+                transpiler =>
+                {
+                    var m = get(typeof(RuntimeType)).GetMethod(nameof(RuntimeType.ValueEquals));
+                    transpiler.Enqueue(m);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(m)}(a_0->f_type(), a_0 + 1, a_1);\n", 0);
+                }
             );
             code.For(
                 type.GetMethod(nameof(GetHashCode), Type.EmptyTypes),
                 transpiler =>
                 {
-                    var marvin = get(Type.GetType("System.Marvin", true));
-                    var seed = marvin.GetProperty("DefaultSeed").GetMethod;
-                    var compute = marvin.GetMethod("ComputeHash32", new[] { get(typeof(byte)).MakeByRefType(), get(typeof(uint)), get(typeof(uint)), get(typeof(uint)) });
-                    transpiler.Enqueue(seed);
-                    transpiler.Enqueue(compute);
-                    return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto seed = {transpiler.Escape(seed)}();
-{'\t'}return {transpiler.Escape(compute)}(reinterpret_cast<uint8_t*>(a_0 + 1), a_0->f_type()->v__size, seed, seed >> 32);
-", 0);
+                    var m = get(typeof(RuntimeType)).GetMethod(nameof(RuntimeType.ValueGetHashCode));
+                    transpiler.Enqueue(m);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(m)}(a_0->f_type(), a_0 + 1);\n", 0);
                 }
             );
             code.For(
                 type.GetMethod(nameof(ToString)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->f_type()->v__display_name);\n", 0)
+                transpiler =>
+                {
+                    var m = get(typeof(RuntimeType)).GetMethod(nameof(RuntimeType.ValueToString));
+                    transpiler.Enqueue(m);
+                    return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(m)}(a_0->f_type(), a_0 + 1);\n", 0);
+                }
             );
             // TODO
             code.ForTree(

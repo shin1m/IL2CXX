@@ -238,7 +238,7 @@ namespace IL2CXX.Console
                         if (inline) return inlines;
                         if (type.IsInterface || type.IsSubclassOf(transpiler.typeofMulticastDelegate) || type.IsGenericParameter) return others;
                         definition.Dispose();
-                        while ((Nullable.GetUnderlyingType(type) ?? type.GetElementType()) is Type t) type = t;
+                        while ((transpiler.GetNullableUnderlyingType(type) ?? type.GetElementType()) is Type t) type = t;
                         while (type.IsNested) type = type.DeclaringType;
                         if (type.IsGenericType) type = type.GetGenericTypeDefinition();
                         if (type2path.TryGetValue(type, out var path)) return definition = new StreamWriter(path, true);

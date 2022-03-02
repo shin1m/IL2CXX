@@ -1040,12 +1040,12 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             if (type.IsArray) writerForDefinitions.WriteLine($"\tv__rank = {type.GetArrayRank()};");
             if (type.IsEnum)
             {
-                writerForDefinitions.WriteLine($"\tv__underlying = &t__type_of<{Escape(Enum.GetUnderlyingType(type))}>::v__instance;");
+                writerForDefinitions.WriteLine($"\tv__underlying = &t__type_of<{Escape(type.GetEnumUnderlyingType())}>::v__instance;");
             }
             else
             {
-                var nv = Nullable.GetUnderlyingType(type);
-                if (nv != null) writerForDefinitions.WriteLine($"\tv__underlying = &t__type_of<{Escape(nv)}>::v__instance;");
+                var nv = GetNullableUnderlyingType(type);
+                if (nv != null && !nv.IsGenericParameter) writerForDefinitions.WriteLine($"\tv__underlying = &t__type_of<{Escape(nv)}>::v__instance;");
             }
             if (type.IsGenericType)
             {

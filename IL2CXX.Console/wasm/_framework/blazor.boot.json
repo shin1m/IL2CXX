@@ -14,7 +14,7 @@
     "runtime": {
       "dotnet.js": "sha256-",
       "dotnet.worker.js": "sha256-",
-      "dotnet.timezones.blat": "sha256-MSlKZuLHfzsKLVF\/3omAUcZ57QL0puRif12PGTAXwDY=",
+      "dotnet.timezones.blat": "sha256-0mLavfd4jcI6WJSCMtoiuaRp1/9Wrpg7zsCrKhHS+OI=",
       "dotnet.wasm": "sha256-",
       "icudt_CJK.dat": "sha256-WPyI4hWDPnOw62Nr27FkzGjdbucZnQD+Ph+GOPhAedw=",
       "icudt_EFIGS.dat": "sha256-4RwaPx87Z4dvn77ie\/ro3\/QzyS+\/gGmO3Y\/0CSAXw4k=",

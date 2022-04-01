@@ -974,10 +974,10 @@ namespace IL2CXX
         {
             var parameters = method.GetParameters();
             /*return $@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
-{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {GenerateThrow("TargetParameterCount")};
+{'\t'}if ((parameters ? parameters->v__length : 0) != {parameters.Length}) [[unlikely]] {GenerateThrow("TargetParameterCount")};
 ";*/
             return $@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
-{'\t'}if ({(parameters.Length > 0 ? $"!parameters || parameters->v__length != {parameters.Length}" : "parameters")}) [[unlikely]] {{
+{'\t'}if ((parameters ? parameters->v__length : 0) != {parameters.Length}) [[unlikely]] {{
 {'\t'}{'\t'}std::cerr << ""invalid parameter count for {method.DeclaringType}::[{method}]: "";
 {'\t'}{'\t'}if (parameters)
 {'\t'}{'\t'}{'\t'}std::cerr << parameters->v__length;

@@ -183,8 +183,9 @@ struct t__runtime_assembly : t__assembly
 	std::u16string_view v__name;
 	t__runtime_method_info* v__entry_point;
 	t__type* const* v__exported_types;
+	std::map<std::u16string_view, std::pair<uint8_t*, size_t>> v__resources;
 
-	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types);
+	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types, std::map<std::u16string_view, std::pair<uint8_t*, size_t>>&& a_resources);
 };
 
 struct t__type : t__abstract_type
@@ -229,6 +230,7 @@ struct t__type : t__abstract_type
 		};
 		struct
 		{
+			t__runtime_method_info* v__invoke_method;
 			void* v__multicast_invoke;
 			void* v__invoke_static;
 			void* v__invoke_unmanaged;
@@ -490,7 +492,7 @@ inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type
 	t__type::f_be(this, a_type);
 }
 
-inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types) : t__assembly(-1), v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point), v__exported_types(a_exported_types)
+inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types, std::map<std::u16string_view, std::pair<uint8_t*, size_t>>&& a_resources) : t__assembly(-1), v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point), v__exported_types(a_exported_types), v__resources(std::move(a_resources))
 {
 	t__type::f_be(this, a_type);
 }

@@ -53,14 +53,36 @@ namespace IL2CXX
             if (type.IsArray)
             {
                 var rank = type.GetArrayRank();
+                var element = type.GetElementType();
                 if (method == type.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, rank).ToArray())) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
-{'\t'}auto extra = sizeof({transpiler.EscapeForMember(type.GetElementType())}) * n;
+{'\t'}auto extra = sizeof({transpiler.EscapeForMember(element)}) * n;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = n;
 {string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tp->v__bounds[{i}] = {{static_cast<size_t>(a_{i}), 0}};\n"))
 }{'\t'}std::memset(p->f_data(), 0, extra);
 {'\t'}return p;
-", 1);
+", 0);
+                if (rank == 1)
+                {
+                    var indices = 0;
+                    for (var t = element; t.IsArray; t = t.GetElementType())
+                    {
+                        ++indices;
+                        if (method == type.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, indices + 1).ToArray()))
+                        {
+                            var c = element.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, indices).ToArray());
+                            transpiler.Enqueue(c);
+                            return ((transpiler.CheckRange ? $"\tif (a_0 < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto extra = sizeof({transpiler.EscapeForMember(element)}) * a_0;
+{'\t'}t__new<{transpiler.Escape(type)}> p(extra);
+{'\t'}p->v__length = a_0;
+{'\t'}p->v__bounds[0] = {{static_cast<size_t>(a_0), 0}};
+{'\t'}std::memset(p->f_data(), 0, extra);
+{'\t'}for (size_t i = 0; i < a_0; ++i) p->f_data()[i] = {transpiler.Escape(c)}({string.Join(", ", Enumerable.Range(1, indices).Select(i => $"a_{i}"))});
+{'\t'}return p;
+", 0);
+                        }
+                    }
+                }
                 string prepare() => transpiler.GenerateCheckNull("a_0") + $@"{'\t'}size_t i = 0;
 {'\t'}auto bounds = a_0->f_bounds();
 {string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $@"{'\t'}{{
@@ -94,6 +116,8 @@ namespace IL2CXX
                     var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                     return ($"\treturn reinterpret_cast<{transpiler.EscapeForStacked(@return)}(*)({string.Join(", ", parameters.Prepend(transpiler.typeofObject).Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
                 }
+                if (key == ToKey(type.GetMethod("BeginInvoke"))) return ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0);
+                if (key == ToKey(type.GetMethod("EndInvoke"))) return ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0);
             }
             if (TypeToCode.TryGetValue(type, out var code))
             {

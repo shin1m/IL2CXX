@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 
 namespace IL2CXX
@@ -107,13 +108,28 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Assembly.GetExportedTypes)),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}std::cerr << ""exported types: "" << f__string(a_0->v__full_name) << std::endl;
+                transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}std::cout << ""exported types: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__exported_types; *p; ++p) ++n;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.Escape(get(typeof(Type)))}>(n);
 {'\t'}std::copy_n(a_0->v__exported_types, n, p->f_data());
 {'\t'}return p;
 ", 0)
+            );
+            code.For(
+                type.GetMethod(nameof(Assembly.GetManifestResourceStream), new[] { get(typeof(string)) }),
+                transpiler =>
+                {
+                    var type = get(typeof(UnmanagedMemoryStream));
+                    var constructor = type.GetConstructor(new[] { get(typeof(byte*)), get(typeof(long)) });
+                    transpiler.Enqueue(constructor);
+                    return (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}auto i = a_0->v__resources.find({{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}});
+{'\t'}if (i == a_0->v__resources.end()) return nullptr;
+{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
+{'\t'}{transpiler.Escape(constructor)}(p, i->second.first, i->second.second);
+{'\t'}return p;
+", 0);
+                }
             );
             code.For(
                 type.GetProperty(nameof(RuntimeAssembly.Name)).GetMethod,
@@ -240,7 +256,8 @@ namespace IL2CXX
             // TODO: check signature.
             code.For(
                 type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__function) {transpiler.GenerateThrow("NotSupported")};
+{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
 {'\t'}auto RECYCLONE__SPILL p = type->f_new_zerod();
 {'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
@@ -253,7 +270,8 @@ namespace IL2CXX
             // TODO: check signature.
             code.For(
                 type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)), get(typeof(object)) }),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__function) {transpiler.GenerateThrow("NotSupported")};
+{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
 {'\t'}auto RECYCLONE__SPILL p = type->f_new_zerod();
 {'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
@@ -290,6 +308,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(RuntimeMethodInfo.GetParentDefinition)),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!(a_0->v__attributes & {(int)MethodAttributes.Virtual})) return nullptr;
+{'\t'}if (!a_0->v__function) {transpiler.GenerateThrow("InvalidOperation")};
 {'\t'}auto type = a_0->v__declaring_type;
 {'\t'}size_t i = 0;
 {'\t'}while (reinterpret_cast<void**>(type + 1)[i] != a_0->v__function) ++i;

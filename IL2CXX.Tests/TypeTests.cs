@@ -139,6 +139,14 @@ namespace IL2CXX.Tests
             if (c == null) return 1;
             return c.Invoke(new object[] { 10 }) is string[] xs && xs.Length == 10 ? 0 : 2;
         }
+        static int GetConstructorOfArrayOfArrays()
+        {
+            var c = typeof(string[][]).GetConstructor(new[] { typeof(int), typeof(int) });
+            if (c == null) return 1;
+            if (!(c.Invoke(new object[] { 2, 3 }) is string[][] xs)) return 2;
+            if (xs.Length != 2) return 3;
+            return xs[0].Length == 3 && xs[1].Length == 3 ? 0 : 4;
+        }
         static int GetConstructors()
         {
             if (typeof(Zot).GetConstructors().Length != 2) return 1;
@@ -180,6 +188,11 @@ namespace IL2CXX.Tests
         {
             var f = typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).CreateDelegate<Func<Zot, string, string>>();
             return f(new Zot("Hello"), "World") == "Hello, World!" ? 0 : 1;
+        }
+        static int DynamicInvoke()
+        {
+            Delegate f = (Func<string, string>)(x => $"Hello, {x}!");
+            return f.DynamicInvoke("World") is string x && x == "Hello, World!" ? 0 : 1;
         }
         static int MakeGenericMethod()
         {
@@ -292,6 +305,7 @@ namespace IL2CXX.Tests
             nameof(GetConstructor) => GetConstructor(),
             nameof(GetConstructorOfString) => GetConstructorOfString(),
             nameof(GetConstructorOfArray) => GetConstructorOfArray(),
+            nameof(GetConstructorOfArrayOfArrays) => GetConstructorOfArrayOfArrays(),
             nameof(GetConstructors) => GetConstructors(),
             nameof(GetMethod) => GetMethod(),
             nameof(GetMethods) => GetMethods(),
@@ -299,6 +313,7 @@ namespace IL2CXX.Tests
             nameof(CreateDelegateWithNull) => CreateDelegateWithNull(),
             nameof(CreateDelegateWithTarget) => CreateDelegateWithTarget(),
             nameof(CreateDelegateAsStatic) => CreateDelegateAsStatic(),
+            nameof(DynamicInvoke) => DynamicInvoke(),
             nameof(MakeGenericMethod) => MakeGenericMethod(),
             nameof(GetProperty) => GetProperty(),
             nameof(SetProperty) => SetProperty(),
@@ -319,7 +334,9 @@ namespace IL2CXX.Tests
         public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
             typeof(string),
             typeof(string[]),
-            typeof(Zot)
+            typeof(string[][]),
+            typeof(Zot),
+            typeof(Func<string, string>)
         }, new[] {
             typeof(Zot).GetMethod(nameof(Zot.Do), 2, new[] { Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1) }).MakeGenericMethod(typeof(string), typeof(int))
         });
@@ -341,6 +358,7 @@ namespace IL2CXX.Tests
                 nameof(GetConstructor),
                 nameof(GetConstructorOfString),
                 nameof(GetConstructorOfArray),
+                nameof(GetConstructorOfArrayOfArrays),
                 nameof(GetConstructors),
                 nameof(GetMethod),
                 nameof(GetMethods),
@@ -348,6 +366,7 @@ namespace IL2CXX.Tests
                 nameof(CreateDelegateWithNull),
                 nameof(CreateDelegateWithTarget),
                 nameof(CreateDelegateAsStatic),
+                nameof(DynamicInvoke),
                 nameof(MakeGenericMethod),
                 nameof(GetProperty),
                 nameof(SetProperty),

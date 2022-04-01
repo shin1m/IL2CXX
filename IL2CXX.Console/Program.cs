@@ -254,7 +254,7 @@ namespace IL2CXX.Console
 namespace il2cxx
 {");
                         return definition;
-                    }, Path.Combine(options.Out, "resources"));
+                    });
                     declarations.WriteLine("\nnamespace il2cxx\n{");
                     declarations.Write(inlines);
                     declarations.WriteLine(@"
@@ -314,7 +314,6 @@ else()
 {'\t'}target_include_directories({name} PRIVATE src .)
 {'\t'}target_link_libraries({name} recyclone dl)
 endif()
-file(COPY resources DESTINATION .)
 ");
             return 0;
         }, _ => 1);

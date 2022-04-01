@@ -82,7 +82,7 @@ namespace il2cxx
                     type.IsValueType || type.IsInterface || type.IsArray ? 0 :
                     type.IsGenericType ? 1 :
                     2
-                ], Path.Combine(build, "resources"));
+                ]);
                 declarations.WriteLine("\nnamespace il2cxx\n{");
                 declarations.Write(inlines);
                 declarations.WriteLine(@"

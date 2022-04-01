@@ -129,8 +129,17 @@ namespace IL2CXX.Tests
         {
             Foo, Bar, Zot
         }
+        [Flags]
+        enum Flags
+        {
+            None = 0,
+            X = 1,
+            Y = 2,
+            XY = 3
+        }
         static int EnumGetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
         static int EnumGetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
+        static int EnumHasFlag() => Flags.XY.HasFlag(Flags.Y) ? 0 : 1;
         static int EnumToStringDefault() => Names.Bar.ToString() == "Bar" ? 0 : 1;
         static int EnumToStringG() => Names.Bar.ToString("g") == "Bar" ? 0 : 1;
 
@@ -148,6 +157,7 @@ namespace IL2CXX.Tests
             nameof(ToPointer) => ToPointer(),
             nameof(EnumGetNames) => EnumGetNames(),
             nameof(EnumGetValues) => EnumGetValues(),
+            nameof(EnumHasFlag) => EnumHasFlag(),
             nameof(EnumToStringDefault) => EnumToStringDefault(),
             nameof(EnumToStringG) => EnumToStringG(),
             _ => -1
@@ -174,6 +184,7 @@ namespace IL2CXX.Tests
                 nameof(ToPointer),
                 nameof(EnumGetNames),
                 nameof(EnumGetValues),
+                nameof(EnumHasFlag),
                 nameof(EnumToStringDefault),
                 nameof(EnumToStringG)
             )] string name,

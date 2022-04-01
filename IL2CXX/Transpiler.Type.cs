@@ -221,7 +221,8 @@ namespace IL2CXX
 {'\t'}{{
 {body}{'\t'}}})";
                     string call(string @this) => $"{transpiler.Escape(invoke)}({string.Join(", ", parameters.Select((_, i) => $"a_{i + 1}").Prepend(transpiler.CastValue(Type, @this)))});";
-                    Delegate = $@"{'\t'}v__multicast_invoke = {generate(transpiler.typeofMulticastDelegate, $@"{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(transpiler.typeofObject.MakeArrayType())}*>(a_0->v__5finvocationList)->f_data();
+                    Delegate = transpiler.ShouldGenerateReflection(Type) ? $"\tv__invoke_method = &v__method_{transpiler.Escape(invoke)};\n" : string.Empty;
+                    Delegate += $@"{'\t'}v__multicast_invoke = {generate(transpiler.typeofMulticastDelegate, $@"{'\t'}{'\t'}auto xs = static_cast<{transpiler.Escape(transpiler.typeofObject.MakeArrayType())}*>(a_0->v__5finvocationList)->f_data();
 {'\t'}{'\t'}auto n = static_cast<intptr_t>(a_0->v__5finvocationCount) - 1;
 {'\t'}{'\t'}for (intptr_t i = 0; i < n; ++i) {call("xs[i]")};
 {'\t'}{'\t'}return {call("xs[n]")};

@@ -181,11 +181,11 @@ mono_wasm_invoke_method (t__runtime_method_info *method, t__object *this_arg, vo
 	{
 		if (out_exc) *out_exc = nullptr;
 		try {
-			std::printf("invoke method: %s, %p, %p, %p\n", f__string(method->v__name).c_str(), method->v__wasm_invoke, this_arg, params);
+			//std::printf("invoke method: %s, %p, %p, %p\n", f__string(method->v__name).c_str(), method->v__wasm_invoke, this_arg, params);
 			result = method->v__wasm_invoke(this_arg, params);
-			std::printf("\tgot: %p (%s)\n", result, result ? f__string(result->f_type()->v__full_name).c_str() : "");
+			/*std::printf("\tgot: %p (%s)\n", result, result ? f__string(result->f_type()->v__full_name).c_str() : "");
 			auto s = result ? f__to_string(result) : nullptr;
-			std::printf("\tstring: %s\n", s ? f__string({&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}).c_str() : nullptr);
+			std::printf("\tstring: %s\n", s ? f__string({&s->v__5ffirstChar, static_cast<size_t>(s->v__5fstringLength)}).c_str() : nullptr);*/
 		} catch (t__object* e) {
 			std::fprintf(stderr, "\tcaught object: %p\n", e);
 			if (out_exc) *out_exc = e;

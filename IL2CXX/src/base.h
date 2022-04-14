@@ -7,6 +7,7 @@
 #include <climits>
 #include <clocale>
 #ifdef __EMSCRIPTEN__
+#include <future>
 #include <uchar.h>
 namespace std
 {
@@ -14,6 +15,7 @@ namespace std
 	using ::mbrtoc16;
 	using ::c16rtomb;
 }
+#include <emscripten/threading.h>
 #else
 #include <cuchar>
 #ifdef __unix__

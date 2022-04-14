@@ -165,18 +165,41 @@ namespace IL2CXX.Console
                                 t.IsByRef || t.IsPointer ? x :
                                 t.IsPrimitive || t.IsEnum ? $"reinterpret_cast<void*>({x})" :
                                 t.IsValueType ? $"&{x}" : x;
-                            return ($@"{'\t'}std::printf(""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>:\n"");
+                            string root(Type t, string x) => transpiler.Define(t).IsManaged ? $"\t\t{transpiler.EscapeForRoot(t)} r{x}({x});\n" : string.Empty;
+                            return ($@"{'\t'}/*std::printf(""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>:\n"");
 {'\t'}std::printf(""\tFunctionIdentifier: %s\n"", f__string(a_1->v_FunctionIdentifier.v).c_str());
 {'\t'}std::printf(""\tResultType: %d\n"", a_1->v_ResultType.v);
 {'\t'}if (auto s = a_1->v_MarshalledCallArgsJson.v) std::printf(""\tMarshalledCallArgsJson: %s\n"", f__string(s).c_str());
 {'\t'}std::printf(""\tMarshalledCallAsyncHandle: %lld\n"", a_1->v_MarshalledCallAsyncHandle.v);
-{'\t'}std::printf(""\tTargetInstanceId: %lld\n"", a_1->v_TargetInstanceId.v);
+{'\t'}std::printf(""\tTargetInstanceId: %lld\n"", a_1->v_TargetInstanceId.v);*/
 {'\t'}f__store(*a_0, nullptr);
-{'\t'}auto p = f_epoch_region([&]
-{'\t'}{{
-{'\t'}{'\t'}return mono_wasm_invoke_js_blazor(a_0, a_1, {marshal(types[0], "a_2")}, {marshal(types[1], "a_3")}, {marshal(types[2], "a_4")});
-{'\t'}}});
-{'\t'}std::printf(""done: %p, %p\n"", p, *a_0);
+{'\t'}void* p;
+{'\t'}if (emscripten_is_main_runtime_thread()) {{
+{'\t'}{'\t'}p = f_epoch_region([&]
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}return mono_wasm_invoke_js_blazor(a_0, a_1, {marshal(types[0], "a_2")}, {marshal(types[1], "a_3")}, {marshal(types[2], "a_4")});
+{'\t'}{'\t'}}});
+{'\t'}}} else {{
+{'\t'}{'\t'}t_root<t_slot_of<t_System_2eString>> r0(a_1->v_FunctionIdentifier.v);
+{'\t'}{'\t'}t_root<t_slot_of<t_System_2eString>> r1(a_1->v_MarshalledCallArgsJson.v);
+{root(types[0], "a_2")}{root(types[1], "a_3")}{root(types[2], "a_4")
+}{'\t'}{'\t'}p = f_epoch_region([&]
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}std::promise<void*> promise;
+{'\t'}{'\t'}{'\t'}void* ps[] = {{a_0, a_1, {marshal(types[0], "a_2")}, {marshal(types[1], "a_3")}, {marshal(types[2], "a_4")}, &promise}};
+{'\t'}{'\t'}{'\t'}emscripten_async_run_in_main_runtime_thread(EM_FUNC_SIG_VI, +[](void* p)
+{'\t'}{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}{'\t'}emscripten_async_call([](void* p)
+{'\t'}{'\t'}{'\t'}{'\t'}{{
+{'\t'}{'\t'}{'\t'}{'\t'}{'\t'}auto ps = static_cast<void**>(p);
+{'\t'}{'\t'}{'\t'}{'\t'}{'\t'}static_cast<std::promise<void*>*>(ps[5])->set_value(mono_wasm_invoke_js_blazor(static_cast<t_System_2eString**>(ps[0]), ps[1], ps[2], ps[3], ps[4]));
+{'\t'}{'\t'}{'\t'}{'\t'}}}, p, 0);
+{'\t'}{'\t'}{'\t'}}}, ps);
+{'\t'}{'\t'}{'\t'}return promise.get_future().get();
+{'\t'}{'\t'}}});
+{'\t'}}}
+{'\t'}if (*a_0) std::fprintf(stderr, ""InvokeJS<{string.Join(", ", types.Select(x => x.ToString()))}>: %s\n"", f__string(*a_0).c_str());
+{'\t'}//std::printf(""done: %p, %p\n"", p, *a_0);
 {'\t'}return reinterpret_cast<{transpiler.EscapeForStacked(types[3])}>(p);
 ", 0);
                         }
@@ -308,7 +331,7 @@ if(EMSCRIPTEN)
 {'\t'}{'\t'}#${{PROJECT_SOURCE_DIR}}/wasm/libicuuc.a
 {'\t'}{'\t'}#${{PROJECT_SOURCE_DIR}}/wasm/libicui18n.a
 {'\t'}{'\t'}#${{PROJECT_SOURCE_DIR}}/wasm/libSystem.Globalization.Native.a
-{'\t'}{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ArrayToString']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc']\"";-s STRICT_JS;-s PTHREAD_POOL_SIZE=2;--extern-pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime.iffe.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/library-dotnet.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/pal_random.js""
+{'\t'}{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ArrayToString']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc']\"";-s STRICT_JS;--extern-pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime.iffe.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/library-dotnet.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/pal_random.js""
 {'\t'}{'\t'})
 else()
 {'\t'}target_include_directories({name} PRIVATE src .)

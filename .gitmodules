@@ -4,6 +4,6 @@
 [submodule "examples/Platformer2D/MonoGame.Samples"]
 	path = examples/Platformer2D/MonoGame.Samples
 	url = https://github.com/MonoGame/MonoGame.Samples.git
-[submodule "examples/Demos/bepuphysics2"]
-	path = examples/Demos/bepuphysics2
+[submodule "externals/bepuphysics2"]
+	path = externals/bepuphysics2
 	url = https://github.com/bepu/bepuphysics2.git

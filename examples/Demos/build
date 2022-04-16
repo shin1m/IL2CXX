@@ -1,61 +1,65 @@
 #!/bin/bash
 BASE=$(cd $(dirname $0) && pwd)
 cd $BASE
-dotnet build bepuphysics2/Demos.GL -c Release || exit $?
-dotnet run --project ../../IL2CXX.Console --target Unix\
- --out out bepuphysics2/Demos.GL/bin/Release/net6.0/Demos.dll\
- --reflection\
-  'BepuPhysics.Constraints.AngularAxisGearMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.AngularAxisMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.AngularHingeTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.AngularMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.AngularServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.AngularSwivelHingeTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.AreaConstraintTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.BallSocketMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.BallSocketServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.BallSocketTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.CenterDistanceLimitTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.CenterDistanceTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.DistanceLimitTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.DistanceServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.HingeTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.LinearAxisLimitTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.LinearAxisMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.LinearAxisServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.OneBodyAngularMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.OneBodyAngularServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.OneBodyLinearMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.OneBodyLinearServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.PointOnLineServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.SwingLimitTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.SwivelHingeTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.TwistLimitTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.TwistMotorTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.TwistServoTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.VolumeConstraintTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.WeldTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact2NonconvexOneBodyTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact3NonconvexOneBodyTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact4NonconvexOneBodyTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact2NonconvexTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact3NonconvexTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact4NonconvexTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact1OneBodyTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact2OneBodyTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact3OneBodyTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact4OneBodyTypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact1TypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact2TypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact3TypeProcessor, BepuPhysics'\
-  'BepuPhysics.Constraints.Contact.Contact4TypeProcessor, BepuPhysics'\
-  'OpenTK.Input.Key, OpenTK'\
-  'OpenTK.Input.MouseButton, OpenTK'\
-  'Demos.Demos.Characters.DynamicCharacterMotionTypeProcessor, Demos'\
-  'Demos.Demos.Characters.StaticCharacterMotionTypeProcessor, Demos'\
-  'Demos.MouseWheelAction, Demos'\
- || exit $?
-mkdir out/build || exit $?
-cd out/build || exit $?
-CXX=clang++ LDFLAGS=-fuse-ld=gold cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-Oz' .. || exit $?
+if [ "$1" == '' ]; then
+	dotnet build ../../externals/bepuphysics2/Demos.GL -c Release || exit $?
+	dotnet run --project ../../IL2CXX.Console --target Unix\
+	 --out out ../../externals/bepuphysics2/Demos.GL/bin/Release/net6.0/Demos.dll\
+	 --reflection\
+	  'BepuPhysics.Constraints.AngularAxisGearMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularAxisMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularHingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularSwivelHingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AreaConstraintTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.BallSocketMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.BallSocketServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.BallSocketTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.CenterDistanceLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.CenterDistanceTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.DistanceLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.DistanceServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.HingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.LinearAxisLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.LinearAxisMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.LinearAxisServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyAngularMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyAngularServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyLinearMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyLinearServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.PointOnLineServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.SwingLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.SwivelHingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.TwistLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.TwistMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.TwistServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.VolumeConstraintTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.WeldTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2NonconvexOneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3NonconvexOneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4NonconvexOneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2NonconvexTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3NonconvexTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4NonconvexTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact1OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact1TypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2TypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3TypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4TypeProcessor, BepuPhysics'\
+	  'OpenTK.Input.Key, OpenTK'\
+	  'OpenTK.Input.MouseButton, OpenTK'\
+	  'Demos.Demos.Characters.DynamicCharacterMotionTypeProcessor, Demos'\
+	  'Demos.Demos.Characters.StaticCharacterMotionTypeProcessor, Demos'\
+	  'Demos.MouseWheelAction, Demos'\
+	 || exit $?
+	mkdir out/build || exit $?
+	cd out/build || exit $?
+	CXX=clang++ LDFLAGS=-fuse-ld=gold cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-Oz' .. || exit $?
+else
+	cd out/build || exit $?
+fi
 ulimit -Sn 2048 && cmake --build . -j8 || exit $?

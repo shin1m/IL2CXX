@@ -48,6 +48,7 @@ Below are build durations running the above commands on my Core i7-8550U laptop:
 * [Platformer2D](examples/Platformer2D) - Platformer2D of [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples)
 * [Demos](examples/Demos) - Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
 * [BlazorWasm](examples/BlazorWasm) - Blazor WebAssembly Template Application
+* [BPDemosBW](examples/BPDemosBW) - Blazor WebAssembly Port of Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
 
 # Comparing GC Pauses
 

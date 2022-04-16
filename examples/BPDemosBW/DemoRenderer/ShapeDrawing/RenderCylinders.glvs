@@ -1,0 +1,80 @@
+#version 300 es
+
+layout(std140) uniform type_VertexConstants
+{
+    mat4 Projection;
+    vec3 CameraPosition;
+    float NearClip;
+    vec3 CameraRight;
+    float Padding0;
+    vec3 CameraUp;
+    float Padding1;
+    vec3 CameraBackward;
+} VertexConstants;
+
+layout(location = 0) in vec3 CylinderPosition;
+layout(location = 1) in float CylinderRadius;
+layout(location = 2) in uvec2 CylinderPackedOrientation;
+layout(location = 3) in float CylinderHalfLength;
+layout(location = 4) in uint CylinderPackedColor;
+
+out vec3 varying_RayDirection;
+flat out vec3 varying_Position;
+flat out float varying_Radius;
+flat out uvec2 varying_PackedOrientation;
+flat out float varying_HalfLength;
+flat out uint varying_PackedColor;
+
+void main()
+{
+    vec3 _73 = CylinderPosition - VertexConstants.CameraPosition;
+    vec3 _83 = vec3(float((uint(gl_VertexID) & 1u) << 1u), float(uint(gl_VertexID) & 2u), float((uint(gl_VertexID) & 4u) >> 1u)) - vec3(1.0);
+    mat3 _91 = transpose(mat3(VertexConstants.CameraRight, VertexConstants.CameraUp, VertexConstants.CameraBackward));
+    vec3 _92 = _91 * _73;
+    uint _99 = (CylinderPackedOrientation.x & 32768u) << 16u;
+    uint _103 = CylinderPackedOrientation.x >> 16u;
+    uint _109 = (_103 & 32768u) << 16u;
+    uint _119 = (CylinderPackedOrientation.y & 32768u) << 16u;
+    uint _123 = CylinderPackedOrientation.y >> 16u;
+    uint _129 = (_123 & 32768u) << 16u;
+    vec4 _133 = vec4(uintBitsToFloat((floatBitsToUint(float(CylinderPackedOrientation.x & 32767u) * 3.0518509447574615478515625e-05) | _99) | _99), uintBitsToFloat((floatBitsToUint(float(_103 & 32767u) * 3.0518509447574615478515625e-05) | _109) | _109), uintBitsToFloat((floatBitsToUint(float(CylinderPackedOrientation.y & 32767u) * 3.0518509447574615478515625e-05) | _119) | _119), uintBitsToFloat((floatBitsToUint(float(_123 & 32767u) * 3.0518509447574615478515625e-05) | _129) | _129));
+    vec4 _136 = _133 / vec4(length(_133));
+    float _137 = _136.x;
+    float _138 = _137 + _137;
+    float _139 = _136.y;
+    float _140 = _139 + _139;
+    float _141 = _136.z;
+    float _142 = _141 + _141;
+    float _144 = _137 * _140;
+    float _145 = _137 * _142;
+    float _146 = _139 * _140;
+    float _147 = _139 * _142;
+    float _148 = _141 * _142;
+    float _149 = _136.w;
+    float _150 = _149 * _138;
+    float _151 = _149 * _140;
+    float _152 = _149 * _142;
+    float _158 = 1.0 - (_137 * _138);
+    vec3 _169 = (_91 * mat3(vec3((1.0 - _146) - _148, _144 + _152, _145 - _151), vec3(_144 - _152, _158 - _148, _147 + _150), vec3(_145 + _151, _147 - _150, _158 - _146)))[1];
+    vec3 _177 = abs(_169 * CylinderHalfLength) + (sqrt(clamp(vec3(1.0) - (_169 * _169), vec3(0.0), vec3(1.0))) * CylinderRadius);
+    vec3 _179 = _92 + (_177 * _83);
+    vec3 _194;
+    if (_83.z > 0.0)
+    {
+        vec3 _193 = _179;
+        _193.z = max(min((-9.9999997473787516355514526367188e-06) - VertexConstants.NearClip, _179.z), _92.z - _177.z);
+        _194 = _193;
+    }
+    else
+    {
+        _194 = _179;
+    }
+    gl_Position = VertexConstants.Projection * vec4(_194, 1.0);
+    varying_RayDirection = ((VertexConstants.CameraRight * _194.x) + (VertexConstants.CameraUp * _194.y)) + (VertexConstants.CameraBackward * _194.z);
+    varying_Position = _73;
+    varying_Radius = CylinderRadius;
+    varying_PackedOrientation = CylinderPackedOrientation;
+    varying_HalfLength = CylinderHalfLength;
+    varying_PackedColor = CylinderPackedColor;
+}
+

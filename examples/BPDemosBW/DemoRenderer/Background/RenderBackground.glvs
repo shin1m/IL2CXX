@@ -1,0 +1,19 @@
+#version 300 es
+
+layout(std140) uniform type_Constants
+{
+    mat4 NDCToOffset;
+} Constants;
+
+out vec3 varying_Offset;
+
+void main()
+{
+    vec4 _41 = vec4(vec2(float((uint(gl_VertexID) << 2u) & 4u), float((uint(gl_VertexID) << 1u) & 4u)) - vec2(1.0), 1.0000000116860974230803549289703e-07, 1.0);
+    vec4 _44 = Constants.NDCToOffset * _41;
+    gl_Position = _41;
+    // EDIT: Adjusts for OpenGL far clipping plane.
+    gl_Position.z -= 1.0;
+    varying_Offset = _44.xyz / vec3(_44.w);
+}
+

@@ -1,0 +1,6 @@
+.demo-container {
+    height: 75vh;
+}
+.demo-container canvas {
+    vertical-align: top;
+}

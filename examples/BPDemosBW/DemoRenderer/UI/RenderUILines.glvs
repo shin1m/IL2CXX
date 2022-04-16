@@ -1,0 +1,38 @@
+#version 300 es
+
+layout(std140) uniform type_VertexConstants
+{
+    vec2 PackedToScreenScale;
+    vec2 ScreenToNDCScale;
+} VertexConstants;
+
+layout(location = 0) in uint InstancePackedStart;
+layout(location = 1) in uint InstancePackedEnd;
+layout(location = 2) in float InstanceRadius;
+layout(location = 3) in uint InstancePackedColor;
+
+flat out vec2 varying_Start;
+flat out vec2 varying_LineDirection;
+flat out float varying_LineLength;
+flat out float varying_Radius;
+flat out vec3 varying_Color;
+
+void main()
+{
+    vec2 _73 = vec2(float(InstancePackedStart & 65535u), float(InstancePackedStart >> 16u)) * VertexConstants.PackedToScreenScale;
+    vec2 _97 = (vec2(float(InstancePackedEnd & 65535u), float(InstancePackedEnd >> 16u)) * VertexConstants.PackedToScreenScale) - _73;
+    float _98 = length(_97);
+    vec2 _103 = mix(vec2(1.0, 0.0), _97 / vec2(_98), bvec2(_98 > 9.9999997473787516355514526367188e-06));
+    float _108 = InstanceRadius + 0.707106769084930419921875;
+    float _109 = _108 * 2.0;
+    vec2 _112 = vec2(_98 + _109, _109) * vec2(float(uint(gl_VertexID) & 1u), float((uint(gl_VertexID) >> 1u) & 1u));
+    gl_Position = vec4((((_73 + (_103 * (_112.x - _108))) + (vec2(-_103.y, _103.x) * (_112.y - _108))) * VertexConstants.ScreenToNDCScale) + vec2(-1.0, 1.0), 0.5, 1.0);
+    // EDIT: Adjusts for OpenGL screenspace.
+    gl_Position.y -= 2.0;
+    varying_Start = _73;
+    varying_LineDirection = _103;
+    varying_LineLength = _98;
+    varying_Radius = InstanceRadius;
+    varying_Color = vec3(float(InstancePackedColor & 2047u) * 0.000488519784994423389434814453125, float((InstancePackedColor >> 11u) & 2047u) * 0.000488519784994423389434814453125, float(InstancePackedColor >> 22u) * 0.000977517105638980865478515625);
+}
+

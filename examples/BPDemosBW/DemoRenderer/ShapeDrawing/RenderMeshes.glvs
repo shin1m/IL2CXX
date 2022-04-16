@@ -1,0 +1,60 @@
+#version 300 es
+
+layout(std140) uniform type_VertexConstants
+{
+    mat4 Projection;
+    vec3 CameraPosition;
+    float Padding0;
+    vec3 CameraRight;
+    float Padding1;
+    vec3 CameraUp;
+    float Padding2;
+    vec3 CameraBackward;
+} VertexConstants;
+
+layout(location = 0) in vec3 InstancePosition;
+layout(location = 1) in uint InstancePackedColor;
+layout(location = 2) in uvec2 InstancePackedOrientation;
+layout(location = 3) in vec3 InstanceScale;
+layout(location = 4) in vec3 Vertex;
+
+out vec3 varying_RayDirection;
+flat out vec3 varying_Position;
+flat out uint varying_PackedColor;
+flat out vec4 varying_Orientation;
+
+void main()
+{
+    vec3 _79 = InstancePosition - VertexConstants.CameraPosition;
+    uint _86 = (InstancePackedOrientation.x & 32768u) << 16u;
+    uint _90 = InstancePackedOrientation.x >> 16u;
+    uint _96 = (_90 & 32768u) << 16u;
+    uint _106 = (InstancePackedOrientation.y & 32768u) << 16u;
+    uint _110 = InstancePackedOrientation.y >> 16u;
+    uint _116 = (_110 & 32768u) << 16u;
+    vec4 _120 = vec4(uintBitsToFloat((floatBitsToUint(float(InstancePackedOrientation.x & 32767u) * 3.0518509447574615478515625e-05) | _86) | _86), uintBitsToFloat((floatBitsToUint(float(_90 & 32767u) * 3.0518509447574615478515625e-05) | _96) | _96), uintBitsToFloat((floatBitsToUint(float(InstancePackedOrientation.y & 32767u) * 3.0518509447574615478515625e-05) | _106) | _106), uintBitsToFloat((floatBitsToUint(float(_110 & 32767u) * 3.0518509447574615478515625e-05) | _116) | _116));
+    vec4 _123 = _120 / vec4(length(_120));
+    float _124 = _123.x;
+    float _125 = _124 + _124;
+    float _126 = _123.y;
+    float _127 = _126 + _126;
+    float _128 = _123.z;
+    float _129 = _128 + _128;
+    float _131 = _124 * _127;
+    float _132 = _124 * _129;
+    float _133 = _126 * _127;
+    float _134 = _126 * _129;
+    float _135 = _128 * _129;
+    float _136 = _123.w;
+    float _137 = _136 * _125;
+    float _138 = _136 * _127;
+    float _139 = _136 * _129;
+    float _145 = 1.0 - (_124 * _125);
+    vec3 _156 = _79 + (mat3(vec3((1.0 - _133) - _135, _131 + _139, _132 - _138), vec3(_131 - _139, _145 - _135, _134 + _137), vec3(_132 + _138, _134 - _137, _145 - _133)) * (InstanceScale * Vertex));
+    gl_Position = VertexConstants.Projection * vec4(_156 * mat3(VertexConstants.CameraRight, VertexConstants.CameraUp, VertexConstants.CameraBackward), 1.0);
+    varying_RayDirection = _156;
+    varying_Position = _79;
+    varying_PackedColor = InstancePackedColor;
+    varying_Orientation = _123;
+}
+

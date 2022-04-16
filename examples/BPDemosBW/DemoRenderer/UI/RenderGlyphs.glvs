@@ -1,0 +1,36 @@
+#version 300 es
+
+layout(std140) uniform type_VertexConstants
+{
+    vec2 PackedToScreenScale;
+    vec2 ScreenToNDCScale;
+    vec2 InverseAtlasResolution;
+} VertexConstants;
+
+layout(location = 0) in uint InstancePackedMinimum;
+layout(location = 1) in uint InstancePackedHorizontalAxis;
+layout(location = 2) in uint InstancePackedScaleAndSourceId;
+layout(location = 3) in uint InstancePackedColor;
+
+layout(location = 4) in vec2 SourceMinimum;
+layout(location = 5) in uint SourcePackedSpan;
+layout(location = 6) in float SourceDistanceScale;
+
+out vec2 varying_TextureCoordinates;
+flat out float varying_DistanceScale;
+flat out vec4 varying_Color;
+
+void main()
+{
+    vec2 _82 = vec2(float(InstancePackedHorizontalAxis & 65535u) - 32767.0, float(InstancePackedHorizontalAxis >> 16u) - 32767.0) * vec2(3.0518509447574615478515625e-05);
+    float _84 = float(InstancePackedScaleAndSourceId & 65535u);
+    float _85 = _84 * 0.0002441443502902984619140625;
+    vec2 _100 = vec2(float(SourcePackedSpan & 65535u), float(SourcePackedSpan >> 16u)) + vec2(4095.9375 / _84);
+    vec2 _106 = vec2(float(uint(gl_VertexID) & 1u), float((uint(gl_VertexID) >> 1u) & 1u));
+    vec2 _109 = ((_100 * _85) * _106) - vec2(0.5);
+    gl_Position = vec4(((((vec2(float(InstancePackedMinimum & 65535u), float(InstancePackedMinimum >> 16u)) * VertexConstants.PackedToScreenScale) + (_82 * _109.x)) + (vec2(-_82.y, _82.x) * _109.y)) * VertexConstants.ScreenToNDCScale) + vec2(-1.0, 1.0), 0.5, 1.0);
+    varying_TextureCoordinates = ((SourceMinimum - vec2(2047.96875 / _84)) + (_100 * _106)) * VertexConstants.InverseAtlasResolution;
+    varying_DistanceScale = SourceDistanceScale * _85;
+    varying_Color = vec4(float(InstancePackedColor & 255u) * 0.0039215688593685626983642578125, float((InstancePackedColor >> 8u) & 255u) * 0.0039215688593685626983642578125, float((InstancePackedColor >> 16u) & 255u) * 0.0039215688593685626983642578125, float((InstancePackedColor >> 24u) & 255u) * 0.0039215688593685626983642578125);
+}
+

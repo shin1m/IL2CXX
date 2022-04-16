@@ -1,0 +1,50 @@
+#version 300 es
+
+layout(std140) uniform type_VertexConstants
+{
+    mat4 Projection;
+    vec3 CameraPosition;
+    float NearClip;
+    vec3 CameraRight;
+    float Padding0;
+    vec3 CameraUp;
+    float Padding1;
+    vec3 CameraBackward;
+} VertexConstants;
+
+layout(location = 0) in vec3 SpherePosition;
+layout(location = 1) in float SphereRadius;
+layout(location = 2) in vec3 SpherePackedOrientation;
+layout(location = 3) in uint SpherePackedColor;
+
+out vec3 varying_RayDirection;
+flat out vec3 varying_Position;
+flat out float varying_Radius;
+flat out vec3 varying_PackedOrientation;
+flat out uint varying_PackedColor;
+
+void main()
+{
+    vec3 _63 = SpherePosition - VertexConstants.CameraPosition;
+    vec3 _73 = vec3(float((uint(gl_VertexID) & 1u) << 1u), float(uint(gl_VertexID) & 2u), float((uint(gl_VertexID) & 4u) >> 1u)) - vec3(1.0);
+    float _82 = dot(VertexConstants.CameraBackward, _63);
+    vec3 _85 = vec3(dot(VertexConstants.CameraRight, _63), dot(VertexConstants.CameraUp, _63), _82) + (_73 * SphereRadius);
+    vec3 _98;
+    if (_73.z > 0.0)
+    {
+        vec3 _97 = _85;
+        _97.z = max(min((-9.9999997473787516355514526367188e-06) - VertexConstants.NearClip, _85.z), _82 - SphereRadius);
+        _98 = _97;
+    }
+    else
+    {
+        _98 = _85;
+    }
+    gl_Position = VertexConstants.Projection * vec4(_98, 1.0);
+    varying_RayDirection = ((VertexConstants.CameraRight * _98.x) + (VertexConstants.CameraUp * _98.y)) + (VertexConstants.CameraBackward * _98.z);
+    varying_Position = _63;
+    varying_Radius = SphereRadius;
+    varying_PackedOrientation = SpherePackedOrientation;
+    varying_PackedColor = SpherePackedColor;
+}
+

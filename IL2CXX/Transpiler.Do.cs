@@ -59,7 +59,7 @@ t__runtime_method_info v__method_{identifier}{{&t__type_of<t__runtime_method_inf
             var parameters = method.GetParameters().Select(x => (
                 Prefix: $"{attributes("\t", x)}\n\t// {x}", Type: x.ParameterType
             ));
-            if (!method.IsStatic && !(method.IsConstructor && builtin.body != null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
+            if (!method.IsStatic && (!method.IsConstructor || method.DeclaringType.IsValueType || builtin.body == null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
             string argument(Type t, int i) => $"\n\t{EscapeForArgument(t)} a_{i}";
             var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
             string returns;
@@ -70,7 +70,7 @@ t__runtime_method_info v__method_{identifier}{{&t__type_of<t__runtime_method_inf
             }
             else
             {
-                returns = method.IsStatic || builtin.body == null ? "void" : EscapeForStacked(method.DeclaringType);
+                returns = method.IsStatic || method.DeclaringType.IsValueType || builtin.body == null ? "void" : EscapeForStacked(method.DeclaringType);
             }
             var prototype = $@"{returns}
 {identifier}({string.Join(",", arguments)}

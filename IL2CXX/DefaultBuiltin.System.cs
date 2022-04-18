@@ -1060,10 +1060,7 @@ namespace IL2CXX
         {
             code.ForGeneric(
                 type.GetConstructor(new[] { type.GetGenericArguments()[0].MakeByRefType() }),
-                (transpiler, types) => ($@"{'\t'}{transpiler.EscapeForValue(type.MakeGenericType(types))} a;
-{'\t'}a.v__5fvalue = {{a_0}};
-{'\t'}return a;
-", 1)
+                (transpiler, types) => ("\ta_0->v__5fvalue = {a_1};\n", 1)
             );
             code.ForGeneric(
                 type.GetProperty("Value").GetMethod,

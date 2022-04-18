@@ -872,15 +872,15 @@ namespace IL2CXX
                     string call(IEnumerable<string> xs) => $"{Escape(m)}({string.Join(",", xs)}\n\t)";
                     var parameters = m.GetParameters();
                     var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{CastValue(p.ParameterType, s.Variable)}");
-                    if (builtin.GetBody(this, ToKey(m)).body != null)
-                        writer.WriteLine($"\t{after.Variable} = {call(arguments)};");
-                    else if (t == typeofIntPtr || t == typeofUIntPtr)
+                    if (t == typeofIntPtr || t == typeofUIntPtr)
                         writer.WriteLine($@"{'\t'}{{{EscapeForValue(t)} p{{}};
 {'\t'}{call(arguments.Prepend("\n\t\t&p"))};
 {'\t'}{after.Variable} = p;}}");
                     else if (t.IsValueType)
                         writer.WriteLine($@"{'\t'}{after.Variable} = {EscapeForValue(t)}{{}};
 {'\t'}{call(arguments.Prepend($"\n\t\tconst_cast<std::remove_volatile_t<decltype({after.Variable})>*>(&{after.Variable})"))};");
+                    else if (builtin.GetBody(this, ToKey(m)).body != null)
+                        writer.WriteLine($"\t{after.Variable} = {call(arguments)};");
                     else
                         writer.WriteLine($@"{'\t'}{{auto RECYCLONE__SPILL p = f__new_zerod<{Escape(t)}>();
 {'\t'}{call(arguments.Prepend("\n\t\tp"))};

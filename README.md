@@ -25,7 +25,7 @@ Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 
 	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/6.0.x dotnet test -- NUnit.NumberOfTestWorkers=2
 
-## Transpile and Build .NET Core Executable
+## Transpile and Build .NET Executable
 
 	cd IL2CXX.Console
 	dotnet run --target Unix --out out-Foo .../Foo.dll

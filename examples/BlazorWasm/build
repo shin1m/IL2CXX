@@ -19,7 +19,7 @@ if [ "$1" == '' ]; then
 	cd il2cxx || exit $?
 	ln -s ../out/build/_framework wwwroot/_framework || exit $?
 	dotnet run --project $BASE/../../IL2CXX.Console --target Other --is32\
-	 --assemblies $DOTNET_ROOT/shared/Microsoft.AspNetCore.App/6.0.1\
+	 --assemblies $DOTNET_ROOT/shared/Microsoft.AspNetCore.App/6.0.4\
 	 --out out source/BlazorWasm.dll\
 	 --bundle\
 	  'System.Text.Json.Serialization.Converters.ArrayConverter`2[[System.Object[], System.Private.CoreLib], [System.Object, System.Private.CoreLib]], System.Text.Json'\

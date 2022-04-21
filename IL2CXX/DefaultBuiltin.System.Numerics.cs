@@ -8,6 +8,26 @@ namespace IL2CXX
     partial class DefaultBuiltin
     {
         private static Builtin SetupSystemNumerics(this Builtin @this, Func<Type, Type> get) => @this
+        .For(get(typeof(BitOperations)), (type, code) =>
+        {
+            code.For(
+                type.GetMethod(nameof(BitOperations.RotateLeft), new[] { get(typeof(uint)), get(typeof(int)) }),
+                transpiler => ("\treturn (a_0 << (a_1 & 31)) | (a_0 >> ((32 - a_1) & 31));\n", 2)
+            );
+            code.For(
+                type.GetMethod(nameof(BitOperations.RotateRight), new[] { get(typeof(uint)), get(typeof(int)) }),
+                transpiler => ("\treturn (a_0 >> (a_1 & 31)) | (a_0 << ((32 - a_1) & 31));\n", 2)
+            );
+            /*var methods = type.GetMethods();
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.IsPow2))) code.For(x, transpiler => ("\treturn std::has_single_bit(static_cast<std::make_unsigned_t<decltype(a_0)>>(a_0));\n", 1));
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.LeadingZeroCount))) code.For(x, transpiler => ("\treturn std::countl_zero(a_0);\n", 1));
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.Log2))) code.For(x, transpiler => ("\treturn a_0 == 0 ? 0 : std::bit_width(a_0) - 1;\n", 1));
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.PopCount))) code.For(x, transpiler => ("\treturn std::popcount(a_0);\n", 1));
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.RotateLeft))) code.For(x, transpiler => ("\treturn std::rotl(a_0, a_1);\n", 1));
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.RotateRight))) code.For(x, transpiler => ("\treturn std::rotr(a_0, a_1);\n", 1));
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.RoundUpToPowerOf2))) code.For(x, transpiler => ("\treturn std::bit_ceil(a_0);\n", 1));
+            foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.TrailingZeroCount))) code.For(x, transpiler => ("\treturn std::countr_zero(static_cast<std::make_unsigned_t<decltype(a_0)>>(a_0));\n", 1));*/
+        })
         .For(get(typeof(Vector)), (type, code) =>
         {
             var methods = type.GetMethods();
@@ -47,6 +67,23 @@ namespace IL2CXX
 ", 1);
             });
         })
+        .For(get(typeof(Vector3)), (type, code) =>
+        {
+            (string body, int inline) binary(Transpiler transpiler, string function) => ($@"{'\t'}{transpiler.EscapeForStacked(type)} value;
+{'\t'}value.v_X = std::{function}(a_0.v_X, a_1.v_X);
+{'\t'}value.v_Y = std::{function}(a_0.v_Y, a_1.v_Y);
+{'\t'}value.v_Z = std::{function}(a_0.v_Z, a_1.v_Z);
+{'\t'}return value;
+", 1);
+            code.For(
+                type.GetMethod(nameof(Vector3.Max)),
+                transpiler => binary(transpiler, "max")
+            );
+            code.For(
+                type.GetMethod(nameof(Vector3.Min)),
+                transpiler => binary(transpiler, "min")
+            );
+        })
         .For(get(typeof(Vector<>)), (type, code) =>
         {
             code.ForGeneric(
@@ -73,6 +110,17 @@ namespace IL2CXX
 {'\t'}for (size_t i = 0; i < sizeof(*a_0) / sizeof({e}); ++i) p[i] = a_1;
 ", 1);
                 }
+            );
+            code.ForGeneric(
+                type.GetMethod("ConditionalSelect", BindingFlags.Static | BindingFlags.NonPublic),
+                (transpiler, types) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
+{'\t'}auto p = reinterpret_cast<uint8_t*>(&value);
+{'\t'}auto p0 = reinterpret_cast<uint8_t*>(&a_0);
+{'\t'}auto p1 = reinterpret_cast<uint8_t*>(&a_1);
+{'\t'}auto p2 = reinterpret_cast<uint8_t*>(&a_2);
+{'\t'}for (size_t i = 0; i < sizeof(value); ++i) p[i] = p0[i] & p1[i] | ~p0[i] & p2[i];
+{'\t'}return value;
+", 1)
             );
             (string body, int inline) unary(Transpiler transpiler, Type[] types, Func<string, string ,string> action)
             {
@@ -114,6 +162,34 @@ namespace IL2CXX
             code.ForGeneric(
                 type.GetMethod("op_Division"),
                 (transpiler, types) => binary(transpiler, types, (value, x, y) => $"{value} = {x} / {y}")
+            );
+            (string body, int inline) bitwise(Transpiler transpiler, Type[] types, string @operator) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
+{'\t'}auto p = reinterpret_cast<uint8_t*>(&value);
+{'\t'}auto p0 = reinterpret_cast<uint8_t*>(&a_0);
+{'\t'}auto p1 = reinterpret_cast<uint8_t*>(&a_1);
+{'\t'}for (size_t i = 0; i < sizeof(value); ++i) p[i] = p0[i] {@operator} p1[i];
+{'\t'}return value;
+", 1);
+            code.ForGeneric(
+                type.GetMethod("op_BitwiseAnd"),
+                (transpiler, types) => bitwise(transpiler, types, "&")
+            );
+            code.ForGeneric(
+                type.GetMethod("op_BitwiseOr"),
+                (transpiler, types) => bitwise(transpiler, types, "|")
+            );
+            code.ForGeneric(
+                type.GetMethod("op_ExclusiveOr"),
+                (transpiler, types) => bitwise(transpiler, types, "^")
+            );
+            code.ForGeneric(
+                type.GetMethod("op_OnesComplement"),
+                (transpiler, types) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
+{'\t'}auto p = reinterpret_cast<uint8_t*>(&value);
+{'\t'}auto p0 = reinterpret_cast<uint8_t*>(&a_0);
+{'\t'}for (size_t i = 0; i < sizeof(value); ++i) p[i] = ~p0[i];
+{'\t'}return value;
+", 1)
             );
             code.ForGeneric(
                 type.GetMethod("op_Equality"),
@@ -196,17 +272,6 @@ namespace IL2CXX
             code.ForGeneric(
                 type.GetMethod("Floor", BindingFlags.Static | BindingFlags.NonPublic),
                 (transpiler, types) => unary(transpiler, types, (value, x) => $"{value} = std::floor({x})")
-            );
-        })
-        .For(get(typeof(BitOperations)), (type, code) =>
-        {
-            code.For(
-                type.GetMethod(nameof(BitOperations.RotateLeft), new[] { get(typeof(uint)), get(typeof(int)) }),
-                transpiler => ("\treturn (a_0 << (a_1 & 31)) | (a_0 >> ((32 - a_1) & 31));\n", 2)
-            );
-            code.For(
-                type.GetMethod(nameof(BitOperations.RotateRight), new[] { get(typeof(uint)), get(typeof(int)) }),
-                transpiler => ("\treturn (a_0 >> (a_1 & 31)) | (a_0 << ((32 - a_1) & 31));\n", 2)
             );
         });
     }

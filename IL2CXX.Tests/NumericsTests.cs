@@ -7,6 +7,28 @@ namespace IL2CXX.Tests
     [Parallelizable]
     class NumericsTests
     {
+        static int BitIsPow2() => BitOperations.IsPow2(64) ? 0 : 1;
+        static int BitRoundUpToPowerOf2() => BitOperations.RoundUpToPowerOf2(63) == 64 ? 0 : 1;
+        static int BitLeadingZeroCount() => BitOperations.LeadingZeroCount(256) == 23 ? 0 : 1;
+        static int BitLog2()
+        {
+            if (BitOperations.Log2(0) != 0) return 1;
+            if (BitOperations.Log2(1) != 0) return 2;
+            if (BitOperations.Log2(2) != 1) return 3;
+            if (BitOperations.Log2(3) != 1) return 4;
+            if (BitOperations.Log2(4) != 2) return 5;
+            if (BitOperations.Log2(0x80000000) != 31) return 6;
+            return 0;
+        }
+        static int BitPopCount() => BitOperations.PopCount(255) == 8 ? 0 : 1;
+        static int BitTrailingZeroCount() => BitOperations.TrailingZeroCount(256) == 8 ? 0 : 1;
+        static int BitRotateLeft() => BitOperations.RotateLeft(0x89abcdef, 8) == 0xabcdef89 ? 0 : 1;
+        static int BitRotateRight() => BitOperations.RotateRight(0x89abcdef, 8) == 0xef89abcd ? 0 : 1;
+        static int VectorConditionalSelect()
+        {
+            var x = Vector.ConditionalSelect(new Vector<int>(new[] { ~0, 0, ~0, 0 }), new Vector<float>(1f), new Vector<float>(2f));
+            return x == new Vector<float>(new[] { 1f, 2f, 1f, 2f }) ? 0 : 1;
+        }
         static int VectorAdd()
         {
             var x = new Vector<float>(1f) + new Vector<float>(2f);
@@ -31,6 +53,26 @@ namespace IL2CXX.Tests
         {
             var x = new Vector<float>(3f) / new Vector<float>(2f);
             return x[0] == 1.5f ? 0 : 1;
+        }
+        static int VectorBitwiseAnd()
+        {
+            var x = Vector.BitwiseAnd(new Vector<int>(3), new Vector<int>(6));
+            return x[0] == 2 ? 0 : 1;
+        }
+        static int VectorBitwiseOr()
+        {
+            var x = Vector.BitwiseOr(new Vector<int>(3), new Vector<int>(6));
+            return x[0] == 7 ? 0 : 1;
+        }
+        static int VectorXor()
+        {
+            var x = Vector.Xor(new Vector<int>(3), new Vector<int>(6));
+            return x[0] == 5 ? 0 : 1;
+        }
+        static int VectorOnesComplement()
+        {
+            var x = Vector.OnesComplement(new Vector<int>(0));
+            return x[0] == ~0 ? 0 : 1;
         }
         static int VectorEquality()
         {
@@ -138,14 +180,37 @@ namespace IL2CXX.Tests
             var x = Vector.ConvertToInt64(new Vector<double>(-1.0));
             return x[0] == (long)-1 ? 0 : 1;
         }
+        static int Vector3Max()
+        {
+            var x = Vector3.Max(new Vector3(-1f), new Vector3(1f));
+            return x.X == 1f ? 0 : 1;
+        }
+        static int Vector3Min()
+        {
+            var x = Vector3.Min(new Vector3(-1f), new Vector3(1f));
+            return x.X == -1f ? 0 : 1;
+        }
 
         static int Run(string[] arguments) => arguments[1] switch
         {
+            nameof(BitIsPow2) => BitIsPow2(),
+            nameof(BitRoundUpToPowerOf2) => BitRoundUpToPowerOf2(),
+            nameof(BitLeadingZeroCount) => BitLeadingZeroCount(),
+            nameof(BitLog2) => BitLog2(),
+            nameof(BitPopCount) => BitPopCount(),
+            nameof(BitTrailingZeroCount) => BitTrailingZeroCount(),
+            nameof(BitRotateLeft) => BitRotateLeft(),
+            nameof(BitRotateRight) => BitRotateRight(),
+            nameof(VectorConditionalSelect) => VectorConditionalSelect(),
             nameof(VectorAdd) => VectorAdd(),
             nameof(VectorSubtract) => VectorSubtract(),
             nameof(VectorMultiply) => VectorMultiply(),
             nameof(VectorMultiplyValue) => VectorMultiplyValue(),
             nameof(VectorDivide) => VectorDivide(),
+            nameof(VectorBitwiseAnd) => VectorBitwiseAnd(),
+            nameof(VectorBitwiseOr) => VectorBitwiseOr(),
+            nameof(VectorXor) => VectorXor(),
+            nameof(VectorOnesComplement) => VectorOnesComplement(),
             nameof(VectorEquality) => VectorEquality(),
             nameof(VectorEquals) => VectorEquals(),
             nameof(VectorLessThan) => VectorLessThan(),
@@ -167,6 +232,8 @@ namespace IL2CXX.Tests
             nameof(VectorConvertToDouble) => VectorConvertToDouble(),
             nameof(VectorConvertToInt32) => VectorConvertToInt32(),
             nameof(VectorConvertToInt64) => VectorConvertToInt64(),
+            nameof(Vector3Max) => Vector3Max(),
+            nameof(Vector3Min) => Vector3Min(),
             _ => -1
         };
 
@@ -177,11 +244,24 @@ namespace IL2CXX.Tests
         [Test]
         public void Test(
             [Values(
+                nameof(BitIsPow2),
+                nameof(BitRoundUpToPowerOf2),
+                nameof(BitLeadingZeroCount),
+                nameof(BitLog2),
+                nameof(BitPopCount),
+                nameof(BitTrailingZeroCount),
+                nameof(BitRotateLeft),
+                nameof(BitRotateRight),
+                nameof(VectorConditionalSelect),
                 nameof(VectorAdd),
                 nameof(VectorSubtract),
                 nameof(VectorMultiply),
                 nameof(VectorMultiplyValue),
                 nameof(VectorDivide),
+                nameof(VectorBitwiseAnd),
+                nameof(VectorBitwiseOr),
+                nameof(VectorXor),
+                nameof(VectorOnesComplement),
                 nameof(VectorEquality),
                 nameof(VectorEquals),
                 nameof(VectorLessThan),
@@ -202,7 +282,9 @@ namespace IL2CXX.Tests
                 nameof(VectorConvertToSingle),
                 nameof(VectorConvertToDouble),
                 nameof(VectorConvertToInt32),
-                nameof(VectorConvertToInt64)
+                nameof(VectorConvertToInt64),
+                nameof(Vector3Max),
+                nameof(Vector3Min)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

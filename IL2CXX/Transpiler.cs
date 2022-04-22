@@ -629,6 +629,7 @@ namespace IL2CXX
         {
             if (!IsComposite(type)) return false;
             if (!type.IsValueType) return true;
+            if (!Define(type).IsManaged) return false;
             if (type.StructLayoutAttribute?.Value == LayoutKind.Explicit)
             {
                 var map = ((TypeDefinition)Define(type)).ExplicitMap;

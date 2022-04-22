@@ -16,6 +16,7 @@ namespace IL2CXX
             public string Base;
             public Func<Transpiler, string> StaticMembers;
             public Func<Transpiler, (string, bool, string)> Members;
+            public Func<Transpiler, Type[], (string, bool, string)> GenericMembers;
             public Func<Transpiler, string> Initialize;
             public Dictionary<MethodKey, Func<Transpiler, (string body, int inline)>> MethodToBody = new();
             public Dictionary<MethodKey, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new();
@@ -44,7 +45,12 @@ namespace IL2CXX
 
         public string GetBase(Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Base : null;
         public string GetStaticMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.StaticMembers?.Invoke(transpiler) : null;
-        public (string members, bool managed, string unmanaged) GetMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Members?.Invoke(transpiler) ?? default : default;
+        public (string members, bool managed, string unmanaged) GetMembers(Transpiler transpiler, Type type)
+        {
+            if (TypeToCode.TryGetValue(type, out var code) && code.Members != null) return code.Members(transpiler);
+            if (type.IsGenericType && TypeToCode.TryGetValue(type.GetGenericTypeDefinition(), out code) && code.GenericMembers != null) return code.GenericMembers(transpiler, type.GetGenericArguments());
+            return default;
+        }
         public string GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
         public (string body, int inline) GetBody(Transpiler transpiler, MethodKey key)
         {

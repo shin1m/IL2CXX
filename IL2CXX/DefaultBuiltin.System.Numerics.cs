@@ -86,6 +86,14 @@ namespace IL2CXX
         })
         .For(get(typeof(Vector<>)), (type, code) =>
         {
+            code.GenericMembers = (transpiler, types) => ($@"{'\t'}{'\t'}double _[{(transpiler.Is64Bit ? 4 : 2)}];
+{'\t'}{'\t'}void f_destruct()
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
+{'\t'}{'\t'}{{
+{'\t'}{'\t'}}}
+", false, null);
             code.ForGeneric(
                 type.GetMethod("GetOneValue", BindingFlags.Static | BindingFlags.NonPublic),
                 (transpiler, types) => ("\treturn 1;\n", 1)

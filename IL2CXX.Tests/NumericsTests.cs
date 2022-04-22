@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using NUnit.Framework;
 
@@ -26,8 +27,8 @@ namespace IL2CXX.Tests
         static int BitRotateRight() => BitOperations.RotateRight(0x89abcdef, 8) == 0xef89abcd ? 0 : 1;
         static int VectorConditionalSelect()
         {
-            var x = Vector.ConditionalSelect(new Vector<int>(new[] { ~0, 0, ~0, 0 }), new Vector<float>(1f), new Vector<float>(2f));
-            return x == new Vector<float>(new[] { 1f, 2f, 1f, 2f }) ? 0 : 1;
+            var x = Vector.ConditionalSelect(new Vector<int>(Enumerable.Range(0, Vector<int>.Count).Select(x => x % 2 == 0 ? ~0 : 0).ToArray()), new Vector<float>(1f), new Vector<float>(2f));
+            return x == new Vector<float>(Enumerable.Range(0, Vector<float>.Count).Select(x => x % 2 == 0 ? 1f : 2f).ToArray()) ? 0 : 1;
         }
         static int VectorAdd()
         {

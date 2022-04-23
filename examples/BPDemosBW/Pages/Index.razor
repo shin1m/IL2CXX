@@ -6,8 +6,8 @@
 
 <PageTitle>Demos</PageTitle>
 
-<h1>Demos@(pausing ? " (Pausing... Press Esc to unpause.)" : string.Empty)</h1>
-
+<h1>Demos</h1>
+<div>@(pausing ? "Pausing... Press Esc to unpause." : "Press Esc to pause.")</div>
 <div tabindex="0" class="demo-container" @ref="container"
  @onkeydown="@(async e =>
  {

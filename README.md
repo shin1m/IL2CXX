@@ -9,7 +9,7 @@ There are a lot of missing pieces in .NET runtime support as they are implemente
 # Requirements
 
 * .NET 6
-* C++17 or later
+* C++17
 
 Currently, it is built and tested only on Linux x86-64.
 
@@ -49,6 +49,7 @@ Below are build durations running the above commands on my Core i7-8550U laptop:
 * [Demos](examples/Demos) - Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
 * [BlazorWasm](examples/BlazorWasm) - Blazor WebAssembly Template Application
 * [BPDemosBW](examples/BPDemosBW) - Blazor WebAssembly Port of Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
+  * [Live Demo](https://shin1m.github.io/bpdemosbw)
 
 # Comparing GC Pauses
 

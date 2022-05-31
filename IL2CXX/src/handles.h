@@ -12,6 +12,7 @@ struct t__handle
 {
 	virtual ~t__handle() = default;
 	virtual t__object* f_target() const = 0;
+	virtual void f_target__(t__object* a_value) = 0;
 };
 
 struct t__normal_handle : t__handle
@@ -22,6 +23,7 @@ struct t__normal_handle : t__handle
 	{
 	}
 	virtual t__object* f_target() const;
+	virtual void f_target__(t__object* a_value);
 };
 
 struct t__weak_handle : t__handle, t_weak_pointer<t__type>
@@ -30,20 +32,10 @@ struct t__weak_handle : t__handle, t_weak_pointer<t__type>
 	{
 	}
 	virtual t__object* f_target() const;
-	virtual void f_target__(t__object* a_p);
+	virtual void f_target__(t__object* a_value);
 };
 
-struct t__dependent_handle : t__weak_handle
-{
-	t_slot_of<t__object> v_dependent;
-
-	t__dependent_handle(t__object* a_target, t__object* a_dependent) : t__weak_handle(a_target, false), v_dependent(a_dependent)
-	{
-	}
-	virtual ~t__dependent_handle();
-	virtual void f_target__(t__object* a_p);
-	virtual void f_scan(t_scan<t__type> a_scan);
-};
+using t__dependent_handle = t_weak_pointer<t__type>;
 
 }
 

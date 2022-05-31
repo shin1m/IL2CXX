@@ -28,10 +28,9 @@ namespace IL2CXX
                 type.GetMethod("InternalGet", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn static_cast<t__handle*>(a_0.v__5fvalue)->f_target();\n", 1)
             );
-            // TODO
             code.For(
                 type.GetMethod("InternalSet", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+                transpiler => ("\tstatic_cast<t__handle*>(a_0.v__5fvalue)->f_target__(a_1);\n", 1)
             );
         })
         .For(get(typeof(GCSettings)), (type, code) =>
@@ -199,25 +198,22 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod("InternalGetTarget", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn static_cast<t__dependent_handle*>(a_0.v__5fvalue)->f_target();\n", 1)
+                transpiler => ("\treturn static_cast<t__object*>(static_cast<t__dependent_handle*>(a_0.v__5fvalue)->f_get().first);\n", 1)
             );
             code.For(
                 type.GetMethod("InternalGetDependent", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn static_cast<t__dependent_handle*>(a_0.v__5fvalue)->v_dependent;\n", 1)
+                transpiler => ("\treturn static_cast<t__object*>(static_cast<t__dependent_handle*>(a_0.v__5fvalue)->f_get().second);\n", 1)
             );
             code.For(
                 type.GetMethod("InternalGetTargetAndDependent", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0.v__5fvalue);
-{'\t'}auto target = p->f_target();
-{'\t'}f__store(*a_1, target ? static_cast<t__object*>(p->v_dependent) : nullptr);
-{'\t'}return target;
+                transpiler => ($@"{'\t'}auto [target, dependent] = static_cast<t__dependent_handle*>(a_0.v__5fvalue)->f_get();
+{'\t'}f__store(*a_1, static_cast<t__object*>(dependent));
+{'\t'}return static_cast<t__object*>(target);
 ", 1)
             );
             code.For(
                 type.GetMethod("InternalSetDependent", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto p = static_cast<t__dependent_handle*>(a_0.v__5fvalue);
-{'\t'}if (auto target = p->f_target()) p->v_dependent = a_1;
-", 1)
+                transpiler => ("\tstatic_cast<t__dependent_handle*>(a_0.v__5fvalue)->f_dependent__(a_1);\n", 1)
             );
             code.For(
                 type.GetMethod("InternalSetTargetToNull", BindingFlags.Static | BindingFlags.NonPublic),

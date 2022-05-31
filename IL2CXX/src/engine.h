@@ -42,7 +42,10 @@ struct t_engine : recyclone::t_engine<t__type>
 template<typename T>
 void t_engine::f_start(t__thread* RECYCLONE__SPILL a_thread, T a_main)
 {
-	recyclone::t_engine<t__type>::f_start(a_thread, [a_thread, main = std::move(a_main)]
+	recyclone::t_engine<t__type>::f_start(a_thread, [a_thread]
+	{
+		a_thread->f_initialize();
+	}, [a_thread, main = std::move(a_main)]
 	{
 		v_current_thread = a_thread;
 		main();

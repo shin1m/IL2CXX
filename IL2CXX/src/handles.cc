@@ -8,30 +8,19 @@ t__object* t__normal_handle::f_target() const
 	return v_target;
 }
 
+void t__normal_handle::f_target__(t__object* a_value)
+{
+	v_target = a_value;
+}
+
 t__object* t__weak_handle::f_target() const
 {
-	return static_cast<t__object*>(t_weak_pointer<t__type>::f_target());
+	return static_cast<t__object*>(t_weak_pointer<t__type>::f_get().first);
 }
 
-void t__weak_handle::f_target__(t__object* a_p)
+void t__weak_handle::f_target__(t__object* a_value)
 {
-	t_weak_pointer<t__type>::f_target__(a_p);
-}
-
-t__dependent_handle::~t__dependent_handle()
-{
-	v_dependent = nullptr;
-}
-
-void t__dependent_handle::f_target__(t__object* a_p)
-{
-	if (!a_p) v_dependent = nullptr;
-	t__weak_handle::f_target__(a_p);
-}
-
-void t__dependent_handle::f_scan(t_scan<t__type> a_scan)
-{
-	a_scan(v_dependent);
+	t_weak_pointer<t__type>::f_target__(a_value);
 }
 
 }

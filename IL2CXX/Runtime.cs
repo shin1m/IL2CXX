@@ -129,6 +129,7 @@ namespace IL2CXX
         public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
         public override IList<CustomAttributeData> GetCustomAttributesData() => throw new NotImplementedException();
         public override Type GetElementType() => throw new NotImplementedException();
+        public override string GetEnumName(object value) => throw new NotImplementedException();
         public override string[] GetEnumNames() => throw new NotImplementedException();
         public override Array GetEnumValues() => throw new NotImplementedException();
         public override FieldInfo GetField(string name, BindingFlags bindingFlags) => throw new NotImplementedException();
@@ -145,6 +146,7 @@ namespace IL2CXX
         protected override bool HasElementTypeImpl() => throw new NotImplementedException();
         protected override bool IsArrayImpl() => throw new NotImplementedException();
         public override bool IsAssignableFrom(Type c) => throw new NotImplementedException();
+        protected override bool IsByRefImpl() => throw new NotImplementedException();
         public override bool IsByRefLike => throw new NotImplementedException();
         public override bool IsConstructedGenericType => throw new NotImplementedException();
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();

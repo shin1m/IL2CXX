@@ -12,6 +12,14 @@ namespace IL2CXX.Tests
 {
     static class Utilities
     {
+        class Disposer : IDisposable
+        {
+            private readonly Action dispose;
+
+            public Disposer(Action dispose) => this.dispose = dispose;
+            public void Dispose() => dispose();
+        }
+
         static int Spawn(string command, string arguments, string workingDirectory, IEnumerable<(string, string)> environment, Action<string> output, Action<string> error)
         {
             var si = new ProcessStartInfo(command)
@@ -43,12 +51,10 @@ namespace IL2CXX.Tests
             var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
             if (Directory.Exists(build)) Directory.Delete(build, true);
             Directory.CreateDirectory(build);
+            var definitionsCount = 0;
             using (var context = new MetadataLoadContext(new PathAssemblyResolver(Directory.EnumerateFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll").Append(typeof(Builtin).Assembly.Location).Append(method.Module.Assembly.Location))))
             using (var declarations = File.CreateText(Path.Combine(build, "declarations.h")))
             using (var inlines = new StringWriter())
-            using (var definitions0 = File.CreateText(Path.Combine(build, "definitions0.cc")))
-            using (var definitions1 = File.CreateText(Path.Combine(build, "definitions1.cc")))
-            using (var definitions2 = File.CreateText(Path.Combine(build, "definitions2.cc")))
             using (var main = File.CreateText(Path.Combine(build, "main.cc")))
             {
                 var assembly = context.LoadFromAssemblyPath(method.Module.Assembly.Location);
@@ -56,11 +62,17 @@ namespace IL2CXX.Tests
                 method = type.GetMethod(method.Name, BindingFlags.Static | BindingFlags.NonPublic);
                 declarations.WriteLine(@"#ifndef DECLARATIONS_H
 #define DECLARATIONS_H");
-                var definitions = new[] { definitions0, definitions1, definitions2 };
-                foreach (var x in definitions) x.WriteLine(@"#include ""declarations.h""
+                StreamWriter newDefinitions()
+                {
+                    var x = File.CreateText(Path.Combine(build, $"definitions{definitionsCount++}.cc"));
+                    x.WriteLine(@"#include ""declarations.h""
 
 namespace il2cxx
 {");
+                    return x;
+                }
+                var definitions = newDefinitions();
+                using var disposer = new Disposer(() => definitions.Dispose());
                 main.WriteLine("#include \"declarations.h\"\n");
                 Type get(Type x) => context.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
                 var target = Environment.OSVersion.Platform;
@@ -78,18 +90,24 @@ namespace il2cxx
                         ).MakeGenericMethod(x.GetGenericArguments().Select(get).ToArray());
                     }) ?? Enumerable.Empty<MethodInfo>(),
                     GenerateReflection = reflection.Contains
-                }.Do(method, declarations, main, (type, inline) => inline ? inlines : definitions[
-                    type.IsValueType || type.IsInterface || type.IsArray ? 0 :
-                    type.IsGenericType ? 1 :
-                    2
-                ]);
+                }.Do(method, declarations, main, (type, inline) =>
+                {
+                    if (inline) return inlines;
+                    if (definitions.BaseStream.Position > 2 * 1024 * 1024)
+                    {
+                        definitions.WriteLine("\n}");
+                        definitions.Dispose();
+                        definitions = newDefinitions();
+                    }
+                    return definitions;
+                });
                 declarations.WriteLine("\nnamespace il2cxx\n{");
                 declarations.Write(inlines);
                 declarations.WriteLine(@"
 }
 
 #endif");
-                foreach (var x in definitions) x.WriteLine("\n}");
+                definitions.WriteLine("\n}");
                 main.WriteLine(@"
 #include ""types.cc""
 #include ""engine.cc""
@@ -100,7 +118,7 @@ namespace il2cxx
 project(run)
 add_subdirectory(../src/recyclone recyclone-build EXCLUDE_FROM_ALL)
 function(add name)
-{'\t'}add_executable(${{name}} definitions0.cc definitions1.cc definitions2.cc main.cc)
+{'\t'}add_executable(${{name}} {string.Join(" ", Enumerable.Range(0, definitionsCount).Select(i => $"definitions{i}.cc"))} main.cc)
 {'\t'}target_include_directories(${{name}} PRIVATE ../src)
 {'\t'}target_compile_options(${{name}} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 {'\t'}target_link_libraries(${{name}} recyclone $<$<NOT:$<PLATFORM_ID:Windows>>:dl>)

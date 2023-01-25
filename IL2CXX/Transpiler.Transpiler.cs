@@ -418,6 +418,11 @@ namespace IL2CXX
                 {
                     var m = ParseMethod(ref index);
                     writer.WriteLine($" {m.DeclaringType}::[{m}]");
+                    if (constrained != null)
+                    {
+                        m = GetInterfaceStaticConcrete((MethodInfo)m, constrained);
+                        constrained = null;
+                    }
                     GenerateCall(m, Escape(m), stack, indexToStack[index]);
                     return index;
                 };
@@ -764,7 +769,7 @@ namespace IL2CXX
                     var m = (MethodInfo)ParseMethod(ref index);
                     writer.WriteLine($" {m.DeclaringType}::[{m}]");
                     var after = indexToStack[index];
-                    string generateVirtual(string target) => GenerateVirtualCall(m, target,
+                    string generateVirtual(string target) => GenerateVirtualCall(GetBaseDefinition(m), target,
                         stack.Take(m.GetParameters().Length).Select(y => y.Variable).Reverse(),
                         y => $"\t{(GetReturnType(m) == typeofVoid ? string.Empty : $"{after.Variable} = ")}{y};\n"
                     );
@@ -776,7 +781,7 @@ namespace IL2CXX
                         if (isConcrete)
                             generateConcrete(m);
                         else if (@this.Type.IsSealed)
-                            generateConcrete(GetConcrete(m, @this.Type));
+                            generateConcrete(GetConcrete(GetBaseDefinition(m), @this.Type));
                         else
                             writer.Write(GenerateCheckNull(@this.Variable) + generateVirtual(@this.Variable));
                     }
@@ -789,7 +794,7 @@ namespace IL2CXX
                         }
                         if (constrained.IsValueType)
                         {
-                            var cm = isConcrete ? m : GetConcrete(m, constrained);
+                            var cm = isConcrete ? m : GetConcrete(GetBaseDefinition(m), constrained);
                             if (cm.DeclaringType == constrained)
                             {
                                 generateConcrete(cm);
@@ -819,7 +824,7 @@ namespace IL2CXX
                             writer.WriteLine($@"{'\t'}{{auto p = *static_cast<{Escape(constrained.IsInterface ? typeofObject : constrained)}**>({@this.Variable});
 {(
     isConcrete ? generate(m) :
-    constrained.IsSealed ? generate(GetConcrete(m, constrained)) :
+    constrained.IsSealed ? generate(GetConcrete(GetBaseDefinition(m), constrained)) :
     GenerateCheckNull("p") + generateVirtual("p")
 )}{'\t'}}}");
                         }
@@ -898,7 +903,8 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) {GenerateThrow("InvalidCast")};");
+                    writer.WriteLine($" {t}");
+                    if (t != typeofObject) writer.WriteLine($"\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) {GenerateThrow("InvalidCast")};");
                     return index;
                 };
             });
@@ -912,9 +918,10 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var t = ParseType(ref index);
+                    writer.WriteLine($" {t}");
                     var after = indexToStack[index];
                     Trace.Assert(after.Variable == stack.Variable);
-                    writer.WriteLine($" {t}\n\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) {after.Variable} = nullptr;");
+                    if (t != typeofObject) writer.WriteLine($"\tif ({stack.Variable} && !{GenerateIsAssignableTo(stack.Variable, t)}) {after.Variable} = nullptr;");
                     return index;
                 };
             });
@@ -1109,15 +1116,108 @@ namespace IL2CXX
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
                     var after = indexToStack[index];
-                    var next = instructions1[bytes[index]].OpCode;
-                    if (t.IsValueType && (next == OpCodes.Brtrue_S || next == OpCodes.Brfalse_S || next == OpCodes.Brtrue || next == OpCodes.Brfalse))
+                    bool justTrue(OpCode next)
+                    {
+                        if (!t.IsValueType || !(next == OpCodes.Brtrue_S || next == OpCodes.Brfalse_S || next == OpCodes.Brtrue || next == OpCodes.Brfalse)) return false;
                         writer.WriteLine($"\t{after.Variable} = reinterpret_cast<t__object*>(1);");
-                    else if (next == OpCodes.Unbox_Any)
-                        constrained = t;
-                    else if (GetNullableUnderlyingType(t) is Type u)
-                        writer.WriteLine($"\t{after.Variable} = {stack.Variable}.v_hasValue ? f__new_constructed<{Escape(u)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}).v_value) : nullptr;");
-                    else if (t.IsValueType)
-                        writer.WriteLine($"\t{after.Variable} = f__new_constructed<{Escape(t)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}));");
+                        return true;
+                    }
+                    var next = instructions1[bytes[index]].OpCode;
+                    if (justTrue(next)) return index;
+                    void boxIfValue()
+                    {
+                        if (t.IsValueType) writer.WriteLine($"\t{after.Variable} = f__new_constructed<{Escape(t)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}));");
+                    }
+                    void box()
+                    {
+                        if (GetNullableUnderlyingType(t) is Type u)
+                            writer.WriteLine($"\t{after.Variable} = {stack.Variable}.v_hasValue ? f__new_constructed<{Escape(u)}>(const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable}).v_value) : nullptr;");
+                        else
+                            boxIfValue();
+                    }
+                    if (next == OpCodes.Isinst || next == OpCodes.Unbox_Any)
+                    {
+                        var index0 = index + 1;
+                        var t0 = ParseType(ref index0);
+                        int label0()
+                        {
+                            writer.WriteLine($"L_{index:x04}: // {next.Name} {t0}");
+                            return index0;
+                        }
+                        var after0 = indexToStack[index0];
+                        if (next == OpCodes.Isinst)
+                        {
+                            Trace.Assert(after0.Variable == after.Variable);
+                            var next0 = instructions1[bytes[index0]].OpCode;
+                            int isinst()
+                            {
+                                if (t.IsAssignableTo(t0))
+                                {
+                                    if (justTrue(next0)) return label0();
+                                    box();
+                                    return label0();
+                                }
+                                label0();
+                                if (t.IsValueType || (t0.IsInterface ? t.IsSealed : !t0.IsSubclassOf(t)))
+                                    writer.WriteLine($"\t{after.Variable} = nullptr;");
+                                else if (t0 != typeofObject)
+                                    writer.WriteLine($"\tif ({after.Variable} && !{GenerateIsAssignableTo(after.Variable, t0)}) {after.Variable} = nullptr;");
+                                return index0;
+                            }
+                            if (next0 == OpCodes.Unbox_Any)
+                            {
+                                var index1 = index0 + 1;
+                                if (ParseType(ref index1) == t0)
+                                {
+                                    void label1() => writer.WriteLine($"L_{index0:x04}: // {next0.Name} {t0}");
+                                    if (t0.IsValueType)
+                                    {
+                                        label0();
+                                        label1();
+                                        if (t0 == t) return index1;
+                                        var after1 = indexToStack[index1];
+                                        if (t != typeofObject)
+                                            writer.WriteLine(GetNullableUnderlyingType(t0) == t ? $"\t{after1.Variable} = {{true, {stack.Variable}}};" : $"\t[[unlikely]] {GenerateThrow("NullReference")};");
+                                        else if (GetNullableUnderlyingType(t0) is Type u)
+                                            writer.WriteLine($@"{'\t'}if ({stack.Variable} && {stack.Variable}->f_type() == &t__type_of<{Escape(u)}>::v__instance)
+{'\t'}{'\t'}{after1.Variable} = {{true, static_cast<{Escape(u)}*>({stack.Variable})->v__value}};
+{'\t'}else
+{'\t'}{'\t'}{after1.Variable} = {{false}};");
+                                        else
+                                            writer.WriteLine($@"{'\t'}if ({stack.Variable} && {stack.Variable}->f_type() == &t__type_of<{Escape(t0)}>::v__instance)
+{'\t'}{'\t'}{after1.Variable} = static_cast<{Escape(t0)}*>({stack.Variable})->v__value;
+{'\t'}else
+{'\t'}{'\t'}[[unlikely]] {GenerateThrow("NullReference")};");
+                                        return index1;
+                                    }
+                                    isinst();
+                                    label1();
+                                    return index1;
+                                }
+                            }
+                            return isinst();
+                        }
+                        if (t0 == t || t.IsEnum && t0 == t.GetEnumUnderlyingType()) return label0();
+                        if (GetNullableUnderlyingType(t0) == t)
+                        {
+                            label0();
+                            writer.WriteLine($"\t{after0.Variable} = {{true, {stack.Variable}}};");
+                            return index0;
+                        }
+                        if (t.IsAssignableTo(t0))
+                        {
+                            label0();
+                            boxIfValue();
+                            return index0;
+                        }
+                        if (t.IsValueType)
+                        {
+                            label0();
+                            writer.WriteLine($"\t[[unlikely]] {GenerateThrow("InvalidCast")};");
+                            return index0;
+                        }
+                    }
+                    box();
                     return index;
                 };
             });
@@ -1287,28 +1387,6 @@ namespace IL2CXX
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
                     var after = indexToStack[index];
-                    if (constrained != null)
-                    {
-                        var s = constrained;
-                        constrained = null;
-                        if (t == s || s.IsEnum && t == s.GetEnumUnderlyingType()) return index;
-                        var before = indexToStack[index - 10];
-                        if (GetNullableUnderlyingType(t) == s)
-                        {
-                            writer.WriteLine($"\t{after.Variable} = {{true, {before.Variable}}};");
-                            return index;
-                        }
-                        if (s.IsAssignableTo(t))
-                        {
-                            if (s.IsValueType) writer.WriteLine($"\t{after.Variable} = f__new_constructed<{Escape(s)}>(const_cast<std::remove_volatile_t<decltype({before.Variable})>&>({before.Variable}));");
-                            return index;
-                        }
-                        if (s.IsValueType)
-                        {
-                            writer.WriteLine($"\t{GenerateThrow("InvalidCast")};");
-                            return index;
-                        }
-                    }
                     if (t.IsValueType)
                     {
                         if (GetNullableUnderlyingType(t) is Type u)
@@ -1484,7 +1562,13 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     var m = ParseMethod(ref index);
-                    writer.WriteLine($" {m.DeclaringType}::[{m}]\n\t{indexToStack[index].Variable} = reinterpret_cast<void*>(&{Escape(m)});");
+                    writer.WriteLine($" {m.DeclaringType}::[{m}]");
+                    if (constrained != null)
+                    {
+                        m = GetInterfaceStaticConcrete((MethodInfo)m, constrained);
+                        constrained = null;
+                    }
+                    writer.WriteLine($"\t{indexToStack[index].Variable} = reinterpret_cast<void*>(&{Escape(m)});");
                     Enqueue(m);
                     ldftnMethods.Add(m);
                     return index;

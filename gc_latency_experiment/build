@@ -2,7 +2,7 @@
 cd $(dirname $0) || exit $?
 dotnet build -c Release || exit $?
 dotnet run --project ../IL2CXX.Console --target Unix\
- --out out bin/Release/net6.0/gc_latency_experiment.dll\
+ --out out bin/Release/net7.0/gc_latency_experiment.dll\
  --reflection 'System.Runtime.GCLatencyMode, System.Private.CoreLib'\
  || exit $?
 mkdir out/build || exit $?

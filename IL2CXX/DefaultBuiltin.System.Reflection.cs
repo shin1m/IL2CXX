@@ -16,11 +16,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Assembly.GetExecutingAssembly)),
-                transpiler => ("\treturn {};\n", 0)
-            );
-            code.For(
-                type.GetMethod("IsRuntimeImplemented", declaredAndInstance),
-                transpiler => ($"\treturn a_0 && !a_0->f_type()->f_is(&t__type_of<{transpiler.Escape(get(typeof(RuntimeAssembly)))}>::v__instance);\n", 1)
+                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             if (target == PlatformID.Win32NT)
                 code.For(
@@ -40,23 +36,6 @@ namespace IL2CXX
 {'\t'}return f__new_string(std::string_view(cs, static_cast<size_t>(r)));
 ", 0)
                 );
-        })
-        .For(get(typeof(AssemblyName)), (type, code) =>
-        {
-            // TODO
-            code.For(
-                type.GetMethod("ComputePublicKeyToken", declaredAndInstance),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-            );
-            code.For(
-                type.GetMethod("nInit", declaredAndInstance),
-                transpiler =>
-                {
-                    var initialize = transpiler.typeofRuntimeAssembly.GetMethod(nameof(RuntimeAssembly.Initialize));
-                    transpiler.Enqueue(initialize);
-                    return ($"\t{transpiler.Escape(initialize)}(a_0);\n", 0);
-                }
-            );
         })
         .For(get(typeof(CustomAttributeData)), (type, code) =>
         {

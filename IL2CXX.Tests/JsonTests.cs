@@ -46,6 +46,7 @@ namespace IL2CXX.Tests
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
+            var jpi = Type.GetType("System.Text.Json.Serialization.Metadata.JsonPropertyInfo`1, System.Text.Json", true);
             var odc = Type.GetType("System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1, System.Text.Json", true);
             var odcOfFoo = odc.MakeGenericType(typeof(Foo));
             var ec = Type.GetType("System.Text.Json.Serialization.Converters.EnumConverter`1, System.Text.Json", true);
@@ -54,6 +55,8 @@ namespace IL2CXX.Tests
                 odcOfFoo,
                 ecOfBar
             }, new[] {
+                jpi.MakeGenericType(typeof(int)),
+                jpi.MakeGenericType(typeof(string)),
                 odc,
                 typeof(Foo),
                 odcOfFoo,

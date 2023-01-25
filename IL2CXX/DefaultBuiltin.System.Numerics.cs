@@ -7,6 +7,27 @@ namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
+        private static (string body, int inline) VectorOfTUnary(Type type, Transpiler transpiler, Type[] types, Func<string, string ,string> action)
+        {
+            var e = transpiler.EscapeForStacked(types[0]);
+            return ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
+{'\t'}auto p = reinterpret_cast<{e}*>(&value);
+{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
+{'\t'}for (size_t i = 0; i < sizeof(value) / sizeof({e}); ++i) {action("p[i]", "p0[i]")};
+{'\t'}return value;
+", 1);
+        }
+        private static (string body, int inline) VectorOfTBinary(Type type, Transpiler transpiler, Type[] types, Func<string, string, string, string> action)
+        {
+            var e = transpiler.EscapeForStacked(types[0]);
+            return ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
+{'\t'}auto p = reinterpret_cast<{e}*>(&value);
+{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
+{'\t'}auto p1 = reinterpret_cast<{e}*>(&a_1);
+{'\t'}for (size_t i = 0; i < sizeof(value) / sizeof({e}); ++i) {action("p[i]", "p0[i]", "p1[i]")};
+{'\t'}return value;
+", 1);
+        }
         private static Builtin SetupSystemNumerics(this Builtin @this, Func<Type, Type> get) => @this
         .For(get(typeof(BitOperations)), (type, code) =>
         {
@@ -30,6 +51,65 @@ namespace IL2CXX
         })
         .For(get(typeof(Vector)), (type, code) =>
         {
+            var typeofVectorOfT = get(typeof(Vector<>));
+            var typeofVectorOfT0 = typeofVectorOfT.MakeGenericType(Type.MakeGenericMethodParameter(0));
+            void relation(string name, string @operator) => code.ForGeneric(
+                type.GetMethod(name, 1, new[] { typeofVectorOfT0, typeofVectorOfT0 }),
+                (transpiler, types) => VectorOfTBinary(typeofVectorOfT, transpiler, types, (value, x, y) => $"std::memset(&{value}, {x} {@operator} {y} ? 0xff : 0, sizeof({transpiler.EscapeForStacked(types[0])}))")
+            );
+            relation(nameof(Vector.Equals), "==");
+            relation(nameof(Vector.LessThan), "<");
+            relation(nameof(Vector.LessThanOrEqual), "<=");
+            relation(nameof(Vector.GreaterThan), ">");
+            relation(nameof(Vector.GreaterThanOrEqual), ">=");
+            void unary0(string name, Func<string, string ,string> action) => code.ForGeneric(
+                type.GetMethod(name),
+                (transpiler, types) => VectorOfTUnary(typeofVectorOfT, transpiler, types, action)
+            );
+            unary0(nameof(Vector.Abs), (value, x) => $"{value} = std::abs({x})");
+            void binary(string name, Func<string, string, string, string> action) => code.ForGeneric(
+                type.GetMethod(name, 1, new[] { typeofVectorOfT0, typeofVectorOfT0 }),
+                (transpiler, types) => VectorOfTBinary(typeofVectorOfT, transpiler, types, action)
+            );
+            binary(nameof(Vector.Min), (value, x, y) => $"{value} = std::min({x}, {y})");
+            binary(nameof(Vector.Max), (value, x, y) => $"{value} = std::max({x}, {y})");
+            code.ForGeneric(
+                type.GetMethod(nameof(Vector.Dot)),
+                (transpiler, types) =>
+                {
+                    var e = transpiler.EscapeForStacked(types[0]);
+                    return ($@"{'\t'}{e} value{{}};
+{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
+{'\t'}auto p1 = reinterpret_cast<{e}*>(&a_1);
+{'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) value += p0[i] * p1[i];
+{'\t'}return value;
+", 1);
+                }
+            );
+            code.ForGeneric(
+                type.GetMethod(nameof(Vector.Sum)),
+                (transpiler, types) =>
+                {
+                    var e = transpiler.EscapeForStacked(types[0]);
+                    return ($@"{'\t'}{e} value{{}};
+{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
+{'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) value += p0[i];
+{'\t'}return value;
+", 1);
+                }
+            );
+            unary0(nameof(Vector.SquareRoot), (value, x) => $"{value} = std::sqrt({x})");
+            void unary1(string name, Func<string, string ,string> action)
+            {
+                void unary<T>(Func<string, string ,string> action) => code.For(
+                    type.GetMethod(name, new[] { typeofVectorOfT.MakeGenericType(get(typeof(T))) }),
+                    transpiler => VectorOfTUnary(typeofVectorOfT, transpiler, new[] { get(typeof(T)) }, action)
+                );
+                unary<double>(action);
+                unary<float>(action);
+            }
+            unary1(nameof(Vector.Ceiling), (value, x) => $"{value} = std::ceil({x})");
+            unary1(nameof(Vector.Floor), (value, x) => $"{value} = std::floor({x})");
             var methods = type.GetMethods();
             foreach (var x in methods.Where(x => x.Name.StartsWith("ConvertTo"))) code.For(x, transpiler =>
             {
@@ -69,20 +149,17 @@ namespace IL2CXX
         })
         .For(get(typeof(Vector3)), (type, code) =>
         {
-            (string body, int inline) binary(Transpiler transpiler, string function) => ($@"{'\t'}{transpiler.EscapeForStacked(type)} value;
+            void binary(string name, string function) => code.For(
+                type.GetMethod(name),
+                transpiler => ($@"{'\t'}{transpiler.EscapeForStacked(type)} value;
 {'\t'}value.v_X = std::{function}(a_0.v_X, a_1.v_X);
 {'\t'}value.v_Y = std::{function}(a_0.v_Y, a_1.v_Y);
 {'\t'}value.v_Z = std::{function}(a_0.v_Z, a_1.v_Z);
 {'\t'}return value;
-", 1);
-            code.For(
-                type.GetMethod(nameof(Vector3.Max)),
-                transpiler => binary(transpiler, "max")
+", 1)
             );
-            code.For(
-                type.GetMethod(nameof(Vector3.Min)),
-                transpiler => binary(transpiler, "min")
-            );
+            binary(nameof(Vector3.Max), "max");
+            binary(nameof(Vector3.Min), "min");
         })
         .For(get(typeof(Vector<>)), (type, code) =>
         {
@@ -95,21 +172,6 @@ namespace IL2CXX
 {'\t'}{'\t'}}}
 ", false, null);
             code.ForGeneric(
-                type.GetMethod("GetOneValue", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => ("\treturn 1;\n", 1)
-            );
-            code.ForGeneric(
-                type.GetMethod("GetAllBitsSetValue", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) =>
-                {
-                    var e = transpiler.EscapeForStacked(types[0]);
-                    return ($@"{'\t'}{e} value;
-{'\t'}std::memset(&value, 0xff, sizeof({e}));
-{'\t'}return value;
-", 1);
-                }
-            );
-            code.ForGeneric(
                 type.GetConstructor(new[] { type.GetGenericArguments()[0] }),
                 (transpiler, types) =>
                 {
@@ -119,77 +181,34 @@ namespace IL2CXX
 ", 1);
                 }
             );
-            code.ForGeneric(
-                type.GetMethod("ConditionalSelect", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
-{'\t'}auto p = reinterpret_cast<uint8_t*>(&value);
-{'\t'}auto p0 = reinterpret_cast<uint8_t*>(&a_0);
-{'\t'}auto p1 = reinterpret_cast<uint8_t*>(&a_1);
-{'\t'}auto p2 = reinterpret_cast<uint8_t*>(&a_2);
-{'\t'}for (size_t i = 0; i < sizeof(value); ++i) p[i] = p0[i] & p1[i] | ~p0[i] & p2[i];
-{'\t'}return value;
-", 1)
+            void binary(string name, Func<string, string, string, string> action) => code.ForGeneric(
+                type.GetMethod(name),
+                (transpiler, types) => VectorOfTBinary(type, transpiler, types, action)
             );
-            (string body, int inline) unary(Transpiler transpiler, Type[] types, Func<string, string ,string> action)
-            {
-                var e = transpiler.EscapeForStacked(types[0]);
-                return ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
-{'\t'}auto p = reinterpret_cast<{e}*>(&value);
-{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
-{'\t'}for (size_t i = 0; i < sizeof(value) / sizeof({e}); ++i) {action("p[i]", "p0[i]")};
-{'\t'}return value;
-", 1);
-            }
-            (string body, int inline) binary(Transpiler transpiler, Type[] types, Func<string, string, string, string> action)
-            {
-                var e = transpiler.EscapeForStacked(types[0]);
-                return ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
-{'\t'}auto p = reinterpret_cast<{e}*>(&value);
-{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
-{'\t'}auto p1 = reinterpret_cast<{e}*>(&a_1);
-{'\t'}for (size_t i = 0; i < sizeof(value) / sizeof({e}); ++i) {action("p[i]", "p0[i]", "p1[i]")};
-{'\t'}return value;
-", 1);
-            }
-            code.ForGeneric(
-                type.GetMethod("op_Addition"),
-                (transpiler, types) => binary(transpiler, types, (value, x, y) => $"{value} = {x} + {y}")
-            );
-            code.ForGeneric(
-                type.GetMethod("op_Subtraction"),
-                (transpiler, types) => binary(transpiler, types, (value, x, y) => $"{value} = {x} - {y}")
-            );
+            binary("op_Addition", (value, x, y) => $"{value} = {x} + {y}");
+            binary("op_Subtraction", (value, x, y) => $"{value} = {x} - {y}");
             code.ForGeneric(
                 type.GetMethod("op_Multiply", new[] { type, type }),
-                (transpiler, types) => binary(transpiler, types, (value, x, y) => $"{value} = {x} * {y}")
+                (transpiler, types) => VectorOfTBinary(type, transpiler, types, (value, x, y) => $"{value} = {x} * {y}")
             );
             code.ForGeneric(
                 type.GetMethod("op_Multiply", new[] { type, type.GetGenericArguments()[0] }),
-                (transpiler, types) => unary(transpiler, types, (value, x) => $"{value} = {x} * a_1")
+                (transpiler, types) => VectorOfTUnary(type, transpiler, types, (value, x) => $"{value} = {x} * a_1")
             );
-            code.ForGeneric(
-                type.GetMethod("op_Division"),
-                (transpiler, types) => binary(transpiler, types, (value, x, y) => $"{value} = {x} / {y}")
-            );
-            (string body, int inline) bitwise(Transpiler transpiler, Type[] types, string @operator) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
+            binary("op_Division", (value, x, y) => $"{value} = {x} / {y}");
+            void bitwise(string name, string @operator) => code.ForGeneric(
+                type.GetMethod(name),
+                (transpiler, types) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
 {'\t'}auto p = reinterpret_cast<uint8_t*>(&value);
 {'\t'}auto p0 = reinterpret_cast<uint8_t*>(&a_0);
 {'\t'}auto p1 = reinterpret_cast<uint8_t*>(&a_1);
 {'\t'}for (size_t i = 0; i < sizeof(value); ++i) p[i] = p0[i] {@operator} p1[i];
 {'\t'}return value;
-", 1);
-            code.ForGeneric(
-                type.GetMethod("op_BitwiseAnd"),
-                (transpiler, types) => bitwise(transpiler, types, "&")
+", 1)
             );
-            code.ForGeneric(
-                type.GetMethod("op_BitwiseOr"),
-                (transpiler, types) => bitwise(transpiler, types, "|")
-            );
-            code.ForGeneric(
-                type.GetMethod("op_ExclusiveOr"),
-                (transpiler, types) => bitwise(transpiler, types, "^")
-            );
+            bitwise("op_BitwiseAnd", "&");
+            bitwise("op_BitwiseOr", "|");
+            bitwise("op_ExclusiveOr", "^");
             code.ForGeneric(
                 type.GetMethod("op_OnesComplement"),
                 (transpiler, types) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;
@@ -210,76 +229,6 @@ namespace IL2CXX
 {'\t'}return true;
 ", 1);
                 }
-            );
-            (string body, int inline) relation(Transpiler transpiler, Type[] types, string @operator) => binary(transpiler, types, (value, x, y) => $"std::memset(&{value}, {x} {@operator} {y} ? 0xff : 0, sizeof({transpiler.EscapeForStacked(types[0])}))");
-            code.ForGeneric(
-                type.GetMethod("Equals", BindingFlags.Static | BindingFlags.NonPublic, new[] { type, type }),
-                (transpiler, types) => relation(transpiler, types, "==")
-            );
-            code.ForGeneric(
-                type.GetMethod("LessThan", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => relation(transpiler, types, "<")
-            );
-            code.ForGeneric(
-                type.GetMethod("LessThanOrEqual", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => relation(transpiler, types, "<=")
-            );
-            code.ForGeneric(
-                type.GetMethod("GreaterThan", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => relation(transpiler, types, ">")
-            );
-            code.ForGeneric(
-                type.GetMethod("GreaterThanOrEqual", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => relation(transpiler, types, ">=")
-            );
-            code.ForGeneric(
-                type.GetMethod("Abs", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => unary(transpiler, types, (value, x) => $"{value} = std::abs({x})")
-            );
-            code.ForGeneric(
-                type.GetMethod("Min", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => binary(transpiler, types, (value, x, y) => $"{value} = std::min({x}, {y})")
-            );
-            code.ForGeneric(
-                type.GetMethod("Max", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => binary(transpiler, types, (value, x, y) => $"{value} = std::max({x}, {y})")
-            );
-            code.ForGeneric(
-                type.GetMethod("Dot", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) =>
-                {
-                    var e = transpiler.EscapeForStacked(types[0]);
-                    return ($@"{'\t'}{e} value{{}};
-{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
-{'\t'}auto p1 = reinterpret_cast<{e}*>(&a_1);
-{'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) value += p0[i] * p1[i];
-{'\t'}return value;
-", 1);
-                }
-            );
-            code.ForGeneric(
-                type.GetMethod("Sum", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) =>
-                {
-                    var e = transpiler.EscapeForStacked(types[0]);
-                    return ($@"{'\t'}{e} value{{}};
-{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
-{'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) value += p0[i];
-{'\t'}return value;
-", 1);
-                }
-            );
-            code.ForGeneric(
-                type.GetMethod("SquareRoot", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => unary(transpiler, types, (value, x) => $"{value} = std::sqrt({x})")
-            );
-            code.ForGeneric(
-                type.GetMethod("Ceiling", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => unary(transpiler, types, (value, x) => $"{value} = std::ceil({x})")
-            );
-            code.ForGeneric(
-                type.GetMethod("Floor", BindingFlags.Static | BindingFlags.NonPublic),
-                (transpiler, types) => unary(transpiler, types, (value, x) => $"{value} = std::floor({x})")
             );
         });
     }

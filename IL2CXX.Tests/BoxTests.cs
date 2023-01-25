@@ -26,6 +26,20 @@ namespace IL2CXX.Tests
         static int BoxObjectUnboxNullable() => BoxUnbox<object, int?>(1) == 1 ? 0 : 1;
         static int BoxValueUnboxAssignable() => BoxUnbox<int, IComparable>(1) != null ? 0 : 1;
         static int BoxObjectUnboxAssignable() => BoxUnbox<string, IComparable>(string.Empty) != null ? 0 : 1;
+        static U Convert<T, U>(T x) => x is U y ? y : default;
+        sealed class Bar { }
+        static int ConvertObject() => Convert<object, IComparable>(string.Empty) != null ? 0 : 1;
+        static int ConvertObjectAssignable() => Convert<string, IComparable>(string.Empty) != null ? 0 : 1;
+        static int ConvertObjectUnassignable() => Convert<string, Bar>(string.Empty) == null ? 0 : 1;
+        static int ConvertObjectSealedUnassignable() => Convert<Bar, IComparable>(new()) == null ? 0 : 1;
+        static int ConvertObjectValue() => Convert<string, int>(string.Empty) == 0 ? 0 : 1;
+        static int ConvertBoxValue() => Convert<object, int>(1) == 1 ? 0 : 1;
+        static int ConvertBoxNullable() => Convert<object, int?>(1) == 1 ? 0 : 1;
+        static int ConvertValueObject() => Convert<int, string>(1) == null ? 0 : 1;
+        static int ConvertValueInterface() => Convert<int, IComparable>(0) != null ? 0 : 1;
+        static int ConvertValueValue() => Convert<int, int>(1) == 1 ? 0 : 1;
+        static int ConvertValueOther() => Convert<int, short>(1) == 0 ? 0 : 1;
+        static int ConvertValueBox() => Convert<int, object>(0) != null ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -45,6 +59,18 @@ namespace IL2CXX.Tests
             nameof(BoxObjectUnboxNullable) => BoxObjectUnboxNullable(),
             nameof(BoxValueUnboxAssignable) => BoxValueUnboxAssignable(),
             nameof(BoxObjectUnboxAssignable) => BoxObjectUnboxAssignable(),
+            nameof(ConvertObject) => ConvertObject(),
+            nameof(ConvertObjectAssignable) => ConvertObjectAssignable(),
+            nameof(ConvertObjectUnassignable) => ConvertObjectUnassignable(),
+            nameof(ConvertObjectSealedUnassignable) => ConvertObjectSealedUnassignable(),
+            nameof(ConvertObjectValue) => ConvertObjectValue(),
+            nameof(ConvertBoxValue) => ConvertBoxValue(),
+            nameof(ConvertBoxNullable) => ConvertBoxNullable(),
+            nameof(ConvertValueObject) => ConvertValueObject(),
+            nameof(ConvertValueInterface) => ConvertValueInterface(),
+            nameof(ConvertValueValue) => ConvertValueValue(),
+            nameof(ConvertValueOther) => ConvertValueOther(),
+            nameof(ConvertValueBox) => ConvertValueBox(),
             _ => -1
         };
 
@@ -70,7 +96,19 @@ namespace IL2CXX.Tests
                 nameof(BoxNullUnboxNullable),
                 nameof(BoxObjectUnboxNullable),
                 nameof(BoxValueUnboxAssignable),
-                nameof(BoxObjectUnboxAssignable)
+                nameof(BoxObjectUnboxAssignable),
+                nameof(ConvertObject),
+                nameof(ConvertObjectAssignable),
+                nameof(ConvertObjectUnassignable),
+                nameof(ConvertObjectSealedUnassignable),
+                nameof(ConvertObjectValue),
+                nameof(ConvertBoxValue),
+                nameof(ConvertBoxNullable),
+                nameof(ConvertValueObject),
+                nameof(ConvertValueInterface),
+                nameof(ConvertValueValue),
+                nameof(ConvertValueOther),
+                nameof(ConvertValueBox)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

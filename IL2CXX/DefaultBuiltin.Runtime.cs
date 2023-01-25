@@ -410,6 +410,15 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__array || a_0->v__by_ref || a_0->v__pointer ? a_0->v__element : nullptr;\n", 0)
             );
             code.For(
+                type.GetMethod(nameof(Type.GetEnumName)),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
+{'\t'}if (!a_0->v__fields) throw std::runtime_error(""no fields: "" + f__string(a_0->v__full_name));
+{'\t'}if (!a_1->f_type()->f_assignable_to_value(a_0)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
+{'\t'}for (auto p = a_0->v__fields; *p; ++p) if (std::memcmp((*p)->f_address(nullptr), a_0->f_unbox(const_cast<t__object*&>(a_1)), a_0->v__size) == 0) return f__new_string((*p)->v__name);
+{'\t'}return nullptr;
+", 0)
+            );
+            code.For(
                 type.GetMethod(nameof(Type.GetEnumNames)),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (!a_0->v__enum) throw std::runtime_error(""not enum"");
 {'\t'}if (!a_0->v__fields) throw std::runtime_error(""no fields: "" + f__string(a_0->v__full_name));
@@ -693,6 +702,10 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("IsArrayImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__array;\n", 0)
+            );
+            code.For(
+                type.GetMethod("IsByRefImpl", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__by_ref;\n", 0)
             );
             code.For(
                 type.GetMethod("IsPrimitiveImpl", declaredAndInstance),

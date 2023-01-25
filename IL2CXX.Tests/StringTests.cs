@@ -32,6 +32,7 @@ namespace IL2CXX.Tests
         }
         static int Substring() => AssertEquals("Hello, World!".Substring(7, 5), "World");
         static int ToLowerInvariant() => AssertEquals("Hello, World!".ToLowerInvariant(), "hello, world!");
+        static int Surrogate() => "\uD8000\uDB800\uDC00".Length == 5 ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -44,6 +45,7 @@ namespace IL2CXX.Tests
             nameof(Split) => Split(),
             nameof(Substring) => Substring(),
             nameof(ToLowerInvariant) => ToLowerInvariant(),
+            nameof(Surrogate) => Surrogate(),
             _ => -1
         };
 
@@ -62,7 +64,8 @@ namespace IL2CXX.Tests
                 nameof(Join),
                 nameof(Split),
                 nameof(Substring),
-                nameof(ToLowerInvariant)
+                nameof(ToLowerInvariant),
+                nameof(Surrogate)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

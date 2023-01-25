@@ -137,8 +137,12 @@ namespace IL2CXX.Tests
             Y = 2,
             XY = 3
         }
+        static int EnumGetName() => Enum.GetName(typeof(Names), Names.Foo) == "Foo" ? 0 : 1;
+        static int EnumGetNameOfT() => Enum.GetName(Names.Foo) == "Foo" ? 0 : 1;
         static int EnumGetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
+        static int EnumGetNamesOfT() => Enum.GetNames<Names>().SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
         static int EnumGetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
+        static int EnumGetValuesOfT() => Enum.GetValues<Names>().Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
         static int EnumHasFlag() => Flags.XY.HasFlag(Flags.Y) ? 0 : 1;
         static int EnumToStringDefault() => Names.Bar.ToString() == "Bar" ? 0 : 1;
         static int EnumToStringG() => Names.Bar.ToString("g") == "Bar" ? 0 : 1;
@@ -155,8 +159,12 @@ namespace IL2CXX.Tests
             nameof(Unordered) => Unordered(),
             nameof(ToInt32) => ToInt32(),
             nameof(ToPointer) => ToPointer(),
+            nameof(EnumGetName) => EnumGetName(),
+            nameof(EnumGetNameOfT) => EnumGetNameOfT(),
             nameof(EnumGetNames) => EnumGetNames(),
+            nameof(EnumGetNamesOfT) => EnumGetNamesOfT(),
             nameof(EnumGetValues) => EnumGetValues(),
+            nameof(EnumGetValuesOfT) => EnumGetValuesOfT(),
             nameof(EnumHasFlag) => EnumHasFlag(),
             nameof(EnumToStringDefault) => EnumToStringDefault(),
             nameof(EnumToStringG) => EnumToStringG(),
@@ -182,8 +190,12 @@ namespace IL2CXX.Tests
                 nameof(Unordered),
                 nameof(ToInt32),
                 nameof(ToPointer),
+                nameof(EnumGetName),
+                nameof(EnumGetNameOfT),
                 nameof(EnumGetNames),
+                nameof(EnumGetNamesOfT),
                 nameof(EnumGetValues),
+                nameof(EnumGetValuesOfT),
                 nameof(EnumHasFlag),
                 nameof(EnumToStringDefault),
                 nameof(EnumToStringG)

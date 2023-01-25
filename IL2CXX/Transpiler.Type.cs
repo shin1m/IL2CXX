@@ -28,14 +28,14 @@ namespace IL2CXX
         }
         public static MethodInfo GetBaseDefinition(MethodInfo method)
         {
-            if (method.ReflectedType != method.DeclaringType) throw new InvalidOperationException();
             if (!method.IsVirtual || method.DeclaringType.IsInterface) return method;
             var name = method.Name;
             var g = method.GetGenericArguments().Length;
             var ps = method.GetParameters().Select(x => x.ParameterType).Select(ReplaceGenericMethodParameter).ToArray();
             MethodInfo get(Type t) => t.GetMethod(name, g, exactInstance, null, ps, null);
+            var gas = method.IsGenericMethodDefinition ? null : method.GetGenericArguments();
             while (!method.Attributes.HasFlag(MethodAttributes.NewSlot)) method = get(get(method.DeclaringType.BaseType).DeclaringType);
-            return method;
+            return gas != null && method.IsGenericMethodDefinition ? method.MakeGenericMethod(gas) : method;
         }
         private MethodInfo GetConcrete(MethodInfo method, Type type)
         {
@@ -46,18 +46,26 @@ namespace IL2CXX
                 ? methods[dt.GetIndex(method.GetGenericMethodDefinition())].MakeGenericMethod(method.GetGenericArguments())
                 : methods[dt.GetIndex(method)];
         }
-        private static string ExplicitName(Type type)
+        private MethodInfo GetInterfaceStaticConcrete(MethodInfo method, Type type)
+        {
+            if (!method.DeclaringType.IsInterface) throw new ArgumentException(nameof(method));
+            var methods = ((TypeDefinition)Define(type)).InterfaceStaticMethods;
+            return method.IsGenericMethod
+                ? methods[method.GetGenericMethodDefinition()].MakeGenericMethod(method.GetGenericArguments())
+                : methods[method];
+        }
+        private string ExplicitName(Type type)
         {
             if (type.IsGenericTypeParameter) return type.Name;
             var prefix = type.IsNested ? $"{ExplicitName(type.DeclaringType)}." : type.Namespace == null ? string.Empty : $"{type.Namespace}.";
             if (!type.IsGenericType) return prefix + type.Name;
             var name = type.GetGenericTypeDefinition().Name;
             var i = name.IndexOf('`');
-            return $"{prefix}{(i < 0 ? name : name.Substring(0, i))}<{string.Join(",", type.GetGenericArguments().Select(ExplicitName))}>";
+            return $"{prefix}{(i < 0 ? name : name.Substring(0, i))}<{string.Join(",", type.GetGenericArguments().Select(x => x == typeofIntPtr ? "nint" : x == typeofUIntPtr ? "nuint" : ExplicitName(x)))}>";
         }
         private InterfaceMapping GetInterfaceMap(Type type, Type @interface)
         {
-            var ims = @interface.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var ims = @interface.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Where(x => x.IsVirtual).ToArray();
             var tms = new MethodInfo[ims.Length];
             for (var i = 0; i < ims.Length; ++i)
             {
@@ -66,7 +74,7 @@ namespace IL2CXX
                 var ps = m.GetParameters().Select(x => x.ParameterType).Select(ReplaceGenericMethodParameter).ToArray();
                 MethodInfo get(Type t, string name)
                 {
-                    var m = t.GetMethod(name, g, exactInstance, null, ps, null);
+                    var m = t.GetMethod(name, g, exactInstance | BindingFlags.Static, null, ps, null);
                     return m == null || m.DeclaringType == t ? m : get(m.DeclaringType, name);
                 }
                 var t = type;
@@ -80,7 +88,7 @@ namespace IL2CXX
                 }
                 while ((t = t.BaseType) != null);
                 if (tms[i] != null) continue;
-                if (m.IsAbstract) throw new Exception($"{type} -> {@interface} :: [{m}]");
+                if (m.IsAbstract) throw new Exception($"{type} -> {@interface}::[{m}]");
                 tms[i] = m;
             }
             return new InterfaceMapping
@@ -159,6 +167,7 @@ namespace IL2CXX
         {
             public readonly TypeDefinition Base;
             public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new();
+            public readonly Dictionary<MethodInfo, MethodInfo> InterfaceStaticMethods = new();
             public readonly string Delegate;
             public bool HasFields;
             public bool HasConstructors;
@@ -205,7 +214,13 @@ namespace IL2CXX
                     var definition = (InterfaceDefinition)transpiler.Define(x);
                     var methods = new MethodInfo[definition.Methods.Count];
                     var map = transpiler.GetInterfaceMap(Type.IsArray && x.IsGenericType ? transpiler.typeofSZArrayHelper.MakeGenericType(transpiler.GetElementType(Type)) : Type, x);
-                    foreach (var (i, t) in map.InterfaceMethods.Zip(map.TargetMethods, (i, t) => (i, t))) methods[definition.GetIndex(i)] = t;
+                    foreach (var (i, t) in map.InterfaceMethods.Zip(map.TargetMethods, (i, t) => (i, t)))
+                    {
+                        if (i.IsStatic)
+                            InterfaceStaticMethods.Add(i, t);
+                        else
+                            methods[definition.GetIndex(i)] = t;
+                    }
                     InterfaceToMethods.Add(x, methods);
                 }
                 if (Type.IsSubclassOf(transpiler.typeofDelegate) && Type != transpiler.typeofMulticastDelegate)

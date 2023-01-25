@@ -15,6 +15,12 @@ namespace IL2CXX.Tests
         }
         static int SizeOfType()
         {
+            var n = Marshal.SizeOf(typeof(Point));
+            Console.WriteLine($"{n}");
+            return n == 8 ? 0 : 1;
+        }
+        static int SizeOfTypeOfT()
+        {
             var n = Marshal.SizeOf<Point>();
             Console.WriteLine($"{n}");
             return n == 8 ? 0 : 1;
@@ -39,25 +45,43 @@ namespace IL2CXX.Tests
             Console.WriteLine($"{n}");
             return n == Marshal.SizeOf<IntPtr>() + 4 ? 0 : 1;
         }
-        static int StructureToPtr()
+        static int StructureToPtr(Func<Name, Name> f)
+        {
+            var name = f(new()
+            {
+                First = "abcdefgh",
+                Last = "ABCDEFGH"
+            });
+            return name.First == "abcdefgh" && name.Last == "ABC" ? 0 : 1;
+        }
+        static int StructureToPtr() => StructureToPtr(x =>
+        {
+            var p = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Name)));
+            try
+            {
+                Marshal.StructureToPtr((object)x, p, false);
+                return (Name)Marshal.PtrToStructure(p, typeof(Name));
+            }
+            finally
+            {
+                Marshal.DestroyStructure(p, typeof(Name));
+                Marshal.FreeHGlobal(p);
+            }
+        });
+        static int StructureToPtrOfT() => StructureToPtr(x =>
         {
             var p = Marshal.AllocHGlobal(Marshal.SizeOf<Name>());
             try
             {
-                Marshal.StructureToPtr(new Name
-                {
-                    First = "abcdefgh",
-                    Last = "ABCDEFGH"
-                }, p, false);
-                var name = Marshal.PtrToStructure<Name>(p);
-                return name.First == "abcdefgh" && name.Last == "ABC" ? 0 : 1;
+                Marshal.StructureToPtr(x, p, false);
+                return Marshal.PtrToStructure<Name>(p);
             }
             finally
             {
                 Marshal.DestroyStructure<Name>(p);
                 Marshal.FreeHGlobal(p);
             }
-        }
+        });
 
         [StructLayout(LayoutKind.Explicit)]
         struct Union
@@ -117,18 +141,19 @@ namespace IL2CXX.Tests
         }
 
         static void Foo(IntPtr x, IntPtr y) { }
-        static int GetFunctionPointerForDelegate() =>
-            Marshal.GetFunctionPointerForDelegate((Action<IntPtr, IntPtr>)Foo) == IntPtr.Zero ? 1 : 0;
+        static int GetFunctionPointerForDelegate() => Marshal.GetFunctionPointerForDelegate((Action<IntPtr, IntPtr>)Foo) == IntPtr.Zero ? 1 : 0;
         delegate IntPtr BarDelegate(IntPtr x, ref IntPtr y);
         static IntPtr Bar(IntPtr x, ref IntPtr y) => new IntPtr((int)x + (int)y);
-        static int GetDelegateForFunctionPointer()
+        static int GetDelegateForFunctionPointer(Func<IntPtr, BarDelegate> get)
         {
             var p = Marshal.GetFunctionPointerForDelegate((BarDelegate)Bar);
-            var d = Marshal.GetDelegateForFunctionPointer<BarDelegate>(p);
+            var d = get(p);
             var y = new IntPtr(2);
             if (d(new IntPtr(1), ref y) != new IntPtr(3)) return 1;
             return p == Marshal.GetFunctionPointerForDelegate(d) ? 0 : 1;
         }
+        static int GetDelegateForFunctionPointer() => GetDelegateForFunctionPointer(x => (BarDelegate)Marshal.GetDelegateForFunctionPointer(x, typeof(BarDelegate)));
+        static int GetDelegateForFunctionPointerOfT() => GetDelegateForFunctionPointer(Marshal.GetDelegateForFunctionPointer<BarDelegate>);
 
         struct utsname
         {
@@ -162,14 +187,17 @@ namespace IL2CXX.Tests
         static int Run(string[] arguments) => arguments[1] switch
         {
             nameof(SizeOfType) => SizeOfType(),
+            nameof(SizeOfTypeOfT) => SizeOfTypeOfT(),
             nameof(SizeOfInstance) => SizeOfInstance(),
             nameof(SizeOfByValTStr) => SizeOfByValTStr(),
             nameof(StructureToPtr) => StructureToPtr(),
+            nameof(StructureToPtrOfT) => StructureToPtrOfT(),
             nameof(Explicit) => Explicit(),
             nameof(ExplicitWithReference) => ExplicitWithReference(),
             nameof(ExplicitComposite) => ExplicitComposite(),
             nameof(GetFunctionPointerForDelegate) => GetFunctionPointerForDelegate(),
             nameof(GetDelegateForFunctionPointer) => GetDelegateForFunctionPointer(),
+            nameof(GetDelegateForFunctionPointerOfT) => GetDelegateForFunctionPointerOfT(),
             nameof(Parameter) => Parameter(),
             _ => -1
         };
@@ -182,14 +210,17 @@ namespace IL2CXX.Tests
         public void Test(
             [Values(
                 nameof(SizeOfType),
+                nameof(SizeOfTypeOfT),
                 nameof(SizeOfInstance),
                 nameof(SizeOfByValTStr),
                 nameof(StructureToPtr),
+                nameof(StructureToPtrOfT),
                 nameof(Explicit),
                 nameof(ExplicitWithReference),
                 nameof(ExplicitComposite),
                 nameof(GetFunctionPointerForDelegate),
                 nameof(GetDelegateForFunctionPointer),
+                nameof(GetDelegateForFunctionPointerOfT),
                 nameof(Parameter)
             )] string name,
             [Values] bool cooperative

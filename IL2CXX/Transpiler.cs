@@ -222,7 +222,7 @@ namespace IL2CXX
             var interfaces = type.GetInterfaces();
             if (!type.IsSZArray) return interfaces;
             // TODO: Work around for szarray bug.
-            var roc = getType(typeof(IReadOnlyCollection<>)).MakeGenericType(new[] { GetElementType(type) });
+            var roc = getType(typeof(IReadOnlyCollection<>)).MakeGenericType(GetElementType(type));
             return interfaces.Contains(roc) ? interfaces : interfaces.Append(roc).ToArray();
         }
         private byte ParseU1(ref int index) => bytes[index++];
@@ -932,8 +932,10 @@ namespace IL2CXX
             foreach (var c in value)
                 if (escapes.TryGetValue(c, out var e))
                     writer.Write(e);
+                else if (char.IsSurrogate(c))
+                    writer.Write($"\"\"\\x{(ushort)c:X4}\"\"");
                 else if (c < 0x20 || c >= 0x7f)
-                    writer.Write($"\\x{(ushort)c:X}");
+                    writer.Write($"\\u{(ushort)c:X4}");
                 else
                     writer.Write(c);
             writer.Write('"');

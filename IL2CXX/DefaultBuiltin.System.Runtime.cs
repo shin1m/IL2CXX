@@ -56,16 +56,27 @@ namespace IL2CXX
 {'\t'}static_cast<t__type*>(a_1)->f_destroy_unmanaged(a_0);
 ", 1)
             );
-            code.For(
-                type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
-{'\t'}auto type = static_cast<t__type*>(a_1);
+            var gdffpi = type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic);
+            code.For(gdffpi, transpiler => ($@"{'\t'}auto type = static_cast<t__type*>(a_1);
 {'\t'}auto p = static_cast<{transpiler.EscapeForValue(get(typeof(Delegate)))}>(type->f_new_zerod());
 {'\t'}p->v__5ftarget = p;
 {'\t'}p->v__5fmethodPtr = type->v__invoke_unmanaged;
 {'\t'}p->v__5fmethodPtrAux = a_0;
 {'\t'}return p;
-", 0)
+", 0));
+            code.For(
+                type.GetMethod(nameof(Marshal.GetDelegateForFunctionPointer), new[] { get(typeof(IntPtr)), get(typeof(Type)) }),
+                transpiler =>
+                {
+                    var md = $"&t__type_of<{transpiler.Escape(get(typeof(MulticastDelegate)))}>::v__instance";
+                    transpiler.Enqueue(gdffpi);
+                    return (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_1);
+{'\t'}if (type->v__generic_definition) throw std::runtime_error(""must be non generic"");
+{'\t'}if (type->v__base != {md} && type != {md}) throw std::runtime_error(""must be delegate"");
+{'\t'}return {transpiler.Escape(gdffpi)}(a_0, a_1);
+", 0);
+                }
             );
             code.For(
                 type.GetMethod("GetFunctionPointerForDelegateInternal", BindingFlags.Static | BindingFlags.NonPublic),
@@ -90,17 +101,41 @@ namespace IL2CXX
                 type.GetMethod("IsPinnable", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn true;\n", 1)
             );
+            var ptsh = type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr)), get(typeof(object)), get(typeof(bool)) }, null);
+            code.For(ptsh, transpiler => ($"\ta_1->f_type()->f_from_unmanaged(a_1, a_0);\n", 1));
             code.For(
-                type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr)), get(typeof(object)), get(typeof(bool)) }, null),
-                transpiler => ($"\ta_1->f_type()->f_from_unmanaged(a_1, a_0);\n", 1)
+                type.GetMethod(nameof(Marshal.PtrToStructure), new[] { get(typeof(IntPtr)), get(typeof(Type)) }),
+                transpiler =>
+                {
+                    var create = get(typeof(Activator)).GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(bool)) });
+                    transpiler.Enqueue(create);
+                    transpiler.Enqueue(ptsh);
+                    return (transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0) return nullptr;
+{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_1);
+{'\t'}if (type->v__generic_definition) throw std::runtime_error(""must be non generic"");
+{'\t'}auto RECYCLONE__SPILL p = {transpiler.Escape(create)}(a_1, true);
+{'\t'}{transpiler.Escape(ptsh)}(a_0, p, true);
+{'\t'}return p;
+", 0);
+                }
             );
+            var soh = type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic);
+            code.For(soh, transpiler => ($@"{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (a_1 && type->v__unmanaged_size <= 0) throw std::runtime_error(""not marshalable"");
+{'\t'}return type->v__unmanaged_size;
+", 1));
             code.For(
-                type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
-{'\t'}auto p = static_cast<t__type*>(a_0);
-{'\t'}if (a_1 && p->v__unmanaged_size <= 0) throw std::runtime_error(""not marshalable"");
-{'\t'}return p->v__unmanaged_size;
-", 1)
+                type.GetMethod(nameof(Marshal.SizeOf), new[] { get(typeof(Type)) }),
+                transpiler =>
+                {
+                    transpiler.Enqueue(soh);
+                    return (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (type->v__generic_definition) throw std::runtime_error(""must be non generic"");
+{'\t'}return {transpiler.Escape(soh)}(a_0, true);
+", 0);
+                }
             );
             code.For(
                 type.GetMethod(nameof(Marshal.StructureToPtr), new[] { get(typeof(object)), get(typeof(IntPtr)), get(typeof(bool)) }),
@@ -129,6 +164,10 @@ namespace IL2CXX
         })
         .For(get(typeof(RuntimeFeature)), (type, code) =>
         {
+            code.For(
+                type.GetProperty(nameof(RuntimeFeature.IsDynamicCodeCompiled)).GetMethod,
+                transpiler => ($"\treturn false;\n", 1)
+            );
             code.For(
                 type.GetProperty(nameof(RuntimeFeature.IsDynamicCodeSupported)).GetMethod,
                 transpiler => ($"\treturn false;\n", 1)
@@ -224,6 +263,24 @@ namespace IL2CXX
                 transpiler => ("\tdelete static_cast<t__dependent_handle*>(a_0.v__5fvalue);\n", 1)
             );
         })
+        .For(get(Type.GetType("System.Runtime.Intrinsics.Scalar`1", true)), (type, code) =>
+        {
+            code.ForGeneric(
+                type.GetProperty("AllBitsSet").GetMethod,
+                (transpiler, types) =>
+                {
+                    var e = transpiler.EscapeForStacked(types[0]);
+                    return ($@"{'\t'}{e} value;
+{'\t'}std::memset(&value, 0xff, sizeof({e}));
+{'\t'}return value;
+", 1);
+                }
+            );
+            code.ForGeneric(
+                type.GetProperty("One").GetMethod,
+                (transpiler, types) => ("\treturn 1;\n", 1)
+            );
+        })
         .For(get(Type.GetType("System.Runtime.Intrinsics.Vector128`1", true)), (type, code) =>
         {
             // TODO
@@ -248,66 +305,95 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
-        .For(get(Type.GetType("Internal.Runtime.CompilerServices.Unsafe", true)), (type, code) =>
+        .For(get(typeof(Unsafe)), (type, code) =>
         {
+            var t0 = Type.MakeGenericMethodParameter(0);
+            var t0ref = t0.MakeByRefType();
             var methods = GenericMethods(type);
+            void additive(string name, char @operator)
+            {
+                var voidp = type.GetMethod(name, new[] { get(typeof(void*)), get(typeof(int)) });
+                foreach (var m in methods.Where(x => x != voidp && x.Name == name))
+                    code.ForGeneric(m, (transpiler, types) => ($"\treturn a_0 {@operator} a_1;\n", 1));
+                code.ForGeneric(voidp, (transpiler, types) => ($"\treturn static_cast<char*>(a_0) {@operator} a_1;\n", 1));
+            }
+            additive(nameof(Unsafe.Add), '+');
+            additive(nameof(Unsafe.Subtract), '-');
+            void offset(string name, char @operator)
+            {
+                foreach (var x in new[] { typeof(IntPtr), typeof(UIntPtr) }) code.ForGeneric(
+                    type.GetMethod(name, new[] { t0ref, get(x) }),
+                    (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) {@operator} a_1);\n", 1)
+                );
+            }
+            offset(nameof(Unsafe.AddByteOffset), '+');
+            offset(nameof(Unsafe.SubtractByteOffset), '-');
             code.ForGeneric(
-                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { get(typeof(void*)), get(typeof(int)) })),
-                (transpiler, types) => ("\treturn static_cast<char*>(a_0) + a_1;\n", 1)
-            );
-            code.ForGeneric(
-                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { x.GetGenericArguments()[0].MakeByRefType(), get(typeof(int)) })),
-                (transpiler, types) => ("\treturn a_0 + a_1;\n", 1)
-            );
-            code.ForGeneric(
-                methods.Single(x => x.Name == "Add" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == get(typeof(IntPtr))),
-                (transpiler, types) => ("\treturn a_0 + static_cast<intptr_t>(a_1);\n", 1)
-            );
-            code.ForGeneric(
-                methods.Single(x => x.Name == "AddByteOffset" && x.GetGenericArguments().Length == 1 && x.GetParameters()[1].ParameterType == get(typeof(IntPtr))),
-                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) + static_cast<intptr_t>(a_1));\n", 1)
-            );
-            code.ForGeneric(
-                type.GetMethod("AreSame"),
+                type.GetMethod(nameof(Unsafe.AreSame)),
                 (transpiler, types) => ("\treturn a_0 == a_1;\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "As" && x.GetGenericArguments().Length == 1),
+                type.GetMethod(nameof(Unsafe.As), 1, new[] { get(typeof(object)) }),
                 (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(types[0])}>(a_0);\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "As" && x.GetGenericArguments().Length == 2),
+                type.GetMethod(nameof(Unsafe.As), 2, new[] { t0ref }),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[1])}*>(a_0);\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "AsPointer" && x.GetGenericArguments().Length == 1),
+                type.GetMethod(nameof(Unsafe.AsPointer)),
                 (transpiler, types) => ("\treturn a_0;\n", 1)
             );
-            foreach (var m in methods.Where(x => x.Name == "AsRef" && x.GetGenericArguments().Length == 1))
+            foreach (var m in methods.Where(x => x.Name == nameof(Unsafe.AsRef)))
                 code.ForGeneric(m, (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(((MethodInfo)m).MakeGenericMethod(types).ReturnType)}>(a_0);\n", 1));
             code.ForGeneric(
-                methods.Single(x => x.Name == "ByteOffset" && x.GetGenericArguments().Length == 1),
+                type.GetMethod(nameof(Unsafe.ByteOffset)),
                 (transpiler, types) => ("\treturn reinterpret_cast<char*>(a_1) - reinterpret_cast<char*>(a_0);\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "IsAddressLessThan" && x.GetGenericArguments().Length == 1),
-                (transpiler, types) => ("\treturn reinterpret_cast<uintptr_t>(a_0) < reinterpret_cast<uintptr_t>(a_1);\n", 1)
+                type.GetMethod(nameof(Unsafe.Copy), 1, new[] { get(typeof(void*)), t0ref }),
+                (transpiler, types) => ($"\t*static_cast<{transpiler.EscapeForValue(types[0])}*>(a_0) = *a_1;\n", 1)
             );
-            foreach (var m in methods.Where(x => x.Name == "ReadUnaligned" && x.GetGenericArguments().Length == 1))
-                code.ForGeneric(m,
+            code.ForGeneric(
+                type.GetMethod(nameof(Unsafe.Copy), 1, new[] { t0ref, get(typeof(void*)) }),
+                (transpiler, types) => ($"\t*a_0 = *static_cast<{transpiler.EscapeForValue(types[0])}*>(a_1);\n", 1)
+            );
+            foreach (var x in new[] { typeof(void*), typeof(byte).MakeByRefType() })
+            {
+                foreach (var name in new[] { nameof(Unsafe.CopyBlock), nameof(Unsafe.CopyBlockUnaligned) }) code.For(
+                    type.GetMethod(name, new[] { get(x), get(x), get(typeof(uint)) }),
+                    transpiler => ("\tstd::memcpy(a_0, a_1, a_2);\n", 1)
+                );
+                foreach (var name in new[] { nameof(Unsafe.InitBlock), nameof(Unsafe.InitBlockUnaligned) }) code.For(
+                    type.GetMethod(name, new[] { get(x), get(typeof(byte)), get(typeof(uint)) }),
+                    transpiler => ("\tstd::memset(a_0, a_1, a_2);\n", 1)
+                );
+                code.ForGeneric(
+                    type.GetMethod(nameof(Unsafe.ReadUnaligned), new[] { get(x) }),
                     (transpiler, types) => ($"\treturn *reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0);\n", 1)
                 );
-            foreach (var m in methods.Where(x => x.Name == "WriteUnaligned" && x.GetGenericArguments().Length == 1))
-                code.ForGeneric(m,
+                code.ForGeneric(
+                    type.GetMethod(nameof(Unsafe.WriteUnaligned), new[] { get(x), t0 }),
                     (transpiler, types) => ($"\t*reinterpret_cast<{transpiler.EscapeForMember(types[0])}*>(a_0) = a_1;\n", 1)
                 );
+            }
+            void relation(string name, char @operator) => code.ForGeneric(
+                type.GetMethod(name),
+                (transpiler, types) => ($"\treturn reinterpret_cast<uintptr_t>(a_0) {@operator} reinterpret_cast<uintptr_t>(a_1);\n", 1)
+            );
+            relation(nameof(Unsafe.IsAddressGreaterThan), '>');
+            relation(nameof(Unsafe.IsAddressLessThan), '<');
             code.ForGeneric(
-                methods.Single(x => x.Name == "SizeOf" && x.GetGenericArguments().Length == 1),
+                type.GetMethod(nameof(Unsafe.SizeOf)),
                 (transpiler, types) => ($"\treturn sizeof({transpiler.EscapeForValue(types[0])});\n", 1)
             );
             code.ForGeneric(
-                methods.Single(x => x.Name == "SkipInit" && x.GetGenericArguments().Length == 1),
+                type.GetMethod(nameof(Unsafe.SkipInit)),
                 (transpiler, types) => (string.Empty, 1)
+            );
+            code.ForGeneric(
+                type.GetMethod(nameof(Unsafe.Unbox)),
+                (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0 + 1);\n", 1)
             );
         })
         .For(get(typeof(AssemblyLoadContext)), (type, code) =>

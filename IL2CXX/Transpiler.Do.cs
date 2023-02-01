@@ -334,24 +334,23 @@ static t__type* v__exported_{name}[] = {{
                     var names = assembly.GetManifestResourceNames();
                     foreach (var x in names)
                     {
-                        writer.WriteLine($"\nstatic uint8_t v__resource_{name}__{Escape(x)}[] = {{");
+                        writer.Write($"\nstatic uint8_t v__resource_{name}__{Escape(x)}[] = \"");
                         using (var source = assembly.GetManifestResourceStream(x))
-                        {
-                            var b = source.ReadByte();
-                            if (b != -1)
+                            while (true)
                             {
-                                writer.Write($"\t0x{b:x2}");
-                                while (true)
-                                {
-                                    b = source.ReadByte();
-                                    if (b == -1) break;
-                                    writer.Write($", 0x{b:x2}");
-                                }
+                                var b = source.ReadByte();
+                                if (b == -1) break;
+                                var c = (char)b;
+                                if (escapes.TryGetValue(c, out var e))
+                                    writer.Write(e);
+                                else if (c < 0x20 || c >= 0x7f)
+                                    writer.Write($"\\{Convert.ToString(c, 8).PadLeft(3, '0')}");
+                                else
+                                    writer.Write(c);
                             }
-                        }
-                        writer.Write("\n};");
+                        writer.Write("\";");
                     }
-                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}, {(exportedTypes.Count > 0 ? $"v__exported_{name}" : "t__type::v__empty_types")}, {{{string.Join(",", names.Select(x => $"\n\t{{u\"{x}\"sv, {{v__resource_{name}__{Escape(x)}, sizeof(v__resource_{name}__{Escape(x)})}}}}"))}\n}}}};");
+                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}, {(exportedTypes.Count > 0 ? $"v__exported_{name}" : "t__type::v__empty_types")}, {{{string.Join(",", names.Select(x => $"\n\t{{u\"{x}\"sv, {{v__resource_{name}__{Escape(x)}, sizeof(v__resource_{name}__{Escape(x)}) - 1}}}}"))}\n}}}};");
                 }
                 WriteRuntimeDefinition(definition, $"v__assembly_{name}", genericTypeDefinitionToConstructeds, writerForDeclarations, writer);
             }

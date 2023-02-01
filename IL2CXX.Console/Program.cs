@@ -34,7 +34,7 @@ namespace IL2CXX.Console
         static int Main(string[] args) => Parser.Default.ParseArguments<Options>(args).MapResult(options =>
         {
             var names = new SortedSet<string>();
-            var type2path = new Dictionary<Type, string>();
+            var type2paths = new Dictionary<Type, List<string>>();
             using (var context = new MetadataLoadContext(new PathAssemblyResolver(options.Assemblies.Prepend(Path.GetDirectoryName(options.Source)).Append(RuntimeEnvironment.GetRuntimeDirectory()).SelectMany(x => Directory.EnumerateFiles(x.Length > 0 ? x : ".", "*.dll")).Append(typeof(Builtin).Assembly.Location).UnionBy(Enumerable.Empty<string>(), Path.GetFileNameWithoutExtension))))
             {
                 var assembly = context.LoadFromAssemblyPath(options.Source);
@@ -264,13 +264,22 @@ namespace IL2CXX.Console
                         while ((transpiler.GetNullableUnderlyingType(type) ?? type.GetElementType()) is Type t) type = t;
                         while (type.IsNested) type = type.DeclaringType;
                         if (type.IsGenericType) type = type.GetGenericTypeDefinition();
-                        if (type2path.TryGetValue(type, out var path)) return definition = new StreamWriter(path, true);
+                        if (type2paths.TryGetValue(type, out var paths))
+                        {
+                            var last = paths[paths.Count - 1];
+                            if (new FileInfo(last).Length < 1024 * 1024) return definition = new StreamWriter(last, true);
+                        }
+                        else
+                        {
+                            paths = new();
+                            type2paths.Add(type, paths);
+                        }
                         var escaped = transpiler.EscapeType(type);
                         if (escaped.Length > 240) escaped = escaped.Substring(0, 240);
                         var name = $"{escaped}.cc";
                         for (var i = 0; !names.Add(name); ++i) name = $"{escaped}__{i}.cc";
-                        path = Path.Combine(options.Out, name);
-                        type2path.Add(type, path);
+                        var path = Path.Combine(options.Out, name);
+                        paths.Add(path);
                         definition = new StreamWriter(path);
                         definition.WriteLine(@"#include ""declarations.h""
 
@@ -293,7 +302,7 @@ namespace il2cxx
                     definition.Dispose();
                 }
             }
-            foreach (var path in type2path.Values) File.AppendAllText(path, "\n}\n");
+            foreach (var path in type2paths.Values.SelectMany(x => x)) File.AppendAllText(path, "\n}\n");
             void copy(string path)
             {
                 var destination = Path.Combine(options.Out, path);

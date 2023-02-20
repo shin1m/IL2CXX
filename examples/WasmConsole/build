@@ -1,0 +1,47 @@
+#!/bin/bash
+BASE=$(cd $(dirname $0) && pwd)
+cd $BASE
+if [ "$1" == '' ]; then
+	dotnet publish -c Release || exit $?
+	rm -rf il2cxx || exit $?
+	mkdir -p il2cxx/source || exit $?
+	(cd bin/Release/net7.0/browser-wasm/AppBundle/managed && cp\
+	 System.Console.dll\
+	 System.Runtime.InteropServices.JavaScript.dll\
+	 WasmConsole.dll\
+	 $BASE/il2cxx/source\
+	) || exit $?
+	cd il2cxx || exit $?
+	dotnet run --project $BASE/../../IL2CXX.Console --target Other --is32\
+	 --out out source/WasmConsole.dll\
+	 --bundle\
+	  'System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript'\
+	  'MyClass, WasmConsole'\
+	  '<Module>, WasmConsole'\
+	 --reflection\
+	  'System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript'\
+	  'System.Threading.Tasks.Task`1, System.Private.CoreLib'\
+	  'MyClass, WasmConsole'\
+	  'Program, WasmConsole'\
+	 || exit $?
+	mkdir out/build || exit $?
+	cd out/build || exit $?
+	emcmake cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 .. || exit $?
+else
+	cd il2cxx/out/build || exit $?
+fi
+cmake --build . -j8 || exit $?
+(cd $BASE/bin/Release/net7.0/browser-wasm/AppBundle && cp\
+ dotnet.timezones.blat\
+ icudt.dat\
+ main.mjs\
+ package.json\
+ $BASE/il2cxx/out/build\
+) || exit $?
+(cd ../wasm/src && cp\
+ mono-config.json\
+ $BASE/il2cxx/out/build\
+) || exit $?
+sed -i "1s/^\/\//'use strict';\n\/\//
+s/^\"use strict\";//" dotnet.js || exit $?
+sed -i 's/"mainAssemblyName": ""/"mainAssemblyName": "WasmConsole.dll"/' mono-config.json || exit $?

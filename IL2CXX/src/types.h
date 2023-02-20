@@ -123,6 +123,7 @@ struct t__method_info : t__method_base
 
 struct t__runtime_method_info : t__method_info
 {
+	t__type* v__return_type;
 	void* v__function;
 #ifdef __EMSCRIPTEN__
 	t__object*(*v__wasm_invoke)(t__object*, void**);
@@ -137,6 +138,7 @@ struct t__runtime_method_info : t__method_info
 		int32_t a_attributes,
 		t__custom_attribute* const* a_custom_attributes,
 		t__runtime_parameter_info* const* a_parameters,
+		t__type* a_return_type,
 		t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), void* a_function,
 #ifdef __EMSCRIPTEN__
 		t__object*(*a_wasm_invoke)(t__object*, void**),
@@ -144,7 +146,7 @@ struct t__runtime_method_info : t__method_info
 		t__runtime_method_info* a_generic_definition,
 		t__abstract_type* const* a_generic_arguments,
 		t__runtime_method_info* const* a_generic_methods
-	) : t__method_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__function(a_function),
+	) : t__method_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__return_type(a_return_type), v__function(a_function),
 #ifdef __EMSCRIPTEN__
 		v__wasm_invoke(a_wasm_invoke),
 #endif

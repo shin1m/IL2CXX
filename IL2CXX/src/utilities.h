@@ -150,9 +150,13 @@ t__type* f__find_type(const std::map<std::string_view, t__type*>& a_name_to_type
 
 extern RECYCLONE__THREAD int32_t v_last_unmanaged_error;
 
+inline std::u16string_view f__string_view(t_System_2eString* a_p)
+{
+	return {&a_p->v__5ffirstChar, static_cast<size_t>(a_p->v__5fstringLength)};
+}
 inline std::string f__string(t_System_2eString* a_p)
 {
-	return f__string({&a_p->v__5ffirstChar, static_cast<size_t>(a_p->v__5fstringLength)});
+	return f__string(f__string_view(a_p));
 }
 t_System_2eString* f__to_string(t__object* a_p);
 

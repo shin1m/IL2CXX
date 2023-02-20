@@ -762,13 +762,15 @@ struct t__static_{identifier}
 {'\t'}{'\t'}{{
 {scanSlots("\t\t\t")}{'\t'}{'\t'}}}
 "
-                                    : $@"{variables("\t")}
+                                    : type.BaseType == null || type.IsAbstract && type.IsSealed ? string.Empty : $@"{variables("\t")}
 {'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
-{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f__scan(a_scan);\n")}{scanSlots("\t\t")}{'\t'}}}
+{'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
+{scanSlots("\t\t")}{'\t'}}}
 {'\t'}void f_construct({identifier}* a_p) const
 {'\t'}{{
-{(type.BaseType == null ? string.Empty : $"\t\t{Escape(type.BaseType)}::f_construct(a_p);\n")}{string.Join(string.Empty, constructs.Select(x => $"{'\t'}{'\t'}new(&a_p->{x}) decltype({x})({x});\n"))}{'\t'}}}
+{'\t'}{'\t'}{Escape(type.BaseType)}::f_construct(a_p);
+{string.Join(string.Empty, constructs.Select(x => $"{'\t'}{'\t'}new(&a_p->{x}) decltype({x})({x});\n"))}{'\t'}}}
 ";
                             }
                         }
@@ -849,7 +851,7 @@ static t__runtime_field_info* v__fields_{identifier}[] = {{
 extern t__runtime_method_info* v__generic_methods_{name}[];");
                     }
                     fieldDeclarations.WriteLine($"extern t__runtime_method_info v__method_{name};");
-                    definition.Definitions.WriteLine($@"t__runtime_method_info v__method_{name}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {WriteAttributes(x, name, definition.Definitions)}, {WriteParameters(x.GetParameters(), name, definition.Definitions)}, {GenerateInvokeFunction(x)}, {function},
+                    definition.Definitions.WriteLine($@"t__runtime_method_info v__method_{name}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {WriteAttributes(x, name, definition.Definitions)}, {WriteParameters(x.GetParameters(), name, definition.Definitions)}, &t__type_of<{Escape(x.ReturnType)}>::v__instance, {GenerateInvokeFunction(x)}, {function},
 #ifdef __EMSCRIPTEN__
 {'\t'}{GenerateWASMInvokeFunction(x)},
 #endif
@@ -990,7 +992,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
                     writerForDeclarations.WriteLine($"\t}} v_interface__{ii}__thunks;");
                 }
                 writerForDefinitions.WriteLine(string.Join(",", td.InterfaceToMethods.Select(p => $"\n\t{{&t__type_of<{Escape(p.Key)}>::v__instance, {{reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__thunks), reinterpret_cast<void**>(&v_interface__{Escape(p.Key)}__methods)}}}}")));
-                writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
+                if (type.BaseType != null && !(type.IsAbstract && type.IsSealed)) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
 {'\t'}static t__object* f_do_clone(const t__object* a_this);");
                 if (type != typeofVoid && type.IsValueType) writerForDeclarations.WriteLine($@"{'\t'}static void f_do_clear(void* a_p, size_t a_n);
 {'\t'}static void f_do_copy(const void* a_from, size_t a_n, void* a_to);
@@ -1079,7 +1081,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             writerForDefinitions.Write(td?.Delegate);
             if (definition is TypeDefinition)
             {
-                writerForDefinitions.WriteLine($@"{'\t'}t__type::f_scan = f_do_scan;
+                if (type.BaseType != null && !(type.IsAbstract && type.IsSealed)) writerForDefinitions.WriteLine($@"{'\t'}t__type::f_scan = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
                 if (type != typeofVoid && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear;
 {'\t'}f_copy = f_do_copy;
@@ -1093,7 +1095,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
             }
             writerForDefinitions.WriteLine($@"}}
 t__type_of<{identifier}> t__type_of<{identifier}>::v__instance;");
-            if (definition is TypeDefinition)
+            if (definition is TypeDefinition && type.BaseType != null && !(type.IsAbstract && type.IsSealed))
             {
                 writerForDefinitions.WriteLine($@"void t__type_of<{identifier}>::f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan)
 {{

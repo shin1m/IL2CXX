@@ -96,6 +96,7 @@ namespace IL2CXX
         public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
         public override MethodInfo MakeGenericMethod(params Type[] types) => throw new NotImplementedException();
         public override string Name => throw new NotImplementedException();
+        public override Type ReturnType => throw new NotImplementedException();
     }
     abstract class RuntimePropertyInfo : PropertyInfo
     {

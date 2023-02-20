@@ -123,7 +123,7 @@ namespace IL2CXX
                     var type = get(typeof(UnmanagedMemoryStream));
                     var constructor = type.GetConstructor(new[] { get(typeof(byte*)), get(typeof(long)) });
                     transpiler.Enqueue(constructor);
-                    return (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}auto i = a_0->v__resources.find({{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}});
+                    return (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}auto i = a_0->v__resources.find(f__string_view(a_1));
 {'\t'}if (i == a_0->v__resources.end()) return nullptr;
 {'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}{transpiler.Escape(constructor)}(p, i->second.first, i->second.second);
@@ -325,6 +325,10 @@ namespace IL2CXX
 {'\t'}return *p;
 ", 0)
             );
+            code.For(
+                type.GetProperty(nameof(MethodInfo.ReturnType)).GetMethod,
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__return_type;\n", 0)
+            );
         })
         .For(get(typeof(RuntimePropertyInfo)), (type, code) =>
         {
@@ -447,7 +451,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Type.GetField), new[] { get(typeof(string)), get(typeof(BindingFlags)) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__fields) std::cerr << ""no fields: "" << f__string(a_0->v__full_name) << std::endl;
-{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}auto name = f__string_view(a_1);
 {'\t'}t__runtime_field_info* p = nullptr;
 {'\t'}a_0->f_each_field(a_2, [&](auto a_x)
 {'\t'}{{
@@ -611,7 +615,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetMethodImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
-{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}auto name = f__string_view(a_1);
 {'\t'}t__runtime_method_info* p = nullptr;
 {'\t'}a_0->f_each_method(a_2, [&](auto a_x)
 {'\t'}{{
@@ -635,7 +639,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetMethodImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(int)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
-{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}auto name = f__string_view(a_1);
 {'\t'}t__runtime_method_info* p = nullptr;
 {'\t'}a_0->f_each_method(a_3, [&](auto a_x)
 {'\t'}{{
@@ -670,7 +674,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod("GetPropertyImpl", declaredAndInstance),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__properties) std::cerr << ""no properties: "" << f__string(a_0->v__full_name) << std::endl;
-{'\t'}std::u16string_view name = {{&a_1->v__5ffirstChar, static_cast<size_t>(a_1->v__5fstringLength)}};
+{'\t'}auto name = f__string_view(a_1);
 {'\t'}t__runtime_property_info* p = nullptr;
 {'\t'}a_0->f_each_property(a_2, [&](auto a_x)
 {'\t'}{{

@@ -136,11 +136,11 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__find_type(v__name_to_type, {&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)});\n", 0)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__find_type(v__name_to_type, f__string_view(a_0));\n", 0)
             );
             code.For(
                 type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)), get(typeof(bool)) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__find_type(v__name_to_type, {{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}});
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__find_type(v__name_to_type, f__string_view(a_0));
 {'\t'}if (!p && a_1) throw std::runtime_error(""TypeLoadException"");
 {'\t'}return p;
 ", 0)
@@ -149,7 +149,7 @@ namespace IL2CXX
             code.For(
                 type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)), get(typeof(bool)), get(typeof(bool)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_2) {transpiler.GenerateThrow("NotSupported")};
-{'\t'}auto p = f__find_type(v__name_to_type, {{&a_0->v__5ffirstChar, static_cast<size_t>(a_0->v__5fstringLength)}});
+{'\t'}auto p = f__find_type(v__name_to_type, f__string_view(a_0));
 {'\t'}if (!p && a_1) throw std::runtime_error(""TypeLoadException"");
 {'\t'}return p;
 ", 0)

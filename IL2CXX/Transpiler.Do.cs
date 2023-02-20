@@ -39,7 +39,7 @@ namespace IL2CXX
                 definition.Definitions.WriteLine($@"static t__abstract_type* v__generic_arguments_{identifier}[] = {{
 {string.Join(string.Empty, method.GetGenericArguments().Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
 }};
-t__runtime_method_info v__method_{identifier}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(method.DeclaringType)}>::v__instance, u""{method.Name}""sv, {(int)method.Attributes}, {WriteAttributes(method, identifier, definition.Definitions)}, {WriteParameters(method.GetParameters(), identifier, definition.Definitions)}, {GenerateInvokeFunction(method)}, {(
+t__runtime_method_info v__method_{identifier}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(method.DeclaringType)}>::v__instance, u""{method.Name}""sv, {(int)method.Attributes}, {WriteAttributes(method, identifier, definition.Definitions)}, {WriteParameters(method.GetParameters(), identifier, definition.Definitions)}, &t__type_of<{Escape(((MethodInfo)method).ReturnType)}>::v__instance, {GenerateInvokeFunction(method)}, {(
     method.IsAbstract ? "nullptr" : $"reinterpret_cast<void*>({identifier})"
 )},
 #ifdef __EMSCRIPTEN__

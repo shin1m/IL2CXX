@@ -15,7 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="wasm/**">
+    <Content Include="wasm/src/**;wasm/runtime/es6/**;wasm/runtime/bin/src/**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

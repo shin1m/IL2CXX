@@ -609,9 +609,7 @@ struct t__static_{identifier}
                                             if (value == UnmanagedType.ByValTStr)
                                             {
                                                 if (unicode) pad(align(Math.Min(2, td.Alignment)));
-                                                // TODO: Work around for ByValTStr bug.
-                                                //var size = (int)marshalAs.NamedArguments.First(x => x.MemberName == nameof(MarshalAsAttribute.SizeConst)).TypedValue.Value;
-                                                var size = GetSizeConst(x);
+                                                var size = (int)marshalAs.NamedArguments.First(x => x.MemberName == nameof(MarshalAsAttribute.SizeConst)).TypedValue.Value;
                                                 sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {f}[{size}];");
                                                 i += size * (unicode ? 2 : 1);
                                             }

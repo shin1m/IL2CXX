@@ -494,15 +494,6 @@ namespace IL2CXX
         private static readonly Type typeofEcmaParameter = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaFatMethodParameter, System.Reflection.MetadataLoadContext", true);
         private static readonly FieldInfo ecmaParameterHandle = typeofEcmaParameter.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly PropertyInfo ecmaModulePEReader = typeofEcmaModule.GetProperty("PEReader", BindingFlags.Instance | BindingFlags.NonPublic);
-        // TODO: Work around for ByValTStr bug.
-        private int GetSizeConst(FieldInfo field)
-        {
-            var reader = GetMetadataReader(field.Module);
-            var definition = reader.GetFieldDefinition((FieldDefinitionHandle)ecmaFieldHandle.GetValue(field));
-            var br = reader.GetBlobReader(definition.GetMarshallingDescriptor());
-            br.ReadByte();
-            return br.ReadCompressedInteger();
-        }
         private IEnumerable<byte> GetRVAData(FieldInfo field)
         {
             var handle = (FieldDefinitionHandle)ecmaFieldHandle.GetValue(field);

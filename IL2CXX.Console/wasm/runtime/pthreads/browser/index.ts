@@ -134,15 +134,5 @@ export function preAllocatePThreadWorkerPool(defaultPthreadPoolSize: number, con
 /// conditioned on a non-zero PTHREAD_POOL_SIZE (but we set it to 0 to avoid early worker allocation).
 export async function instantiateWasmPThreadWorkerPool(): Promise<void> {
     // this is largely copied from emscripten's "receiveInstance" in "createWasm" in "src/preamble.js"
-    const workers = Internals.getUnusedWorkerPool();
-    if (workers.length > 0) {
-        const allLoaded = createPromiseController<void>();
-        let leftToLoad = workers.length;
-        workers.forEach((w) => {
-            Internals.loadWasmModuleToWorker(w, function () {
-                if (!--leftToLoad) allLoaded.promise_control.resolve();
-            });
-        });
-        await allLoaded.promise;
-    }
+    return Promise.all(Internals.getUnusedWorkerPool().map(Internals.loadWasmModuleToWorker)).then(() => {});
 }

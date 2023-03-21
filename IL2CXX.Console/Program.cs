@@ -56,9 +56,9 @@ namespace IL2CXX.Console
                         codeFor(
                             type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToManaged), new[] { get(typeof(string).MakeByRefType()) }),
                             transpiler => ($@"{'\t'}if (a_0->v_slot.v_Type.v) {{
-{'\t'}{'\t'}auto& p = reinterpret_cast<t_slot_of<t_System_2eString>&>(a_0->v_slot.v_IntPtrValue.v);
+{'\t'}{'\t'}auto& p = reinterpret_cast<t_System_2eString*&>(a_0->v_slot.v_IntPtrValue.v);
 {'\t'}{'\t'}f__store(*a_1, p);
-{'\t'}{'\t'}p = nullptr;
+{'\t'}{'\t'}f__store(p, nullptr);
 {'\t'}}} else {{
 {'\t'}{'\t'}f__store(*a_1, nullptr);
 {'\t'}}}
@@ -68,7 +68,7 @@ namespace IL2CXX.Console
                             type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToJS), new[] { get(typeof(string)) }),
                             transpiler => ($@"{'\t'}if (a_1) {{
 {'\t'}{'\t'}a_0->v_slot.v_Type.v = 15;
-{'\t'}{'\t'}new(&a_0->v_slot.v_IntPtrValue.v) t_slot_of<t_System_2eString>(a_1);
+{'\t'}{'\t'}f__store(reinterpret_cast<t_System_2eString*&>(a_0->v_slot.v_IntPtrValue.v), a_1);
 {'\t'}}} else {{
 {'\t'}{'\t'}a_0->v_slot.v_Type.v = 0;
 {'\t'}}}
@@ -267,7 +267,7 @@ target_sources({name} PRIVATE wasm/src/driver.cc wasm/src/pinvoke.cc)
 target_include_directories({name} PRIVATE wasm/src src .)
 target_link_libraries({name} recyclone dl
 {'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libSystem.Native.a
-{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ToString', 'UTF8ArrayToString', 'FS_readFile']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s STRICT_JS;-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--extern-pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/bin/src/es6/runtime.es6.iffe.js;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.lib.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/pal_random.lib.js;--post-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.post.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.extpost.js""
+{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ToString', 'UTF8ArrayToString', 'FS']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--extern-pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/bin/src/es6/runtime.es6.iffe.js;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.lib.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/pal_random.lib.js;--post-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.post.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.extpost.js""
 {'\t'})
 " : $@"
 target_include_directories({name} PRIVATE src .)

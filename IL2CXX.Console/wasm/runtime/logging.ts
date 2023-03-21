@@ -187,7 +187,7 @@ export function readSymbolMapFile(filename: string): void {
     if (runtimeHelpers.mono_wasm_symbols_are_ready) return;
     runtimeHelpers.mono_wasm_symbols_are_ready = true;
     try {
-        const res = Module.FS_readFile(filename, { flags: "r", encoding: "utf8" });
+        const res = Module.FS.readFile(filename, { flags: "r", encoding: "utf8" });
         res.split(/[\r\n]/).forEach((line: string) => {
             const parts: string[] = line.split(/:/);
             if (parts.length < 2)

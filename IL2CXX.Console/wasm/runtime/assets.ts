@@ -383,7 +383,7 @@ function _instantiate_asset(asset: AssetEntry, url: string, bytes: Uint8Array) {
                 if (runtimeHelpers.diagnosticTracing)
                     console.debug(`MONO_WASM: Creating directory '${parentDirectory}'`);
 
-                Module.FS_createPath(
+                Module.FS.createPath(
                     "/", parentDirectory, true, true // fixme: should canWrite be false?
                 );
             } else {
@@ -394,7 +394,7 @@ function _instantiate_asset(asset: AssetEntry, url: string, bytes: Uint8Array) {
                 console.debug(`MONO_WASM: Creating file '${fileName}' in directory '${parentDirectory}'`);
 
             if (!mono_wasm_load_data_archive(bytes, parentDirectory)) {
-                Module.FS_createDataFile(
+                Module.FS.createDataFile(
                     parentDirectory, fileName,
                     bytes, true /* canRead */, true /* canWrite */, true /* canOwn */
                 );
@@ -494,14 +494,14 @@ export function mono_wasm_load_data_archive(data: Uint8Array, prefix: string): b
         folders.add(directory);
     });
     folders.forEach(folder => {
-        Module["FS_createPath"](prefix, folder, true, true);
+        Module["FS"]["createPath"](prefix, folder, true, true);
     });
 
     for (const row of manifest) {
         const name = row[0];
         const length = row[1];
         const bytes = data.slice(0, length);
-        Module["FS_createDataFile"](prefix, name, bytes, true, true);
+        Module["FS"]["createDataFile"](prefix, name, bytes, true, true);
         data = data.slice(length);
     }
     return true;

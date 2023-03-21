@@ -16,6 +16,3 @@ extern "C" void mono_wasm_bind_js_function(t_System_2eString** function_name, t_
 extern "C" void mono_wasm_invoke_bound_function(int function_js_handle, void* data);
 extern "C" void mono_wasm_bind_cs_function(t_System_2eString** fully_qualified_name, int signature_hash, void* signatures, int* is_exception, t__object** result);
 extern "C" void mono_wasm_marshal_promise(void* data);
-
-// Blazor specific custom routines - see dotnet_support.js for backing code
-//extern "C" void* mono_wasm_invoke_js_blazor(t_System_2eString** exceptionMessage, void* callInfo, void* arg0, void* arg1, void* arg2);

@@ -34,6 +34,11 @@ declare interface CharPtr extends NativePointer {
 declare interface Int32Ptr extends NativePointer {
     __brand: "Int32Ptr";
 }
+declare interface FileSystem {
+    createPath(parent: string, path: string, canRead?: boolean, canWrite?: boolean): string;
+    createDataFile(parent: string, name: string, data: TypedArray, canRead: boolean, canWrite: boolean, canOwn?: boolean): string;
+    readFile(filename: string, opts: any): any;
+}
 declare interface EmscriptenModule {
     HEAP8: Int8Array;
     HEAP16: Int16Array;
@@ -43,6 +48,7 @@ declare interface EmscriptenModule {
     HEAPU32: Uint32Array;
     HEAPF32: Float32Array;
     HEAPF64: Float64Array;
+    FS: FileSystem;
     _malloc(size: number): VoidPtr;
     _free(ptr: VoidPtr): void;
     print(message: string): void;
@@ -55,9 +61,6 @@ declare interface EmscriptenModule {
     getValue(ptr: number, type: string, noSafe?: number | boolean): number;
     UTF8ToString(ptr: CharPtr, maxBytesToRead?: number): string;
     UTF8ArrayToString(u8Array: Uint8Array, idx?: number, maxBytesToRead?: number): string;
-    FS_createPath(parent: string, path: string, canRead?: boolean, canWrite?: boolean): string;
-    FS_createDataFile(parent: string, name: string, data: TypedArray, canRead: boolean, canWrite: boolean, canOwn?: boolean): string;
-    FS_readFile(filename: string, opts: any): any;
     removeRunDependency(id: string): void;
     addRunDependency(id: string): void;
     stackSave(): VoidPtr;

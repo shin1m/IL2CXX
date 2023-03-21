@@ -176,7 +176,7 @@ export function init_polyfills(replacements: EarlyReplacements): void {
     // threads
     if (MonoWasmThreads) {
         if (replacements.pthreadReplacements) {
-            //replaceEmscriptenPThreadLibrary(replacements.pthreadReplacements);
+            replaceEmscriptenPThreadLibrary(replacements.pthreadReplacements);
         }
     }
 

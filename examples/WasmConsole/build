@@ -35,13 +35,12 @@ cmake --build . -j8 || exit $?
  dotnet.timezones.blat\
  icudt.dat\
  main.mjs\
- package.json\
  $BASE/il2cxx/out/build\
 ) || exit $?
 (cd ../wasm/src && cp\
  mono-config.json\
  $BASE/il2cxx/out/build\
 ) || exit $?
-sed -i "1s/^\/\//'use strict';\n\/\//
-s/^\"use strict\";//" dotnet.js || exit $?
 sed -i 's/"mainAssemblyName": ""/"mainAssemblyName": "WasmConsole.dll"/' mono-config.json || exit $?
+cp -f dotnet.js dotnet.mjs || exit $?
+sed -i s/\'\\.\\/dotnet\\.js\'/\'.\\/dotnet.mjs\'/ main.mjs || exit $?

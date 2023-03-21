@@ -283,7 +283,6 @@ function _marshal_string_to_cs(arg: JSMarshalerArgument, value: string) {
 
 function _marshal_string_to_cs_impl(arg: JSMarshalerArgument, value: string) {
     const root = get_string_root(arg);
-    set_arg_intptr(arg, <any>0);
     try {
         js_string_to_mono_string_root(value, root);
     }

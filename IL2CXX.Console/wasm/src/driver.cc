@@ -52,6 +52,19 @@ using namespace il2cxx;
 namespace
 {
 
+/*
+template<typename T, typename U>
+inline void f__store(T*& a_slot, U* a_p) {
+	if (!t_thread<t__type>::f_current()->f_on_stack(&a_slot)) {
+		auto* p = a_slot;
+		std::printf("store: %p, %p -> %p\n", &a_slot, p, a_p);
+		if (p && !f_engine()->f_object__find(p)) throw std::runtime_error("invalid old pointer");
+		if (a_p && !f_engine()->f_object__find(a_p)) throw std::runtime_error("invalid new pointer");
+	}
+	il2cxx::f__store(a_slot, a_p);
+}
+*/
+
 template<typename T>
 t__runtime_method_info* f_find_method(t__type* a_type, std::u16string_view a_name, T a_match_parameters)
 {
@@ -76,20 +89,28 @@ struct t__string_less
 std::set<t_root<il2cxx::t_slot_of<t_System_2eString>>, t__string_less> v__interned_strings_by_value;
 std::set<t_System_2eString*> v__interned_strings_by_pointer;
 
+template<typename... Ts>
+auto f_module_cctor(nullptr_t, Ts... xs) -> decltype(f_t__3cModule_3e___2ecctor(xs...))
+{
+	f_epoch_noiger([&]
+	{
+		try {
+			f_t__3cModule_3e___2ecctor(xs...);
+		} catch (t__object* e) {
+			throw std::runtime_error(f__string(f__to_string(e)).c_str());
+		}
+	});
+}
+
+template<typename... Ts>
+void f_module_cctor(void*, Ts...)
+{
+}
+
 }
 
 extern "C"
 {
-
-EMSCRIPTEN_KEEPALIVE void il2cxx_wasm_slot_set(il2cxx::t_slot_of<t__object>* a_slot, t__object* RECYCLONE__SPILL a_value)
-{
-	//std::printf("slot set: %p, %p -> %p\n", a_slot, static_cast<t__object*>(*a_slot), a_value);
-	f_epoch_noiger([&]
-	{
-		//if (a_value && !f_engine()->f_object__find(a_value)) throw std::runtime_error("invalid object pointer");
-		*a_slot = a_value;
-	});
-}
 
 EMSCRIPTEN_KEEPALIVE int
 mono_wasm_register_root (char *start, size_t size, const char *name)
@@ -158,14 +179,7 @@ mono_wasm_assembly_find_class (t__runtime_assembly *assembly, const char *ns, co
 EMSCRIPTEN_KEEPALIVE void
 mono_wasm_runtime_run_module_cctor (t__runtime_assembly *assembly)
 {
-	f_epoch_noiger([&]
-	{
-		try {
-			f_t__3cModule_3e___2ecctor();
-		} catch (t__object* e) {
-			throw std::runtime_error(f__string(f__to_string(e)).c_str());
-		}
-	});
+	f_module_cctor(nullptr);
 }
 
 EMSCRIPTEN_KEEPALIVE t__runtime_method_info*
@@ -692,10 +706,8 @@ mono_wasm_string_get_data_ref (
 
 EMSCRIPTEN_KEEPALIVE void
 mono_wasm_write_managed_pointer_unsafe (t__object** destination, t__object* RECYCLONE__SPILL source) {
-	//std::printf("slot set: %p, %p -> %p\n", destination, static_cast<t__object*>(*destination), source);
 	f_epoch_noiger([&]
 	{
-		//if (source && !f_engine()->f_object__find(source)) throw std::runtime_error("invalid object pointer");
 		f__store(*destination, source);
 	});
 }

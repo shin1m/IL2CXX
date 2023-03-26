@@ -1,0 +1,17 @@
+#!/bin/bash
+BASE=$(cd $(dirname $0) && pwd)
+cd $BASE
+if [ "$1" == '' ]; then
+	rm -rf build || exit $?
+	mkdir -p build || exit $?
+	cd build || exit $?
+	emcmake cmake -DCMAKE_BUILD_TYPE=Release $DOTNET_RUNTIME/src/native/libs || exit $?
+else
+	cd build || exit $?
+fi
+cmake --build . -j8 || exit $?
+(cd ../wasm/src && cp\
+ mono-config.json\
+ $BASE/il2cxx/out/build\
+) || exit $?
+cp System.Native/libSystem.Native.a ../src || exit $?

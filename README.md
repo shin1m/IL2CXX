@@ -8,7 +8,7 @@ There are a lot of missing pieces in .NET runtime support as they are implemente
 
 # Requirements
 
-* .NET 6
+* .NET 7
 * C++17
 
 Currently, it is built and tested only on Linux x86-64.
@@ -18,12 +18,12 @@ Currently, it is built and tested only on Linux x86-64.
 ## Run Tests
 
 	cd IL2CXX.Tests
-	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/6.0.x dotnet test
+	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/7.0.x dotnet test
 
 This requires a lot of memory.
 Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 
-	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/6.0.x dotnet test -- NUnit.NumberOfTestWorkers=2
+	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/7.0.x dotnet test -- NUnit.NumberOfTestWorkers=2
 
 ## Transpile and Build .NET Executable
 
@@ -35,7 +35,7 @@ Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 	CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 ..
 	cmake --build . -j8 # or whatever
 
-	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/6.0.x ./Foo
+	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/7.0.x ./Foo
 
 `cmake --build .` takes really long time.
 
@@ -47,9 +47,10 @@ Below are build durations running the above commands on my Core i7-8550U laptop:
 
 * [Platformer2D](examples/Platformer2D) - Platformer2D of [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples)
 * [Demos](examples/Demos) - Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
-* [BlazorWasm](examples/BlazorWasm) - Blazor WebAssembly Template Application
-* [BPDemosBW](examples/BPDemosBW) - Blazor WebAssembly Port of Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
-  * [Live Demo](https://shin1m.github.io/bpdemosbw)
+* [WebGL](examples/WebGL) - WebGL demo
+  * TODO [Live Demo](https://shin1m.github.io/il2cxx/webgl)
+* [DemosWasm](examples/DemosWasm) - A WebAssembly Port of Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
+  * TODO [Live Demo](https://shin1m.github.io/il2cxx/demoswasm)
 
 # Comparing GC Pauses
 

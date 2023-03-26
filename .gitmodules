@@ -7,6 +7,3 @@
 [submodule "externals/bepuphysics2"]
 	path = externals/bepuphysics2
 	url = https://github.com/bepu/bepuphysics2.git
-[submodule "externals/Canvas"]
-	path = externals/Canvas
-	url = git@github.com:shin1m/Canvas.git

@@ -1,0 +1,94 @@
+#!/bin/bash
+BASE=$(cd $(dirname $0) && pwd)
+cd $BASE
+if [ "$1" == '' ]; then
+	node generate.mjs || exit $?
+	dotnet publish -c Release || exit $?
+	rm -rf il2cxx || exit $?
+	mkdir -p il2cxx/source || exit $?
+	(cd bin/Release/net7.0/browser-wasm/AppBundle/managed && cp\
+	 System.Console.dll\
+	 System.Runtime.InteropServices.JavaScript.dll\
+	 BepuPhysics.dll\
+	 BepuUtilities.dll\
+	 DemoContentLoader.dll\
+	 DemosWasm.dll\
+	 $BASE/il2cxx/source\
+	) || exit $?
+	cd il2cxx || exit $?
+	dotnet run --project $BASE/../../IL2CXX.Console --target Other --is32\
+	 --out out source/DemosWasm.dll\
+	 --bundle\
+	  'System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript'\
+	 --reflection\
+	  'System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript'\
+	  'System.Threading.Tasks.Task`1, System.Private.CoreLib'\
+	  'BepuPhysics.Constraints.AngularAxisGearMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularAxisMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularHingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AngularSwivelHingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.AreaConstraintTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.BallSocketMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.BallSocketServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.BallSocketTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.CenterDistanceLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.CenterDistanceTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.DistanceLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.DistanceServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.HingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.LinearAxisLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.LinearAxisMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.LinearAxisServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyAngularMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyAngularServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyLinearMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.OneBodyLinearServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.PointOnLineServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.SwingLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.SwivelHingeTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.TwistLimitTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.TwistMotorTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.TwistServoTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.VolumeConstraintTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.WeldTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2NonconvexOneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3NonconvexOneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4NonconvexOneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2NonconvexTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3NonconvexTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4NonconvexTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact1OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4OneBodyTypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact1TypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact2TypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact3TypeProcessor, BepuPhysics'\
+	  'BepuPhysics.Constraints.Contact.Contact4TypeProcessor, BepuPhysics'\
+	  'Demos.Demos.Characters.DynamicCharacterMotionTypeProcessor, DemosWasm'\
+	  'Demos.Demos.Characters.StaticCharacterMotionTypeProcessor, DemosWasm'\
+	  'Program, DemosWasm'\
+	 || exit $?
+	mkdir out/build || exit $?
+	cd out/build || exit $?
+	emcmake cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_CXX_FLAGS='-msimd128' -DCMAKE_EXE_LINKER_FLAGS="-s INITIAL_MEMORY=1073741824 -s PTHREAD_POOL_SIZE='4 + Math.max(0, navigator.hardwareConcurrency - (navigator.hardwareConcurrency > 4 ? 3 : 2)) * 2'" .. || exit $?
+else
+	cd il2cxx/out/build || exit $?
+fi
+cmake --build . -j8 || exit $?
+(cd $BASE/bin/Release/net7.0/browser-wasm/AppBundle && cp -a\
+ dotnet.timezones.blat\
+ icudt.dat\
+ index.html\
+ main.js\
+ webgl.js\
+ $BASE/il2cxx/out/build\
+) || exit $?
+(cd ../wasm/src && cp\
+ mono-config.json\
+ $BASE/il2cxx/out/build\
+) || exit $?
+sed -i 's/"mainAssemblyName": ""/"mainAssemblyName": "DemosWasm.dll"/' mono-config.json || exit $?
+cp $BASE/serve.json $BASE/il2cxx/out/build || exit $?

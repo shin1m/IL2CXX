@@ -6,12 +6,55 @@ using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Runtime.Loader;
 
 namespace IL2CXX
 {
     partial class DefaultBuiltin
     {
+        private static void SetupIntrinsicsVector(Func<Type, Type> get, Type type, Builtin.Code code, Type typeofVectorOfT)
+        {
+            SetupVector(get, type, code, typeofVectorOfT, nameof(Vector64.Sqrt));
+            foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector64.Widen))) code.For(x, transpiler =>
+            {
+                var t = x.ReturnType.GenericTypeArguments[0];
+                var v = transpiler.EscapeForStacked(t);
+                var e = transpiler.EscapeForStacked(t.GenericTypeArguments[0]);
+                return ($@"{'\t'}auto p0 = reinterpret_cast<{transpiler.EscapeForStacked(x.GetParameters()[0].ParameterType.GenericTypeArguments[0])}*>(&a_0);
+{'\t'}auto n = sizeof({v}) / sizeof({e});
+{'\t'}{v} x;
+{'\t'}auto p1 = reinterpret_cast<{e}*>(&x);
+{'\t'}for (size_t i = 0; i < n; ++i) p1[i] = p0[i];
+{'\t'}{v} y;
+{'\t'}auto p2 = reinterpret_cast<{e}*>(&y);
+{'\t'}for (size_t i = 0; i < n; ++i) p2[i] = p0[n + i];
+{'\t'}return {{x, y}};
+", 1);
+            });
+            code.ForGeneric(
+                type.GetMethod(nameof(Vector64.ExtractMostSignificantBits)),
+                (transpiler, types) =>
+                {
+                    var t = types[0];
+                    var e = transpiler.EscapeForStacked(t);
+                    return ($@"{'\t'}uint32_t value{{}};
+{'\t'}auto p0 = reinterpret_cast<{(t == get(typeof(float)) ? "uint32_t" : t == get(typeof(double)) ? "uint64_t" : $"std::make_unsigned_t<{e}>")}*>(&a_0);
+{'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) value |= p0[i] >> (sizeof({e}) * 8 - 1) << i;
+{'\t'}return value;
+", 1);
+                }
+            );
+        }
+        private static void SetupIntrinsicsVectorOfT(Type type, Builtin.Code code)
+        {
+            SetupVectorOfT(type, code);
+            // TODO
+            code.ForGeneric(
+                type.GetMethod(nameof(ToString)),
+                (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
+            );
+        }
         private static Builtin ForIf(this Builtin @this, Type type, Action<Type, Builtin.Code> action) => type == null ? @this : @this.For(type, action);
         private static Builtin SetupSystemRuntime(this Builtin @this, Func<Type, Type> get) => @this
         .For(get(typeof(GCHandle)), (type, code) =>
@@ -281,22 +324,12 @@ namespace IL2CXX
                 (transpiler, types) => ("\treturn 1;\n", 1)
             );
         })
-        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector128`1", true)), (type, code) =>
-        {
-            // TODO
-            code.ForGeneric(
-                type.GetMethod(nameof(ToString)),
-                (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
-            );
-        })
-        .For(get(Type.GetType("System.Runtime.Intrinsics.Vector256`1", true)), (type, code) =>
-        {
-            // TODO
-            code.ForGeneric(
-                type.GetMethod(nameof(ToString)),
-                (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
-            );
-        })
+        .For(get(typeof(Vector64)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector64<>))))
+        .For(get(typeof(Vector128)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector128<>))))
+        .For(get(typeof(Vector256)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector256<>))))
+        .For(get(typeof(Vector64<>)), SetupIntrinsicsVectorOfT)
+        .For(get(typeof(Vector128<>)), SetupIntrinsicsVectorOfT)
+        .For(get(typeof(Vector256<>)), SetupIntrinsicsVectorOfT)
         .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch", true)), (type, code) =>
         {
             // TODO

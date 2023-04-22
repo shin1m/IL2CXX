@@ -48,9 +48,9 @@ Below are build durations running the above commands on my Core i7-8550U laptop:
 * [Platformer2D](examples/Platformer2D) - Platformer2D of [MonoGame.Samples](https://github.com/MonoGame/MonoGame.Samples)
 * [Demos](examples/Demos) - Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
 * [WebGL](examples/WebGL) - WebGL demo
-  * TODO [Live Demo](https://shin1m.github.io/il2cxx/webgl)
+  * [Live Demo](https://shin1m.github.io/webgl)
 * [DemosWasm](examples/DemosWasm) - A WebAssembly Port of Demos.GL of [bepuphysics2](https://github.com/bepu/bepuphysics2)
-  * TODO [Live Demo](https://shin1m.github.io/il2cxx/demoswasm)
+  * [Live Demo](https://shin1m.github.io/demoswasm)
 
 # Comparing GC Pauses
 

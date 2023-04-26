@@ -2,7 +2,7 @@
 using BepuUtilities.Memory;
 using System;
 using System.Numerics;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace DemoRenderer.ShapeDrawing
 {

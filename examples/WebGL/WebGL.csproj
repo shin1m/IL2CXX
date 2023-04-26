@@ -8,9 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\externals\ThinJS.WebGL\ThinJS.WebGL.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <WasmExtraFilesToDeploy Include="index.html" />
     <WasmExtraFilesToDeploy Include="main.js" />
-    <WasmExtraFilesToDeploy Include="webgl.js" />
+    <WasmExtraFilesToDeploy Include="$(OutputPath)thinjs.webgl.js" />
     <WasmExtraFilesToDeploy Include="data/1F603_color.png" TargetPath="data/1F603_color.png" />
     <WasmExtraFilesToDeploy Include="data/1F923_color.png" TargetPath="data/1F923_color.png" />
     <WasmExtraFilesToDeploy Include="data/1F970_color.png" TargetPath="data/1F970_color.png" />

@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Text;
 using BepuUtilities;
 using BepuUtilities.Memory;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace Demos
 {

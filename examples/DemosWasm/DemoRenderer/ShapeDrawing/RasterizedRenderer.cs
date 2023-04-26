@@ -4,7 +4,7 @@ using DemoContentLoader;
 using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace DemoRenderer.ShapeDrawing
 {

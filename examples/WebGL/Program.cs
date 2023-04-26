@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.JavaScript;
 using System.Threading.Tasks;
-using GL = WebGL;
+using GL = ThinJS.WebGL;
 
 using var host = new Host();
 using var canvas = Host.GetCanvas();

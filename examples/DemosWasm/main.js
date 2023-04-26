@@ -1,5 +1,5 @@
 import { dotnet } from './dotnet.js';
-import { webgl } from './webgl.js';
+import { webgl } from './thinjs.webgl.js';
 
 const { setModuleImports, getAssemblyExports, getConfig } = await dotnet
     .withDiagnosticTracing(false)

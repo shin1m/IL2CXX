@@ -3,7 +3,7 @@ using System.Runtime.InteropServices.JavaScript;
 using System.Threading.Tasks;
 using DemoContentLoader;
 using Demos;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 using var canvas = Host.GetCanvas();
 using var context = new GL(canvas);

@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices.JavaScript;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace DemoRenderer.UI
 {

@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices.JavaScript;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace DemoRenderer
 {

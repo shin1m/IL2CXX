@@ -6,7 +6,7 @@ using System;
 using DemoRenderer.UI;
 using DemoContentLoader;
 using BepuUtilities;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace Demos
 {

@@ -1,6 +1,6 @@
 ﻿using BepuUtilities;
 using DemoContentLoader;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace DemoRenderer.Background
 {

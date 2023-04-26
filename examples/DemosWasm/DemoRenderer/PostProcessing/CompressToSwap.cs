@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices.JavaScript;
 using DemoContentLoader;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace DemoRenderer.PostProcessing
 {

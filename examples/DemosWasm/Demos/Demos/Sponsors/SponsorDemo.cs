@@ -13,7 +13,7 @@ using BepuUtilities.Collections;
 using BepuPhysics.Collidables;
 using Demos.Demos.Characters;
 using Helpers = DemoRenderer.Helpers;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace Demos.Demos.Sponsors
 {

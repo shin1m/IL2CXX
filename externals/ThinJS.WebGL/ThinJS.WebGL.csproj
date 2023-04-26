@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent" Inputs="generate.mjs" Outputs="$(IntermediateOutputPath)WebGL.g.cs;$(IntermediateOutputPath)WebGL2.g.cs;$(IntermediateOutputPath)thinjs.webgl.js">
+    <Exec Command="node generate.mjs $(IntermediateOutputPath)" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)WebGL*.g.cs" />
+      <Content Include="$(IntermediateOutputPath)thinjs.webgl.js" TargetPath="thinjs.webgl.js" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+</Project>

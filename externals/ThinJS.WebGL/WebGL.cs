@@ -1,3 +1,5 @@
+namespace ThinJS;
+
 public partial class WebGL
 {
     /* ClearBufferMask */

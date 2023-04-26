@@ -10,7 +10,7 @@ using DemoRenderer.Constraints;
 using BepuUtilities;
 using BepuUtilities.Memory;
 using DemoUtilities;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace DemoRenderer
 {

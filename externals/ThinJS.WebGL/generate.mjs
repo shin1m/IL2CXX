@@ -12,8 +12,7 @@ void blendColor(float red, float green, float blue, float alpha);
 void blendEquation(int mode);
 void blendEquationSeparate(int modeRGB, int modeAlpha);
 void blendFunc(int sfactor, int dfactor);
-void blendFuncSeparate(int srcRGB, int dstRGB,
-			int srcAlpha, int dstAlpha);
+void blendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
 
 int checkFramebufferStatus(int target);
 void clear(int mask);
@@ -23,11 +22,8 @@ void clearStencil(int s);
 void colorMask(bool red, bool green, bool blue, bool alpha);
 void compileShader(JSObject shader);
 
-void copyTexImage2D(int target, int level, int internalformat,
-		     int x, int y, int width, int height,
-		     int border);
-void copyTexSubImage2D(int target, int level, int xoffset, int yoffset,
-			int x, int y, int width, int height);
+void copyTexImage2D(int target, int level, int internalformat, int x, int y, int width, int height, int border);
+void copyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
 
 JSObject? createBuffer();
 JSObject? createFramebuffer();
@@ -58,11 +54,8 @@ void enable(int cap);
 void enableVertexAttribArray(int index);
 void finish();
 void flush();
-void framebufferRenderbuffer(int target, int attachment,
-			      int renderbuffertarget,
-			      JSObject? renderbuffer);
-void framebufferTexture2D(int target, int attachment, int textarget,
-			   JSObject? texture, int level);
+void framebufferRenderbuffer(int target, int attachment, int renderbuffertarget, JSObject? renderbuffer);
+void framebufferTexture2D(int target, int attachment, int textarget, JSObject? texture, int level);
 void frontFace(int mode);
 
 void generateMipmap(int target);
@@ -78,8 +71,7 @@ object getParameter(int pname);
 
 int getError();
 
-object getFramebufferAttachmentParameter(int target, int attachment,
-				  int pname);
+object getFramebufferAttachmentParameter(int target, int attachment, int pname);
 object getProgramParameter(JSObject program, int pname);
 string? getProgramInfoLog(JSObject program);
 object getRenderbufferParameter(int target, int pname);
@@ -112,8 +104,7 @@ void linkProgram(JSObject program);
 void pixelStorei(int pname, int param);
 void polygonOffset(float factor, float units);
 
-void renderbufferStorage(int target, int internalformat,
-			  int width, int height);
+void renderbufferStorage(int target, int internalformat, int width, int height);
 void sampleCoverage(float value, bool invert);
 void scissor(int x, int y, int width, int height);
 
@@ -152,8 +143,7 @@ void vertexAttrib2fv(int index, Span<float> values);
 void vertexAttrib3fv(int index, Span<float> values);
 void vertexAttrib4fv(int index, Span<float> values);
 
-void vertexAttribPointer(int index, int size, int type,
-			  bool normalized, int stride, long offset);
+void vertexAttribPointer(int index, int size, int type, bool normalized, int stride, long offset);
 
 void viewport(int x, int y, int width, int height);
 
@@ -161,34 +151,18 @@ void bufferData(int target, long size, int usage);
 void bufferData<T>(int target, Span<T> data, int usage);
 void bufferSubData<T>(int target, long offset, Span<T> data);
 
-void compressedTexImage2D<T>(int target, int level, int internalformat,
-			   int width, int height, int border,
-			   Span<T> data);
-void compressedTexSubImage2D<T>(int target, int level,
-			      int xoffset, int yoffset,
-			      int width, int height, int format,
-			      Span<T> data);
+void compressedTexImage2D<T>(int target, int level, int internalformat, int width, int height, int border, Span<T> data);
+void compressedTexSubImage2D<T>(int target, int level, int xoffset, int yoffset, int width, int height, int format, Span<T> data);
 
-void readPixels(int x, int y, int width, int height,
-		 int format, int type, JSObject? pixels);
+void readPixels(int x, int y, int width, int height, int format, int type, JSObject? pixels);
 
-void texImage2D(int target, int level, int internalformat,
-		 int width, int height, int border, int format,
-		 int type);
-void texImage2D<T>(int target, int level, int internalformat,
-		 int width, int height, int border, int format,
-		 int type, Span<T> pixels);
-void texImage2D(int target, int level, int internalformat,
-		 int format, int type, JSObject source);
+void texImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type);
+void texImage2D<T>(int target, int level, int internalformat, int width, int height, int border, int format, int type, Span<T> pixels);
+void texImage2D(int target, int level, int internalformat, int format, int type, JSObject source);
 
-void texSubImage2D(int target, int level, int xoffset, int yoffset,
-		    int width, int height,
-		    int format, int type);
-void texSubImage2D<T>(int target, int level, int xoffset, int yoffset,
-		    int width, int height,
-		    int format, int type, Span<T> pixels);
-void texSubImage2D(int target, int level, int xoffset, int yoffset,
-		    int format, int type, JSObject source);
+void texSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type);
+void texSubImage2D<T>(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, Span<T> pixels);
+void texSubImage2D(int target, int level, int xoffset, int yoffset, int format, int type, JSObject source);
 
 void uniform1fv(JSObject? location, Span<float> v);
 void uniform2fv(JSObject? location, Span<float> v);
@@ -206,89 +180,46 @@ void uniformMatrix4fv(JSObject? location, bool transpose, Span<float> value);
 `;
 
 const webgl2 = `
-void copyBufferSubData(int readTarget, int writeTarget, long readOffset,
-		      long writeOffset, long size);
+void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
 void getBufferSubData<T>(int target, long srcByteOffset, Span<T> dstBuffer);
-void getBufferSubData<T>(int target, long srcByteOffset, Span<T> dstBuffer,
-		     int dstOffset);
-void getBufferSubData<T>(int target, long srcByteOffset, Span<T> dstBuffer,
-		     int dstOffset, int length);
+void getBufferSubData<T>(int target, long srcByteOffset, Span<T> dstBuffer, int dstOffset);
+void getBufferSubData<T>(int target, long srcByteOffset, Span<T> dstBuffer, int dstOffset, int length);
 
-void blitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0,
-		    int dstX1, int dstY1, int mask, int filter);
-void framebufferTextureLayer(int target, int attachment, JSObject? texture, int level,
-			    int layer);
+void blitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
+void framebufferTextureLayer(int target, int attachment, JSObject? texture, int level, int layer);
 void invalidateFramebuffer(int target, Span<int> attachments);
-void invalidateSubFramebuffer(int target, Span<int> attachments,
-			     int x, int y, int width, int height);
+void invalidateSubFramebuffer(int target, Span<int> attachments, int x, int y, int width, int height);
 void readBuffer(int src);
 
 object getInternalformatParameter(int target, int internalformat, int pname);
-void renderbufferStorageMultisample(int target, int samples, int internalformat,
-				   int width, int height);
+void renderbufferStorageMultisample(int target, int samples, int internalformat, int width, int height);
 
-void texStorage2D(int target, int levels, int internalformat, int width,
-		 int height);
-void texStorage3D(int target, int levels, int internalformat, int width,
-		 int height, int depth);
+void texStorage2D(int target, int levels, int internalformat, int width, int height);
+void texStorage3D(int target, int levels, int internalformat, int width, int height, int depth);
 
-void texImage3D(int target, int level, int internalformat, int width, int height,
-	       int depth, int border, int format, int type, long pboOffset);
-void texImage3D(int target, int level, int internalformat, int width, int height,
-	       int depth, int border, int format, int type,
-	       JSObject source);
-void texImage3D(int target, int level, int internalformat, int width, int height,
-	       int depth, int border, int format, int type);
-void texImage3D<T>(int target, int level, int internalformat, int width, int height,
-	       int depth, int border, int format, int type, Span<T> srcData);
-void texImage3D<T>(int target, int level, int internalformat, int width, int height,
-	       int depth, int border, int format, int type, Span<T> srcData,
-	       int srcOffset);
+void texImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, long pboOffset);
+void texImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, JSObject source);
+void texImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type);
+void texImage3D<T>(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, Span<T> srcData);
+void texImage3D<T>(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, Span<T> srcData, int srcOffset);
 
-void texSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset,
-		  int width, int height, int depth, int format, int type,
-		  long pboOffset);
-void texSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset,
-		  int width, int height, int depth, int format, int type,
-		  JSObject source);
-void texSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset,
-		  int width, int height, int depth, int format, int type);
-void texSubImage3D<T>(int target, int level, int xoffset, int yoffset, int zoffset,
-		  int width, int height, int depth, int format, int type,
-		  Span<T> srcData);
-void texSubImage3D<T>(int target, int level, int xoffset, int yoffset, int zoffset,
-		  int width, int height, int depth, int format, int type,
-		  Span<T> srcData, int srcOffset);
+void texSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int type, long pboOffset);
+void texSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int type, JSObject source);
+void texSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int type);
+void texSubImage3D<T>(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int type, Span<T> srcData);
+void texSubImage3D<T>(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int type, Span<T> srcData, int srcOffset);
 
-void copyTexSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset,
-		      int x, int y, int width, int height);
+void copyTexSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset, int x, int y, int width, int height);
 
-void compressedTexImage3D(int target, int level, int internalformat, int width,
-			 int height, int depth, int border, int imageSize, long offset);
-void compressedTexImage3D<T>(int target, int level, int internalformat, int width,
-			 int height, int depth, int border, Span<T> srcData);
-void compressedTexImage3D<T>(int target, int level, int internalformat, int width,
-			 int height, int depth, int border, Span<T> srcData,
-			 int srcOffset);
-void compressedTexImage3D<T>(int target, int level, int internalformat, int width,
-			 int height, int depth, int border, Span<T> srcData,
-			 int srcOffset, int srcLengthOverride);
+void compressedTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int imageSize, long offset);
+void compressedTexImage3D<T>(int target, int level, int internalformat, int width, int height, int depth, int border, Span<T> srcData);
+void compressedTexImage3D<T>(int target, int level, int internalformat, int width, int height, int depth, int border, Span<T> srcData, int srcOffset);
+void compressedTexImage3D<T>(int target, int level, int internalformat, int width, int height, int depth, int border, Span<T> srcData, int srcOffset, int srcLengthOverride);
 
-void compressedTexSubImage3D(int target, int level, int xoffset, int yoffset,
-			    int zoffset, int width, int height, int depth,
-			    int format, int imageSize, long offset);
-void compressedTexSubImage3D<T>(int target, int level, int xoffset, int yoffset,
-			    int zoffset, int width, int height, int depth,
-			    int format, Span<T> srcData);
-void compressedTexSubImage3D<T>(int target, int level, int xoffset, int yoffset,
-			    int zoffset, int width, int height, int depth,
-			    int format, Span<T> srcData,
-			    int srcOffset);
-void compressedTexSubImage3D<T>(int target, int level, int xoffset, int yoffset,
-			    int zoffset, int width, int height, int depth,
-			    int format, Span<T> srcData,
-			    int srcOffset,
-			    int srcLengthOverride);
+void compressedTexSubImage3D(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int imageSize, long offset);
+void compressedTexSubImage3D<T>(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, Span<T> srcData);
+void compressedTexSubImage3D<T>(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, Span<T> srcData, int srcOffset);
+void compressedTexSubImage3D<T>(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, Span<T> srcData, int srcOffset, int srcLengthOverride);
 
 int getFragDataLocation(JSObject program, string name);
 
@@ -299,52 +230,36 @@ void uniform4ui(JSObject? location, int v0, int v1, int v2, int v3);
 
 void uniform1uiv(JSObject? location, Span<uint> data);
 void uniform1uiv(JSObject? location, Span<uint> data, int srcOffset);
-void uniform1uiv(JSObject? location, Span<uint> data, int srcOffset,
-		int srcLength);
+void uniform1uiv(JSObject? location, Span<uint> data, int srcOffset, int srcLength);
 void uniform2uiv(JSObject? location, Span<uint> data);
 void uniform2uiv(JSObject? location, Span<uint> data, int srcOffset);
-void uniform2uiv(JSObject? location, Span<uint> data, int srcOffset,
-		int srcLength);
+void uniform2uiv(JSObject? location, Span<uint> data, int srcOffset, int srcLength);
 void uniform3uiv(JSObject? location, Span<uint> data);
 void uniform3uiv(JSObject? location, Span<uint> data, int srcOffset);
-void uniform3uiv(JSObject? location, Span<uint> data, int srcOffset,
-		int srcLength);
+void uniform3uiv(JSObject? location, Span<uint> data, int srcOffset, int srcLength);
 void uniform4uiv(JSObject? location, Span<uint> data);
 void uniform4uiv(JSObject? location, Span<uint> data, int srcOffset);
-void uniform4uiv(JSObject? location, Span<uint> data, int srcOffset,
-		int srcLength);
+void uniform4uiv(JSObject? location, Span<uint> data, int srcOffset, int srcLength);
 void uniformMatrix3x2fv(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix3x2fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset);
-void uniformMatrix3x2fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset, int srcLength);
+void uniformMatrix3x2fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix3x2fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 void uniformMatrix4x2fv(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix4x2fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset);
-void uniformMatrix4x2fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset, int srcLength);
+void uniformMatrix4x2fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix4x2fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 
 void uniformMatrix2x3fv(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix2x3fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset);
-void uniformMatrix2x3fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset, int srcLength);
+void uniformMatrix2x3fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix2x3fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 void uniformMatrix4x3fv(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix4x3fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset);
-void uniformMatrix4x3fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset, int srcLength);
+void uniformMatrix4x3fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix4x3fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 
 void uniformMatrix2x4fv(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix2x4fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset);
-void uniformMatrix2x4fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset, int srcLength);
+void uniformMatrix2x4fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix2x4fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 void uniformMatrix3x4fv(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix3x4fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset);
-void uniformMatrix3x4fv(JSObject? location, bool transpose, Span<float> data,
-		       int srcOffset, int srcLength);
+void uniformMatrix3x4fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix3x4fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 
 void vertexAttribI4i(int index, int x, int y, int z, int w);
 void vertexAttribI4iv(int index, Span<int> values);
@@ -360,14 +275,11 @@ void drawRangeElements(int mode, int start, int end, int count, int type, long o
 void drawBuffers(Span<int> buffers);
 
 void clearBufferfv(int buffer, int drawbuffer, Span<float> values);
-void clearBufferfv(int buffer, int drawbuffer, Span<float> values,
-		  int srcOffset);
+void clearBufferfv(int buffer, int drawbuffer, Span<float> values, int srcOffset);
 void clearBufferiv(int buffer, int drawbuffer, Span<int> values);
-void clearBufferiv(int buffer, int drawbuffer, Span<int> values,
-		  int srcOffset);
+void clearBufferiv(int buffer, int drawbuffer, Span<int> values, int srcOffset);
 void clearBufferuiv(int buffer, int drawbuffer, Span<uint> values);
-void clearBufferuiv(int buffer, int drawbuffer, Span<uint> values,
-		   int srcOffset);
+void clearBufferuiv(int buffer, int drawbuffer, Span<uint> values, int srcOffset);
 
 void clearBufferfi(int buffer, int drawbuffer, float depth, int stencil);
 
@@ -421,115 +333,68 @@ bool isVertexArray(JSObject? vertexArray);
 void bindVertexArray(JSObject? array);
 
 void bufferData<T>(int target, Span<T> srcData, int usage, int srcOffset);
-void bufferData<T>(int target, Span<T> srcData, int usage, int srcOffset,
-	       int length);
-void bufferSubData<T>(int target, long dstByteOffset, Span<T> srcData,
-		  int srcOffset);
-void bufferSubData<T>(int target, long dstByteOffset, Span<T> srcData,
-		  int srcOffset, int length);
+void bufferData<T>(int target, Span<T> srcData, int usage, int srcOffset, int length);
+void bufferSubData<T>(int target, long dstByteOffset, Span<T> srcData, int srcOffset);
+void bufferSubData<T>(int target, long dstByteOffset, Span<T> srcData, int srcOffset, int length);
 
-void texImage2D(int target, int level, int internalformat, int width, int height,
-	       int border, int format, int type, long pboOffset);
-void texImage2D(int target, int level, int internalformat, int width, int height,
-	       int border, int format, int type,
-	       JSObject source);
-void texImage2D<T>(int target, int level, int internalformat, int width, int height,
-	       int border, int format, int type, Span<T> srcData,
-	       int srcOffset);
+void texImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, long pboOffset);
+void texImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, JSObject source);
+void texImage2D<T>(int target, int level, int internalformat, int width, int height, int border, int format, int type, Span<T> srcData, int srcOffset);
 
-void texSubImage2D(int target, int level, int xoffset, int yoffset, int width,
-		  int height, int format, int type, long pboOffset);
-void texSubImage2D(int target, int level, int xoffset, int yoffset, int width,
-		  int height, int format, int type,
-		  JSObject source);
-void texSubImage2D<T>(int target, int level, int xoffset, int yoffset, int width,
-		  int height, int format, int type, Span<T> srcData,
-		  int srcOffset);
+void texSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, long pboOffset);
+void texSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, JSObject source);
+void texSubImage2D<T>(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, Span<T> srcData, int srcOffset);
 
-void compressedTexImage2D(int target, int level, int internalformat, int width,
-			 int height, int border, int imageSize, long offset);
-void /*compressedTexImage2D<T>*/(int target, int level, int internalformat, int width,
-			 int height, int border, Span<T> srcData);
-void compressedTexImage2D<T>(int target, int level, int internalformat, int width,
-			 int height, int border, Span<T> srcData,
-			 int srcOffset);
-void compressedTexImage2D<T>(int target, int level, int internalformat, int width,
-			 int height, int border, Span<T> srcData,
-			 int srcOffset, int srcLengthOverride);
+void compressedTexImage2D(int target, int level, int internalformat, int width, int height, int border, int imageSize, long offset);
+void /*compressedTexImage2D<T>*/(int target, int level, int internalformat, int width, int height, int border, Span<T> srcData);
+void compressedTexImage2D<T>(int target, int level, int internalformat, int width, int height, int border, Span<T> srcData, int srcOffset);
+void compressedTexImage2D<T>(int target, int level, int internalformat, int width, int height, int border, Span<T> srcData, int srcOffset, int srcLengthOverride);
 
-void compressedTexSubImage2D(int target, int level, int xoffset, int yoffset,
-			    int width, int height, int format, int imageSize, long offset);
-void /*compressedTexSubImage2D<T>*/(int target, int level, int xoffset, int yoffset,
-			    int width, int height, int format,
-			    Span<T> srcData);
-void compressedTexSubImage2D<T>(int target, int level, int xoffset, int yoffset,
-			    int width, int height, int format,
-			    Span<T> srcData,
-			    int srcOffset);
-void compressedTexSubImage2D<T>(int target, int level, int xoffset, int yoffset,
-			    int width, int height, int format,
-			    Span<T> srcData,
-			    int srcOffset,
-			    int srcLengthOverride);
+void compressedTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int imageSize, long offset);
+void /*compressedTexSubImage2D<T>*/(int target, int level, int xoffset, int yoffset, int width, int height, int format, Span<T> srcData);
+void compressedTexSubImage2D<T>(int target, int level, int xoffset, int yoffset, int width, int height, int format, Span<T> srcData, int srcOffset);
+void compressedTexSubImage2D<T>(int target, int level, int xoffset, int yoffset, int width, int height, int format, Span<T> srcData, int srcOffset, int srcLengthOverride);
 
 void /*uniform1fv*/(JSObject? location, Span<float> data);
 void uniform1fv(JSObject? location, Span<float> data, int srcOffset);
-void uniform1fv(JSObject? location, Span<float> data, int srcOffset,
-	       int srcLength);
+void uniform1fv(JSObject? location, Span<float> data, int srcOffset, int srcLength);
 void /*uniform2fv*/(JSObject? location, Span<float> data);
 void uniform2fv(JSObject? location, Span<float> data, int srcOffset);
-void uniform2fv(JSObject? location, Span<float> data, int srcOffset,
-	       int srcLength);
+void uniform2fv(JSObject? location, Span<float> data, int srcOffset, int srcLength);
 void /*uniform3fv*/(JSObject? location, Span<float> data);
 void uniform3fv(JSObject? location, Span<float> data, int srcOffset);
-void uniform3fv(JSObject? location, Span<float> data, int srcOffset,
-	       int srcLength);
+void uniform3fv(JSObject? location, Span<float> data, int srcOffset, int srcLength);
 void /*uniform4fv*/(JSObject? location, Span<float> data);
 void uniform4fv(JSObject? location, Span<float> data, int srcOffset);
-void uniform4fv(JSObject? location, Span<float> data, int srcOffset,
-	       int srcLength);
+void uniform4fv(JSObject? location, Span<float> data, int srcOffset, int srcLength);
 
 void /*uniform1iv*/(JSObject? location, Span<int> data);
 void uniform1iv(JSObject? location, Span<int> data, int srcOffset);
-void uniform1iv(JSObject? location, Span<int> data, int srcOffset,
-	       int srcLength);
+void uniform1iv(JSObject? location, Span<int> data, int srcOffset, int srcLength);
 void /*uniform2iv*/(JSObject? location, Span<int> data);
 void uniform2iv(JSObject? location, Span<int> data, int srcOffset);
-void uniform2iv(JSObject? location, Span<int> data, int srcOffset,
-	       int srcLength);
+void uniform2iv(JSObject? location, Span<int> data, int srcOffset, int srcLength);
 void /*uniform3iv*/(JSObject? location, Span<int> data);
 void uniform3iv(JSObject? location, Span<int> data, int srcOffset);
-void uniform3iv(JSObject? location, Span<int> data, int srcOffset,
-	       int srcLength);
+void uniform3iv(JSObject? location, Span<int> data, int srcOffset, int srcLength);
 void /*uniform4iv*/(JSObject? location, Span<int> data);
 void uniform4iv(JSObject? location, Span<int> data, int srcOffset);
-void uniform4iv(JSObject? location, Span<int> data, int srcOffset,
-	       int srcLength);
+void uniform4iv(JSObject? location, Span<int> data, int srcOffset, int srcLength);
 
 void /*uniformMatrix2fv*/(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix2fv(JSObject? location, bool transpose, Span<float> data,
-		     int srcOffset);
-void uniformMatrix2fv(JSObject? location, bool transpose, Span<float> data,
-		     int srcOffset, int srcLength);
+void uniformMatrix2fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix2fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 void /*uniformMatrix3fv*/(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix3fv(JSObject? location, bool transpose, Span<float> data,
-		     int srcOffset);
-void uniformMatrix3fv(JSObject? location, bool transpose, Span<float> data,
-		     int srcOffset, int srcLength);
+void uniformMatrix3fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix3fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 void /*uniformMatrix4fv*/(JSObject? location, bool transpose, Span<float> data);
-void uniformMatrix4fv(JSObject? location, bool transpose, Span<float> data,
-		     int srcOffset);
-void uniformMatrix4fv(JSObject? location, bool transpose, Span<float> data,
-		     int srcOffset, int srcLength);
+void uniformMatrix4fv(JSObject? location, bool transpose, Span<float> data, int srcOffset);
+void uniformMatrix4fv(JSObject? location, bool transpose, Span<float> data, int srcOffset, int srcLength);
 
-void readPixels(int x, int y, int width, int height, int format, int type,
-	       long offset);
-void readPixels(int x, int y, int width, int height, int format, int type,
-	       Span<byte> dstData, int dstOffset);
-void readPixels(int x, int y, int width, int height, int format, int type,
-	       Span<ushort> dstData, int dstOffset);
-void readPixels(int x, int y, int width, int height, int format, int type,
-	       Span<float> dstData, int dstOffset);
+void readPixels(int x, int y, int width, int height, int format, int type, long offset);
+void readPixels(int x, int y, int width, int height, int format, int type, Span<byte> dstData, int dstOffset);
+void readPixels(int x, int y, int width, int height, int format, int type, Span<ushort> dstData, int dstOffset);
+void readPixels(int x, int y, int width, int height, int format, int type, Span<float> dstData, int dstOffset);
 `;
 
 async function write(path, action) {
@@ -541,13 +406,15 @@ async function write(path, action) {
 	}
 }
 
-await write('WebGL.g.cs', async cs =>
-await write('WebGL2.g.cs', async cs2 =>
-await write('webgl.js', async js => {
-	await cs.write(`using System;
-using System.Numerics;
+const out = process.argv[2];
+await write(`${out}WebGL.g.cs`, async cs =>
+await write(`${out}WebGL2.g.cs`, async cs2 =>
+await write(`${out}thinjs.webgl.js`, async js => {
+	await cs.write(`using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.JavaScript;
+
+namespace ThinJS;
 
 #nullable enable
 
@@ -557,20 +424,21 @@ partial class WebGL : IDisposable
 
     protected unsafe Span<byte> AsBytes<T>(Span<T> data) where T : unmanaged => new Span<byte>(Unsafe.AsPointer(ref data[0]), data.Length * sizeof(T));
 
-    [JSImport("create", "webgl")]
+    [JSImport("create", "thisjs.webgl")]
     private static partial JSObject Create(JSObject canvas, string name);
     protected WebGL(JSObject canvas, string name) => context = Create(canvas, name);
     public WebGL(JSObject canvas) : this(canvas, "webgl") { }
     public void Dispose() => context.Dispose();
-    [JSImport("width", "webgl")]
+    [JSImport("width", "thisjs.webgl")]
     private static partial float GetWidth(JSObject context);
     public float Width => GetWidth(context);
-    [JSImport("height", "webgl")]
+    [JSImport("height", "thisjs.webgl")]
     private static partial float GetHeight(JSObject context);
     public float Height => GetHeight(context);`);
-	await cs2.write(`using System;
-using System.Numerics;
+	await cs2.write(`using System.Numerics;
 using System.Runtime.InteropServices.JavaScript;
+
+namespace ThinJS;
 
 #nullable enable
 
@@ -582,7 +450,7 @@ partial class WebGL2 : WebGL
 export function webgl(set) {
     const module = dotnet.instance.Module;
     const asArray = (type, bytes) => new type(module.HEAPU8.buffer, bytes._pointer, bytes._length / type.BYTES_PER_ELEMENT);
-    set('webgl', {
+    set('thisjs.webgl', {
         create: (canvas, name) => canvas.getContext(name),
         width: gl => gl.canvas.clientWidth,
         height: gl => gl.canvas.clientHeight`);
@@ -615,7 +483,7 @@ export function webgl(set) {
 			jsnames.add(jsname);
 			const csname = pascal(jsname);
 			await cs.write(`
-    [JSImport("${jsname}", "webgl")]${
+    [JSImport("${jsname}", "thisjs.webgl")]${
 	type === 'object' ? '[return: JSMarshalAs<JSType.Any>]' :
 	type === 'long' ? '[return: JSMarshalAs<JSType.Number>]' :
 	''}

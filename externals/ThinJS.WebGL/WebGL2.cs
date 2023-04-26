@@ -1,3 +1,5 @@
+namespace ThinJS;
+
 public partial class WebGL2
 {
     public const int READ_BUFFER                                   = 0x0C02;

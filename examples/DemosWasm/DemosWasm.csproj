@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\externals\bepuphysics2\BepuPhysics\BepuPhysics.csproj" />
     <ProjectReference Include="..\..\externals\bepuphysics2\DemoContentLoader\DemoContentLoader.csproj" />
+    <ProjectReference Include="..\..\externals\ThinJS.WebGL\ThinJS.WebGL.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +29,6 @@
   <ItemGroup>
     <WasmExtraFilesToDeploy Include="index.html" />
     <WasmExtraFilesToDeploy Include="main.js" />
-    <WasmExtraFilesToDeploy Include="webgl.js" />
+    <WasmExtraFilesToDeploy Include="$(OutputPath)thinjs.webgl.js" />
   </ItemGroup>
 </Project>

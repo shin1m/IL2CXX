@@ -2,7 +2,6 @@
 BASE=$(cd $(dirname $0) && pwd)
 cd $BASE
 if [ "$1" == '' ]; then
-	node generate.mjs || exit $?
 	dotnet publish -c Release || exit $?
 	rm -rf il2cxx || exit $?
 	mkdir -p il2cxx/source || exit $?

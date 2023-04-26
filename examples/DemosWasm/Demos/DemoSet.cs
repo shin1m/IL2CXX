@@ -9,7 +9,7 @@ using Demos.Demos.Tanks;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using GL = WebGL2;
+using GL = ThinJS.WebGL2;
 
 namespace Demos
 {

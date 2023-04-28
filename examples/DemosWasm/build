@@ -11,6 +11,7 @@ if [ "$1" == '' ]; then
 	 BepuPhysics.dll\
 	 BepuUtilities.dll\
 	 DemoContentLoader.dll\
+	 ThinJS.WebGL.dll\
 	 DemosWasm.dll\
 	 $BASE/il2cxx/source\
 	) || exit $?
@@ -82,7 +83,7 @@ cmake --build . -j8 || exit $?
  icudt.dat\
  index.html\
  main.js\
- webgl.js\
+ thinjs.webgl.js\
  $BASE/il2cxx/out/build\
 ) || exit $?
 (cd ../wasm/src && cp\

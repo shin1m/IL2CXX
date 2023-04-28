@@ -8,18 +8,18 @@ if [ "$1" == '' ]; then
 	(cd bin/Release/net7.0/browser-wasm/AppBundle/managed && cp\
 	 System.Runtime.InteropServices.JavaScript.dll\
 	 ThinJS.WebGL.dll\
-	 WebGL.dll\
+	 WebGLGears.dll\
 	 $BASE/il2cxx/source\
 	) || exit $?
 	cd il2cxx || exit $?
 	dotnet run --project $BASE/../../IL2CXX.Console --target Other --is32\
-	 --out out source/WebGL.dll\
+	 --out out source/WebGLGears.dll\
 	 --bundle\
 	  'System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript'\
 	 --reflection\
 	  'System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript'\
 	  'System.Threading.Tasks.Task`1, System.Private.CoreLib'\
-	  'Program, WebGL'\
+	  'Program, WebGLGears'\
 	 || exit $?
 	mkdir out/build || exit $?
 	cd out/build || exit $?
@@ -34,11 +34,12 @@ cmake --build . -j8 || exit $?
  index.html\
  main.js\
  thinjs.webgl.js\
+ data\
  $BASE/il2cxx/out/build\
 ) || exit $?
 (cd ../wasm/src && cp\
  mono-config.json\
  $BASE/il2cxx/out/build\
 ) || exit $?
-sed -i 's/"mainAssemblyName": ""/"mainAssemblyName": "WebGL.dll"/' mono-config.json || exit $?
+sed -i 's/"mainAssemblyName": ""/"mainAssemblyName": "WebGLGears.dll"/' mono-config.json || exit $?
 cp $BASE/serve.json $BASE/il2cxx/out/build || exit $?

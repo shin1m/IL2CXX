@@ -1,8 +1,8 @@
-template<typename T, typename... T_an>
-T* f__new_constructed(T_an&&... a_n)
+template<typename T>
+T* f__new_constructed(auto&&... a_xs)
 {
 	t__new<T> p(0);
-	p->f_construct(std::forward<T_an>(a_n)...);
+	p->f_construct(std::forward<decltype(a_xs)>(a_xs)...);
 	return p;
 }
 
@@ -72,18 +72,15 @@ inline void f__marshal_out(const int32_t& a_x, bool& a_y)
 	a_y = static_cast<bool>(a_x);
 }
 
-template<typename T, typename U>
-inline auto f__marshal_in(T& a_x, const U& a_y) -> decltype(a_x.f_in(&a_y))
+inline auto f__marshal_in(auto& a_x, const auto& a_y) -> decltype(a_x.f_in(&a_y))
 {
 	a_x.f_in(&a_y);
 }
-template<typename T, typename U>
-inline auto f__marshal_out(const T& a_x, U& a_y) -> decltype(a_x.f_out(&a_y))
+inline auto f__marshal_out(const auto& a_x, auto& a_y) -> decltype(a_x.f_out(&a_y))
 {
 	a_x.f_out(&a_y);
 }
-template<typename T>
-inline auto f__marshal_destroy(T& a_x) -> decltype(a_x.f_destroy())
+inline auto f__marshal_destroy(auto& a_x) -> decltype(a_x.f_destroy())
 {
 	a_x.f_destroy();
 }
@@ -123,16 +120,14 @@ inline void f__marshal_in(char16_t (&a_x)[N], const t_slot_of<t_System_2eString>
 {
 	*std::copy_n(&a_y->v__5ffirstChar, std::min(static_cast<size_t>(a_y->v__5fstringLength), N - 1), a_x) = u'\0';
 }
-template<typename T>
-inline void f__marshal_out(const T* a_x, t_slot_of<t_System_2eString>& a_y)
+inline void f__marshal_out(const auto* a_x, t_slot_of<t_System_2eString>& a_y)
 {
 	f__store(a_y, f__new_string(a_x));
 }
 inline void f__marshal_destroy(void*)
 {
 }
-template<typename T>
-inline void f__marshal_destroy(T*& a_x)
+inline void f__marshal_destroy(auto*& a_x)
 {
 	delete a_x;
 }
@@ -160,8 +155,7 @@ inline std::string f__string(t_System_2eString* a_p)
 }
 t_System_2eString* f__to_string(t__object* a_p);
 
-template<typename T>
-t_System_2eArray* f__new_array(t__type* a_type, size_t a_length, T a_do)
+t_System_2eArray* f__new_array(t__type* a_type, size_t a_length, auto a_do)
 {
 	auto a = sizeof(t_System_2eArray) + sizeof(t_System_2eArray::t__bound);
 	auto n = a_type->v__size * a_length;

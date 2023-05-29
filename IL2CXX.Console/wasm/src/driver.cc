@@ -53,8 +53,7 @@ namespace
 {
 
 /*
-template<typename T, typename U>
-inline void f__store(T*& a_slot, U* a_p) {
+inline void f__store(auto*& a_slot, auto* a_p) {
 	if (!t_thread<t__type>::f_current()->f_on_stack(&a_slot)) {
 		auto* p = a_slot;
 		std::printf("store: %p, %p -> %p\n", &a_slot, p, a_p);
@@ -65,8 +64,7 @@ inline void f__store(T*& a_slot, U* a_p) {
 }
 */
 
-template<typename T>
-t__runtime_method_info* f_find_method(t__type* a_type, std::u16string_view a_name, T a_match_parameters)
+t__runtime_method_info* f_find_method(t__type* a_type, std::u16string_view a_name, auto a_match_parameters)
 {
 	t__runtime_method_info* p = nullptr;
 	a_type->f_each_method(t__type::bf_instance | t__type::bf_static | t__type::bf_public | t__type::bf_non_public, [&](auto a_x)
@@ -89,8 +87,7 @@ struct t__string_less
 std::set<t_root<il2cxx::t_slot_of<t_System_2eString>>, t__string_less> v__interned_strings_by_value;
 std::set<t_System_2eString*> v__interned_strings_by_pointer;
 
-template<typename... Ts>
-auto f_module_cctor(nullptr_t, Ts... xs) -> decltype(f_t__3cModule_3e___2ecctor(xs...))
+auto f_module_cctor(nullptr_t, auto... xs) -> decltype(f_t__3cModule_3e___2ecctor(xs...))
 {
 	f_epoch_noiger([&]
 	{
@@ -102,8 +99,7 @@ auto f_module_cctor(nullptr_t, Ts... xs) -> decltype(f_t__3cModule_3e___2ecctor(
 	});
 }
 
-template<typename... Ts>
-void f_module_cctor(void*, Ts...)
+void f_module_cctor(void*, auto...)
 {
 }
 

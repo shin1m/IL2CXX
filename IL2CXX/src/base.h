@@ -6,22 +6,12 @@
 #include <regex>
 #include <climits>
 #include <clocale>
-#ifdef __EMSCRIPTEN__
-#include <future>
-#include <uchar.h>
-namespace std
-{
-	using ::mbstate_t;
-	using ::mbrtoc16;
-	using ::c16rtomb;
-}
-#include <emscripten/threading.h>
-#else
 #include <cuchar>
-#ifdef __unix__
+#ifdef __EMSCRIPTEN__
+#include <emscripten/threading.h>
+#elif defined(__unix__)
 #include <dlfcn.h>
 #include <gnu/lib-names.h>
-#endif
 #endif
 
 namespace il2cxx
@@ -33,28 +23,25 @@ template<typename T>
 struct t_stacked : T
 {
 	t_stacked() = default;
-	template<typename U>
-	t_stacked(U&& a_value)
+	t_stacked(auto&& a_value)
 	{
-		std::memcpy(this, const_cast<std::remove_volatile_t<std::remove_reference_t<U>>*>(&a_value), sizeof(T));
+		std::memcpy(this, const_cast<std::remove_volatile_t<std::remove_reference_t<decltype(a_value)>>*>(&a_value), sizeof(T));
 	}
 	t_stacked(const t_stacked& a_value) : t_stacked(static_cast<const T&>(a_value))
 	{
 	}
-	template<typename U>
-	t_stacked& operator=(U&& a_value)
+	t_stacked& operator=(auto&& a_value)
 	{
-		std::memcpy(this, const_cast<std::remove_volatile_t<std::remove_reference_t<U>>*>(&a_value), sizeof(T));
+		std::memcpy(this, const_cast<std::remove_volatile_t<std::remove_reference_t<decltype(a_value)>>*>(&a_value), sizeof(T));
 		return *this;
 	}
 	t_stacked& operator=(const t_stacked& a_value)
 	{
 		return *this = static_cast<const T&>(a_value);
 	}
-	template<typename U>
-	t_stacked volatile& operator=(U&& a_value) volatile
+	t_stacked volatile& operator=(auto&& a_value) volatile
 	{
-		std::memcpy(const_cast<t_stacked*>(this), const_cast<std::remove_volatile_t<std::remove_reference_t<U>>*>(&a_value), sizeof(T));
+		std::memcpy(const_cast<t_stacked*>(this), const_cast<std::remove_volatile_t<std::remove_reference_t<decltype(a_value)>>*>(&a_value), sizeof(T));
 		return *this;
 	}
 	t_stacked volatile& operator=(const t_stacked& a_value) volatile
@@ -67,10 +54,9 @@ struct t_stacked : T
 	}
 };
 
-template<typename T_field, typename T_value>
-inline RECYCLONE__ALWAYS_INLINE void f__copy(T_field& a_field, T_value&& a_value)
+inline RECYCLONE__ALWAYS_INLINE void f__copy(auto& a_field, auto&& a_value)
 {
-	std::memcpy(&a_field, const_cast<std::remove_volatile_t<std::remove_reference_t<T_value>>*>(&a_value), sizeof(T_field));
+	std::memcpy(&a_field, const_cast<std::remove_volatile_t<std::remove_reference_t<decltype(a_value)>>*>(&a_value), sizeof(std::remove_reference_t<decltype(a_field)>));
 }
 
 template<typename T>
@@ -79,27 +65,24 @@ inline RECYCLONE__ALWAYS_INLINE void f__assign(T*& a_field, T* a_value)
 	reinterpret_cast<t_slot<t__type>&>(a_field) = a_value;
 }
 
-template<typename T_field, typename T_value>
-inline RECYCLONE__ALWAYS_INLINE void f__assign(T_field& a_field, T_value&& a_value)
+inline RECYCLONE__ALWAYS_INLINE void f__assign(auto& a_field, auto&& a_value)
 {
-	a_field = std::forward<T_value>(a_value);
+	a_field = std::forward<decltype(a_value)>(a_value);
 }
 
-template<typename T_field, typename T_value>
-inline RECYCLONE__ALWAYS_INLINE void f__store(T_field& a_field, T_value&& a_value)
+inline RECYCLONE__ALWAYS_INLINE void f__store(auto& a_field, auto&& a_value)
 {
-	auto p = &a_field;
-	if (t_thread<t__type>::f_current()->f_on_stack(p))
-		std::memcpy(p, const_cast<std::remove_volatile_t<std::remove_reference_t<T_value>>*>(&a_value), sizeof(T_field));
+	if (t_thread<t__type>::f_current()->f_on_stack(&a_field))
+		f__copy(a_field, std::forward<decltype(a_value)>(a_value));
 	else
-		f__assign(a_field, std::forward<T_value>(a_value));
+		f__assign(a_field, std::forward<decltype(a_value)>(a_value));
 }
 
 template<typename T>
 inline T* f__exchange(T*& a_target, T* a_desired)
 {
 	return t_thread<t__type>::f_current()->f_on_stack(&a_target)
-		? reinterpret_cast<std::atomic<T*>&>(a_target).exchange(a_desired, std::memory_order_relaxed)
+		? std::atomic_ref(a_target).exchange(a_desired, std::memory_order_relaxed)
 		: reinterpret_cast<t_slot_of<T>&>(a_target).f_exchange(a_desired);
 }
 
@@ -107,7 +90,7 @@ template<typename T>
 inline bool f__compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
 {
 	return t_thread<t__type>::f_current()->f_on_stack(&a_target)
-		? reinterpret_cast<std::atomic<T*>&>(a_target).compare_exchange_strong(a_expected, a_desired)
+		? std::atomic_ref(a_target).compare_exchange_strong(a_expected, a_desired)
 		: reinterpret_cast<t_slot_of<T>&>(a_target).f_compare_exchange(a_expected, a_desired);
 }
 
@@ -131,7 +114,7 @@ t__finally<T> f__finally(T&& a_f)
 template<typename T>
 class t__lazy
 {
-	std::atomic<T*> v_initialized = nullptr;
+	std::atomic<T*> v_initialized;
 	std::recursive_mutex v_mutex;
 	T v_p;
 	bool v_initializing = false;

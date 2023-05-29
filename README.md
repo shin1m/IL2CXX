@@ -9,7 +9,7 @@ There are a lot of missing pieces in .NET runtime support as they are implemente
 # Requirements
 
 * .NET 7
-* C++17
+* C++20
 
 Currently, it is built and tested only on Linux x86-64.
 

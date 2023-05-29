@@ -343,8 +343,7 @@ struct t__type : t__abstract_type
 	static constexpr int32_t bf_public = 16;
 	static constexpr int32_t bf_non_public = 32;
 	static constexpr int32_t bf_flatten_hierarchy = 64;
-	template<typename T>
-	void f_each_field(int32_t a_flags, T a_do)
+	void f_each_field(int32_t a_flags, auto a_do)
 	{
 		constexpr int32_t fa_private = 1;
 		constexpr int32_t fa_public = 6;
@@ -373,8 +372,7 @@ struct t__type : t__abstract_type
 	static constexpr int32_t ma_public = 6;
 	static constexpr int32_t ma_access_mask = 7;
 	static constexpr int32_t ma_static = 16;
-	template<typename T>
-	void f_each_constructor(int32_t a_flags, T a_do)
+	void f_each_constructor(int32_t a_flags, auto a_do)
 	{
 		if (auto p = v__constructors) for (; *p; ++p) {
 			auto x = *p;
@@ -387,8 +385,7 @@ struct t__type : t__abstract_type
 			if (!a_do(x)) return;
 		}
 	}
-	template<typename T>
-	void f_each_method(int32_t a_flags, T a_do)
+	void f_each_method(int32_t a_flags, auto a_do)
 	{
 		constexpr int32_t ma_private_scope = 0;
 		constexpr int32_t ma_private = 1;
@@ -414,8 +411,7 @@ struct t__type : t__abstract_type
 			if (!(a_flags & bf_flatten_hierarchy)) a_flags &= ~bf_static;
 		}
 	}
-	template<typename T>
-	void f_each_property(int32_t a_flags, T a_do)
+	void f_each_property(int32_t a_flags, auto a_do)
 	{
 		constexpr int32_t ma_private_scope = 0;
 		constexpr int32_t ma_private = 1;
@@ -501,8 +497,7 @@ inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_
 
 struct t__type_finalizee : t__type
 {
-	template<typename... T_n>
-	t__type_finalizee(t__type* a_type, t__type* a_base, t__type* const* a_interfaces, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, T_n&&... a_n) : t__type(a_type, a_base, a_interfaces, std::move(a_interface_to_methods), std::forward<T_n>(a_n)...)
+	t__type_finalizee(t__type* a_type, t__type* a_base, t__type* const* a_interfaces, std::map<t__type*, std::pair<void**, void**>>&& a_interface_to_methods, auto&&... a_xs) : t__type(a_type, a_base, a_interfaces, std::move(a_interface_to_methods), std::forward<decltype(a_xs)>(a_xs)...)
 	{
 		f_register_finalize = f_do_register_finalize;
 		f_suppress_finalize = f_do_suppress_finalize;
@@ -559,8 +554,7 @@ T_r f__generic_method(t__object* a_this, T_an... a_n, void** a_site)
 	return a_this->f_type() == &t__type_of<T_type>::v__instance ? A_method(static_cast<T_type*>(a_this), a_n...) : f__generic_invoke<T_interface, A_i, A_j, T_r, T_an...>(a_this, a_n..., a_site);
 }
 
-template<typename T0, typename T1>
-inline T1 f__copy(T0 a_in, size_t a_n, T1 a_out)
+inline auto f__copy(auto a_in, size_t a_n, auto a_out)
 {
 	return a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
 }

@@ -8,8 +8,7 @@ struct PinvokeImport
 	const char* v_name;
 	void* v_function;
 
-	template<typename T>
-	PinvokeImport(const char* a_name, T a_function) : v_name(a_name), v_function(reinterpret_cast<void*>(a_function))
+	PinvokeImport(const char* a_name, auto a_function) : v_name(a_name), v_function(reinterpret_cast<void*>(a_function))
 	{
 	}
 };

@@ -8,9 +8,25 @@ namespace IL2CXX.Tests
     [Parallelizable]
     class NumericsTests
     {
-        static int BitIsPow2() => BitOperations.IsPow2(64) ? 0 : 1;
-        static int BitRoundUpToPowerOf2() => BitOperations.RoundUpToPowerOf2(63) == 64 ? 0 : 1;
-        static int BitLeadingZeroCount() => BitOperations.LeadingZeroCount(256) == 23 ? 0 : 1;
+        static int BitIsPow2()
+        {
+            if (!BitOperations.IsPow2(64)) return 1;
+            if (!BitOperations.IsPow2((nint)64)) return 2;
+            if (!BitOperations.IsPow2((nuint)64)) return 3;
+            return 0;
+        }
+        static int BitRoundUpToPowerOf2()
+        {
+            if (BitOperations.RoundUpToPowerOf2(63) != 64) return 1;
+            if (BitOperations.RoundUpToPowerOf2((nuint)63) != 64) return 2;
+            return 0;
+        }
+        static int BitLeadingZeroCount()
+        {
+            if (BitOperations.LeadingZeroCount(256) != 23) return 1;
+            if (BitOperations.LeadingZeroCount(~(nuint)0 >> 8) != 8) return 2;
+            return 0;
+        }
         static int BitLog2()
         {
             if (BitOperations.Log2(0) != 0) return 1;
@@ -19,12 +35,34 @@ namespace IL2CXX.Tests
             if (BitOperations.Log2(3) != 1) return 4;
             if (BitOperations.Log2(4) != 2) return 5;
             if (BitOperations.Log2(0x80000000) != 31) return 6;
+            if (BitOperations.Log2((nuint)0x80000000) != 31) return 7;
             return 0;
         }
-        static int BitPopCount() => BitOperations.PopCount(255) == 8 ? 0 : 1;
-        static int BitTrailingZeroCount() => BitOperations.TrailingZeroCount(256) == 8 ? 0 : 1;
-        static int BitRotateLeft() => BitOperations.RotateLeft(0x89abcdef, 8) == 0xabcdef89 ? 0 : 1;
-        static int BitRotateRight() => BitOperations.RotateRight(0x89abcdef, 8) == 0xef89abcd ? 0 : 1;
+        static int BitPopCount()
+        {
+            if (BitOperations.PopCount(255) != 8) return 1;
+            if (BitOperations.PopCount((nuint)255) != 8) return 2;
+            return 0;
+        }
+        static int BitTrailingZeroCount()
+        {
+            if (BitOperations.TrailingZeroCount(256) != 8) return 1;
+            if (BitOperations.TrailingZeroCount((nint)256) != 8) return 2;
+            if (BitOperations.TrailingZeroCount((nuint)256) != 8) return 3;
+            return 0;
+        }
+        static int BitRotateLeft()
+        {
+            if (BitOperations.RotateLeft(0x89abcdef, 8) != 0xabcdef89) return 1;
+            if ((BitOperations.RotateLeft((nuint)0x89abcdef, 8) & 0xffffffff) != 0xabcdef00) return 2;
+            return 0;
+        }
+        static int BitRotateRight()
+        {
+            if (BitOperations.RotateRight(0x89abcdef, 8) != 0xef89abcd) return 1;
+            if ((BitOperations.RotateRight((nuint)0x89abcdef, 8) & 0xffffffff) != 0x0089abcd) return 2;
+            return 0;
+        }
         static int VectorConditionalSelect()
         {
             var x = Vector.ConditionalSelect(new Vector<int>(Enumerable.Range(0, Vector<int>.Count).Select(x => x % 2 == 0 ? ~0 : 0).ToArray()), new Vector<float>(1f), new Vector<float>(2f));
@@ -118,28 +156,63 @@ namespace IL2CXX.Tests
         }
         static int VectorMin()
         {
-            var x = Vector.Min(new Vector<float>(1f), new Vector<float>(2f));
-            return x[0] == 1f ? 0 : 1;
+            {
+                var x = Vector.Min(new Vector<float>(1f), new Vector<float>(2f));
+                if (x[0] != 1f) return 1;
+            }
+            {
+                var x = Vector.Min(new Vector<nint>(1), new Vector<nint>(2));
+                if (x[0] != 1) return 2;
+            }
+            return 0;
         }
         static int VectorMax()
         {
-            var x = Vector.Max(new Vector<float>(1f), new Vector<float>(2f));
-            return x[0] == 2f ? 0 : 1;
+            {
+                var x = Vector.Max(new Vector<float>(1f), new Vector<float>(2f));
+                if (x[0] != 2f) return 1;
+            }
+            {
+                var x = Vector.Max(new Vector<nint>(1), new Vector<nint>(2));
+                if (x[0] != 2) return 2;
+            }
+            return 0;
         }
         static int VectorDot()
         {
-            var x = Vector.Dot(new Vector<float>(1f), new Vector<float>(2f));
-            return x == 2f * Vector<float>.Count ? 0 : 1;
+            {
+                var x = Vector.Dot(new Vector<float>(1f), new Vector<float>(2f));
+                if (x != 2f * Vector<float>.Count) return 1;
+            }
+            {
+                var x = Vector.Dot(new Vector<nint>(1), new Vector<nint>(2));
+                if (x != 2 * Vector<nint>.Count) return 2;
+            }
+            return 0;
         }
         static int VectorSum()
         {
-            var x = Vector.Sum(new Vector<float>(1f));
-            return x == Vector<float>.Count ? 0 : 1;
+            {
+                var x = Vector.Sum(new Vector<float>(1f));
+                if (x != Vector<float>.Count) return 1;
+            }
+            {
+                var x = Vector.Sum(new Vector<nint>(1));
+                if (x != Vector<nint>.Count) return 2;
+            }
+            return 0;
         }
         static int VectorSquareRoot()
         {
-            var x = Vector.SquareRoot(new Vector<float>(2f));
-            return x[0] == MathF.Sqrt(2f) ? 0 : 1;
+            {
+                var x = Vector.SquareRoot(new Vector<float>(2f));
+                if (x[0] != MathF.Sqrt(2f)) return 1;
+            }
+            {
+                var x = Vector.SquareRoot(new Vector<nint>(2));
+                if (x[0] != (nint)MathF.Sqrt(2)) return 2;
+            }
+            return 0;
         }
         static int VectorCeiling()
         {
@@ -193,8 +266,19 @@ namespace IL2CXX.Tests
         }
         static int VectorShiftRightLogical()
         {
-            var x = Vector.ShiftRightLogical(new Vector<int>(~0), 1);
-            return x[0] == int.MaxValue ? 0 : 1;
+            {
+                var x = Vector.ShiftRightLogical(new Vector<int>(~0), 1);
+                if (x[0] != int.MaxValue) return 1;
+            }
+            {
+                var x = Vector.ShiftRightLogical(new Vector<nint>(~(nint)0), 1);
+                if (x[0] != nint.MaxValue) return 2;
+            }
+            {
+                var x = Vector.ShiftRightLogical(new Vector<nuint>(~(nuint)0), 1);
+                if (x[0] != nuint.MaxValue / 2) return 3;
+            }
+            return 0;
         }
         static int Vector3Max()
         {

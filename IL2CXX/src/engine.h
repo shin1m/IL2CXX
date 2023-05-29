@@ -10,13 +10,11 @@ inline auto f_epoch_point()
 {
 	return recyclone::f_epoch_point<t__type>();
 }
-template<typename T>
-inline auto f_epoch_region(T a_do)
+inline auto f_epoch_region(auto a_do)
 {
 	return recyclone::f_epoch_region<t__type>(a_do);
 }
-template<typename T>
-inline auto f_epoch_noiger(T a_do)
+inline auto f_epoch_noiger(auto a_do)
 {
 	return recyclone::f_epoch_noiger<t__type>(a_do);
 }
@@ -30,8 +28,7 @@ struct t_engine : recyclone::t_engine<t__type>
 	{
 		return static_cast<t__object*>(recyclone::t_engine<t__type>::f_allocate(a_size));
 	}
-	template<typename T>
-	void f_start(t__thread* RECYCLONE__SPILL a_thread, T a_main);
+	void f_start(t__thread* RECYCLONE__SPILL a_thread, auto a_main);
 	void f_background__(t__thread* RECYCLONE__SPILL a_thread, bool a_value);
 	void f_priority__(t__thread* RECYCLONE__SPILL a_thread, int32_t a_value);
 	template<typename T_thread, typename T_thread_static>
@@ -39,8 +36,7 @@ struct t_engine : recyclone::t_engine<t__type>
 	size_t f_load_count() const;
 };
 
-template<typename T>
-void t_engine::f_start(t__thread* RECYCLONE__SPILL a_thread, T a_main)
+void t_engine::f_start(t__thread* RECYCLONE__SPILL a_thread, auto a_main)
 {
 	recyclone::t_engine<t__type>::f_start(a_thread, [a_thread]
 	{

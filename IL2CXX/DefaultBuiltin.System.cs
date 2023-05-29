@@ -49,15 +49,13 @@ namespace IL2CXX
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}return reinterpret_cast<{native}>(v__5fvalue);
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}template<typename T>
-{'\t'}{'\t'}bool operator==(T&& a_value) const
+{'\t'}{'\t'}bool operator==(auto&& a_value) const
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}return v__5fvalue == t_value(std::forward<T>(a_value)).v__5fvalue;
+{'\t'}{'\t'}{'\t'}return v__5fvalue == t_value(std::forward<decltype(a_value)>(a_value)).v__5fvalue;
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}template<typename T>
-{'\t'}{'\t'}bool operator!=(T&& a_value) const
+{'\t'}{'\t'}bool operator!=(auto&& a_value) const
 {'\t'}{'\t'}{{
-{'\t'}{'\t'}{'\t'}return !(*this == std::forward<T>(a_value));
+{'\t'}{'\t'}{'\t'}return !(*this == std::forward<decltype(a_value)>(a_value));
 {'\t'}{'\t'}}}
 ", false, null);
             code.For(
@@ -988,13 +986,8 @@ namespace IL2CXX
         {
             code.For(
                 type.GetProperty(nameof(Environment.CurrentManagedThreadId)).GetMethod,
-                // TODO: emscripten
                 transpiler => ($@"#ifdef __unix__
-#ifdef __EMSCRIPTEN__
-{'\t'}return pthread_self();
-#else
 {'\t'}return gettid();
-#endif
 #endif
 #ifdef _WIN32
 {'\t'}return GetCurrentThreadId();

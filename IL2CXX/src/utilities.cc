@@ -1,8 +1,7 @@
 namespace
 {
 
-template<typename T_push>
-void f__to_u16(const char* a_first, const char* a_last, T_push a_push)
+void f__to_u16(const char* a_first, const char* a_last, auto a_push)
 {
 	std::mbstate_t state{};
 	char16_t c;

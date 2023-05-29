@@ -737,7 +737,7 @@ namespace IL2CXX
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(typeofVoidPointer));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<{set.Type}>({stack.AsSigned})")};");
+                    writer.WriteLine($"\n\t{indexToStack[index].Assign($"static_cast<{set.Type}>({(set.Type == "intptr_t" ? stack.AsSigned : stack.AsUnsigned)})")};");
                     return index;
                 };
             }));

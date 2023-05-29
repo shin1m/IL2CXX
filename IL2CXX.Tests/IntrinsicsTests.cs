@@ -151,7 +151,7 @@ namespace IL2CXX.Tests
         }
         static int VectorConvertToDouble()
         {
-            var x = Vector256.ConvertToDouble(Vector256.Create(-1l));
+            var x = Vector256.ConvertToDouble(Vector256.Create(-1L));
             return x[0] == -1.0 ? 0 : 1;
         }
         static int VectorConvertToInt32()

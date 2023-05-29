@@ -783,10 +783,9 @@ struct t__static_{identifier}
 {members}{'\t'}}};{(!td.HasUnmanaged && pack > 0 ? "\n#pragma pack(pop)" : string.Empty)}
 {'\t'}using t_stacked = {(td.IsManaged ? "il2cxx::t_stacked<t_value>" : "t_value")};
 {'\t'}t_value v__value;
-{'\t'}template<typename T>
-{'\t'}void f_construct(T&& a_value)
+{'\t'}void f_construct(auto&& a_value)
 {'\t'}{{
-{'\t'}{'\t'}new(&v__value) decltype(v__value)(std::forward<T>(a_value));
+{'\t'}{'\t'}new(&v__value) decltype(v__value)(std::forward<decltype(a_value)>(a_value));
 {'\t'}}}
 {'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{

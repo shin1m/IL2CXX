@@ -10,8 +10,4 @@ else
 	cd build || exit $?
 fi
 cmake --build . -j8 || exit $?
-(cd ../wasm/src && cp\
- mono-config.json\
- $BASE/il2cxx/out/build\
-) || exit $?
 cp System.Native/libSystem.Native.a ../src || exit $?

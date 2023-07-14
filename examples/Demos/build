@@ -58,7 +58,7 @@ if [ "$1" == '' ]; then
 	 || exit $?
 	mkdir out/build || exit $?
 	cd out/build || exit $?
-	CXX=clang++ LDFLAGS=-fuse-ld=gold cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-Oz' .. || exit $?
+	CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_CXX_FLAGS='-march=native' .. || exit $?
 else
 	cd out/build || exit $?
 fi

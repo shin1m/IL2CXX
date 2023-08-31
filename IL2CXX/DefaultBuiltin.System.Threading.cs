@@ -208,7 +208,25 @@ namespace IL2CXX
                 type.GetMethod(nameof(Thread.SpinWait)),
                 transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}for (; a_0 > 0; --a_0) std::this_thread::yield();
+{'\t'}{'\t'}for (; a_0 > 0; --a_0) {{
+#ifdef _MSC_VER
+#if defined(HOST_X86) || defined(HOST_AMD64)
+{'\t'}{'\t'}{'\t'}_mm_pause();
+#elif defined(HOST_ARM) || defined(HOST_ARM64)
+{'\t'}{'\t'}{'\t'}__yield();
+#else
+#error
+#endif
+#else
+#if defined(__i386__) || defined(__x86_64__)
+{'\t'}{'\t'}{'\t'}asm volatile (""pause"");
+#elif defined(__arm__) || defined(__aarch64__)
+{'\t'}{'\t'}{'\t'}asm volatile (""yield"");
+#else
+{'\t'}{'\t'}{'\t'}std::this_thread::yield();
+#endif
+#endif
+{'\t'}{'\t'}}}
 {'\t'}}});
 ", 0)
             );

@@ -107,7 +107,7 @@ function instantiateWasm(
     if (userInstantiateWasm) {
         const exports = userInstantiateWasm(imports, (instance: WebAssembly.Instance, module: WebAssembly.Module) => {
             afterInstantiateWasm.promise_control.resolve();
-            successCallback(instance, module);
+            return successCallback(instance, module);
         });
         return exports;
     }

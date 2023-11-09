@@ -1,1 +1,1 @@
-createDotnetRuntime.ready = createDotnetRuntime.ready.then(() => { return __dotnet_exportedAPI; });
+moduleArg.ready = moduleArg.ready.then(() => { return __dotnet_exportedAPI; });

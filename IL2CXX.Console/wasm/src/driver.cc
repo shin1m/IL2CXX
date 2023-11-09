@@ -1,6 +1,7 @@
 #include "declarations.h"
 #include <set>
 #include <emscripten.h>
+#include <emscripten/stack.h>
 
 #define MARSHAL_TYPE_NULL 0
 #define MARSHAL_TYPE_INT 1

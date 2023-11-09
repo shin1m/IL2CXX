@@ -176,18 +176,18 @@ namespace IL2CXX
 {'\t'}{{
 {'\t'}{'\t'}{transpiler.EscapeForStacked(helper)} RECYCLONE__SPILL p = a_0->v__5fstartHelper;
 {'\t'}{'\t'}a_0->v__5fstartHelper = {{}};
-{'\t'}{'\t'}t_thread_static ts;
+{'\t'}{'\t'}auto ts = std::make_unique<t_thread_static>();
 {'\t'}{'\t'}try {{
-{'\t'}{'\t'}{'\t'}try {{
-{'\t'}{'\t'}{'\t'}{'\t'}{transpiler.Escape(run)}(p);
-{'\t'}{'\t'}{'\t'}}} catch (t__object* p) {{
-{'\t'}{'\t'}{'\t'}{'\t'}throw std::runtime_error(f__string(f__to_string(p)));
-{'\t'}{'\t'}{'\t'}}}
+{'\t'}{'\t'}{'\t'}{transpiler.Escape(run)}(p);
+{'\t'}{'\t'}{'\t'}return;
+{'\t'}{'\t'}}} catch (t__object* p) {{
+{'\t'}{'\t'}{'\t'}std::cerr << ""caught: "" << f__string(f__to_string(p)) << std::endl;
 {'\t'}{'\t'}}} catch (std::exception& e) {{
 {'\t'}{'\t'}{'\t'}std::cerr << ""caught: "" << e.what() << std::endl;
 {'\t'}{'\t'}}} catch (...) {{
 {'\t'}{'\t'}{'\t'}std::cerr << ""caught unknown"" << std::endl;
 {'\t'}{'\t'}}}
+{'\t'}{'\t'}std::terminate();
 {'\t'}}});
 ", 0);
                 }

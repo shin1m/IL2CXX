@@ -7,6 +7,9 @@
 #include <climits>
 #include <clocale>
 #include <cuchar>
+#ifdef __unix__
+#include <unistd.h>
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten/threading.h>
 #elif defined(__unix__)

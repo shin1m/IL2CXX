@@ -3,44 +3,6 @@
 #include <emscripten.h>
 #include <emscripten/stack.h>
 
-#define MARSHAL_TYPE_NULL 0
-#define MARSHAL_TYPE_INT 1
-#define MARSHAL_TYPE_FP64 2
-#define MARSHAL_TYPE_STRING 3
-#define MARSHAL_TYPE_VT 4
-#define MARSHAL_TYPE_DELEGATE 5
-#define MARSHAL_TYPE_TASK 6
-#define MARSHAL_TYPE_OBJECT 7
-#define MARSHAL_TYPE_BOOL 8
-#define MARSHAL_TYPE_ENUM 9
-#define MARSHAL_TYPE_DATE 20
-#define MARSHAL_TYPE_DATEOFFSET 21
-#define MARSHAL_TYPE_URI 22
-#define MARSHAL_TYPE_SAFEHANDLE 23
-
-// typed array marshaling
-#define MARSHAL_ARRAY_BYTE 10
-#define MARSHAL_ARRAY_UBYTE 11
-#define MARSHAL_ARRAY_UBYTE_C 12
-#define MARSHAL_ARRAY_SHORT 13
-#define MARSHAL_ARRAY_USHORT 14
-#define MARSHAL_ARRAY_INT 15
-#define MARSHAL_ARRAY_UINT 16
-#define MARSHAL_ARRAY_FLOAT 17
-#define MARSHAL_ARRAY_DOUBLE 18
-
-#define MARSHAL_TYPE_FP32 24
-#define MARSHAL_TYPE_UINT32 25
-#define MARSHAL_TYPE_INT64 26
-#define MARSHAL_TYPE_UINT64 27
-#define MARSHAL_TYPE_CHAR 28
-#define MARSHAL_TYPE_STRING_INTERNED 29
-#define MARSHAL_TYPE_VOID 30
-#define MARSHAL_TYPE_POINTER 32
-
-// errors
-#define MARSHAL_ERROR_BUFFER_TOO_SMALL 512
-
 namespace il2cxx
 {
 
@@ -144,11 +106,6 @@ mono_wasm_getenv (const char *name)
 }
 
 EMSCRIPTEN_KEEPALIVE void
-mono_wasm_register_bundled_satellite_assemblies ()
-{
-}
-
-EMSCRIPTEN_KEEPALIVE void
 mono_wasm_load_runtime (const char *unused, int debug_level)
 {
 	f__startup(reinterpret_cast<void*>(emscripten_stack_get_base()));
@@ -162,7 +119,7 @@ mono_wasm_assembly_load (const char *name)
 }
 
 EMSCRIPTEN_KEEPALIVE t__runtime_assembly* 
-mono_wasm_get_corlib ()
+mono_wasm_get_corlib (void)
 {
 	return v__entry_assembly;
 }
@@ -190,25 +147,6 @@ mono_wasm_assembly_find_method (t__type *klass, const char *name, int arguments)
 	{
 		for (int i = 0; i < arguments; ++i, ++a_xs) if (!*a_xs) return false;
 		return !*a_xs;
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE t__runtime_method_info*
-mono_wasm_get_delegate_invoke_ref (t__object *delegate)
-{
-	return f_find_method(delegate->f_type(), u"Invoke"sv, [](auto)
-	{
-		return true;
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_box_primitive_ref (t__type *klass, void *value, int value_size, t__object **result)
-{
-	assert (klass);
-	if (klass->v__size <= value_size) f_epoch_noiger([&]
-	{
-		f__store(*result, klass->f_box(value));
 	});
 }
 
@@ -245,26 +183,26 @@ mono_wasm_invoke_method_ref (t__runtime_method_info *method, t__object **this_ar
 	});
 }
 
-EMSCRIPTEN_KEEPALIVE t__object*
-mono_wasm_invoke_method_bound (t__runtime_method_info *method, void* args)// JSMarshalerArguments
+EMSCRIPTEN_KEEPALIVE int
+mono_wasm_invoke_method_bound (t__runtime_method_info *method, void* args /*JSMarshalerArguments*/, t_System_2eString **out_exc)
 {
-	t__object* RECYCLONE__SPILL error = nullptr;
-	f_epoch_noiger([&]
+	return f_epoch_noiger([&]
 	{
 		try {
 			method->v__wasm_invoke(nullptr, &args);
+			return 0;
 		} catch (t__object* e) {
 			std::fprintf(stderr, "\tcaught object: %p\n", e);
-			error = f__to_string(e);
+			if (out_exc) f__store(*out_exc, f__to_string(e));
 		} catch (std::exception& e) {
 			std::fprintf(stderr, "\tcaught exception: %s\n", e.what());
-			error = f__new_string(e.what());
+			if (out_exc) f__store(*out_exc, f__new_string(e.what()));
 		} catch (...) {
 			std::fprintf(stderr, "\tcaught unknown\n");
-			error = f__new_string(u"unknown exception"sv);
+			if (out_exc) f__store(*out_exc, f__new_string(u"unknown exception"sv));
 		}
+		return 1;
 	});
-	return error;
 }
 
 EMSCRIPTEN_KEEPALIVE t__runtime_method_info*
@@ -285,25 +223,6 @@ mono_wasm_assembly_get_entry_point (t__runtime_assembly *assembly, int auto_inse
 	return method;
 }
 
-// TODO: ref
-EMSCRIPTEN_KEEPALIVE char *
-mono_wasm_string_get_utf8 (t_System_2eString *str)
-{
-	return strdup(f__string(str).c_str());
-}
-
-EMSCRIPTEN_KEEPALIVE t_System_2eString *
-mono_wasm_string_from_js (const char *str)
-{
-	if (!str) return nullptr;
-	t_System_2eString* RECYCLONE__SPILL result;
-	f_epoch_noiger([&]
-	{
-		result = f__new_string(str);
-	});
-	return result;
-}
-
 EMSCRIPTEN_KEEPALIVE void
 mono_wasm_string_from_utf16_ref (const char16_t * chars, int length, t_System_2eString **result)
 {
@@ -312,327 +231,6 @@ mono_wasm_string_from_utf16_ref (const char16_t * chars, int length, t_System_2e
 	{
 		f__store(*result, chars ? f__new_string({chars, static_cast<size_t>(length)}) : nullptr);
 	});
-}
-
-typedef enum {
-	MONO_TYPE_END        = 0x00,       /* End of List */
-	MONO_TYPE_VOID       = 0x01,
-	MONO_TYPE_BOOLEAN    = 0x02,
-	MONO_TYPE_CHAR       = 0x03,
-	MONO_TYPE_I1         = 0x04,
-	MONO_TYPE_U1         = 0x05,
-	MONO_TYPE_I2         = 0x06,
-	MONO_TYPE_U2         = 0x07,
-	MONO_TYPE_I4         = 0x08,
-	MONO_TYPE_U4         = 0x09,
-	MONO_TYPE_I8         = 0x0a,
-	MONO_TYPE_U8         = 0x0b,
-	MONO_TYPE_R4         = 0x0c,
-	MONO_TYPE_R8         = 0x0d,
-	MONO_TYPE_STRING     = 0x0e,
-	MONO_TYPE_PTR        = 0x0f,       /* arg: <type> token */
-	MONO_TYPE_BYREF      = 0x10,       /* arg: <type> token */
-	MONO_TYPE_VALUETYPE  = 0x11,       /* arg: <type> token */
-	MONO_TYPE_CLASS      = 0x12,       /* arg: <type> token */
-	MONO_TYPE_VAR	     = 0x13,	   /* number */
-	MONO_TYPE_ARRAY      = 0x14,       /* type, rank, boundsCount, bound1, loCount, lo1 */
-	MONO_TYPE_GENERICINST= 0x15,	   /* <type> <type-arg-count> <type-1> \x{2026} <type-n> */
-	MONO_TYPE_TYPEDBYREF = 0x16,
-	MONO_TYPE_I          = 0x18,
-	MONO_TYPE_U          = 0x19,
-	MONO_TYPE_FNPTR      = 0x1b,	      /* arg: full method signature */
-	MONO_TYPE_OBJECT     = 0x1c,
-	MONO_TYPE_SZARRAY    = 0x1d,       /* 0-based one-dim-array */
-	MONO_TYPE_MVAR	     = 0x1e,       /* number */
-	MONO_TYPE_CMOD_REQD  = 0x1f,       /* arg: typedef or typeref token */
-	MONO_TYPE_CMOD_OPT   = 0x20,       /* optional arg: typedef or typref token */
-	MONO_TYPE_INTERNAL   = 0x21,       /* CLR internal type */
-
-	MONO_TYPE_MODIFIER   = 0x40,       /* Or with the following types */
-	MONO_TYPE_SENTINEL   = 0x41,       /* Sentinel for varargs method signature */
-	MONO_TYPE_PINNED     = 0x45,       /* Local var that points to pinned object */
-
-	MONO_TYPE_ENUM       = 0x55        /* an enumeration */
-} MonoTypeEnum;
-
-// This must be run inside a GC unsafe region
-static int
-_wasm_marshal_type_from_mono_type (int mono_type, t__type *klass)
-{
-	switch (mono_type) {
-	// case MONO_TYPE_CHAR: prob should be done not as a number?
-	case MONO_TYPE_VOID:
-		return MARSHAL_TYPE_VOID;
-	case MONO_TYPE_BOOLEAN:
-		return MARSHAL_TYPE_BOOL;
-	case MONO_TYPE_I: // IntPtr
-	case MONO_TYPE_U: // UIntPtr
-	case MONO_TYPE_PTR:
-		return MARSHAL_TYPE_POINTER;
-	case MONO_TYPE_I1:
-	case MONO_TYPE_I2:
-	case MONO_TYPE_I4:
-		return MARSHAL_TYPE_INT;
-	case MONO_TYPE_CHAR:
-		return MARSHAL_TYPE_CHAR;
-	case MONO_TYPE_U1:
-	case MONO_TYPE_U2:
-	case MONO_TYPE_U4:  // The distinction between this and signed int is
-						// important due to how numbers work in JavaScript
-		return MARSHAL_TYPE_UINT32;
-	case MONO_TYPE_I8:
-		return MARSHAL_TYPE_INT64;
-	case MONO_TYPE_U8:
-		return MARSHAL_TYPE_UINT64;
-	case MONO_TYPE_R4:
-		return MARSHAL_TYPE_FP32;
-	case MONO_TYPE_R8:
-		return MARSHAL_TYPE_FP64;
-	case MONO_TYPE_STRING:
-		return MARSHAL_TYPE_STRING;
-	case MONO_TYPE_SZARRAY: // simple zero based one-dim-array
-		switch (klass->v__element->v__cor_element_type) {
-		case MONO_TYPE_U1:
-			return MARSHAL_ARRAY_UBYTE;
-		case MONO_TYPE_I1:
-			return MARSHAL_ARRAY_BYTE;
-		case MONO_TYPE_U2:
-			return MARSHAL_ARRAY_USHORT;
-		case MONO_TYPE_I2:
-			return MARSHAL_ARRAY_SHORT;
-		case MONO_TYPE_U4:
-			return MARSHAL_ARRAY_UINT;
-		case MONO_TYPE_I4:
-			return MARSHAL_ARRAY_INT;
-		case MONO_TYPE_R4:
-			return MARSHAL_ARRAY_FLOAT;
-		case MONO_TYPE_R8:
-			return MARSHAL_ARRAY_DOUBLE;
-		default:
-			return MARSHAL_TYPE_OBJECT;
-		}
-	default:
-		if (klass == &t__type_of<t_System_2eDateTime>::v__instance) return MARSHAL_TYPE_DATE;
-		if (klass == &t__type_of<t_System_2eDateTimeOffset>::v__instance) return MARSHAL_TYPE_DATEOFFSET;
-		//if (klass->f_is(&t__type_of<t_System_2eUri>::v__instance)) return MARSHAL_TYPE_URI;
-		if (klass == &t__type_of<t_System_2eThreading_2eTasks_2eVoidTaskResult>::v__instance) return MARSHAL_TYPE_VOID;
-		if (klass->v__enum) return MARSHAL_TYPE_ENUM;
-		if (klass->v__value_type) return MARSHAL_TYPE_VT;
-		if (klass->f_is(&t__type_of<t_System_2eDelegate>::v__instance)) return MARSHAL_TYPE_DELEGATE;
-		if (klass->f_is(&t__type_of<t_System_2eThreading_2eTasks_2eTask>::v__instance)) return MARSHAL_TYPE_TASK;
-		if (klass->f_is(&t__type_of<t_System_2eRuntime_2eInteropServices_2eSafeHandle>::v__instance)) return MARSHAL_TYPE_SAFEHANDLE;
-		return MARSHAL_TYPE_OBJECT;
-	}
-}
-
-// FIXME: Ref
-EMSCRIPTEN_KEEPALIVE t__type *
-mono_wasm_get_obj_class (t__object *obj)
-{
-	return obj ? obj->f_type() : nullptr;
-}
-
-// This code runs inside a gc unsafe region
-static int
-_mono_wasm_try_unbox_primitive_and_get_type_ref_impl (t__object* obj, void *result, int result_capacity) {
-	auto resultP = static_cast<void**>(result);
-	auto resultI = static_cast<int*>(result);
-	auto resultU = static_cast<uint32_t*>(result);
-	auto resultL = static_cast<int64_t*>(result);
-
-	auto klass = obj->f_type();
-	if (klass == &t__type_of<t_System_2eString>::v__instance) {
-		*resultP = klass;
-		return v__interned_strings_by_pointer.find(static_cast<t_System_2eString*>(obj)) == v__interned_strings_by_pointer.end() ? MARSHAL_TYPE_STRING : MARSHAL_TYPE_STRING_INTERNED;
-	}
-
-	auto original_klass = klass;
-	if (klass->v__enum) klass = klass->v__underlying;
-
-	int mono_type = klass->v__cor_element_type;
-	if (mono_type == MONO_TYPE_GENERICINST) {
-		// HACK: While the 'any other type' fallback is valid for classes, it will do the
-		//  wrong thing for structs, so we need to make sure the valuetype handler is used
-		if (klass->v__value_type) mono_type = MONO_TYPE_VALUETYPE;
-	}
-
-	// FIXME: We would prefer to unbox once here but it will fail if the value isn't unboxable
-	switch (mono_type) {
-		case MONO_TYPE_I1:
-		case MONO_TYPE_BOOLEAN:
-			*resultI = *static_cast<int8_t*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_U1:
-			*resultU = *static_cast<uint8_t*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_I2:
-		case MONO_TYPE_CHAR:
-			*resultI = *static_cast<int16_t*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_U2:
-			*resultU = *static_cast<uint16_t*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_I4:
-		case MONO_TYPE_I:
-			*resultI = *static_cast<int32_t*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_U4:
-			*resultU = *static_cast<uint32_t*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_R4:
-			*static_cast<float*>(result) = *static_cast<float*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_R8:
-			*static_cast<double*>(result) = *static_cast<double*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_PTR:
-			*resultU = reinterpret_cast<uint32_t>(*static_cast<void**>(klass->f_unbox(obj)));
-			break;
-		case MONO_TYPE_I8:
-		case MONO_TYPE_U8:
-			// FIXME: At present the javascript side of things can't handle this,
-			//  but there's no reason not to future-proof this API
-			*resultL = *static_cast<int64_t*>(klass->f_unbox(obj));
-			break;
-		case MONO_TYPE_VALUETYPE:
-			{
-				// Check whether this struct has special-case marshaling
-				// FIXME: Do we need to null out obj before this?
-				int marshal_type = _wasm_marshal_type_from_mono_type (mono_type, original_klass);
-				if (marshal_type != MARSHAL_TYPE_VT) return marshal_type;
-				// Check whether the result buffer is big enough for the struct and padding
-				auto obj_size = klass->v__size;
-				if (result_capacity < sizeof(t__type*) + sizeof(int) + obj_size) return MARSHAL_ERROR_BUFFER_TOO_SMALL;
-				// Store a header before the struct data with the size of the data and its MonoType
-				*resultP = klass;
-				*reinterpret_cast<int*>(resultP + 1) = obj_size;
-				std::memcpy(resultP + 2, klass->f_unbox(obj), obj_size);
-				return MARSHAL_TYPE_VT;
-			}
-		default:
-			// If we failed to do a fast unboxing, return the original type information so
-			//  that the caller can do a proper, slow unboxing later
-			// HACK: Store the class pointer into the result buffer so our caller doesn't
-			//  have to call back into the native runtime later to get it
-			*resultP = klass;
-			int fallbackResultType = _wasm_marshal_type_from_mono_type (mono_type, original_klass);
-			assert (fallbackResultType != MARSHAL_TYPE_VT);
-			return fallbackResultType;
-	}
-	// We successfully performed a fast unboxing here so use the type information
-	//  matching what we unboxed (i.e. an enum's underlying type instead of its type)
-	int resultType = _wasm_marshal_type_from_mono_type (mono_type, original_klass);
-	assert (resultType != MARSHAL_TYPE_VT);
-	return resultType;
-}
-
-EMSCRIPTEN_KEEPALIVE int
-mono_wasm_try_unbox_primitive_and_get_type_ref (t__object **objRef, void *result, int result_capacity)
-{
-	if (!result)
-		return MARSHAL_ERROR_BUFFER_TOO_SMALL;
-
-	auto resultI = static_cast<int*>(result);
-	auto resultL = static_cast<int64_t*>(result);
-
-	if (result_capacity >= sizeof (int64_t))
-		*resultL = 0;
-	else if (result_capacity >= sizeof (int))
-		*resultI = 0;
-
-	if (result_capacity < 16)
-		return MARSHAL_ERROR_BUFFER_TOO_SMALL;
-
-	if (!objRef || !(*objRef))
-		return MARSHAL_TYPE_NULL;
-
-	return f_epoch_noiger([&]
-	{
-		return _mono_wasm_try_unbox_primitive_and_get_type_ref_impl (*objRef, result, result_capacity);
-	});
-}
-
-// FIXME: Ref
-EMSCRIPTEN_KEEPALIVE int
-mono_wasm_array_length (t_System_2eArray *array)
-{
-	return array->v__length;
-}
-
-static inline t__object*
-f_array_get(t_System_2eArray *array, int idx)
-{
-	auto type = array->f_type();
-	auto element = type->v__element;
-	return element->f_box(reinterpret_cast<char*>(array->f_bounds() + type->v__rank) + idx * element->v__size);
-}
-
-EMSCRIPTEN_KEEPALIVE t__object*
-mono_wasm_array_get (t_System_2eArray *array, int idx)
-{
-	t__object* RECYCLONE__SPILL result;
-	f_epoch_noiger([&]
-	{
-		result = f_array_get(array, idx);
-	});
-	return result;
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_array_get_ref (t_System_2eArray **array, int idx, t__object **result)
-{
-	f_epoch_noiger([&]
-	{
-		f__store(*result, f_array_get(*array, idx));
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_obj_array_new_ref (int size, t_System_2eArray **result)
-{
-	f_epoch_noiger([&]
-	{
-		f__store(*result, f__new_array<t_System_2eObject_5b_5d, t__object>(size));
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_obj_array_set (t_System_2eArray *array, int idx, t__object *obj)
-{
-	f_epoch_noiger([&]
-	{
-		reinterpret_cast<il2cxx::t_slot_of<t__object>*>(array->f_bounds() + array->f_type()->v__rank)[idx] = obj;
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_obj_array_set_ref (t_System_2eArray **array, int idx, t__object **obj)
-{
-	f_epoch_noiger([&]
-	{
-		auto a = *array;
-		reinterpret_cast<il2cxx::t_slot_of<t__object>*>(a->f_bounds() + a->f_type()->v__rank)[idx] = *obj;
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_string_array_new_ref (int size, t_System_2eArray **result)
-{
-	f_epoch_noiger([&]
-	{
-		f__store(*result, f__new_array<t_System_2eString_5b_5d, t_System_2eString>(size));
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE t_System_2eArray*
-mono_wasm_string_array_new (int size)
-{
-	t_System_2eArray* RECYCLONE__SPILL result;
-	f_epoch_noiger([&]
-	{
-		result = f__new_array<t_System_2eString_5b_5d, t_System_2eString>(size);
-	});
-	return result;
 }
 
 EMSCRIPTEN_KEEPALIVE int
@@ -645,6 +243,12 @@ EMSCRIPTEN_KEEPALIVE int
 mono_wasm_exit (int exit_code)
 {
 	std::exit(exit_code);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+mono_wasm_abort ()
+{
+	abort ();
 }
 
 EMSCRIPTEN_KEEPALIVE void
@@ -680,25 +284,18 @@ mono_wasm_intern_string_ref (t_System_2eString **string)
 }
 
 EMSCRIPTEN_KEEPALIVE void
-mono_wasm_string_get_data (
-	t_System_2eString *string, char16_t **outChars, int *outLengthBytes, int *outIsInterned
+mono_wasm_string_get_data_ref (
+	t_System_2eString **string, char16_t **outChars, int *outLengthBytes, int *outIsInterned
 ) {
-	if (!string) {
+	if (!string || !(*string)) {
 		if (outChars) *outChars = 0;
 		if (outLengthBytes) *outLengthBytes = 0;
 		if (outIsInterned) *outIsInterned = 1;
 	} else {
-		if (outChars) *outChars = &string->v__5ffirstChar;
-		if (outLengthBytes) *outLengthBytes = string->v__5fstringLength * sizeof(char16_t);
-		if (outIsInterned) *outIsInterned = v__interned_strings_by_pointer.find(string) != v__interned_strings_by_pointer.end();
+		if (outChars) *outChars = &(*string)->v__5ffirstChar;
+		if (outLengthBytes) *outLengthBytes = (*string)->v__5fstringLength * sizeof(char16_t);
+		if (outIsInterned) *outIsInterned = v__interned_strings_by_pointer.contains(*string);
 	}
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_string_get_data_ref (
-	t_System_2eString **string, char16_t **outChars, int *outLengthBytes, int *outIsInterned
-) {
-	mono_wasm_string_get_data(string ? *string : nullptr, outChars, outLengthBytes, outIsInterned);
 }
 
 EMSCRIPTEN_KEEPALIVE void
@@ -769,64 +366,47 @@ EMSCRIPTEN_KEEPALIVE int mono_wasm_f64_to_i52 (int64_t *destination, double valu
 	return I52_ERROR_NONE;
 }
 
+// JS is responsible for freeing this
+EMSCRIPTEN_KEEPALIVE const char * mono_wasm_method_get_full_name (t__runtime_method_info *method) {
+	return nullptr;
+}
+
+EMSCRIPTEN_KEEPALIVE const char * mono_wasm_method_get_name (t__runtime_method_info *method) {
+	return nullptr;
+}
+
+EMSCRIPTEN_KEEPALIVE float mono_wasm_get_f32_unaligned (const float *src) {
+	return *src;
+}
+
+EMSCRIPTEN_KEEPALIVE double mono_wasm_get_f64_unaligned (const double *src) {
+	return *src;
+}
+
+EMSCRIPTEN_KEEPALIVE int32_t mono_wasm_get_i32_unaligned (const int32_t *src) {
+	return *src;
+}
+
+EMSCRIPTEN_KEEPALIVE int mono_wasm_is_zero_page_reserved () {
+	// If the stack is above the first 512 bytes of memory this indicates that it is safe
+	//  to optimize out null checks for operations that also do a bounds check, like string
+	//  and array element loads. (We already know that Emscripten malloc will never allocate
+	//  data at 0.) This is the default behavior for Emscripten release builds and is
+	//  controlled by the emscripten GLOBAL_BASE option (default value 1024).
+	// clang/llvm may perform this optimization if --low-memory-unused is set.
+	// https://github.com/emscripten-core/emscripten/issues/19389
+	return (emscripten_stack_get_base() > 512) && (emscripten_stack_get_end() > 512);
+}
+
 EMSCRIPTEN_KEEPALIVE int32_t mono_wasm_load_icu_data(void* pData)
 {
 	return 1;
 }
 
-// Int8Array 		| int8_t	| byte or SByte (signed byte)
-// Uint8Array		| uint8_t	| byte or Byte (unsigned byte)
-// Uint8ClampedArray| uint8_t	| byte or Byte (unsigned byte)
-// Int16Array		| int16_t	| short (signed short)
-// Uint16Array		| uint16_t	| ushort (unsigned short)
-// Int32Array		| int32_t	| int (signed integer)
-// Uint32Array		| uint32_t	| uint (unsigned integer)
-// Float32Array		| float		| float
-// Float64Array		| double	| double
-// typed array marshalling
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_typed_array_new_ref (char *arr, int length, int size, int type, t_System_2eArray **result)
+bool
+mono_bundled_resources_get_data_resource_values (const char *id, const uint8_t **data_out, uint32_t *size_out)
 {
-	t__type* typeClass;
-	switch (type) {
-	case MARSHAL_ARRAY_BYTE:
-		typeClass = &t__type_of<t_System_2eSByte>::v__instance;
-		break;
-	case MARSHAL_ARRAY_SHORT:
-		typeClass = &t__type_of<t_System_2eInt16>::v__instance;
-		break;
-	case MARSHAL_ARRAY_USHORT:
-		typeClass = &t__type_of<t_System_2eUInt16>::v__instance;
-		break;
-	case MARSHAL_ARRAY_INT:
-		typeClass = &t__type_of<t_System_2eInt32>::v__instance;
-		break;
-	case MARSHAL_ARRAY_UINT:
-		typeClass = &t__type_of<t_System_2eUInt32>::v__instance;
-		break;
-	case MARSHAL_ARRAY_FLOAT:
-		typeClass = &t__type_of<t_System_2eSingle>::v__instance;
-		break;
-	case MARSHAL_ARRAY_DOUBLE:
-		typeClass = &t__type_of<t_System_2eDouble>::v__instance;
-		break;
-	case MARSHAL_ARRAY_UBYTE:
-	case MARSHAL_ARRAY_UBYTE_C:
-		typeClass = &t__type_of<t_System_2eByte>::v__instance;
-		break;
-	default:
-		printf ("Invalid marshal type %d in mono_wasm_typed_array_new", type);
-		abort();
-	}
-	f_epoch_noiger([&]
-	{
-		if (!typeClass->v__szarray) throw std::runtime_error("no szarray: " + f__string(typeClass->v__full_name));
-		f__store(*result, f__new_array(typeClass, length, [&](auto a_p, auto a_n)
-		{
-			memcpy(a_p, arr, a_n);
-		}));
-	});
+	return false;
 }
 
 }

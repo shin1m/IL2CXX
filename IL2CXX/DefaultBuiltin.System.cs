@@ -153,6 +153,13 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
+                type.GetMethod(nameof(Type.GetTypeCode)),
+                transpiler => ($@"{'\t'}return a_0 ? {
+    transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetTypeCodeImpl", declaredAndInstance), "a_0", Enumerable.Empty<string>(), x => x)
+} : 0;
+", 1)
+            );
+            code.For(
                 type.GetMethod(nameof(Type.GetTypeFromHandle)),
                 transpiler => ("\treturn a_0.v__type;\n", 1)
             );
@@ -173,7 +180,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}return ({
     transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImpl", declaredAndInstance), "a_0", Enumerable.Empty<string>(), x => x)
 } & {(int)TypeAttributes.ClassSemanticsMask}) == {(int)TypeAttributes.Interface};
-", 0)
+", 1)
             );
             code.For(
                 type.GetProperty(nameof(Type.IsVisible)).GetMethod,
@@ -232,7 +239,7 @@ namespace IL2CXX
 ", false, null);
             code.For(
                 type.GetProperty(nameof(RuntimeFieldHandle.Value)).GetMethod,
-                transpiler => ($"\treturn {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{a_0->v__field}};\n", 1)
+                transpiler => ($"\treturn {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{a_0->v__field}};\n", 1)
             );
         })
         .For(get(typeof(RuntimeMethodHandle)), (type, code) =>
@@ -592,46 +599,46 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("Create", declaredAndInstance),
-                transpiler => ($"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
+                transpiler => ($"\ta_0->v__5ftaggedHandle = {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
             );
             code.For(
                 type.GetMethod("Finalize", declaredAndInstance),
-                transpiler => ("\tdelete static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue);\n", 1)
+                transpiler => ("\tdelete static_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue);\n", 1)
             );
             code.For(
                 type.GetMethod("IsTrackResurrection", declaredAndInstance),
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->v_final;\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue)->v_final;\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.IsAlive)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue)->f_target();\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.Target)).GetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target();\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn static_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue)->f_target();\n", 1)
             );
             code.For(
                 type.GetProperty(nameof(WeakReference.Target)).SetMethod,
-                transpiler => (transpiler.GenerateCheckNull("a_0") + "\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n", 1)
+                transpiler => (transpiler.GenerateCheckNull("a_0") + "\tstatic_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue)->f_target__(a_1);\n", 1)
             );
         })
         .For(get(typeof(WeakReference<>)), (type, code) =>
         {
             code.ForGeneric(
                 type.GetMethod("Create", declaredAndInstance),
-                (transpiler, types) => ($"\ta_0->v_m_5fhandle = {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
+                (transpiler, types) => ($"\ta_0->v__5ftaggedHandle = {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod("Finalize", declaredAndInstance),
-                (transpiler, types) => ("\tdelete static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue);\n", 1)
+                (transpiler, types) => ("\tdelete static_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue);\n", 1)
             );
             code.ForGeneric(
                 type.GetProperty("Target", declaredAndInstance).GetMethod,
-                (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(types[0])}>(static_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target());\n", 1)
+                (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForStacked(types[0])}>(static_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue)->f_target());\n", 1)
             );
             code.ForGeneric(
-                type.GetProperty("Target", declaredAndInstance).SetMethod,
-                (transpiler, types) => ("\tstatic_cast<t__weak_handle*>(a_0->v_m_5fhandle.v__5fvalue)->f_target__(a_1);\n", 1)
+                type.GetMethod(nameof(WeakReference<object>.SetTarget)),
+                (transpiler, types) => ("\tstatic_cast<t__weak_handle*>(a_0->v__5ftaggedHandle.v__5fvalue)->f_target__(a_1);\n", 1)
             );
         })
         .For(get(typeof(Delegate)), (type, code) =>
@@ -889,23 +896,29 @@ namespace IL2CXX
                     return ($"\treturn {transpiler.Escape(method)}(&t__type_of<{transpiler.Escape(types[0])}>::v__instance);\n", 1);
                 }
             );
+            code.ForGeneric(
+                type.GetMethod(nameof(Enum.GetValues), 1, Type.EmptyTypes),
+                (transpiler, types) =>
+                {
+                    var method = type.GetMethod(nameof(Enum.GetValues), new[] { get(typeof(Type)) });
+                    transpiler.Enqueue(method);
+                    return ($"\treturn static_cast<{transpiler.EscapeForStacked(types[0].MakeArrayType())}>({transpiler.Escape(method)}(&t__type_of<{transpiler.Escape(types[0])}>::v__instance));\n", 1);
+                }
+            );
             // TODO
-            foreach (var (t, u) in new[]
+            foreach (var t in new[]
             {
-                (typeof(sbyte), "int8_t"),
-                (typeof(short), "int16_t"),
-                (typeof(int), "int32_t"),
-                (typeof(long), "int64_t"),
-                (typeof(byte), "uint8_t"),
-                (typeof(ushort), "uint16_t"),
-                (typeof(uint), "uint32_t"),
-                (typeof(ulong), "uint64_t"),
-                (typeof(char), "char16_t"),
-                (typeof(bool), "bool")
+                typeof(sbyte),
+                typeof(short),
+                typeof(int),
+                typeof(long),
+                typeof(byte),
+                typeof(ushort),
+                typeof(uint),
+                typeof(ulong)
             }) code.For(
                 type.GetMethod(nameof(Enum.ToObject), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(t) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"
-{'\t'}auto type = static_cast<t__type*>(a_0);
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""must be enum"");
 {'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
 {'\t'}switch (type->v__size) {{
@@ -971,9 +984,69 @@ namespace IL2CXX
                 type.GetMethod("InternalGetCorElementType", declaredAndInstance),
                 transpiler => ("\treturn a_0->f_type()->v__cor_element_type;\n", 1)
             );
+            MethodInfo getTryFormat(Transpiler transpiler, Type type)
+            {
+                var method = type.GetMethod(nameof(int.TryFormat), new[] { get(typeof(Span<char>)), get(typeof(int)).MakeByRefType(), get(typeof(ReadOnlySpan<char>)), get(typeof(IFormatProvider)) });
+                transpiler.Enqueue(method);
+                return method;
+            }
+            string generateTryFormat(string type, string size, string value) => $@"{'\t'}if (a_3.v__5flength) {{
+{'\t'}{'\t'}if (a_3.v__5flength != 1) throw std::runtime_error(""FormatException"");
+{'\t'}{'\t'}switch (a_3.v__5freference[0]) {{
+{'\t'}{'\t'}case u'G':
+{'\t'}{'\t'}case u'g':
+{'\t'}{'\t'}{'\t'}break;
+{'\t'}{'\t'}default:
+{'\t'}{'\t'}{'\t'}throw std::runtime_error(""FormatException"");
+{'\t'}{'\t'}}}
+{'\t'}}}
+{'\t'}auto type = {type};
+{'\t'}auto n = {size};
+{'\t'}auto v = {value};
+{'\t'}if (type->v__fields) {{
+{'\t'}{'\t'}for (auto p = type->v__fields; *p; ++p) if (std::memcmp((*p)->f_address(nullptr), v, n) == 0) {{
+{'\t'}{'\t'}{'\t'}auto s = (*p)->v__name;
+{'\t'}{'\t'}{'\t'}if (a_1.v__5flength < s.size()) {{
+{'\t'}{'\t'}{'\t'}{'\t'}*a_2 = 0;
+{'\t'}{'\t'}{'\t'}{'\t'}return false;
+{'\t'}{'\t'}{'\t'}}}
+{'\t'}{'\t'}{'\t'}std::copy(s.begin(), s.end(), a_1.v__5freference);
+{'\t'}{'\t'}{'\t'}*a_2 = s.size();
+{'\t'}{'\t'}{'\t'}return true;
+{'\t'}{'\t'}}}
+{'\t'}}} else {{
+{'\t'}{'\t'}std::cerr << ""no fields: "" << f__string(type->v__full_name) << std::endl;
+{'\t'}}}
+";
             // TODO
             code.For(
-                type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(typeof(string)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType() }),
+                type.GetMethod("System.ISpanFormattable.TryFormat", declaredAndInstance),
+                transpiler => (transpiler.GenerateCheckNull("a_0") + generateTryFormat("a_0->f_type()", "type->v__size", "a_0 + 1") + $@"{'\t'}switch (n) {{
+{'\t'}case 1:
+{'\t'}{'\t'}return {transpiler.Escape(getTryFormat(transpiler, get(typeof(byte))))}(reinterpret_cast<uint8_t*>(v), a_1, a_2, a_3, a_4);
+{'\t'}case 2:
+{'\t'}{'\t'}return {transpiler.Escape(getTryFormat(transpiler, get(typeof(ushort))))}(reinterpret_cast<uint16_t*>(v), a_1, a_2, a_3, a_4);
+{'\t'}case 4:
+{'\t'}{'\t'}return {transpiler.Escape(getTryFormat(transpiler, get(typeof(uint))))}(reinterpret_cast<uint32_t*>(v), a_1, a_2, a_3, a_4);
+{'\t'}default:
+{'\t'}{'\t'}return {transpiler.Escape(getTryFormat(transpiler, get(typeof(ulong))))}(reinterpret_cast<uint64_t*>(v), a_1, a_2, a_3, a_4);
+{'\t'}}}
+", 0)
+            );
+            string generateTryFormatOfT(Transpiler transpiler, Type type) => generateTryFormat($"&t__type_of<{transpiler.Escape(type)}>::v__instance", "sizeof(a_0)", "&a_0") + $"\treturn {transpiler.Escape(getTryFormat(transpiler, Enum.GetUnderlyingType(type)))}(&a_0, a_1, a_2, a_3, nullptr);\n";
+            // TODO
+            code.ForGeneric(
+                type.GetMethod(nameof(Enum.TryFormat)),
+                (transpiler, types) => (generateTryFormatOfT(transpiler, types[0]), 0)
+            );
+            // TODO
+            code.ForGeneric(
+                type.GetMethod("TryFormatUnconstrained", BindingFlags.Static | BindingFlags.NonPublic),
+                (transpiler, types) => types[0].IsEnum ? (generateTryFormatOfT(transpiler, types[0]), 0) : ($"\t{transpiler.GenerateThrow("InvalidOperation")};\n", 1)
+            );
+            // TODO
+            code.For(
+                type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(typeof(ReadOnlySpan<char>)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType() }),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             // TODO

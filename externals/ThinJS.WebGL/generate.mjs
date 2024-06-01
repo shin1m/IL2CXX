@@ -446,7 +446,7 @@ partial class WebGL2 : WebGL
 {
     public WebGL2(JSObject canvas) : base(canvas, "webgl2") { }
 `);
-	await js.write(`import { dotnet } from './dotnet.js';
+	await js.write(`import { dotnet } from './_framework/dotnet.js';
 export function webgl(set) {
     const module = dotnet.instance.Module;
     const asArray = (type, bytes) => new type(module.HEAPU8.buffer, bytes._pointer, bytes._length / type.BYTES_PER_ELEMENT);

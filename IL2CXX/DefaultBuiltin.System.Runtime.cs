@@ -61,7 +61,7 @@ namespace IL2CXX
         {
             code.For(
                 type.GetMethod("InternalAlloc", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($"\treturn {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(a_0, a_1)) : new t__normal_handle(a_0)}};\n", 1)
+                transpiler => ($"\treturn {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{a_1 < 2 ? static_cast<t__handle*>(new t__weak_handle(a_0, a_1)) : new t__normal_handle(a_0)}};\n", 1)
             );
             code.For(
                 type.GetMethod("InternalFree", BindingFlags.Static | BindingFlags.NonPublic),
@@ -101,7 +101,7 @@ namespace IL2CXX
             );
             var gdffpi = type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic);
             code.For(gdffpi, transpiler => ($@"{'\t'}auto type = static_cast<t__type*>(a_1);
-{'\t'}auto p = static_cast<{transpiler.EscapeForValue(get(typeof(Delegate)))}>(type->f_new_zerod());
+{'\t'}auto p = static_cast<{transpiler.EscapeForStacked(get(typeof(Delegate)))}>(type->f_new_zerod());
 {'\t'}p->v__5ftarget = p;
 {'\t'}p->v__5fmethodPtr = type->v__invoke_unmanaged;
 {'\t'}p->v__5fmethodPtrAux = a_0;
@@ -218,9 +218,18 @@ namespace IL2CXX
         })
         .For(get(typeof(RuntimeHelpers)), (type, code) =>
         {
+            code.ForGeneric(
+                type.GetMethod(nameof(RuntimeHelpers.CreateSpan)),
+                (transpiler, types) => {
+                    var t = transpiler.EscapeForValue(types[0]);
+                    return ($@"{'\t'}auto p = static_cast<t__runtime_field_info*>(a_0.v__field);
+{'\t'}return {{static_cast<{t}*>(p->f_address(nullptr)), p->v__field_type->v__size / sizeof({t})}};
+", 1);
+                }
+            );
             code.For(
                 type.GetMethod(nameof(GetHashCode), BindingFlags.Static | BindingFlags.Public),
-                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 0)
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(RuntimeHelpers.GetUninitializedObject)),
@@ -257,6 +266,12 @@ namespace IL2CXX
                 (transpiler, types) => ($"\treturn {(transpiler.Define(types[0]).IsManaged ? "true" : "false")};\n", 1)
             );
             code.For(
+                type.GetMethod("ObjectHasComponentSize", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ($@"{'\t'}auto type = a_0->f_type();
+{'\t'}return type == &t__type_of<{transpiler.Escape(get(typeof(string)))}>::v__instance || type->v__array;
+", 1)
+            );
+            code.For(
                 type.GetProperty(nameof(RuntimeHelpers.OffsetToStringData)).GetMethod,
                 transpiler => ($"\treturn offsetof({transpiler.Escape(get(typeof(string)))}, v__5ffirstChar);\n", 1)
             );
@@ -266,10 +281,8 @@ namespace IL2CXX
                 transpiler => ("\treturn true;\n", 1)
             );
             code.For(
-                type.GetMethod("ObjectHasComponentSize", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ($@"{'\t'}auto type = a_0->f_type();
-{'\t'}return type == &t__type_of<{transpiler.Escape(get(typeof(string)))}>::v__instance || type->v__array;
-", 1)
+                type.GetMethod("TryGetHashCode", BindingFlags.Static | BindingFlags.NonPublic),
+                transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
             );
         })
         .For(get(typeof(DependentHandle)), (type, code) =>
@@ -327,9 +340,11 @@ namespace IL2CXX
         .For(get(typeof(Vector64)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector64<>))))
         .For(get(typeof(Vector128)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector128<>))))
         .For(get(typeof(Vector256)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector256<>))))
+        .For(get(typeof(Vector512)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector512<>))))
         .For(get(typeof(Vector64<>)), SetupIntrinsicsVectorOfT)
         .For(get(typeof(Vector128<>)), SetupIntrinsicsVectorOfT)
         .For(get(typeof(Vector256<>)), SetupIntrinsicsVectorOfT)
+        .For(get(typeof(Vector512<>)), SetupIntrinsicsVectorOfT)
         .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch", true)), (type, code) =>
         {
             // TODO
@@ -367,7 +382,7 @@ namespace IL2CXX
             );
             code.ForGeneric(
                 type.GetMethod(nameof(Unsafe.As), 1, new[] { get(typeof(object)) }),
-                (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(types[0])}>(a_0);\n", 1)
+                (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForStacked(types[0])}>(a_0);\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod(nameof(Unsafe.As), 2, new[] { t0ref }),
@@ -378,14 +393,14 @@ namespace IL2CXX
                 (transpiler, types) => ("\treturn a_0;\n", 1)
             );
             foreach (var m in methods.Where(x => x.Name == nameof(Unsafe.AsRef)))
-                code.ForGeneric(m, (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForValue(((MethodInfo)m).MakeGenericMethod(types).ReturnType)}>(a_0);\n", 1));
+                code.ForGeneric(m, (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForStacked(((MethodInfo)m).MakeGenericMethod(types).ReturnType)}>(a_0);\n", 1));
             code.ForGeneric(
                 type.GetMethod(nameof(Unsafe.ByteOffset)),
                 (transpiler, types) => ("\treturn reinterpret_cast<char*>(a_1) - reinterpret_cast<char*>(a_0);\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod(nameof(Unsafe.Copy), 1, new[] { get(typeof(void*)), t0ref }),
-                (transpiler, types) => ($"\t*static_cast<{transpiler.EscapeForValue(types[0])}*>(a_0) = *a_1;\n", 1)
+                (transpiler, types) => ($"\t*static_cast<{transpiler.EscapeForStacked(types[0])}*>(a_0) = *a_1;\n", 1)
             );
             code.ForGeneric(
                 type.GetMethod(nameof(Unsafe.Copy), 1, new[] { t0ref, get(typeof(void*)) }),

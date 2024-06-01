@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -80,6 +81,7 @@ namespace IL2CXX
             typeofDllImportAttribute = get(typeof(DllImportAttribute));
             typeofFieldOffsetAttribute = get(typeof(FieldOffsetAttribute));
             typeofMarshalAsAttribute = get(typeof(MarshalAsAttribute));
+            typeofInlineArrayAttribute = get(typeof(InlineArrayAttribute));
             typeofThreadStaticAttribute = get(typeof(ThreadStaticAttribute));
             typeofRuntimeFieldHandle = get(typeof(RuntimeFieldHandle));
             typeofRuntimeMethodHandle = get(typeof(RuntimeMethodHandle));
@@ -460,7 +462,6 @@ namespace IL2CXX
                 };
                 x.Generate = (index, stack) =>
                 {
-                    //if (!method.DeclaringType.Name.StartsWith("AllowedBmpCodePointsBitmap")) writer.Write($"\n\tprintf(\"return {Escape(method)}\\n\");");
                     writer.Write("\n\treturn");
                     var @return = GetReturnType(method);
                     if (@return != typeofVoid)
@@ -612,7 +613,11 @@ namespace IL2CXX
             }));
             instructions1[OpCodes.Ldind_Ref.Value].For(x =>
             {
-                x.Estimate = (index, stack) => (index, stack.Pop.Push(GetElementType(stack.Type)));
+                x.Estimate = (index, stack) =>
+                {
+                    var t = GetElementType(stack.Type);
+                    return (index, stack.Pop.Push(t.IsValueType ? typeofObject : t));
+                };
                 x.Generate = (index, stack) =>
                 {
                     var after = indexToStack[index];
@@ -878,11 +883,11 @@ namespace IL2CXX
                     var parameters = m.GetParameters();
                     var arguments = parameters.Zip(stack.Take(parameters.Length).Reverse(), (p, s) => $"\n\t\t{CastValue(p.ParameterType, s.Variable)}");
                     if (t == typeofIntPtr || t == typeofUIntPtr)
-                        writer.WriteLine($@"{'\t'}{{{EscapeForValue(t)} p{{}};
+                        writer.WriteLine($@"{'\t'}{{{EscapeForStacked(t)} p{{}};
 {'\t'}{call(arguments.Prepend("\n\t\t&p"))};
 {'\t'}{after.Variable} = p;}}");
                     else if (t.IsValueType)
-                        writer.WriteLine($@"{'\t'}{after.Variable} = {EscapeForValue(t)}{{}};
+                        writer.WriteLine($@"{'\t'}{after.Variable} = {EscapeForStacked(t)}{{}};
 {'\t'}{call(arguments.Prepend($"\n\t\tconst_cast<std::remove_volatile_t<decltype({after.Variable})>*>(&{after.Variable})"))};");
                     else if (builtin.GetBody(this, ToKey(m)).body != null)
                         writer.WriteLine($"\t{after.Variable} = {call(arguments)};");
@@ -1330,7 +1335,7 @@ namespace IL2CXX
                 x.Generate = (index, stack) =>
                 {
                     writer.WriteLine();
-                    GenerateArrayAccess(stack.Pop.Pop, stack.Pop, y => $"{y} = static_cast<{EscapeForValue(set.Type)}>({stack.Variable})");
+                    GenerateArrayAccess(stack.Pop.Pop, stack.Pop, y => $"{y} = static_cast<{EscapeForStacked(set.Type)}>({stack.Variable})");
                     return index;
                 };
             }));
@@ -1664,13 +1669,12 @@ namespace IL2CXX
                 {
                     var t = ParseType(ref index);
                     writer.WriteLine($" {t}");
-                    var type = EscapeForValue(t);
                     writer.WriteLine(
                         t.IsByRefLike ? "\tf__store({0}, {1});" :
                         Define(t).IsManaged ? "\tf__store({0}, {1});" :
                         "\t{0} = {1};",
-                        $"*static_cast<{type}*>({stack.Variable})",
-                        type.EndsWith("*") ? $"static_cast<{type}>(nullptr)" : $"{type}{{}}"
+                        $"*static_cast<{EscapeForValue(t)}*>({stack.Variable})",
+                        $"({EscapeForStacked(t)}){{}}"
                     );
                     return index;
                 };
@@ -1731,7 +1735,7 @@ namespace IL2CXX
                 x.Estimate = (index, stack) => (index, stack.Pop.Push(typeofRuntimeTypeHandle));
                 x.Generate = (index, stack) =>
                 {
-                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {EscapeForValue(typeofRuntimeTypeHandle)}{{static_cast<t__type*>({stack.Variable}.v__5ftype.v__5fvalue)}};");
+                    writer.WriteLine($"\n\t{indexToStack[index].Variable} = {EscapeForStacked(typeofRuntimeTypeHandle)}{{static_cast<t__type*>({stack.Variable}.v__5ftype.v__5fvalue)}};");
                     return index;
                 };
             });

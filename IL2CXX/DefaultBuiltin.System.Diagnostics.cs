@@ -64,10 +64,6 @@ namespace IL2CXX
                 transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
             );
             code.For(
-                type.GetMethod("RemoveEventListener", declaredAndInstance),
-                transpiler => (string.Empty, 0)
-            );
-            code.For(
                 type.GetMethod("SendCommand", declaredAndInstance),
                 transpiler => (string.Empty, 0)
             );

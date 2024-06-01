@@ -11,3 +11,4 @@ else
 fi
 cmake --build . -j8 || exit $?
 cp System.Native/libSystem.Native.a ../src || exit $?
+cp $DOTNET_RUNTIME/src/native/libs/System.Native/pal_random.lib.js ../src || exit $?

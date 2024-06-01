@@ -1,0 +1,19 @@
+{
+  "mainAssemblyName": "",
+  "resources": {
+    "jsModuleNative": {
+      "dotnet.native.js": ""
+    },
+    "jsModuleRuntime": {
+      "dotnet.runtime.js": ""
+    },
+    "wasmNative": {
+      "dotnet.native.wasm": ""
+    },
+    "wasmSymbols": {
+      "dotnet.native.js.symbols": ""
+    }
+  },
+  "debugLevel": 0,
+  "globalizationMode": "sharded"
+}

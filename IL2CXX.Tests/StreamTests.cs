@@ -116,11 +116,11 @@ namespace IL2CXX.Tests
         public void TestWriteTextFile([Values] bool cooperative)
         {
             Utilities.Run(build, cooperative, nameof(WriteTextFile));
-            Assert.AreEqual(new[]
+            Assert.That(File.ReadLines(FilePath), Is.EqualTo(new[]
             {
                 "Hello, World!",
                 "Good bye."
-            }, File.ReadLines(FilePath));
+            }));
         }
     }
 }

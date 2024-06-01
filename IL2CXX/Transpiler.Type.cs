@@ -77,16 +77,17 @@ namespace IL2CXX
                     var m = t.GetMethod(name, g, exactInstance | BindingFlags.Static, null, ps, null);
                     return m == null || m.DeclaringType == t ? m : get(m.DeclaringType, name);
                 }
-                var t = type;
-                do
+                MethodInfo find(Type t)
                 {
+                    var i = Array.IndexOf(t.GetInterfaces(), @interface);
+                    if (i < 0) return null;
                     var prefix = ExplicitName(t.IsGenericType
-                        ? t.GetGenericTypeDefinition().GetInterfaces()[Array.IndexOf(t.GetInterfaces(), @interface)]
+                        ? t.GetGenericTypeDefinition().GetInterfaces()[i]
                         : @interface
                     );
-                    if ((tms[i] = get(t, $"{prefix}.{m.Name}") ?? get(t, m.Name)) != null) break;
+                    return get(t, $"{prefix}.{m.Name}") ?? get(t, m.Name) ?? (t.BaseType == null ? null : find(t.BaseType));
                 }
-                while ((t = t.BaseType) != null);
+                tms[i] = find(type) ?? type.GetInterfaces().Select(find).FirstOrDefault(x => x != null);
                 if (tms[i] != null) continue;
                 if (m.IsAbstract) throw new Exception($"{type} -> {@interface}::[{m}]");
                 tms[i] = m;
@@ -209,7 +210,7 @@ namespace IL2CXX
                     else
                         Methods[i] = x;
                 }
-                foreach (var x in transpiler.GetInterfaces(Type))
+                foreach (var x in Type.GetInterfaces())
                 {
                     var definition = (InterfaceDefinition)transpiler.Define(x);
                     var methods = new MethodInfo[definition.Methods.Count];
@@ -598,9 +599,8 @@ struct t__static_{identifier}
                                         if (j > i) sb.AppendLine($"\tchar v__padding{i}[{j - i}];");
                                         i = j;
                                     }
-                                    foreach (var x in fields)
+                                    void generateField(FieldInfo x, string name)
                                     {
-                                        var f = Escape(x);
                                         if (x.FieldType == typeofString)
                                         {
                                             var marshalAs = getMarshalAs(x);
@@ -610,7 +610,7 @@ struct t__static_{identifier}
                                             {
                                                 if (unicode) pad(align(Math.Min(2, td.Alignment)));
                                                 var size = (int)marshalAs.NamedArguments.First(x => x.MemberName == nameof(MarshalAsAttribute.SizeConst)).TypedValue.Value;
-                                                sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {f}[{size}];");
+                                                sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {name}[{size}];");
                                                 i += size * (unicode ? 2 : 1);
                                             }
                                             else
@@ -627,7 +627,7 @@ struct t__static_{identifier}
                                                         unicode = true;
                                                         break;
                                                 }
-                                                sb.AppendLine($"\t{(unicode ? "char16_t" : "char")}* {f};");
+                                                sb.AppendLine($"\t{(unicode ? "char16_t" : "char")}* {name};");
                                                 i += ftd.UnmanagedSize;
                                             }
                                         }
@@ -636,12 +636,23 @@ struct t__static_{identifier}
                                             var ftd = Define(x.FieldType);
                                             pad(align(Math.Min(ftd.Alignment, td.Alignment)));
                                             sb.AppendLine(
-                                                x.FieldType == typeofBoolean ? $"\t{EscapeForValue(typeofInt32)} {f};" :
-                                                ftd.HasUnmanaged ? $"\t{Escape(x.FieldType)}__unmanaged {f};" :
-                                                $"\t{EscapeForValue(x.FieldType)} {f};"
+                                                x.FieldType == typeofBoolean ? $"\t{EscapeForValue(typeofInt32)} {name};" :
+                                                ftd.HasUnmanaged ? $"\t{Escape(x.FieldType)}__unmanaged {name};" :
+                                                $"\t{EscapeForValue(x.FieldType)} {name};"
                                             );
                                             i += ftd.UnmanagedSize;
                                         }
+                                    }
+                                    var length = (type.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofInlineArrayAttribute)?.ConstructorArguments[0].Value as int?) ?? 0;
+                                    if (length > 0)
+                                    {
+                                        var f = fields.First();
+                                        generateField(f, Escape(f));
+                                        if (--length > 0) generateField(f, $"v[{length}]");
+                                    }
+                                    else
+                                    {
+                                        foreach (var x in fields) generateField(x, Escape(x));
                                     }
                                     td.UnmanagedSize = Math.Max(align(td.Alignment), layout.Size);
                                     pad(td.UnmanagedSize);
@@ -649,13 +660,19 @@ struct t__static_{identifier}
                                     var fs = fields.Select(Escape);
                                     sb.AppendLine($@"{'\t'}void f_in(const {at} a_p)
 {'\t'}{{
-{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_in({x}, a_p->{x});\n"))}{'\t'}}}
+{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_in({x}, a_p->{x});\n"))}{
+(length > 0 ? $@"{'\t'}{'\t'}for (size_t i = 0; i < {length}; ++i) f__marshal_in(v[i], a_p->v[i]);
+" : string.Empty)}{'\t'}}}
 {'\t'}void f_out({at} a_p) const
 {'\t'}{{
-{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_out({x}, a_p->{x});\n"))}{'\t'}}}
+{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_out({x}, a_p->{x});\n"))}{
+(length > 0 ? $@"{'\t'}{'\t'}for (size_t i = 0; i < {length}; ++i) f__marshal_out(v[i], a_p->v[i]);
+" : string.Empty)}{'\t'}}}
 {'\t'}void f_destroy()
 {'\t'}{{
-{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_destroy({x});\n"))}{'\t'}}}
+{string.Join(string.Empty, fs.Select(x => $"\t\tf__marshal_destroy({x});\n"))}{
+(length > 0 ? $@"{'\t'}{'\t'}for (size_t i = 0; i < {length}; ++i) f__marshal_destroy(v[i]);
+" : string.Empty)}{'\t'}}}
 }};");
                                     if (pack > 0) sb.AppendLine("#pragma pack(pop)");
                                     unmanaged = sb.ToString();
@@ -751,16 +768,9 @@ struct t__static_{identifier}
                                     return sb.ToString();
                                 }
                                 string scanSlots(string indent) => string.Join(string.Empty, slots.Select(x => $"{indent}{scan(x.Type, x.Name)};\n"));
-                                members = type.IsValueType
-                                    ? $@"{variables("\t\t")}
-{'\t'}{'\t'}void f_destruct()
-{'\t'}{'\t'}{{
-{string.Join(string.Empty, slots.Select(x => $"\t\t\t{x.Name}.f_destruct();\n"))}{'\t'}{'\t'}}}
-{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
-{'\t'}{'\t'}{{
-{scanSlots("\t\t\t")}{'\t'}{'\t'}}}
-"
-                                    : type.BaseType == null || type.IsAbstract && type.IsSealed ? string.Empty : $@"{variables("\t")}
+                                if (!type.IsValueType)
+                                {
+                                    members = type.BaseType == null || type.IsAbstract && type.IsSealed ? string.Empty : $@"{variables("\t")}
 {'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
 {'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
@@ -770,6 +780,41 @@ struct t__static_{identifier}
 {'\t'}{'\t'}{Escape(type.BaseType)}::f_construct(a_p);
 {string.Join(string.Empty, constructs.Select(x => $"{'\t'}{'\t'}new(&a_p->{x}) decltype({x})({x});\n"))}{'\t'}}}
 ";
+                                }
+                                else if (type.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofInlineArrayAttribute)?.ConstructorArguments[0].Value is int length)
+                                {
+                                    var f = fields.First();
+                                    var ft = f.FieldType;
+                                    var t = EscapeForMember(ft);
+                                    var n = Escape(f);
+                                    var composite = IsComposite(ft);
+                                    --length;
+                                    members = $@"{'\t'}{'\t'}{t} {n};
+{(length > 0 ? $@"{'\t'}{'\t'}{t} v[{length}];
+" : string.Empty)}
+{'\t'}{'\t'}void f_destruct()
+{'\t'}{'\t'}{{
+{(composite ? $@"{'\t'}{'\t'}{'\t'}{n}.f_destruct();
+{(length > 0 ? $@"{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < {length}; ++i) v[i].f_destruct();
+" : string.Empty)}" : string.Empty)}{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
+{'\t'}{'\t'}{{
+{(composite ? $@"{'\t'}{'\t'}{'\t'}{scan(ft, n)};
+{(length > 0 ? $@"{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < {length}; ++i) {scan(ft, "v[i]")};
+" : string.Empty)}" : string.Empty)}{'\t'}{'\t'}}}
+";
+                                }
+                                else
+                                {
+                                    members = $@"{variables("\t\t")}
+{'\t'}{'\t'}void f_destruct()
+{'\t'}{'\t'}{{
+{string.Join(string.Empty, slots.Select(x => $"\t\t\t{x.Name}.f_destruct();\n"))}{'\t'}{'\t'}}}
+{'\t'}{'\t'}void f__scan(t_scan<t__type> a_scan)
+{'\t'}{'\t'}{{
+{scanSlots("\t\t\t")}{'\t'}{'\t'}}}
+";
+                                }
                             }
                         }
                         else
@@ -891,7 +936,7 @@ extern t__runtime_method_info* v__generic_methods_{name}[];");
             var interfaces = "v__empty_types";
             if (definition is TypeDefinition)
             {
-                var xs = GetInterfaces(type);
+                var xs = type.GetInterfaces();
                 if (xs.Length > 0)
                 {
                     writerForDefinitions.Write($@"

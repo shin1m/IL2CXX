@@ -1,9 +1,6 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
-    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
-    <WasmMainJSPath>main.js</WasmMainJSPath>
-    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
@@ -11,9 +8,7 @@
     <ProjectReference Include="..\..\externals\ThinJS.WebGL\ThinJS.WebGL.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <WasmExtraFilesToDeploy Include="index.html" />
-    <WasmExtraFilesToDeploy Include="main.js" />
-    <WasmExtraFilesToDeploy Include="$(OutputPath)thinjs.webgl.js" />
-  </ItemGroup>
+  <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
+    <Copy SourceFiles="$(OutputPath)thinjs.webgl.js" DestinationFolder="$(ProjectDir)wwwroot" />
+  </Target>
 </Project>

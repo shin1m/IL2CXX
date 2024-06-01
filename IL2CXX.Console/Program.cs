@@ -106,6 +106,14 @@ namespace IL2CXX.Console
 ", 0)
                         );
                         codeFor(
+                            type.GetMethod("InvokeImport"),
+                            transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}mono_wasm_invoke_import(a_0, a_1);
+{'\t'}}});
+", 0)
+                        );
+                        codeFor(
                             type.GetMethod("BindCSFunction"),
                             transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -138,10 +146,10 @@ namespace IL2CXX.Console
                         );
                     })
                     .For(get(typeof(ThreadPool)), (type, code) => code.For(
-                        type.GetMethod("InitializeConfigAndDetermineUsePortableThreadPool", BindingFlags.Static | BindingFlags.NonPublic),
+                        type.GetMethod("InitializeConfig", BindingFlags.Static | BindingFlags.NonPublic),
                         transpiler =>
                         {
-                            var set = get(typeof(AppContext)).GetMethod("SetData");
+                            var set = get(typeof(AppContext)).GetMethod(nameof(AppContext.SetData));
                             transpiler.Enqueue(set);
                             return ($@"{'\t'}{transpiler.Escape(set)}(f__new_string(u""System.Threading.ThreadPool.MinThreads""sv), f__new_constructed<{transpiler.Escape(get(typeof(int)))}>(1));
 {'\t'}{transpiler.Escape(set)}(f__new_string(u""System.Threading.ThreadPool.MaxThreads""sv), f__new_constructed<{transpiler.Escape(get(typeof(int)))}>(1));
@@ -172,6 +180,16 @@ namespace IL2CXX.Console
                         bundleTypes.Add(load(x));
                 }
                 var reflection = options.Reflection.Select(load).ToHashSet();
+                if (options.Target == PlatformID.Other)
+                {
+                    var types = new[] {
+                        load("System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript"),
+                        assembly.GetType("System.Runtime.InteropServices.JavaScript.__GeneratedInitializer")
+                    }.Where(x => x != null);
+                    bundleTypes.AddRange(types);
+                    reflection.UnionWith(types);
+                    reflection.Add(get(typeof(System.Threading.Tasks.Task<>)));
+                }
                 var transpiler = new Transpiler(get, builtin, /*Console.Error.WriteLine*/_ => { }, options.Target, options.Is64, false)
                 {
                     Bundle = bundleTypes,
@@ -262,12 +280,12 @@ add_executable({name}
 target_compile_options({name} PRIVATE ""-fno-rtti"")
 target_precompile_headers({name} PRIVATE declarations.h){
 (options.Target == PlatformID.Other ? $@"
-set_target_properties({name} PROPERTIES OUTPUT_NAME dotnet)
+set_target_properties({name} PROPERTIES OUTPUT_NAME dotnet.native)
 target_sources({name} PRIVATE wasm/src/driver.cc wasm/src/pinvoke.cc)
 target_include_directories({name} PRIVATE wasm/src src .)
 target_link_libraries({name} recyclone dl
 {'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libSystem.Native.a
-{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ToString', 'UTF8ArrayToString', 'FS']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--extern-pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/bin/src/es6/runtime.es6.iffe.js;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.lib.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/pal_random.lib.js;--post-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.post.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/runtime/es6/dotnet.es6.extpost.js""
+{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ToString', 'UTF8ArrayToString', 'FS', 'runtimeKeepalivePush', 'runtimeKeepalivePop']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.lib.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/pal_random.lib.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.extpost.js;-Wl,-u,htonl""
 {'\t'})
 " : $@"
 target_include_directories({name} PRIVATE src .)

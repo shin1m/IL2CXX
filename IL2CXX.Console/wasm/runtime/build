@@ -1,0 +1,3 @@
+Configuration=Release DISABLE_LEGACY_JS_INTEROP=1 npm run rollup
+cp -a es6 ../src
+cat obj/exports-linker.js >>../src/es6/dotnet.es6.lib.js

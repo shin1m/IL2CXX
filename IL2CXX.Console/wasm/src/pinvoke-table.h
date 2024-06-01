@@ -74,14 +74,15 @@ int SystemNative_GetEnv (int);
 int SystemNative_GetEnviron ();
 int SystemNative_GetErrNo ();
 int SystemNative_GetFileSystemType (int);
-int SystemNative_GetIPSocketAddressSizes (int,int);
 int SystemNative_GetIPv4Address (int,int,int);
 int SystemNative_GetIPv6Address (int,int,int,int,int);
 void SystemNative_GetNonCryptographicallySecureRandomBytes (int,int);
 int SystemNative_GetPort (int,int,int);
 int SystemNative_GetReadDirRBufferSize ();
+int SystemNative_GetSocketAddressSizes (int,int,int,int);
 int64_t SystemNative_GetSystemTimeAsTicks ();
 uint64_t SystemNative_GetTimestamp ();
+int SystemNative_GetTimeZoneData (int,int);
 int SystemNative_LChflags (int,int);
 int SystemNative_LChflagsCanSetHiddenFlag ();
 int SystemNative_Link (int,int);
@@ -118,6 +119,7 @@ int SystemNative_ReadLink (int,int,int);
 int SystemNative_Realloc (int,int);
 int SystemNative_Rename (int,int);
 int SystemNative_RmDir (int);
+int SystemNative_SchedGetCpu ();
 int SystemNative_SetAddressFamily (int,int,int);
 void SystemNative_SetErrNo (int);
 int SystemNative_SetIPv4Address (int,int,int);
@@ -168,14 +170,15 @@ static PinvokeImport libSystem_Native_imports [] = {
 {"SystemNative_GetEnviron", SystemNative_GetEnviron}, // System.Private.CoreLib
 {"SystemNative_GetErrNo", SystemNative_GetErrNo}, // System.Private.CoreLib
 {"SystemNative_GetFileSystemType", SystemNative_GetFileSystemType}, // System.Private.CoreLib
-{"SystemNative_GetIPSocketAddressSizes", SystemNative_GetIPSocketAddressSizes}, // System.Net.Primitives
 {"SystemNative_GetIPv4Address", SystemNative_GetIPv4Address}, // System.Net.Primitives
 {"SystemNative_GetIPv6Address", SystemNative_GetIPv6Address}, // System.Net.Primitives
 {"SystemNative_GetNonCryptographicallySecureRandomBytes", SystemNative_GetNonCryptographicallySecureRandomBytes}, // System.Private.CoreLib
 {"SystemNative_GetPort", SystemNative_GetPort}, // System.Net.Primitives
 {"SystemNative_GetReadDirRBufferSize", SystemNative_GetReadDirRBufferSize}, // System.Private.CoreLib
+{"SystemNative_GetSocketAddressSizes", SystemNative_GetSocketAddressSizes}, // System.Net.Primitives
 {"SystemNative_GetSystemTimeAsTicks", SystemNative_GetSystemTimeAsTicks}, // System.Private.CoreLib
 {"SystemNative_GetTimestamp", SystemNative_GetTimestamp}, // System.Private.CoreLib
+{"SystemNative_GetTimeZoneData", SystemNative_GetTimeZoneData}, // System.Private.CoreLib
 {"SystemNative_LChflags", SystemNative_LChflags}, // System.Private.CoreLib
 {"SystemNative_LChflagsCanSetHiddenFlag", SystemNative_LChflagsCanSetHiddenFlag}, // System.Private.CoreLib
 {"SystemNative_Link", SystemNative_Link}, // System.Private.CoreLib
@@ -212,6 +215,7 @@ static PinvokeImport libSystem_Native_imports [] = {
 {"SystemNative_Realloc", SystemNative_Realloc}, // System.Private.CoreLib
 {"SystemNative_Rename", SystemNative_Rename}, // System.Private.CoreLib
 {"SystemNative_RmDir", SystemNative_RmDir}, // System.Private.CoreLib
+{"SystemNative_SchedGetCpu", SystemNative_SchedGetCpu}, // System.Private.CoreLib
 {"SystemNative_SetAddressFamily", SystemNative_SetAddressFamily}, // System.Net.Primitives
 {"SystemNative_SetErrNo", SystemNative_SetErrNo}, // System.Private.CoreLib
 {"SystemNative_SetIPv4Address", SystemNative_SetIPv4Address}, // System.Net.Primitives
@@ -219,7 +223,7 @@ static PinvokeImport libSystem_Native_imports [] = {
 {"SystemNative_SetPort", SystemNative_SetPort}, // System.Net.Primitives
 {"SystemNative_ShmOpen", SystemNative_ShmOpen}, // System.IO.MemoryMappedFiles
 {"SystemNative_ShmUnlink", SystemNative_ShmUnlink}, // System.IO.MemoryMappedFiles
-{"SystemNative_Stat", SystemNative_Stat}, // System.Private.CoreLib
+{"SystemNative_Stat", SystemNative_Stat}, // System.IO.Compression.ZipFile, System.Private.CoreLib
 {"SystemNative_StrErrorR", SystemNative_StrErrorR}, // System.Console, System.IO.Compression.ZipFile, System.IO.MemoryMappedFiles, System.Net.Primitives, System.Private.CoreLib
 {"SystemNative_SymLink", SystemNative_SymLink}, // System.Private.CoreLib
 {"SystemNative_SysConf", SystemNative_SysConf}, // System.IO.MemoryMappedFiles, System.Private.CoreLib
@@ -281,26 +285,50 @@ static PinvokeImport libSystem_Globalization_Native_imports [] = {
 static void *pinvoke_tables[] = { libSystem_Native_imports,};
 static char *pinvoke_names[] = { "libSystem.Native","libSystem.IO.Compression.Native","libSystem.Globalization.Native",};
 /*
-InterpFtnDesc wasm_native_to_interp_ftndescs[3];
+InterpFtnDesc wasm_native_to_interp_ftndescs[7];
 typedef void  (*WasmInterpEntrySig_0) (int*,int*,int*,int*,int*,int*,int*,int*);
 int wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_LoadAssemblyAndGetFunctionPointer (int arg0,int arg1,int arg2,int arg3,int arg4,int arg5) { 
 int res;
-((WasmInterpEntrySig_0)wasm_native_to_interp_ftndescs [0].func) (&res, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, wasm_native_to_interp_ftndescs [0].arg);
+((WasmInterpEntrySig_0)wasm_native_to_interp_ftndescs [0].func) ((int*)&res, (int*)&arg0, (int*)&arg1, (int*)&arg2, (int*)&arg3, (int*)&arg4, (int*)&arg5, wasm_native_to_interp_ftndescs [0].arg);
 return res;
 }
-typedef void  (*WasmInterpEntrySig_1) (int*,int*,int*,int*,int*,int*,int*,int*);
+typedef void  (*WasmInterpEntrySig_1) (int*,int*,int*,int*,int*);
+int wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_LoadAssembly (int arg0,int arg1,int arg2) { 
+int res;
+((WasmInterpEntrySig_1)wasm_native_to_interp_ftndescs [1].func) ((int*)&res, (int*)&arg0, (int*)&arg1, (int*)&arg2, wasm_native_to_interp_ftndescs [1].arg);
+return res;
+}
+typedef void  (*WasmInterpEntrySig_2) (int*,int*,int*,int*,int*,int*,int*,int*);
+int wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_LoadAssemblyBytes (int arg0,int arg1,int arg2,int arg3,int arg4,int arg5) { 
+int res;
+((WasmInterpEntrySig_2)wasm_native_to_interp_ftndescs [2].func) ((int*)&res, (int*)&arg0, (int*)&arg1, (int*)&arg2, (int*)&arg3, (int*)&arg4, (int*)&arg5, wasm_native_to_interp_ftndescs [2].arg);
+return res;
+}
+typedef void  (*WasmInterpEntrySig_3) (int*,int*,int*,int*,int*,int*,int*,int*);
 int wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_GetFunctionPointer (int arg0,int arg1,int arg2,int arg3,int arg4,int arg5) { 
 int res;
-((WasmInterpEntrySig_1)wasm_native_to_interp_ftndescs [1].func) (&res, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, wasm_native_to_interp_ftndescs [1].arg);
+((WasmInterpEntrySig_3)wasm_native_to_interp_ftndescs [3].func) ((int*)&res, (int*)&arg0, (int*)&arg1, (int*)&arg2, (int*)&arg3, (int*)&arg4, (int*)&arg5, wasm_native_to_interp_ftndescs [3].arg);
 return res;
 }
-typedef void  (*WasmInterpEntrySig_2) (int*,int*,int*);
+typedef void  (*WasmInterpEntrySig_4) (int*,int*,int*);
 void wasm_native_to_interp_System_Private_CoreLib_CalendarData_EnumCalendarInfoCallback (int arg0,int arg1) { 
-((WasmInterpEntrySig_2)wasm_native_to_interp_ftndescs [2].func) (&arg0, &arg1, wasm_native_to_interp_ftndescs [2].arg);
+((WasmInterpEntrySig_4)wasm_native_to_interp_ftndescs [4].func) ((int*)&arg0, (int*)&arg1, wasm_native_to_interp_ftndescs [4].arg);
 }
-static void *wasm_native_to_interp_funcs[] = { wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_LoadAssemblyAndGetFunctionPointer,wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_GetFunctionPointer,wasm_native_to_interp_System_Private_CoreLib_CalendarData_EnumCalendarInfoCallback,};
+typedef void  (*WasmInterpEntrySig_5) (int*);
+void wasm_native_to_interp_System_Private_CoreLib_TimerQueue_TimerHandler () { 
+((WasmInterpEntrySig_5)wasm_native_to_interp_ftndescs [5].func) (wasm_native_to_interp_ftndescs [5].arg);
+}
+typedef void  (*WasmInterpEntrySig_6) (int*);
+void wasm_native_to_interp_System_Private_CoreLib_ThreadPool_BackgroundJobHandler () { 
+((WasmInterpEntrySig_6)wasm_native_to_interp_ftndescs [6].func) (wasm_native_to_interp_ftndescs [6].arg);
+}
+static void *wasm_native_to_interp_funcs[] = { wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_LoadAssemblyAndGetFunctionPointer,wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_LoadAssembly,wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_LoadAssemblyBytes,wasm_native_to_interp_System_Private_CoreLib_ComponentActivator_GetFunctionPointer,wasm_native_to_interp_System_Private_CoreLib_CalendarData_EnumCalendarInfoCallback,wasm_native_to_interp_System_Private_CoreLib_TimerQueue_TimerHandler,wasm_native_to_interp_System_Private_CoreLib_ThreadPool_BackgroundJobHandler,};
 static const char *wasm_native_to_interp_map[] = { "System_Private_CoreLib_ComponentActivator_LoadAssemblyAndGetFunctionPointer",
+"System_Private_CoreLib_ComponentActivator_LoadAssembly",
+"System_Private_CoreLib_ComponentActivator_LoadAssemblyBytes",
 "System_Private_CoreLib_ComponentActivator_GetFunctionPointer",
 "System_Private_CoreLib_CalendarData_EnumCalendarInfoCallback",
+"System_Private_CoreLib_TimerQueue_TimerHandler",
+"System_Private_CoreLib_ThreadPool_BackgroundJobHandler",
 };
 */

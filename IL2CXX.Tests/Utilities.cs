@@ -129,8 +129,8 @@ add(runco)
 target_compile_definitions(runco PRIVATE RECYCLONE__COOPERATIVE)
 ");
             var cmake = Environment.GetEnvironmentVariable("CMAKE_PATH") ?? "cmake";
-            Assert.AreEqual(0, Spawn(cmake, ". -DCMAKE_BUILD_TYPE=Debug", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
-            Assert.AreEqual(0, Spawn(cmake, "--build .", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine));
+            Assert.That(Spawn(cmake, ". -DCMAKE_BUILD_TYPE=Debug", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine), Is.Zero);
+            Assert.That(Spawn(cmake, "--build .", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine), Is.Zero);
             return build;
         }
         public static string Build(Func<int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null, IEnumerable<MethodInfo> bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
@@ -145,7 +145,7 @@ target_compile_definitions(runco PRIVATE RECYCLONE__COOPERATIVE)
             var name = cooperative ? "runco" : "run";
             var path = Path.Combine(build, name);
             if (!File.Exists(path)) path = Path.Combine(build, "Debug", name);
-            Assert.AreEqual(0, Spawn(path, arguments, build, environment, Console.Error.WriteLine, Console.Error.WriteLine));
+            Assert.That(Spawn(path, arguments, build, environment, Console.Error.WriteLine, Console.Error.WriteLine), Is.Zero);
         }
 
         [StructLayout(LayoutKind.Sequential, Size = 4096)]

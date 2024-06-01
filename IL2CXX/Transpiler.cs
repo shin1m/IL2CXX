@@ -187,6 +187,7 @@ namespace IL2CXX
         public readonly Type typeofDllImportAttribute;
         public readonly Type typeofFieldOffsetAttribute;
         public readonly Type typeofMarshalAsAttribute;
+        public readonly Type typeofInlineArrayAttribute;
         public readonly Type typeofThreadStaticAttribute;
         public readonly Type typeofRuntimeFieldHandle;
         public readonly Type typeofRuntimeMethodHandle;
@@ -217,14 +218,6 @@ namespace IL2CXX
         }
         // TODO: Nullable.GetUnderlyingType() of MetadataLoadContext does not work.
         public Type GetNullableUnderlyingType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeofNullable ? type.GetGenericArguments()[0] : null;
-        private Type[] GetInterfaces(Type type)
-        {
-            var interfaces = type.GetInterfaces();
-            if (!type.IsSZArray) return interfaces;
-            // TODO: Work around for szarray bug.
-            var roc = getType(typeof(IReadOnlyCollection<>)).MakeGenericType(GetElementType(type));
-            return interfaces.Contains(roc) ? interfaces : interfaces.Append(roc).ToArray();
-        }
         private byte ParseU1(ref int index) => bytes[index++];
         private sbyte ParseI1(ref int index) => (sbyte)bytes[index++];
         private ushort ParseU2(ref int index)
@@ -820,11 +813,7 @@ namespace IL2CXX
                 {
                     var e = GetElementType(x.ParameterType);
                     var @out = x.GetCustomAttributesData().Any(x => x.AttributeType == typeofOutAttribute);
-                    if (@out)
-                    {
-                        var t = EscapeForValue(e);
-                        writer.WriteLine($"\tf__store(*a_{i}, {(t.EndsWith("*") ? $"static_cast<{t}>(nullptr)" : $"{t}{{}}")});");
-                    }
+                    if (@out) writer.WriteLine($"\tf__store(*a_{i}, ({EscapeForStacked(e)}){{}});");
                     if (typeofSafeHandle.IsAssignableFrom(e))
                     {
                         writer.WriteLine($"\tvoid* p{i};");
@@ -967,10 +956,10 @@ namespace IL2CXX
         private string GenerateCheckParameterCount(MethodBase method)
         {
             var parameters = method.GetParameters();
-            /*return $@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
+            /*return $@"{'\t'}auto parameters = static_cast<{EscapeForStacked(TypeOf<object[]>())}>(a_parameters);
 {'\t'}if ((parameters ? parameters->v__length : 0) != {parameters.Length}) [[unlikely]] {GenerateThrow("TargetParameterCount")};
 ";*/
-            return $@"{'\t'}auto parameters = static_cast<{EscapeForValue(TypeOf<object[]>())}>(a_parameters);
+            return $@"{'\t'}auto parameters = static_cast<{EscapeForStacked(TypeOf<object[]>())}>(a_parameters);
 {'\t'}if ((parameters ? parameters->v__length : 0) != {parameters.Length}) [[unlikely]] {{
 {'\t'}{'\t'}std::cerr << ""invalid parameter count for {method.DeclaringType}::[{method}]: "";
 {'\t'}{'\t'}if (parameters)

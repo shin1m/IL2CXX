@@ -25,7 +25,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)), get(typeof(IntPtr)) }),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}void* p = a_2;
 {'\t'}std::atomic_ref(a_0->v__5fvalue).compare_exchange_strong(p, a_1);
-{'\t'}return {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{p}};
+{'\t'}return {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{p}};
 ", 1)
             );
             code.For(
@@ -45,7 +45,7 @@ namespace IL2CXX
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)) }),
-                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $"\treturn {transpiler.EscapeForValue(get(typeof(IntPtr)))}{{std::atomic_ref(a_0->v__5fvalue).exchange(a_1)}};\n", 1)
+                transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $"\treturn {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{std::atomic_ref(a_0->v__5fvalue).exchange(a_1)}};\n", 1)
             );
             code.For(
                 type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(object)).MakeByRefType(), get(typeof(object)) }),
@@ -125,17 +125,6 @@ namespace IL2CXX
 {'\t'}{'\t'}return true;
 {'\t'}}});
 ", 0)
-            );
-        })
-        .For(get(typeof(RegisteredWaitHandle)), (type, code) =>
-        {
-            code.For(
-                type.GetMethod("WaitHandleCleanupNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-            );
-            code.For(
-                type.GetMethod("UnregisterWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(Thread)), (type, code) =>
@@ -309,51 +298,9 @@ namespace IL2CXX
         // TODO
         .For(get(typeof(ThreadPool)), (type, code) =>
         {
-            if (target == PlatformID.Win32NT)
-                code.For(
-                    type.GetMethod("BindIOCompletionCallbackNative", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-                );
             code.For(
-                type.GetMethod("GetEnableWorkerTracking", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn false;\n", 0)
-            );
-            code.For(
-                type.GetMethod("GetThreadCount", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-            );
-            code.For(
-                type.GetMethod("GetPendingUnmanagedWorkItemCount", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-            );
-            code.For(
-                type.GetMethod("InitializeConfigAndDetermineUsePortableThreadPool", BindingFlags.Static | BindingFlags.NonPublic),
+                type.GetMethod("InitializeConfig", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn true;\n", 1)
-            );
-            code.For(
-                type.GetMethod("NotifyWorkItemCompleteNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-            );
-            code.For(
-                type.GetMethod("NotifyWorkItemProgressNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-            );
-            code.For(
-                type.GetMethod("PerformRuntimeSpecificGateActivities", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\treturn false;\n", 1)
-            );
-            if (target == PlatformID.Win32NT)
-                code.For(
-                    type.GetMethod("QueueWaitCompletionNative", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-                );
-            code.For(
-                type.GetMethod("RegisterWaitForSingleObjectNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-            );
-            code.For(
-                type.GetMethod("ReportThreadStatusNative", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
         .For(get(typeof(WaitHandle)), (type, code) =>
@@ -431,24 +378,6 @@ namespace IL2CXX
 {'\t'}}});
 ", 0)
                 );
-        })
-        .For(get(Type.GetType("System.Threading.OverlappedData")), (type, code) =>
-        {
-            if (target == PlatformID.Win32NT)
-            {
-                code.For(
-                    type.GetMethod("AllocateNativeOverlapped", declaredAndInstance),
-                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-                );
-                code.For(
-                    type.GetMethod("FreeNativeOverlapped", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-                );
-                code.For(
-                    type.GetMethod("GetOverlappedFromNative", BindingFlags.Static | BindingFlags.NonPublic),
-                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-                );
-            }
         });
     }
 }

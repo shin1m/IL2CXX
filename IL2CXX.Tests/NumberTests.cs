@@ -146,6 +146,20 @@ namespace IL2CXX.Tests
         static int EnumHasFlag() => Flags.XY.HasFlag(Flags.Y) ? 0 : 1;
         static int EnumToStringDefault() => Names.Bar.ToString() == "Bar" ? 0 : 1;
         static int EnumToStringG() => Names.Bar.ToString("g") == "Bar" ? 0 : 1;
+        static int EnumISpanFormattableTryFormat()
+        {
+            var cs = new char[8];
+            if (!((ISpanFormattable)Names.Bar).TryFormat(cs, out var n, "", null)) return 1;
+            if (n != 3) return 2;
+            return new string(cs, 0, n) == "Bar" ? 0 : 3;
+        }
+        static int EnumTryFormat()
+        {
+            var cs = new char[8];
+            if (!Enum.TryFormat(Names.Bar, cs, out var n)) return 1;
+            if (n != 3) return 2;
+            return new string(cs, 0, n) == "Bar" ? 0 : 3;
+        }
 
         static int Run(string[] arguments) => arguments[1] switch
         {
@@ -168,6 +182,8 @@ namespace IL2CXX.Tests
             nameof(EnumHasFlag) => EnumHasFlag(),
             nameof(EnumToStringDefault) => EnumToStringDefault(),
             nameof(EnumToStringG) => EnumToStringG(),
+            nameof(EnumISpanFormattableTryFormat) => EnumISpanFormattableTryFormat(),
+            nameof(EnumTryFormat) => EnumTryFormat(),
             _ => -1
         };
 
@@ -198,7 +214,9 @@ namespace IL2CXX.Tests
                 nameof(EnumGetValuesOfT),
                 nameof(EnumHasFlag),
                 nameof(EnumToStringDefault),
-                nameof(EnumToStringG)
+                nameof(EnumToStringG),
+                nameof(EnumISpanFormattableTryFormat),
+                nameof(EnumTryFormat)
             )] string name,
             [Values] bool cooperative
         ) => Utilities.Run(build, cooperative, name);

@@ -8,7 +8,7 @@ There are a lot of missing pieces in .NET runtime support as they are implemente
 
 # Requirements
 
-* .NET 7
+* .NET 8
 * C++20
 
 Currently, it is built and tested only on Linux x86-64.
@@ -18,12 +18,12 @@ Currently, it is built and tested only on Linux x86-64.
 ## Run Tests
 
 	cd IL2CXX.Tests
-	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/7.0.x dotnet test
+	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/8.0.x dotnet test
 
 This requires a lot of memory.
 Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 
-	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/7.0.x dotnet test -- NUnit.NumberOfTestWorkers=2
+	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/8.0.x dotnet test -- NUnit.NumberOfTestWorkers=2
 
 ## Transpile and Build .NET Executable
 
@@ -35,7 +35,7 @@ Specify `NUnit.NumberOfTestWorkers` based on the available memory.
 	CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 ..
 	cmake --build . -j8 # or whatever
 
-	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/7.0.x ./Foo
+	LD_LIBRARY_PATH=$DOTNET_ROOT/shared/Microsoft.NETCore.App/8.0.x ./Foo
 
 `cmake --build .` takes really long time.
 

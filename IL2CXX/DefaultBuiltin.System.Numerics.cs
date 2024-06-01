@@ -31,6 +31,10 @@ namespace IL2CXX
         }
         private static void SetupVector(Func<Type, Type> get, Type type, Builtin.Code code, Type typeofVectorOfT, string squareRoot)
         {
+            code.For(
+                type.GetProperty(nameof(Vector.IsHardwareAccelerated)).GetMethod,
+                transpiler => ("\treturn false;\n", 1)
+            );
             var typeofVectorOfT0 = typeofVectorOfT.MakeGenericType(Type.MakeGenericMethodParameter(0));
             void relation(string name, string @operator) => code.ForGeneric(
                 type.GetMethod(name, 1, new[] { typeofVectorOfT0, typeofVectorOfT0 }),
@@ -134,21 +138,25 @@ namespace IL2CXX
         }
         private static void SetupVectorOfT(Type type, Builtin.Code code)
         {
-            void binary(string name, Func<string, string, string, string> action) => code.ForGeneric(
+            void additive(string name, string @operator) => code.ForGeneric(
                 type.GetMethod(name),
-                (transpiler, types) => VectorOfTBinary(type, transpiler, types, action)
+                (transpiler, types) => VectorOfTBinary(type, transpiler, types, (value, x, y) => $"{value} = {x} {@operator} {y}")
             );
-            binary("op_Addition", (value, x, y) => $"{value} = {x} + {y}");
-            binary("op_Subtraction", (value, x, y) => $"{value} = {x} - {y}");
-            code.ForGeneric(
-                type.GetMethod("op_Multiply", new[] { type, type }),
-                (transpiler, types) => VectorOfTBinary(type, transpiler, types, (value, x, y) => $"{value} = {x} * {y}")
-            );
-            code.ForGeneric(
-                type.GetMethod("op_Multiply", new[] { type, type.GetGenericArguments()[0] }),
-                (transpiler, types) => VectorOfTUnary(type, transpiler, types, (value, x) => $"{value} = {x} * a_1")
-            );
-            binary("op_Division", (value, x, y) => $"{value} = {x} / {y}");
+            additive("op_Addition", "+");
+            additive("op_Subtraction", "-");
+            void multiplicative(string name, string @operator)
+            {
+                code.ForGeneric(
+                    type.GetMethod(name, new[] { type, type }),
+                    (transpiler, types) => VectorOfTBinary(type, transpiler, types, (value, x, y) => $"{value} = {x} {@operator} {y}")
+                );
+                code.ForGeneric(
+                    type.GetMethod(name, new[] { type, type.GetGenericArguments()[0] }),
+                    (transpiler, types) => VectorOfTUnary(type, transpiler, types, (value, x) => $"{value} = {x} {@operator} a_1")
+                );
+            }
+            multiplicative("op_Multiply", "*");
+            multiplicative("op_Division", "/");
             void bitwise(string name, string @operator) => code.ForGeneric(
                 type.GetMethod(name),
                 (transpiler, types) => ($@"{'\t'}{transpiler.EscapeForStacked(type.MakeGenericType(types))} value;

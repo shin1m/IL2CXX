@@ -17,7 +17,7 @@ namespace IL2CXX.Tests
         }
         static int GetString()
         {
-            var x = Encoding.UTF8.GetString(new[] { (byte)0xce, (byte)0xa0 });
+            var x = Encoding.UTF8.GetString([(byte)0xce, (byte)0xa0]);
             Console.WriteLine(x);
             return x == "\u03a0" ? 0 : 1;
         }

@@ -55,10 +55,10 @@ namespace IL2CXX.Tests
         string build;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
+        public void OneTimeSetUp() => build = Utilities.Build(Run, null, [
             typeof(Foo),
             typeof(Bar)
-        }, null);
+        ], null);
         [Test]
         public void Test(
             [Values(

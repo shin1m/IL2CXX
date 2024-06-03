@@ -130,13 +130,13 @@ namespace IL2CXX.Tests
             using var semaphore = new Semaphore(0, 1);
             new Thread(() =>
             {
-                WaitHandle.WaitAll(new WaitHandle[] { mutex, auto });
+                WaitHandle.WaitAll([mutex, auto]);
                 semaphore.Release();
                 manual.Set();
             }).Start();
             mutex.ReleaseMutex();
             auto.Set();
-            WaitHandle.WaitAll(new WaitHandle[] { manual, semaphore });
+            WaitHandle.WaitAll([manual, semaphore]);
             return 0;
         }
         static int WaitAny()
@@ -146,11 +146,11 @@ namespace IL2CXX.Tests
             using var other = new EventWaitHandle(false, EventResetMode.AutoReset);
             new Thread(() =>
             {
-                if (WaitHandle.WaitAny(new WaitHandle[] { other, done, ready }) != 2) throw new Exception();
+                if (WaitHandle.WaitAny([other, done, ready]) != 2) throw new Exception();
                 done.Set();
             }).Start();
             ready.Set();
-            return WaitHandle.WaitAny(new WaitHandle[] { other, done }) == 1 ? 0 : 1;
+            return WaitHandle.WaitAny([other, done]) == 1 ? 0 : 1;
         }
         static int SignalAndWait()
         {

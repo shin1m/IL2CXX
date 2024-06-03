@@ -68,11 +68,11 @@ namespace IL2CXX
         .For(get(typeof(MethodBase)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(MethodBase.GetMethodFromHandle), new[] { get(typeof(RuntimeMethodHandle)) }),
+                type.GetMethod(nameof(MethodBase.GetMethodFromHandle), [get(typeof(RuntimeMethodHandle))]),
                 transpiler => ("\treturn a_0.v__method;\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(MethodBase.GetMethodFromHandle), new[] { get(typeof(RuntimeMethodHandle)), get(typeof(RuntimeTypeHandle)) }),
+                type.GetMethod(nameof(MethodBase.GetMethodFromHandle), [get(typeof(RuntimeMethodHandle)), get(typeof(RuntimeTypeHandle))]),
                 transpiler => ("\treturn a_0.v__method;\n", 1)
             );
         })

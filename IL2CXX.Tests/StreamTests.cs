@@ -29,14 +29,14 @@ namespace IL2CXX.Tests
 
         static int ReadMemory()
         {
-            using var stream = new MemoryStream(new byte[] { 0, 1 });
+            using var stream = new MemoryStream([0, 1]);
             var xs = new byte[4];
             return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
         }
         static int WriteMemory()
         {
             using var stream = new MemoryStream();
-            stream.Write(new byte[] { 0, 1 });
+            stream.Write([0, 1]);
             return stream.TryGetBuffer(out var xs) && BytesEquals(xs, 0, 1) ? 0 : 1;
         }
         static int ReadFile()
@@ -47,7 +47,7 @@ namespace IL2CXX.Tests
         }
         static int WriteFile()
         {
-            using (var stream = File.OpenWrite(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName))) stream.Write(new byte[] { 0, 1 });
+            using (var stream = File.OpenWrite(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName))) stream.Write([0, 1]);
             return 0;
         }
         static int ReadTextFile()
@@ -93,7 +93,7 @@ namespace IL2CXX.Tests
         [Test]
         public void TestReadFile([Values] bool cooperative)
         {
-            File.WriteAllBytes(FilePath, new byte[] { 0, 1 });
+            File.WriteAllBytes(FilePath, [0, 1]);
             Utilities.Run(build, cooperative, nameof(ReadFile));
         }
         [Test]
@@ -105,11 +105,10 @@ namespace IL2CXX.Tests
         [Test]
         public void TestReadTextFile([Values] bool cooperative)
         {
-            File.WriteAllLines(FilePath, new[]
-            {
+            File.WriteAllLines(FilePath, [
                 "Hello, World!",
                 "Good bye."
-            });
+            ]);
             Utilities.Run(build, cooperative, nameof(ReadTextFile));
         }
         [Test]

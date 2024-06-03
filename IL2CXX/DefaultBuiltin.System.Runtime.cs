@@ -90,11 +90,11 @@ namespace IL2CXX
         .For(get(typeof(Marshal)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(Marshal.Copy), new[] { get(typeof(IntPtr)), get(typeof(byte[])), get(typeof(int)), get(typeof(int)) }),
+                type.GetMethod(nameof(Marshal.Copy), [get(typeof(IntPtr)), get(typeof(byte[])), get(typeof(int)), get(typeof(int))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_1") + "\tstd::memcpy(a_1->f_data() + a_2, a_0, a_3);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Marshal.DestroyStructure), new[] { get(typeof(IntPtr)), get(typeof(Type)) }),
+                type.GetMethod(nameof(Marshal.DestroyStructure), [get(typeof(IntPtr)), get(typeof(Type))]),
                 transpiler => ($@"{'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}static_cast<t__type*>(a_1)->f_destroy_unmanaged(a_0);
 ", 1)
@@ -108,7 +108,7 @@ namespace IL2CXX
 {'\t'}return p;
 ", 0));
             code.For(
-                type.GetMethod(nameof(Marshal.GetDelegateForFunctionPointer), new[] { get(typeof(IntPtr)), get(typeof(Type)) }),
+                type.GetMethod(nameof(Marshal.GetDelegateForFunctionPointer), [get(typeof(IntPtr)), get(typeof(Type))]),
                 transpiler =>
                 {
                     var md = $"&t__type_of<{transpiler.Escape(get(typeof(MulticastDelegate)))}>::v__instance";
@@ -137,20 +137,20 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(Marshal.GetExceptionForHR), new[] { get(typeof(int)), get(typeof(IntPtr)) }),
+                type.GetMethod(nameof(Marshal.GetExceptionForHR), [get(typeof(int)), get(typeof(IntPtr))]),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
                 type.GetMethod("IsPinnable", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ("\treturn true;\n", 1)
             );
-            var ptsh = type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr)), get(typeof(object)), get(typeof(bool)) }, null);
+            var ptsh = type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(IntPtr)), get(typeof(object)), get(typeof(bool))], null);
             code.For(ptsh, transpiler => ($"\ta_1->f_type()->f_from_unmanaged(a_1, a_0);\n", 1));
             code.For(
-                type.GetMethod(nameof(Marshal.PtrToStructure), new[] { get(typeof(IntPtr)), get(typeof(Type)) }),
+                type.GetMethod(nameof(Marshal.PtrToStructure), [get(typeof(IntPtr)), get(typeof(Type))]),
                 transpiler =>
                 {
-                    var create = get(typeof(Activator)).GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(bool)) });
+                    var create = get(typeof(Activator)).GetMethod(nameof(Activator.CreateInstance), [get(typeof(Type)), get(typeof(bool))]);
                     transpiler.Enqueue(create);
                     transpiler.Enqueue(ptsh);
                     return (transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0) return nullptr;
@@ -169,7 +169,7 @@ namespace IL2CXX
 {'\t'}return type->v__unmanaged_size;
 ", 1));
             code.For(
-                type.GetMethod(nameof(Marshal.SizeOf), new[] { get(typeof(Type)) }),
+                type.GetMethod(nameof(Marshal.SizeOf), [get(typeof(Type))]),
                 transpiler =>
                 {
                     transpiler.Enqueue(soh);
@@ -181,7 +181,7 @@ namespace IL2CXX
                 }
             );
             code.For(
-                type.GetMethod(nameof(Marshal.StructureToPtr), new[] { get(typeof(object)), get(typeof(IntPtr)), get(typeof(bool)) }),
+                type.GetMethod(nameof(Marshal.StructureToPtr), [get(typeof(object)), get(typeof(IntPtr)), get(typeof(bool))]),
                 transpiler => ($@"{'\t'}if (a_2) a_0->f_type()->f_destroy_unmanaged(a_1);
 {'\t'}return a_0->f_type()->f_to_unmanaged(a_0, a_1);
 ", 1)
@@ -190,11 +190,11 @@ namespace IL2CXX
         .For(get(typeof(MemoryMarshal)), (type, code) =>
         {
             code.ForGeneric(
-                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference), 1, new[] { Type.MakeGenericMethodParameter(0).MakeArrayType() }),
+                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference), 1, [Type.MakeGenericMethodParameter(0).MakeArrayType()]),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0->f_data());\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference), new[] { get(typeof(Array)) }),
+                type.GetMethod(nameof(MemoryMarshal.GetArrayDataReference), [get(typeof(Array))]),
                 transpiler => ("\treturn reinterpret_cast<uint8_t*>(a_0->f_bounds() + a_0->f_type()->v__rank);\n", 1)
             );
         })
@@ -360,7 +360,7 @@ namespace IL2CXX
             var methods = GenericMethods(type);
             void additive(string name, char @operator)
             {
-                var voidp = type.GetMethod(name, new[] { get(typeof(void*)), get(typeof(int)) });
+                var voidp = type.GetMethod(name, [get(typeof(void*)), get(typeof(int))]);
                 foreach (var m in methods.Where(x => x != voidp && x.Name == name))
                     code.ForGeneric(m, (transpiler, types) => ($"\treturn a_0 {@operator} a_1;\n", 1));
                 code.ForGeneric(voidp, (transpiler, types) => ($"\treturn static_cast<char*>(a_0) {@operator} a_1;\n", 1));
@@ -370,7 +370,7 @@ namespace IL2CXX
             void offset(string name, char @operator)
             {
                 foreach (var x in new[] { typeof(IntPtr), typeof(UIntPtr) }) code.ForGeneric(
-                    type.GetMethod(name, new[] { t0ref, get(x) }),
+                    type.GetMethod(name, [t0ref, get(x)]),
                     (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(reinterpret_cast<char*>(a_0) {@operator} a_1);\n", 1)
                 );
             }
@@ -381,11 +381,11 @@ namespace IL2CXX
                 (transpiler, types) => ("\treturn a_0 == a_1;\n", 1)
             );
             code.ForGeneric(
-                type.GetMethod(nameof(Unsafe.As), 1, new[] { get(typeof(object)) }),
+                type.GetMethod(nameof(Unsafe.As), 1, [get(typeof(object))]),
                 (transpiler, types) => ($"\treturn static_cast<{transpiler.EscapeForStacked(types[0])}>(a_0);\n", 1)
             );
             code.ForGeneric(
-                type.GetMethod(nameof(Unsafe.As), 2, new[] { t0ref }),
+                type.GetMethod(nameof(Unsafe.As), 2, [t0ref]),
                 (transpiler, types) => ($"\treturn reinterpret_cast<{transpiler.EscapeForValue(types[1])}*>(a_0);\n", 1)
             );
             code.ForGeneric(
@@ -399,29 +399,29 @@ namespace IL2CXX
                 (transpiler, types) => ("\treturn reinterpret_cast<char*>(a_1) - reinterpret_cast<char*>(a_0);\n", 1)
             );
             code.ForGeneric(
-                type.GetMethod(nameof(Unsafe.Copy), 1, new[] { get(typeof(void*)), t0ref }),
+                type.GetMethod(nameof(Unsafe.Copy), 1, [get(typeof(void*)), t0ref]),
                 (transpiler, types) => ($"\t*static_cast<{transpiler.EscapeForStacked(types[0])}*>(a_0) = *a_1;\n", 1)
             );
             code.ForGeneric(
-                type.GetMethod(nameof(Unsafe.Copy), 1, new[] { t0ref, get(typeof(void*)) }),
+                type.GetMethod(nameof(Unsafe.Copy), 1, [t0ref, get(typeof(void*))]),
                 (transpiler, types) => ($"\t*a_0 = *static_cast<{transpiler.EscapeForValue(types[0])}*>(a_1);\n", 1)
             );
             foreach (var x in new[] { typeof(void*), typeof(byte).MakeByRefType() })
             {
                 foreach (var name in new[] { nameof(Unsafe.CopyBlock), nameof(Unsafe.CopyBlockUnaligned) }) code.For(
-                    type.GetMethod(name, new[] { get(x), get(x), get(typeof(uint)) }),
+                    type.GetMethod(name, [get(x), get(x), get(typeof(uint))]),
                     transpiler => ("\tstd::memcpy(a_0, a_1, a_2);\n", 1)
                 );
                 foreach (var name in new[] { nameof(Unsafe.InitBlock), nameof(Unsafe.InitBlockUnaligned) }) code.For(
-                    type.GetMethod(name, new[] { get(x), get(typeof(byte)), get(typeof(uint)) }),
+                    type.GetMethod(name, [get(x), get(typeof(byte)), get(typeof(uint))]),
                     transpiler => ("\tstd::memset(a_0, a_1, a_2);\n", 1)
                 );
                 code.ForGeneric(
-                    type.GetMethod(nameof(Unsafe.ReadUnaligned), new[] { get(x) }),
+                    type.GetMethod(nameof(Unsafe.ReadUnaligned), [get(x)]),
                     (transpiler, types) => ($"\treturn *reinterpret_cast<{transpiler.EscapeForValue(types[0])}*>(a_0);\n", 1)
                 );
                 code.ForGeneric(
-                    type.GetMethod(nameof(Unsafe.WriteUnaligned), new[] { get(x), t0 }),
+                    type.GetMethod(nameof(Unsafe.WriteUnaligned), [get(x), t0]),
                     (transpiler, types) => ($"\t*reinterpret_cast<{transpiler.EscapeForMember(types[0])}*>(a_0) = a_1;\n", 1)
                 );
             }
@@ -456,7 +456,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(AssemblyLoadContext.LoadFromStream), new[] { get(typeof(Stream)), get(typeof(Stream)) }),
+                type.GetMethod(nameof(AssemblyLoadContext.LoadFromStream), [get(typeof(Stream)), get(typeof(Stream))]),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         });

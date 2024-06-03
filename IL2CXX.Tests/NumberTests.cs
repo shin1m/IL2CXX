@@ -139,10 +139,10 @@ namespace IL2CXX.Tests
         }
         static int EnumGetName() => Enum.GetName(typeof(Names), Names.Foo) == "Foo" ? 0 : 1;
         static int EnumGetNameOfT() => Enum.GetName(Names.Foo) == "Foo" ? 0 : 1;
-        static int EnumGetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
-        static int EnumGetNamesOfT() => Enum.GetNames<Names>().SequenceEqual(new[] { "Foo", "Bar", "Zot" }) ? 0 : 1;
-        static int EnumGetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
-        static int EnumGetValuesOfT() => Enum.GetValues<Names>().Cast<Names>().SequenceEqual(new[] { Names.Foo, Names.Bar, Names.Zot }) ? 0 : 1;
+        static int EnumGetNames() => Enum.GetNames(typeof(Names)).SequenceEqual(["Foo", "Bar", "Zot"]) ? 0 : 1;
+        static int EnumGetNamesOfT() => Enum.GetNames<Names>().SequenceEqual(["Foo", "Bar", "Zot"]) ? 0 : 1;
+        static int EnumGetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual([Names.Foo, Names.Bar, Names.Zot]) ? 0 : 1;
+        static int EnumGetValuesOfT() => Enum.GetValues<Names>().Cast<Names>().SequenceEqual([Names.Foo, Names.Bar, Names.Zot]) ? 0 : 1;
         static int EnumHasFlag() => Flags.XY.HasFlag(Flags.Y) ? 0 : 1;
         static int EnumToStringDefault() => Names.Bar.ToString() == "Bar" ? 0 : 1;
         static int EnumToStringG() => Names.Bar.ToString("g") == "Bar" ? 0 : 1;
@@ -190,9 +190,9 @@ namespace IL2CXX.Tests
         string build;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
+        public void OneTimeSetUp() => build = Utilities.Build(Run, null, [
             typeof(Names)
-        });
+        ]);
         [Test]
         public void Test(
             [Values(

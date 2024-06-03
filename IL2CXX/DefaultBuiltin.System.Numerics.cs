@@ -37,7 +37,7 @@ namespace IL2CXX
             );
             var typeofVectorOfT0 = typeofVectorOfT.MakeGenericType(Type.MakeGenericMethodParameter(0));
             void relation(string name, string @operator) => code.ForGeneric(
-                type.GetMethod(name, 1, new[] { typeofVectorOfT0, typeofVectorOfT0 }),
+                type.GetMethod(name, 1, [typeofVectorOfT0, typeofVectorOfT0]),
                 (transpiler, types) => VectorOfTBinary(typeofVectorOfT, transpiler, types, (value, x, y) => $"std::memset(&{value}, {x} {@operator} {y} ? 0xff : 0, sizeof({transpiler.EscapeForStacked(types[0])}))")
             );
             relation(nameof(Vector.Equals), "==");
@@ -51,7 +51,7 @@ namespace IL2CXX
             );
             unary0(nameof(Vector.Abs), (value, x) => $"{value} = std::abs({x})");
             void binary(string name, Func<string, string, string, string> action) => code.ForGeneric(
-                type.GetMethod(name, 1, new[] { typeofVectorOfT0, typeofVectorOfT0 }),
+                type.GetMethod(name, 1, [typeofVectorOfT0, typeofVectorOfT0]),
                 (transpiler, types) => VectorOfTBinary(typeofVectorOfT, transpiler, types, action)
             );
             binary(nameof(Vector.Min), (value, x, y) => $"{value} = std::min({x}, {y})");
@@ -85,8 +85,8 @@ namespace IL2CXX
             void unary1(string name, Func<string, string ,string> action)
             {
                 void unary<T>(Func<string, string ,string> action) => code.For(
-                    type.GetMethod(name, new[] { typeofVectorOfT.MakeGenericType(get(typeof(T))) }),
-                    transpiler => VectorOfTUnary(typeofVectorOfT, transpiler, new[] { get(typeof(T)) }, action)
+                    type.GetMethod(name, [typeofVectorOfT.MakeGenericType(get(typeof(T)))]),
+                    transpiler => VectorOfTUnary(typeofVectorOfT, transpiler, [get(typeof(T))], action)
                 );
                 unary<double>(action);
                 unary<float>(action);
@@ -147,11 +147,11 @@ namespace IL2CXX
             void multiplicative(string name, string @operator)
             {
                 code.ForGeneric(
-                    type.GetMethod(name, new[] { type, type }),
+                    type.GetMethod(name, [type, type]),
                     (transpiler, types) => VectorOfTBinary(type, transpiler, types, (value, x, y) => $"{value} = {x} {@operator} {y}")
                 );
                 code.ForGeneric(
-                    type.GetMethod(name, new[] { type, type.GetGenericArguments()[0] }),
+                    type.GetMethod(name, [type, type.GetGenericArguments()[0]]),
                     (transpiler, types) => VectorOfTUnary(type, transpiler, types, (value, x) => $"{value} = {x} {@operator} a_1")
                 );
             }
@@ -189,7 +189,7 @@ namespace IL2CXX
 ", 1);
             });
             equality(type.GetMethod("op_Equality"));
-            equality(type.GetMethod(nameof(Equals), new[] { type }));
+            equality(type.GetMethod(nameof(Equals), [type]));
         }
         private static Builtin SetupSystemNumerics(this Builtin @this, Func<Type, Type> get) => @this
         .For(get(typeof(BitOperations)), (type, code) =>
@@ -241,7 +241,7 @@ namespace IL2CXX
 {'\t'}{'\t'}}}
 ", false, null);
             code.ForGeneric(
-                type.GetConstructor(new[] { type.GetGenericArguments()[0] }),
+                type.GetConstructor([type.GetGenericArguments()[0]]),
                 (transpiler, types) =>
                 {
                     var e = transpiler.EscapeForStacked(types[0]);

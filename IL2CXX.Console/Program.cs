@@ -54,7 +54,7 @@ namespace IL2CXX.Console
                     {
                         void codeFor(MethodBase method, Func<Transpiler, (string body, int inline)> body) => forIf(code, method, body);
                         codeFor(
-                            type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToManaged), new[] { get(typeof(string).MakeByRefType()) }),
+                            type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToManaged), [get(typeof(string).MakeByRefType())]),
                             transpiler => ($@"{'\t'}if (a_0->v_slot.v_Type.v) {{
 {'\t'}{'\t'}auto& p = reinterpret_cast<t_System_2eString*&>(a_0->v_slot.v_IntPtrValue.v);
 {'\t'}{'\t'}f__store(*a_1, p);
@@ -65,7 +65,7 @@ namespace IL2CXX.Console
 ", 1)
                         );
                         codeFor(
-                            type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToJS), new[] { get(typeof(string)) }),
+                            type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToJS), [get(typeof(string))]),
                             transpiler => ($@"{'\t'}if (a_1) {{
 {'\t'}{'\t'}a_0->v_slot.v_Type.v = 15;
 {'\t'}{'\t'}f__store(reinterpret_cast<t_System_2eString*&>(a_0->v_slot.v_IntPtrValue.v), a_1);

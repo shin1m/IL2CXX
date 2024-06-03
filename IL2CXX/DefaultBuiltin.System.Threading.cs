@@ -10,53 +10,53 @@ namespace IL2CXX
         .For(get(typeof(Interlocked)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(int)).MakeByRefType(), get(typeof(int)), get(typeof(int)) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(int)).MakeByRefType(), get(typeof(int)), get(typeof(int))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}std::atomic_ref(*a_0).compare_exchange_strong(a_2, a_1);
 {'\t'}return a_2;
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(long)).MakeByRefType(), get(typeof(long)), get(typeof(long)) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(long)).MakeByRefType(), get(typeof(long)), get(typeof(long))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}std::atomic_ref(*a_0).compare_exchange_strong(a_2, a_1);
 {'\t'}return a_2;
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)), get(typeof(IntPtr)) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)), get(typeof(IntPtr))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}void* p = a_2;
 {'\t'}std::atomic_ref(a_0->v__5fvalue).compare_exchange_strong(p, a_1);
 {'\t'}return {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{p}};
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.CompareExchange), new[] { get(typeof(object)).MakeByRefType(), get(typeof(object)), get(typeof(object)) }),
+                type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(object)).MakeByRefType(), get(typeof(object)), get(typeof(object))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = a_2;
 {'\t'}f__compare_exchange(*a_0, p, a_1);
 {'\t'}return p;
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(int)).MakeByRefType(), get(typeof(int)) }),
+                type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(int)).MakeByRefType(), get(typeof(int))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).exchange(a_1);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(long)).MakeByRefType(), get(typeof(long)) }),
+                type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(long)).MakeByRefType(), get(typeof(long))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).exchange(a_1);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)) }),
+                type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $"\treturn {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{std::atomic_ref(a_0->v__5fvalue).exchange(a_1)}};\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Interlocked.Exchange), new[] { get(typeof(object)).MakeByRefType(), get(typeof(object)) }),
+                type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(object)).MakeByRefType(), get(typeof(object))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__exchange(*a_0, a_1);\n", 1)
             );
             code.For(
-                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(int)).MakeByRefType(), get(typeof(int)) }, null),
+                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(int)).MakeByRefType(), get(typeof(int))], null),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).fetch_add(a_1);\n", 1)
             );
             code.For(
-                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(long)).MakeByRefType(), get(typeof(long)) }, null),
+                type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(long)).MakeByRefType(), get(typeof(long))], null),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).fetch_add(a_1);\n", 1)
             );
             code.For(
@@ -84,7 +84,7 @@ namespace IL2CXX
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Monitor.Enter), new[] { get(typeof(object)) }),
+                type.GetMethod(nameof(Monitor.Enter), [get(typeof(object))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}f_epoch_region([&]
 {'\t'}{{
 {'\t'}{'\t'}a_0->f_extension()->v_mutex.lock();
@@ -186,7 +186,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\tf_engine()->f_join(a_0);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Thread.Sleep), new[] { get(typeof(int)) }),
+                type.GetMethod(nameof(Thread.Sleep), [get(typeof(int))]),
                 transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
 {'\t'}{'\t'}std::this_thread::sleep_for(a_0 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_0));
@@ -325,7 +325,7 @@ namespace IL2CXX
 ", 0)
                 );
                 code.For(
-                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int)) }, null),
+                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int))], null),
                     transpiler => ($@"{'\t'}return f_epoch_region([&]
 {'\t'}{{
 {'\t'}{'\t'}return WaitForMultipleObjectsEx(a_1, reinterpret_cast<const HANDLE*>(a_0), a_2, a_3, TRUE);
@@ -353,7 +353,7 @@ namespace IL2CXX
 ", 0)
                 );
                 code.For(
-                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int)) }, null),
+                    type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int))], null),
                     transpiler => ($@"{'\t'}return f_epoch_region([&]() -> int32_t
 {'\t'}{{
 {'\t'}{'\t'}if (a_2) {{

@@ -15,7 +15,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__declaring_type;\n", 0)
             );
             code.For(
-                type.GetMethod(nameof(MemberInfo.GetCustomAttributes), new[] { get(typeof(bool)) }),
+                type.GetMethod(nameof(MemberInfo.GetCustomAttributes), [get(typeof(bool))]),
                 transpiler =>
                 {
                     var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
@@ -24,7 +24,7 @@ namespace IL2CXX
                 }
             );
             code.For(
-                type.GetMethod(nameof(MemberInfo.GetCustomAttributes), new[] { get(typeof(Type)), get(typeof(bool)) }),
+                type.GetMethod(nameof(MemberInfo.GetCustomAttributes), [get(typeof(Type)), get(typeof(bool))]),
                 transpiler =>
                 {
                     var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
@@ -117,11 +117,11 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Assembly.GetManifestResourceStream), new[] { get(typeof(string)) }),
+                type.GetMethod(nameof(Assembly.GetManifestResourceStream), [get(typeof(string))]),
                 transpiler =>
                 {
                     var type = get(typeof(UnmanagedMemoryStream));
-                    var constructor = type.GetConstructor(new[] { get(typeof(byte*)), get(typeof(long)) });
+                    var constructor = type.GetConstructor([get(typeof(byte*)), get(typeof(long))]);
                     transpiler.Enqueue(constructor);
                     return (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}auto i = a_0->v__resources.find(f__string_view(a_1));
 {'\t'}if (i == a_0->v__resources.end()) return nullptr;
@@ -140,7 +140,7 @@ namespace IL2CXX
         {
             SetupMethodBase(get, type, code);
             code.For(
-                type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
+                type.GetMethod(nameof(MethodBase.Invoke), [get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__create(a_0, a_1, a_2, a_3 && a_3->v__length > 0 ? a_3 : nullptr, a_4);\n", 0)
             );
         })
@@ -157,7 +157,7 @@ namespace IL2CXX
                     }
                     var typeofROC = get(typeof(ReadOnlyCollection<CustomAttributeTypedArgument>));
                     var typeofCATA = get(typeof(CustomAttributeTypedArgument));
-                    var constructCATA = escape(typeofCATA.GetConstructor(new[] { transpiler.typeofType, transpiler.typeofObject }));
+                    var constructCATA = escape(typeofCATA.GetConstructor([transpiler.typeofType, transpiler.typeofObject]));
                     var newCATAs = $"f__new_array<{transpiler.Escape(get(typeof(CustomAttributeTypedArgument[])))}, {transpiler.EscapeForMember(typeofCATA)}>";
                     var typeofCANA = get(typeof(CustomAttributeNamedArgument));
                     var typeofCAD = get(typeof(RuntimeCustomAttributeData));
@@ -202,7 +202,7 @@ namespace IL2CXX
 {'\t'}{'\t'}{'\t'}auto a = ca->v_named_arguments[i];
 {'\t'}{'\t'}{'\t'}{transpiler.EscapeForStacked(typeofCATA)} ta{{}};
 {'\t'}{'\t'}{'\t'}{constructCATA}(&ta, a->v_type, value(a));
-{'\t'}{'\t'}{'\t'}{escape(typeofCANA.GetConstructor(new[] { get(typeof(MemberInfo)), typeofCATA }))}(&nas->f_data()[i], a->v_member, ta);
+{'\t'}{'\t'}{'\t'}{escape(typeofCANA.GetConstructor([get(typeof(MemberInfo)), typeofCATA]))}(&nas->f_data()[i], a->v_member, ta);
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}auto RECYCLONE__SPILL cad = f__new_zerod<{transpiler.Escape(typeofCAD)}>();
 {'\t'}{'\t'}{escape(typeofCAD.GetConstructors()[0])}(cad, ca->v_constructor, cas, nas);
@@ -243,7 +243,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(FieldInfo.SetValue), new[] { get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CultureInfo)) }),
+                type.GetMethod(nameof(FieldInfo.SetValue), [get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CultureInfo))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_1 && !a_1->f_type()->f_is(a_0->v__declaring_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}if (a_2 && !a_2->f_type()->f_assignable_to(a_0->v__field_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}a_0->v__field_type->f_copy(a_0->v__field_type->f_unbox(const_cast<t__object*&>(a_2)), 1, a_0->f_address(a_0->v__declaring_type->f_unbox(const_cast<t__object*&>(a_1))));
@@ -255,7 +255,7 @@ namespace IL2CXX
             SetupMethodBase(get, type, code);
             // TODO: check signature.
             code.For(
-                type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)) }),
+                type.GetMethod(nameof(MethodInfo.CreateDelegate), [get(typeof(Type))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__function) {transpiler.GenerateThrow("NotSupported")};
 {'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
@@ -269,7 +269,7 @@ namespace IL2CXX
             );
             // TODO: check signature.
             code.For(
-                type.GetMethod(nameof(MethodInfo.CreateDelegate), new[] { get(typeof(Type)), get(typeof(object)) }),
+                type.GetMethod(nameof(MethodInfo.CreateDelegate), [get(typeof(Type)), get(typeof(object))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__function) {transpiler.GenerateThrow("NotSupported")};
 {'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
@@ -287,7 +287,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(MethodBase.Invoke), new[] { get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
+                type.GetMethod(nameof(MethodBase.Invoke), [get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__invoke(a_1, a_2, a_3, a_4, a_5);\n", 0)
             );
             code.For(
@@ -346,7 +346,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__get;\n", 0)
             );
             code.For(
-                type.GetMethod(nameof(PropertyInfo.GetValue), new[] { get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
+                type.GetMethod(nameof(PropertyInfo.GetValue), [get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__get) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}return a_0->v__get->v__invoke(a_1, a_2, a_3, a_4, a_5);
 ", 0)
@@ -356,7 +356,7 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__set;\n", 0)
             );
             code.For(
-                type.GetMethod(nameof(PropertyInfo.SetValue), new[] { get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)) }),
+                type.GetMethod(nameof(PropertyInfo.SetValue), [get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__set) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}auto n = a_5 ? a_5->v__length : 0;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(n + 1);
@@ -391,7 +391,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Type.GetConstructors), new[] { get(typeof(BindingFlags)) }),
+                type.GetMethod(nameof(Type.GetConstructors), [get(typeof(BindingFlags))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__constructors) std::cerr << ""no constructors: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}size_t n = 0;
 {'\t'}a_0->f_each_constructor(a_1, [&](auto)
@@ -449,7 +449,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Type.GetField), new[] { get(typeof(string)), get(typeof(BindingFlags)) }),
+                type.GetMethod(nameof(Type.GetField), [get(typeof(string)), get(typeof(BindingFlags))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__fields) std::cerr << ""no fields: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}auto name = f__string_view(a_1);
 {'\t'}t__runtime_field_info* p = nullptr;
@@ -466,7 +466,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Type.GetFields), new[] { get(typeof(BindingFlags)) }),
+                type.GetMethod(nameof(Type.GetFields), [get(typeof(BindingFlags))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__fields) std::cerr << ""no fields: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}size_t n = 0;
 {'\t'}a_0->f_each_field(a_1, [&](auto)
@@ -509,7 +509,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Type.GetMethods), new[] { get(typeof(BindingFlags)) }),
+                type.GetMethod(nameof(Type.GetMethods), [get(typeof(BindingFlags))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}size_t n = 0;
 {'\t'}a_0->f_each_method(a_1, [&](auto)
@@ -528,7 +528,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Type.GetProperties), new[] { get(typeof(BindingFlags)) }),
+                type.GetMethod(nameof(Type.GetProperties), [get(typeof(BindingFlags))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__properties) std::cerr << ""no properties: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}size_t n = 0;
 {'\t'}a_0->f_each_property(a_1, [&](auto)
@@ -613,7 +613,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod("GetMethodImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
+                type.GetMethod("GetMethodImpl", declaredAndInstance, [get(typeof(string)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[]))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}auto name = f__string_view(a_1);
 {'\t'}t__runtime_method_info* p = nullptr;
@@ -637,7 +637,7 @@ namespace IL2CXX
 ", 0)
             );
             code.For(
-                type.GetMethod("GetMethodImpl", declaredAndInstance, new[] { get(typeof(string)), get(typeof(int)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[])) }),
+                type.GetMethod("GetMethodImpl", declaredAndInstance, [get(typeof(string)), get(typeof(int)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CallingConventions)), get(typeof(Type[])), get(typeof(ParameterModifier[]))]),
                 transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__methods) std::cerr << ""no methods: "" << f__string(a_0->v__full_name) << std::endl;
 {'\t'}auto name = f__string_view(a_1);
 {'\t'}t__runtime_method_info* p = nullptr;
@@ -750,7 +750,7 @@ namespace IL2CXX
                 {
                     var marvin = get(Type.GetType("System.Marvin", true));
                     var seed = marvin.GetProperty("DefaultSeed").GetMethod;
-                    var compute = marvin.GetMethod("ComputeHash32", new[] { get(typeof(byte)).MakeByRefType(), get(typeof(uint)), get(typeof(uint)), get(typeof(uint)) });
+                    var compute = marvin.GetMethod("ComputeHash32", [get(typeof(byte)).MakeByRefType(), get(typeof(uint)), get(typeof(uint)), get(typeof(uint))]);
                     transpiler.Enqueue(seed);
                     transpiler.Enqueue(compute);
                     return ($@"{'\t'}auto seed = {transpiler.Escape(seed)}();

@@ -21,7 +21,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(ToString), new[] { get(typeof(string)), get(typeof(IFormatProvider)) }),
+                type.GetMethod(nameof(ToString), [get(typeof(string)), get(typeof(IFormatProvider))]),
                 transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
             );
         }
@@ -77,7 +77,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(Equals), new[] { type }),
+                type.GetMethod(nameof(Equals), [type]),
                 transpiler => ("\treturn a_0 == a_1;\n", 0)
             );
             code.For(
@@ -133,11 +133,11 @@ namespace IL2CXX
                 transpiler => ($"\tt_static::v_instance->v_{transpiler.Escape(type)}->{transpiler.Escape(type.GetField(nameof(Type.EmptyTypes)))} = f__new_array<{transpiler.Escape(get(typeof(Type[])))}, {transpiler.EscapeForMember(type)}>(0);\n", 0)
             );
             code.For(
-                type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)) }),
+                type.GetMethod(nameof(Type.GetType), [get(typeof(string))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__find_type(v__name_to_type, f__string_view(a_0));\n", 0)
             );
             code.For(
-                type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)), get(typeof(bool)) }),
+                type.GetMethod(nameof(Type.GetType), [get(typeof(string)), get(typeof(bool))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = f__find_type(v__name_to_type, f__string_view(a_0));
 {'\t'}if (!p && a_1) throw std::runtime_error(""TypeLoadException"");
 {'\t'}return p;
@@ -145,7 +145,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(Type.GetType), new[] { get(typeof(string)), get(typeof(bool)), get(typeof(bool)) }),
+                type.GetMethod(nameof(Type.GetType), [get(typeof(string)), get(typeof(bool)), get(typeof(bool))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_2) {transpiler.GenerateThrow("NotSupported")};
 {'\t'}auto p = f__find_type(v__name_to_type, f__string_view(a_0));
 {'\t'}if (!p && a_1) throw std::runtime_error(""TypeLoadException"");
@@ -330,22 +330,22 @@ namespace IL2CXX
 {'\t'}}}
 ", true, null);
             code.For(
-                type.GetMethod(nameof(Array.Clear), new[] { get(typeof(Array)) }),
+                type.GetMethod(nameof(Array.Clear), [get(typeof(Array))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto element = type->v__element;
 {'\t'}element->f_clear(a_0->f_bounds() + type->v__rank, a_0->v__length);
 ", 1)
             );
             code.For(
-                type.GetMethod(nameof(Array.Clear), new[] { get(typeof(Array)), get(typeof(int)), get(typeof(int)) }),
+                type.GetMethod(nameof(Array.Clear), [get(typeof(Array)), get(typeof(int)), get(typeof(int))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = a_0->f_type();
 {'\t'}auto element = type->v__element;
 {'\t'}element->f_clear(reinterpret_cast<char*>(a_0->f_bounds() + type->v__rank) + a_1 * element->v__size, a_2);
 ", 0)
             );
-            var copy = type.GetMethod(nameof(Array.Copy), new[] { type, get(typeof(int)), type, get(typeof(int)), get(typeof(int)) });
+            var copy = type.GetMethod(nameof(Array.Copy), [type, get(typeof(int)), type, get(typeof(int)), get(typeof(int))]);
             code.For(
-                type.GetMethod(nameof(Array.Copy), new[] { type, type, get(typeof(int)) }),
+                type.GetMethod(nameof(Array.Copy), [type, type, get(typeof(int))]),
                 transpiler =>
                 {
                     transpiler.Enqueue(copy);
@@ -368,7 +368,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(Array.CreateInstance), new[] { get(typeof(Type)), get(typeof(int)) }),
+                type.GetMethod(nameof(Array.CreateInstance), [get(typeof(Type)), get(typeof(int))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__szarray) throw std::runtime_error(""no szarray: "" + f__string(type->v__full_name));
 {'\t'}return f__new_array(type, a_1, [&](auto a_p, auto a_n)
@@ -400,11 +400,11 @@ namespace IL2CXX
                 transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_type()->v__rank;\n", 1)
             );
             code.For(
-                type.GetMethod("GetFlattenedIndex", declaredAndInstance, new[] { get(typeof(int)) }),
+                type.GetMethod("GetFlattenedIndex", declaredAndInstance, [get(typeof(int))]),
                 transpiler => ("\treturn a_1 - a_0->f_bounds()[0].v_lower;\n", 1)
             );
             code.For(
-                type.GetMethod("GetFlattenedIndex", declaredAndInstance, new[] { get(typeof(ReadOnlySpan<int>)) }),
+                type.GetMethod("GetFlattenedIndex", declaredAndInstance, [get(typeof(ReadOnlySpan<int>))]),
                 transpiler => ($@"{'\t'}size_t i = 0;
 {'\t'}for (size_t j = 0; j < a_1.v__5flength; ++j) {{
 {'\t'}{'\t'}auto& b = a_0->f_bounds()[j];
@@ -472,7 +472,7 @@ namespace IL2CXX
                 (transpiler, types) =>
                 {
                     var t = Type.MakeGenericMethodParameter(0);
-                    var method = get(typeof(Array)).GetMethod(nameof(Array.IndexOf), 1, new[] { t.MakeArrayType(), t }).MakeGenericMethod(types[0]);
+                    var method = get(typeof(Array)).GetMethod(nameof(Array.IndexOf), 1, [t.MakeArrayType(), t]).MakeGenericMethod(types[0]);
                     transpiler.Enqueue(method);
                     return ($"\treturn {transpiler.Escape(method)}(a_0, a_1);\n", 1);
                 }
@@ -481,7 +481,7 @@ namespace IL2CXX
         .For(get(typeof(Attribute)), (type, code) =>
         {
             code.For(
-                type.GetMethod("GetParentDefinition", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(PropertyInfo)), get(typeof(Type[])) }),
+                type.GetMethod("GetParentDefinition", BindingFlags.Static | BindingFlags.NonPublic, [get(typeof(PropertyInfo)), get(typeof(Type[]))]),
                 transpiler =>
                 {
                     var method = get(typeof(RuntimePropertyInfo)).GetMethod(nameof(RuntimePropertyInfo.GetParentDefinition));
@@ -521,7 +521,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, new[] { type.GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic) }),
+                type.GetMethod("GetMessageFromNativeResources", BindingFlags.Static | BindingFlags.NonPublic, [type.GetNestedType("ExceptionMessageKind", BindingFlags.NonPublic)]),
                 transpiler => ("\treturn f__new_string(u\"message from native resources\"sv);\n", 0)
             );
             // TODO
@@ -721,9 +721,9 @@ namespace IL2CXX
 ", 0);
                 }
             );
-            var create = type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)), get(typeof(object[])) });
+            var create = type.GetMethod(nameof(Activator.CreateInstance), [get(typeof(Type)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo)), get(typeof(object[]))]);
             code.For(
-                type.GetMethod(nameof(Activator.CreateInstance), new[] { get(typeof(Type)), get(typeof(bool)) }),
+                type.GetMethod(nameof(Activator.CreateInstance), [get(typeof(Type)), get(typeof(bool))]),
                 transpiler =>
                 {
                     transpiler.Enqueue(create);
@@ -785,43 +785,43 @@ namespace IL2CXX
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(char*)) }),
+                type.GetConstructor([get(typeof(char*))]),
                 transpiler => ("\treturn f__new_string(std::u16string_view(a_0));\n", 1)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(char*)), get(typeof(int)), get(typeof(int)) }),
+                type.GetConstructor([get(typeof(char*)), get(typeof(int)), get(typeof(int))]),
                 transpiler => ("\treturn f__new_string(std::u16string_view(a_0 + a_1, a_2));\n", 1)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(char)), get(typeof(int)) }),
+                type.GetConstructor([get(typeof(char)), get(typeof(int))]),
                 transpiler => ($@"{'\t'}auto p = f__new_string(a_1);
 {'\t'}std::fill_n(&p->v__5ffirstChar, a_1, a_0);
 {'\t'}return p;
 ", 1)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(char[])) }),
+                type.GetConstructor([get(typeof(char[]))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f_data(), a_0->v__length));\n", 1)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(char[])), get(typeof(int)), get(typeof(int)) }),
+                type.GetConstructor([get(typeof(char[])), get(typeof(int)), get(typeof(int))]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__new_string(std::u16string_view(a_0->f_data() + a_1, a_2));\n", 1)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(ReadOnlySpan<char>)) }),
+                type.GetConstructor([get(typeof(ReadOnlySpan<char>))]),
                 transpiler => ("\treturn f__new_string(std::u16string_view(a_0.v__5freference, a_0.v__5flength));\n", 1)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(sbyte*)) }),
+                type.GetConstructor([get(typeof(sbyte*))]),
                 transpiler => ("\treturn f__new_string(reinterpret_cast<char*>(a_0));\n", 1)
             );
             code.For(
-                type.GetConstructor(new[] { get(typeof(sbyte*)), get(typeof(int)), get(typeof(int)) }),
+                type.GetConstructor([get(typeof(sbyte*)), get(typeof(int)), get(typeof(int))]),
                 transpiler => ("\treturn f__new_string(std::string_view(reinterpret_cast<char*>(a_0) + a_1, a_2));\n", 1)
             );
             // TODO
             code.For(
-                type.GetConstructor(new[] { get(typeof(sbyte*)), get(typeof(int)), get(typeof(int)), get(typeof(Encoding)) }),
+                type.GetConstructor([get(typeof(sbyte*)), get(typeof(int)), get(typeof(int)), get(typeof(Encoding))]),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             code.For(
@@ -880,7 +880,7 @@ namespace IL2CXX
 ", 0)
             );
             code.ForGeneric(
-                type.GetMethod(nameof(Enum.GetName), 1, new[] { Type.MakeGenericMethodParameter(0) }),
+                type.GetMethod(nameof(Enum.GetName), 1, [Type.MakeGenericMethodParameter(0)]),
                 (transpiler, types) => ($@"{'\t'}auto type = &t__type_of<{transpiler.Escape(types[0])}>::v__instance;
 {'\t'}if (!type->v__fields) throw std::runtime_error(""no fields: "" + f__string(type->v__full_name));
 {'\t'}for (auto p = type->v__fields; *p; ++p) if (std::memcmp((*p)->f_address(nullptr), &a_0, sizeof(a_0)) == 0) return f__new_string((*p)->v__name);
@@ -891,7 +891,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Enum.GetNames), 1, Type.EmptyTypes),
                 (transpiler, types) =>
                 {
-                    var method = type.GetMethod(nameof(Enum.GetNames), new[] { get(typeof(Type)) });
+                    var method = type.GetMethod(nameof(Enum.GetNames), [get(typeof(Type))]);
                     transpiler.Enqueue(method);
                     return ($"\treturn {transpiler.Escape(method)}(&t__type_of<{transpiler.Escape(types[0])}>::v__instance);\n", 1);
                 }
@@ -900,7 +900,7 @@ namespace IL2CXX
                 type.GetMethod(nameof(Enum.GetValues), 1, Type.EmptyTypes),
                 (transpiler, types) =>
                 {
-                    var method = type.GetMethod(nameof(Enum.GetValues), new[] { get(typeof(Type)) });
+                    var method = type.GetMethod(nameof(Enum.GetValues), [get(typeof(Type))]);
                     transpiler.Enqueue(method);
                     return ($"\treturn static_cast<{transpiler.EscapeForStacked(types[0].MakeArrayType())}>({transpiler.Escape(method)}(&t__type_of<{transpiler.Escape(types[0])}>::v__instance));\n", 1);
                 }
@@ -917,7 +917,7 @@ namespace IL2CXX
                 typeof(uint),
                 typeof(ulong)
             }) code.For(
-                type.GetMethod(nameof(Enum.ToObject), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(t) }),
+                type.GetMethod(nameof(Enum.ToObject), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, [get(typeof(Type)), get(t)]),
                 transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""must be enum"");
 {'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
@@ -963,7 +963,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(ToString), new[] { get(typeof(string)) }),
+                type.GetMethod(nameof(ToString), [get(typeof(string))]),
                 transpiler =>
                 {
                     var method = type.GetMethod(nameof(ToString), Type.EmptyTypes);
@@ -986,7 +986,7 @@ namespace IL2CXX
             );
             MethodInfo getTryFormat(Transpiler transpiler, Type type)
             {
-                var method = type.GetMethod(nameof(int.TryFormat), new[] { get(typeof(Span<char>)), get(typeof(int)).MakeByRefType(), get(typeof(ReadOnlySpan<char>)), get(typeof(IFormatProvider)) });
+                var method = type.GetMethod(nameof(int.TryFormat), [get(typeof(Span<char>)), get(typeof(int)).MakeByRefType(), get(typeof(ReadOnlySpan<char>)), get(typeof(IFormatProvider))]);
                 transpiler.Enqueue(method);
                 return method;
             }
@@ -1046,12 +1046,12 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, new[] { get(typeof(Type)), get(typeof(ReadOnlySpan<char>)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType() }),
+                type.GetMethod("TryParse", BindingFlags.Static | BindingFlags.NonPublic, [get(typeof(Type)), get(typeof(ReadOnlySpan<char>)), get(typeof(bool)), get(typeof(bool)), get(typeof(object)).MakeByRefType()]),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
             // TODO
             code.ForGeneric(
-                type.GetMethod("TryParse", 1, BindingFlags.Static | BindingFlags.NonPublic, null, new[] { get(typeof(ReadOnlySpan<char>)), get(typeof(bool)), get(typeof(bool)), Type.MakeGenericMethodParameter(0).MakeByRefType() }, null),
+                type.GetMethod("TryParse", 1, BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(ReadOnlySpan<char>)), get(typeof(bool)), get(typeof(bool)), Type.MakeGenericMethodParameter(0).MakeByRefType()], null),
                 (transpiler, types) => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         })
@@ -1097,20 +1097,20 @@ namespace IL2CXX
             code.For(type.GetProperty(nameof(Environment.TickCount)).GetMethod, transpiler => tick(transpiler, string.Empty));
             code.For(type.GetProperty(nameof(Environment.TickCount64)).GetMethod, transpiler => tick(transpiler, "64"));
             code.For(
-                type.GetMethod(nameof(Environment.FailFast), new[] { get(typeof(string)) }),
+                type.GetMethod(nameof(Environment.FailFast), [get(typeof(string))]),
                 transpiler => ($@"{'\t'}std::cerr << f__string(a_0) << std::endl;
 {'\t'}std::abort();
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Environment.FailFast), new[] { get(typeof(string)), get(typeof(Exception)) }),
+                type.GetMethod(nameof(Environment.FailFast), [get(typeof(string)), get(typeof(Exception))]),
                 transpiler => ($@"{'\t'}std::cerr << f__string(a_0) << std::endl;
 {'\t'}std::cerr << f__string(f__to_string(a_1)) << std::endl;
 {'\t'}std::abort();
 ", 0)
             );
             code.For(
-                type.GetMethod(nameof(Environment.GetEnvironmentVariable), new[] { get(typeof(string)) }),
+                type.GetMethod(nameof(Environment.GetEnvironmentVariable), [get(typeof(string))]),
                 transpiler => ($@"{'\t'}auto p = std::getenv(f__string(a_0).c_str());
 {'\t'}return p ? f__new_string(p) : nullptr;
 ", 0)
@@ -1125,7 +1125,7 @@ namespace IL2CXX
         {
             foreach (var t in new[] { get(typeof(double)), get(typeof(float)) })
                 code.For(
-                    type.GetMethod(nameof(Math.Abs), new[] { t }),
+                    type.GetMethod(nameof(Math.Abs), [t]),
                     transpiler => ("\treturn std::abs(a_0);\n", 1)
                 );
             code.For(
@@ -1161,7 +1161,7 @@ namespace IL2CXX
                 transpiler => ("\treturn std::cbrt(a_0);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Math.Ceiling), new[] { get(typeof(double)) }),
+                type.GetMethod(nameof(Math.Ceiling), [get(typeof(double))]),
                 transpiler => ("\treturn std::ceil(a_0);\n", 1)
             );
             code.For(
@@ -1177,7 +1177,7 @@ namespace IL2CXX
                 transpiler => ("\treturn std::exp(a_0);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Math.Floor), new[] { get(typeof(double)) }),
+                type.GetMethod(nameof(Math.Floor), [get(typeof(double))]),
                 transpiler => ("\treturn std::floor(a_0);\n", 1)
             );
             code.For(
@@ -1185,7 +1185,7 @@ namespace IL2CXX
                 transpiler => ("\treturn std::fma(a_0, a_1, a_2);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(Math.Log), new[] { get(typeof(double)) }),
+                type.GetMethod(nameof(Math.Log), [get(typeof(double))]),
                 transpiler => ("\treturn std::log(a_0);\n", 1)
             );
             code.For(
@@ -1288,7 +1288,7 @@ namespace IL2CXX
                 transpiler => ("\treturn std::fma(a_0, a_1, a_2);\n", 1)
             );
             code.For(
-                type.GetMethod(nameof(MathF.Log), new[] { get(typeof(float)) }),
+                type.GetMethod(nameof(MathF.Log), [get(typeof(float))]),
                 transpiler => ("\treturn std::log(a_0);\n", 1)
             );
             code.For(
@@ -1341,7 +1341,7 @@ namespace IL2CXX
             );
             var @byte = get(typeof(byte)).MakeByRefType();
             code.For(
-                type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, new[] { @byte, @byte, get(typeof(UIntPtr)) }),
+                type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, [@byte, @byte, get(typeof(UIntPtr))]),
                 transpiler => ("\tstd::memmove(a_0, a_1, a_2);\n", -1)
             );
             code.For(
@@ -1367,7 +1367,7 @@ namespace IL2CXX
         {
             var @byte = get(typeof(byte)).MakeByRefType();
             code.For(
-                type.GetMethod("SequenceEqual", new[] { @byte, @byte, get(typeof(UIntPtr)) }),
+                type.GetMethod("SequenceEqual", [@byte, @byte, get(typeof(UIntPtr))]),
                 transpiler => ("\treturn std::memcmp(a_0, a_1, a_2) == 0;\n", 1)
             );
         })

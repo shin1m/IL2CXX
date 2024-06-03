@@ -284,9 +284,9 @@ namespace IL2CXX
         private IEnumerable<PropertyInfo> GetProperties(Type type) => type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance | (type.IsInterface ? BindingFlags.Default : BindingFlags.Static) | BindingFlags.Public | BindingFlags.NonPublic).Where(x => !invalids.Contains(x.PropertyType.FullName));
         private byte[] GetBytes(object value) => value switch
         {
-            byte b => new[] { b },
-            sbyte b => new[] { (byte)b },
-            _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), new[] { value.GetType() }).Invoke(null, new[] { value })
+            byte b => [b],
+            sbyte b => [(byte)b],
+            _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), [value.GetType()]).Invoke(null, [value])
         };
         private string WriteAttributes(MemberInfo member, string name, TextWriter writer)
         {
@@ -712,7 +712,7 @@ struct t__static_{identifier}
                                             mergedFields.Add(($"char p{j}[{i - j}]"));
                                         }
                                     slots = ss;
-                                    constructs = new[] { "v__merged" };
+                                    constructs = ["v__merged"];
                                 }
                                 string variables(string indent)
                                 {

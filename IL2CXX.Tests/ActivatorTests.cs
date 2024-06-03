@@ -19,7 +19,7 @@ namespace IL2CXX.Tests
         }
         static int CreateInstance1()
         {
-            var o = Activator.CreateInstance(typeof(Fooo), new object[] { 0 });
+            var o = Activator.CreateInstance(typeof(Fooo), [0]);
             return o == null ? 1 : 0;
         }
         static int CreateInstanceOfT()
@@ -39,7 +39,7 @@ namespace IL2CXX.Tests
         }
         static int CreateValue1()
         {
-            var o = Activator.CreateInstance(typeof(Baar), new object[] { 0 });
+            var o = Activator.CreateInstance(typeof(Baar), [0]);
             return o == null ? 1 : 0;
         }
         static int CreateValueOfT()
@@ -62,10 +62,10 @@ namespace IL2CXX.Tests
         string build;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
+        public void OneTimeSetUp() => build = Utilities.Build(Run, null, [
             typeof(Fooo),
             typeof(Baar)
-        });
+        ]);
         [Test]
         public void Test(
             [Values(

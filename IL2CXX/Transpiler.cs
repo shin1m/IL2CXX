@@ -283,17 +283,13 @@ namespace IL2CXX
                 Array.Copy(gas, ro, gas.Length);
                 return ro;
             }
-            return Activator.CreateInstance(typeofTypeContext, BindingFlags.Instance | BindingFlags.NonPublic, null, new[]
-            {
-                rogas(tas),
-                rogas(mas)
-            }, null);
+            return Activator.CreateInstance(typeofTypeContext, BindingFlags.Instance | BindingFlags.NonPublic, null, [rogas(tas), rogas(mas)], null);
         }
         private object NewTypeContext() => NewTypeContext(
             method.DeclaringType?.GetGenericArguments(),
             GetGenericArguments()
         );
-        private Type ResolveType(EntityHandle handle) => (Type)ecmaResolverResolveType.Invoke(null, new[] { handle, method.Module, NewTypeContext() });
+        private Type ResolveType(EntityHandle handle) => (Type)ecmaResolverResolveType.Invoke(null, [handle, method.Module, NewTypeContext()]);
         private Type ParseType(ref int index) =>
             //method.Module.ResolveType(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
             ResolveType(MetadataTokens.EntityHandle(ParseI4(ref index)));
@@ -304,26 +300,26 @@ namespace IL2CXX
 
             public GenericMethodSignatureTypeProvider(object module) => this.module = module;
             private static readonly MethodBase getTypeFromDefinition = typeofEcmaModule.GetMethod(nameof(GetTypeFromDefinition));
-            public Type GetTypeFromDefinition(MetadataReader reader, TypeDefinitionHandle handle, byte rawTypeKind) => (Type)getTypeFromDefinition.Invoke(module, new object[] { reader, handle, rawTypeKind });
+            public Type GetTypeFromDefinition(MetadataReader reader, TypeDefinitionHandle handle, byte rawTypeKind) => (Type)getTypeFromDefinition.Invoke(module, [reader, handle, rawTypeKind]);
             private static readonly MethodBase getTypeFromReference = typeofEcmaModule.GetMethod(nameof(GetTypeFromReference));
-            public Type GetTypeFromReference(MetadataReader reader, TypeReferenceHandle handle, byte rawTypeKind) => (Type)getTypeFromReference.Invoke(module, new object[] { reader, handle, rawTypeKind });
+            public Type GetTypeFromReference(MetadataReader reader, TypeReferenceHandle handle, byte rawTypeKind) => (Type)getTypeFromReference.Invoke(module, [reader, handle, rawTypeKind]);
             private static readonly MethodBase getTypeFromSpecification = typeofEcmaModule.GetMethod(nameof(GetTypeFromSpecification));
-            public Type GetTypeFromSpecification(MetadataReader reader, object context, TypeSpecificationHandle handle, byte rawTypeKind) => (Type)getTypeFromSpecification.Invoke(module, new[] { reader, context, handle, rawTypeKind });
+            public Type GetTypeFromSpecification(MetadataReader reader, object context, TypeSpecificationHandle handle, byte rawTypeKind) => (Type)getTypeFromSpecification.Invoke(module, [reader, context, handle, rawTypeKind]);
             public Type GetSZArrayType(Type elementType) => elementType.MakeArrayType();
             public Type GetArrayType(Type elementType, ArrayShape shape) => elementType.MakeArrayType(shape.Rank);
             public Type GetByReferenceType(Type elementType) => elementType.MakeByRefType();
             public Type GetPointerType(Type elementType) => elementType.MakePointerType();
             public Type GetGenericInstantiation(Type genericType, ImmutableArray<Type> typeArguments) => genericType.MakeGenericType(typeArguments.ToArray());
             private static readonly MethodBase getGenericTypeParameter = typeofEcmaModule.GetMethod(nameof(GetGenericTypeParameter));
-            public Type GetGenericTypeParameter(object context, int index) => (Type)getGenericTypeParameter.Invoke(module, new[] { context, index });
+            public Type GetGenericTypeParameter(object context, int index) => (Type)getGenericTypeParameter.Invoke(module, [context, index]);
             public Type GetGenericMethodParameter(object context, int index) => Type.MakeGenericMethodParameter(index);
             public Type GetFunctionPointerType(MethodSignature<Type> signature) => throw new NotSupportedException();
             private static readonly MethodBase getModifiedType = typeofEcmaModule.GetMethod(nameof(GetModifiedType));
-            public Type GetModifiedType(Type modifier, Type unmodifiedType, bool isRequired) => (Type)getModifiedType.Invoke(module, new object[] { modifier, unmodifiedType, isRequired });
+            public Type GetModifiedType(Type modifier, Type unmodifiedType, bool isRequired) => (Type)getModifiedType.Invoke(module, [modifier, unmodifiedType, isRequired]);
             private static readonly MethodBase getPinnedType = typeofEcmaModule.GetMethod(nameof(GetPinnedType));
-            public Type GetPinnedType(Type elementType) => (Type)getPinnedType.Invoke(module, new[] { elementType });
+            public Type GetPinnedType(Type elementType) => (Type)getPinnedType.Invoke(module, [elementType]);
             private static readonly MethodBase getPrimitiveType = typeofEcmaModule.GetMethod(nameof(GetPrimitiveType));
-            public Type GetPrimitiveType(PrimitiveTypeCode typeCode) => (Type)getPrimitiveType.Invoke(module, new object[] { typeCode });
+            public Type GetPrimitiveType(PrimitiveTypeCode typeCode) => (Type)getPrimitiveType.Invoke(module, [typeCode]);
         }
         private MemberInfo ResolveMemberReference(EntityHandle handle)
         {
@@ -365,7 +361,7 @@ namespace IL2CXX
                 ? ResolveFieldDefinition(handle)
                 : (FieldInfo)ResolveMemberReference(handle);
         }
-        private MethodBase ResolveMethodDefinition(EntityHandle handle) => (MethodBase)ecmaResolverResolveMethod.Invoke(null, new[] { (MethodDefinitionHandle)handle, method.Module, NewTypeContext() });
+        private MethodBase ResolveMethodDefinition(EntityHandle handle) => (MethodBase)ecmaResolverResolveMethod.Invoke(null, [(MethodDefinitionHandle)handle, method.Module, NewTypeContext()]);
         private MethodBase ParseMethod(ref int index)
         {
             //return method.Module.ResolveMethod(token, method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
@@ -385,7 +381,7 @@ namespace IL2CXX
             var handle = MetadataTokens.EntityHandle(ParseI4(ref index));
             if (handle.Kind != HandleKind.MethodSpecification) return resolve(handle);
             var specification = GetMetadataReader().GetMethodSpecification((MethodSpecificationHandle)handle);
-            return ((MethodInfo)resolve(specification.Method)).MakeGenericMethod(((IEnumerable)methodSpecificationDecodeSignature.Invoke(specification, new[] { method.Module, NewTypeContext() })).Cast<Type>().ToArray());
+            return ((MethodInfo)resolve(specification.Method)).MakeGenericMethod(((IEnumerable)methodSpecificationDecodeSignature.Invoke(specification, [method.Module, NewTypeContext()])).Cast<Type>().ToArray());
         }
         private MemberInfo ParseMember(ref int index)
         {
@@ -874,7 +870,7 @@ namespace IL2CXX
                 }
             if (typeofSafeHandle.IsAssignableFrom(@return))
             {
-                ConstructorInfo getCI(Type type) => type.GetConstructor(declaredAndInstance, null, new[] { typeofIntPtr, typeofBoolean }, null);
+                ConstructorInfo getCI(Type type) => type.GetConstructor(declaredAndInstance, null, [typeofIntPtr, typeofBoolean], null);
                 var ci = getCI(@return) ?? getCI(typeofSafeHandle);
                 writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
 {'\t'}{Escape(ci)}(p, result, true);

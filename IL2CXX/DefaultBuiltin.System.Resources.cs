@@ -10,7 +10,7 @@ namespace IL2CXX
         .For(get(typeof(ResourceManager)), (type, code) =>
         {
             code.For(
-                type.GetConstructor(new[] { get(typeof(string)), get(typeof(Assembly)) }),
+                type.GetConstructor([get(typeof(string)), get(typeof(Assembly))]),
                 transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}return p;
 ", 0)
@@ -28,7 +28,7 @@ namespace IL2CXX
         .For(get(Type.GetType("System.Resources.RuntimeResourceSet")), (type, code) =>
         {
             code.For(
-                type.GetMethod("GetString", new[] { get(typeof(string)), get(typeof(bool)) }),
+                type.GetMethod("GetString", [get(typeof(string)), get(typeof(bool))]),
                 transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
             );
         });

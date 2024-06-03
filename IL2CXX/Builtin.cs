@@ -104,7 +104,7 @@ namespace IL2CXX
             }
             if (type.IsSubclassOf(transpiler.typeofDelegate) && type != transpiler.typeofMulticastDelegate)
             {
-                if (method == type.GetConstructor(new[] { transpiler.typeofObject, transpiler.typeofIntPtr })) return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
+                if (method == type.GetConstructor([transpiler.typeofObject, transpiler.typeofIntPtr])) return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
 {'\t'}if (a_0) {{
 {'\t'}{'\t'}p->v__5ftarget = a_0;
 {'\t'}{'\t'}p->v__5fmethodPtr = a_1;

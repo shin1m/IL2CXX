@@ -25,32 +25,32 @@ namespace IL2CXX.Tests
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
             Array.Clear(xs, 1, 2);
-            return AssertEquals(xs, new[] { "Hello", null, null, "Bye" });
+            return AssertEquals(xs, ["Hello", null, null, "Bye"]);
         }
         static int ClearAll()
         {
             string[] xs = { "Hello", "World" };
             Array.Clear(xs);
-            return AssertEquals(xs, new string[] { null, null });
+            return AssertEquals(xs, [null, null]);
         }
         static int Copy()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
             var ys = new string[6];
             Array.Copy(xs, 1, ys, 2, 3);
-            return AssertEquals(ys, new[] { null, null, "World", "Good", "Bye", null });
+            return AssertEquals(ys, [null, null, "World", "Good", "Bye", null]);
         }
         static int ResizeLarger()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
             Array.Resize(ref xs, 6);
-            return AssertEquals(xs, new[] { "Hello", "World", "Good", "Bye", null, null });
+            return AssertEquals(xs, ["Hello", "World", "Good", "Bye", null, null]);
         }
         static int ResizeSmaller()
         {
             string[] xs = { "Hello", "World", "Good", "Bye" };
             Array.Resize(ref xs, 3);
-            return AssertEquals(xs, new[] { "Hello", "World", "Good" });
+            return AssertEquals(xs, ["Hello", "World", "Good"]);
         }
         static int IListIsReadOnly()
         {
@@ -83,7 +83,7 @@ namespace IL2CXX.Tests
             IList<string> xs = new[] { "World" };
             string[] ys = { "Hello", null };
             xs.CopyTo(ys, 1);
-            return AssertEquals(ys, new[] { "Hello", "World" });
+            return AssertEquals(ys, ["Hello", "World"]);
         }
         static int GetEnumerator()
         {
@@ -108,15 +108,15 @@ namespace IL2CXX.Tests
         {
             string[] xs = { "foo", "bar" };
             Array.Reverse((Array)xs);
-            return AssertEquals(xs, new[] { "bar", "foo" });
+            return AssertEquals(xs, ["bar", "foo"]);
         }
         static int ReverseT()
         {
             string[] xs = { "foo", "bar" };
             Array.Reverse(xs);
-            return AssertEquals(xs, new[] { "bar", "foo" });
+            return AssertEquals(xs, ["bar", "foo"]);
         }
-        static int New1() => AssertEquals(new string[1], new string[] { null });
+        static int New1() => AssertEquals(new string[1], [null]);
         static int New2() => (new string[1, 1])[0, 0] == null ? 0 : 1;
 
         static int Run(string[] arguments) => arguments[1] switch

@@ -72,7 +72,7 @@ namespace IL2CXX
                 type.GetMethod("CreateArraySortHelper", BindingFlags.Static | BindingFlags.NonPublic),
                 (transpiler, types) =>
                 {
-                    var concrete = (get(typeof(IComparable<>)).MakeGenericType(new[] { types[0] }).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`2")) : type).MakeGenericType(types);
+                    var concrete = (get(typeof(IComparable<>)).MakeGenericType([types[0]]).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`2")) : type).MakeGenericType(types);
                     var constructor = concrete.GetConstructor(Type.EmptyTypes);
                     transpiler.Enqueue(constructor);
                     return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(concrete)}>();

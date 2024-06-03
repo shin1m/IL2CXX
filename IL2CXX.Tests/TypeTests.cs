@@ -83,7 +83,7 @@ namespace IL2CXX.Tests
             public string N1 { get; set; }
             public Type[] N2 { get; set; }
         }
-        [Foo(Answer.Yes, new[] { "foo" }, typeof(IFoo), N0 = new[] { Answer.No }, N1 = "bar", N2 = new[] { typeof(Bar) })]
+        [Foo(Answer.Yes, ["foo"], typeof(IFoo), N0 = [Answer.No], N1 = "bar", N2 = [typeof(Bar)])]
         class Zot
         {
             public static Zot Be(string x, string y) => new Zot($"{x}, {y}!");
@@ -123,27 +123,27 @@ namespace IL2CXX.Tests
         }
         static int GetConstructor()
         {
-            var c = typeof(Zot).GetConstructor(new[] { typeof(string) });
+            var c = typeof(Zot).GetConstructor([typeof(string)]);
             if (c == null) return 1;
-            return c.Invoke(new[] { "foo" }) is Zot zot && zot.X == "foo" ? 0 : 2;
+            return c.Invoke(["foo"]) is Zot zot && zot.X == "foo" ? 0 : 2;
         }
         static int GetConstructorOfString()
         {
-            var c = typeof(string).GetConstructor(new[] { typeof(char[]) });
+            var c = typeof(string).GetConstructor([typeof(char[])]);
             if (c == null) return 1;
-            return c.Invoke(new[] { "foo".ToCharArray() }) is string x && x == "foo" ? 0 : 2;
+            return c.Invoke(["foo".ToCharArray()]) is string x && x == "foo" ? 0 : 2;
         }
         static int GetConstructorOfArray()
         {
-            var c = typeof(string[]).GetConstructor(new[] { typeof(int) });
+            var c = typeof(string[]).GetConstructor([typeof(int)]);
             if (c == null) return 1;
-            return c.Invoke(new object[] { 10 }) is string[] xs && xs.Length == 10 ? 0 : 2;
+            return c.Invoke([10]) is string[] xs && xs.Length == 10 ? 0 : 2;
         }
         static int GetConstructorOfArrayOfArrays()
         {
-            var c = typeof(string[][]).GetConstructor(new[] { typeof(int), typeof(int) });
+            var c = typeof(string[][]).GetConstructor([typeof(int), typeof(int)]);
             if (c == null) return 1;
-            if (!(c.Invoke(new object[] { 2, 3 }) is string[][] xs)) return 2;
+            if (!(c.Invoke([2, 3]) is string[][] xs)) return 2;
             if (xs.Length != 2) return 3;
             return xs[0].Length == 3 && xs[1].Length == 3 ? 0 : 4;
         }
@@ -158,8 +158,8 @@ namespace IL2CXX.Tests
         static int GetMethod()
         {
             var zot = new Zot { X = "Hello", Y = 1 };
-            if (!(typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).Invoke(zot, new[] { "World" }) is string x && x == "Hello, World!")) return 1;
-            return typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(int) }).Invoke(zot, new object[] { 2 }) is int y && y == 3 ? 0 : 2;
+            if (!(typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)]).Invoke(zot, ["World"]) is string x && x == "Hello, World!")) return 1;
+            return typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(int)]).Invoke(zot, [2]) is int y && y == 3 ? 0 : 2;
         }
         static int GetMethods()
         {
@@ -181,12 +181,12 @@ namespace IL2CXX.Tests
         }
         static int CreateDelegateWithTarget()
         {
-            var f = typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).CreateDelegate<Func<string, string>>(new Zot("Hello"));
+            var f = typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)]).CreateDelegate<Func<string, string>>(new Zot("Hello"));
             return f("World") == "Hello, World!" ? 0 : 1;
         }
         static int CreateDelegateAsStatic()
         {
-            var f = typeof(Zot).GetMethod(nameof(Zot.Do), new[] { typeof(string) }).CreateDelegate<Func<Zot, string, string>>();
+            var f = typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)]).CreateDelegate<Func<Zot, string, string>>();
             return f(new Zot("Hello"), "World") == "Hello, World!" ? 0 : 1;
         }
         static int DynamicInvoke()
@@ -196,7 +196,7 @@ namespace IL2CXX.Tests
         }
         static int MakeGenericMethod()
         {
-            var f = typeof(Zot).GetMethod(nameof(Zot.Do), 2, new[] { Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1) }).MakeGenericMethod(typeof(string), typeof(int)).CreateDelegate<Func<string, int, string>>(new Zot("Hello"));
+            var f = typeof(Zot).GetMethod(nameof(Zot.Do), 2, [Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1)]).MakeGenericMethod(typeof(string), typeof(int)).CreateDelegate<Func<string, int, string>>(new Zot("Hello"));
             return f("World", 1) == "Hello, World 1!" ? 0 : 1;
         }
         static int GetProperty()
@@ -331,15 +331,15 @@ namespace IL2CXX.Tests
         string build;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => build = Utilities.Build(Run, null, new[] {
+        public void OneTimeSetUp() => build = Utilities.Build(Run, null, [
             typeof(string),
             typeof(string[]),
             typeof(string[][]),
             typeof(Zot),
             typeof(Func<string, string>)
-        }, new[] {
-            typeof(Zot).GetMethod(nameof(Zot.Do), 2, new[] { Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1) }).MakeGenericMethod(typeof(string), typeof(int))
-        });
+        ], [
+            typeof(Zot).GetMethod(nameof(Zot.Do), 2, [Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1)]).MakeGenericMethod(typeof(string), typeof(int))
+        ]);
         [Test]
         public void Test(
             [Values(

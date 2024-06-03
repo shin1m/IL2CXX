@@ -51,10 +51,10 @@ namespace IL2CXX.Tests
             var odcOfFoo = odc.MakeGenericType(typeof(Foo));
             var ec = Type.GetType("System.Text.Json.Serialization.Converters.EnumConverter`1, System.Text.Json", true);
             var ecOfBar = ec.MakeGenericType(typeof(Bar));
-            build = Utilities.Build(Run, new[] {
+            build = Utilities.Build(Run, [
                 odcOfFoo,
                 ecOfBar
-            }, new[] {
+            ], [
                 jpi.MakeGenericType(typeof(int)),
                 jpi.MakeGenericType(typeof(string)),
                 odc,
@@ -62,7 +62,7 @@ namespace IL2CXX.Tests
                 odcOfFoo,
                 typeof(Bar),
                 ecOfBar
-            });
+            ]);
         }
         [Test]
         public void Test(

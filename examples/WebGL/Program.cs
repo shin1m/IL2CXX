@@ -65,15 +65,15 @@ using var uModelView = gl.GetUniformLocation(program, "uModelViewMatrix");
 
 using var positions = gl.CreateBuffer();
 gl.BindBuffer(GL.ARRAY_BUFFER, positions);
-gl.BufferData(GL.ARRAY_BUFFER, new[] {1f, 1f, -1f, 1f, 1f, -1f, -1f, -1f}.AsSpan(), GL.STATIC_DRAW);
+gl.BufferData(GL.ARRAY_BUFFER, [1f, 1f, -1f, 1f, 1f, -1f, -1f, -1f], GL.STATIC_DRAW);
 using var colors = gl.CreateBuffer();
 gl.BindBuffer(GL.ARRAY_BUFFER, colors);
-gl.BufferData(GL.ARRAY_BUFFER, new[] {
+gl.BufferData(GL.ARRAY_BUFFER, [
     1f, 1f, 1f, 1f, // white
     1f, 0f, 0f, 1f, // red
     0f, 1f, 0f, 1f, // green
     0f, 0f, 1f, 1f, // blue
-}.AsSpan(), GL.STATIC_DRAW);
+], GL.STATIC_DRAW);
 
 gl.ClearColor(0f, 0f, 0f, 1f);
 gl.Enable(GL.CULL_FACE);

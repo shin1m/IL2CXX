@@ -13,7 +13,7 @@ namespace IL2CXX
         .For(get(typeof(Debug)), (type, code) =>
         {
             code.For(
-                type.GetMethod(nameof(Debug.Assert), new[] { get(typeof(bool)) }),
+                type.GetMethod(nameof(Debug.Assert), [get(typeof(bool))]),
                 transpiler => ("\tif (!a_0) throw std::logic_error(\"Debug.Assert failed.\");\n", 0)
             );
         })
@@ -53,7 +53,7 @@ namespace IL2CXX
             );
             // TODO
             code.For(
-                type.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.NonPublic, new[] { type.GetNestedType("TraceFormat", BindingFlags.NonPublic), get(typeof(StringBuilder)) }),
+                type.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.NonPublic, [type.GetNestedType("TraceFormat", BindingFlags.NonPublic), get(typeof(StringBuilder))]),
                 transpiler => (string.Empty, 0)
             );
         })
@@ -95,11 +95,11 @@ namespace IL2CXX
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { get(typeof(Guid)) }),
+                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), [get(typeof(Guid))]),
                 transpiler => (string.Empty, 0)
             );
             code.For(
-                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), new[] { get(typeof(Guid)), get(typeof(Guid)).MakeByRefType() }),
+                type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), [get(typeof(Guid)), get(typeof(Guid)).MakeByRefType()]),
                 transpiler => ("\t*a_1 = {};\n", 0)
             );
             code.For(

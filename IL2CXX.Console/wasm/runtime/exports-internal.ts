@@ -8,7 +8,7 @@ import { http_wasm_supports_streaming_response, http_wasm_create_abort_controler
 import { exportedRuntimeAPI, Module, runtimeHelpers } from "./globals";
 import { get_property, set_property, has_property, get_typeof_property, get_global_this, dynamic_import } from "./invoke-js";
 import { mono_wasm_stringify_as_error_with_stack } from "./logging";
-import { ws_wasm_create, ws_wasm_open, ws_wasm_send, ws_wasm_receive, ws_wasm_close, ws_wasm_abort } from "./web-socket";
+import { ws_wasm_create, ws_wasm_open, ws_wasm_send, ws_wasm_receive, ws_wasm_close, ws_wasm_abort, ws_get_state } from "./web-socket";
 import { mono_wasm_get_loaded_files } from "./assets";
 /*
 import { jiterpreter_dump_stats } from "./jiterpreter";
@@ -64,6 +64,7 @@ export function export_internal(): any {
         ws_wasm_receive,
         ws_wasm_close,
         ws_wasm_abort,
+        ws_get_state,
 
         // BrowserHttpHandler
         http_wasm_supports_streaming_response,
@@ -78,7 +79,7 @@ export function export_internal(): any {
         http_wasm_get_response_length,
         http_wasm_get_streamed_response_bytes,
 
-	/*
+        /*
         // jiterpreter
         jiterpreter_dump_stats,
         jiterpreter_apply_options: applyOptions,

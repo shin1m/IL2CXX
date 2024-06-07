@@ -1,366 +1,360 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using System.Threading;
 
-namespace IL2CXX
+namespace IL2CXX;
+using static MethodKey;
+
+partial class Transpiler
 {
-    using static MethodKey;
+    private readonly StringWriter functionDeclarations = new();
+    private readonly Queue<Type> queuedTypes = new();
+    private readonly HashSet<MethodKey> visitedMethods = new();
+    private readonly Queue<MethodBase> queuedMethods = new();
+    private MethodBase method;
+    private byte[] bytes;
+    private SortedDictionary<string, (string Prefix, int Index)> definedIndices;
+    private bool hasReturn;
+    private Dictionary<int, Stack> indexToStack;
+    private TextWriter writer;
+    private readonly Stack<ExceptionHandlingClause> tries = new();
+    private Type constrained;
+    private bool @volatile;
 
-    partial class Transpiler
+    private void ProcessNextMethod(Func<Type, bool, TextWriter> writerForType)
     {
-        private readonly StringWriter functionDeclarations = new();
-        private readonly Queue<Type> queuedTypes = new();
-        private readonly HashSet<MethodKey> visitedMethods = new();
-        private readonly Queue<MethodBase> queuedMethods = new();
-        private MethodBase method;
-        private byte[] bytes;
-        private SortedDictionary<string, (string Prefix, int Index)> definedIndices;
-        private bool hasReturn;
-        private Dictionary<int, Stack> indexToStack;
-        private TextWriter writer;
-        private readonly Stack<ExceptionHandlingClause> tries = new();
-        private Type constrained;
-        private bool @volatile;
-
-        private void ProcessNextMethod(Func<Type, bool, TextWriter> writerForType)
+        var key = ToKey(queuedMethods.Dequeue());
+        if (!visitedMethods.Add(key)) return;
+        method = key.Method;
+        var identifier = Escape(method);
+        if (method.IsGenericMethod && ShouldGenerateReflection(method.DeclaringType))
         {
-            var key = ToKey(queuedMethods.Dequeue());
-            if (!visitedMethods.Add(key)) return;
-            method = key.Method;
-            var identifier = Escape(method);
-            if (method.IsGenericMethod && ShouldGenerateReflection(method.DeclaringType))
-            {
-                var definition = Define(method.DeclaringType);
-                definition.Definitions.WriteLine($@"static t__abstract_type* v__generic_arguments_{identifier}[] = {{
+            var definition = Define(method.DeclaringType);
+            definition.Definitions.WriteLine($@"static t__abstract_type* v__generic_arguments_{identifier}[] = {{
 {string.Join(string.Empty, method.GetGenericArguments().Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
 }};
 t__runtime_method_info v__method_{identifier}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{Escape(method.DeclaringType)}>::v__instance, u""{method.Name}""sv, {(int)method.Attributes}, {WriteAttributes(method, identifier, definition.Definitions)}, {WriteParameters(method.GetParameters(), identifier, definition.Definitions)}, &t__type_of<{Escape(((MethodInfo)method).ReturnType)}>::v__instance, {GenerateInvokeFunction(method)}, {(
-    method.IsAbstract ? "nullptr" : $"reinterpret_cast<void*>({identifier})"
+method.IsAbstract ? "nullptr" : $"reinterpret_cast<void*>({identifier})"
 )},
 #ifdef __EMSCRIPTEN__
 {'\t'}{GenerateWASMInvokeFunction(method)},
 #endif
 {'\t'}&v__method_{identifier}, v__generic_arguments_{identifier}, nullptr
 }};");
-            }
-            if (method.IsAbstract) return;
-            var builtin = this.builtin.GetBody(this, key);
-            var description = new StringWriter();
-            description.Write($@"
+        }
+        if (method.IsAbstract) return;
+        var builtin = this.builtin.GetBody(this, key);
+        var description = new StringWriter();
+        description.Write($@"
 // {method.DeclaringType.AssemblyQualifiedName}
 // {method}
 // {(method.IsPublic ? "public " : string.Empty)}{(method.IsPrivate ? "private " : string.Empty)}{(method.IsStatic ? "static " : string.Empty)}{(method.IsFinal ? "final " : string.Empty)}{(method.IsVirtual ? "virtual " : string.Empty)}{method.MethodImplementationFlags}");
-            string attributes(string prefix, ParameterInfo pi) => string.Join(string.Empty, pi.GetCustomAttributesData().Select(x => $"\n{prefix}// [{x}]"));
-            var parameters = method.GetParameters().Select(x => (
-                Prefix: $"{attributes("\t", x)}\n\t// {x}", Type: x.ParameterType
-            ));
-            if (!method.IsStatic && (!method.IsConstructor || method.DeclaringType.IsValueType || builtin.body == null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
-            string argument(Type t, int i) => $"\n\t{EscapeForArgument(t)} a_{i}";
-            var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
-            string returns;
-            if (method is MethodInfo m)
-            {
-                description.Write(attributes(string.Empty, m.ReturnParameter));
-                returns = EscapeForStacked(m.ReturnType);
-            }
-            else
-            {
-                returns = method.IsStatic || method.DeclaringType.IsValueType || builtin.body == null ? "void" : EscapeForStacked(method.DeclaringType);
-            }
-            var prototype = $@"{returns}
+        string attributes(string prefix, ParameterInfo pi) => string.Join(string.Empty, pi.GetCustomAttributesData().Select(x => $"\n{prefix}// [{x}]"));
+        var parameters = method.GetParameters().Select(x => (
+            Prefix: $"{attributes("\t", x)}\n\t// {x}", Type: x.ParameterType
+        ));
+        if (!method.IsStatic && (!method.IsConstructor || method.DeclaringType.IsValueType || builtin.body == null)) parameters = parameters.Prepend((string.Empty, GetThisType(method)));
+        string argument(Type t, int i) => $"\n\t{EscapeForArgument(t)} a_{i}";
+        var arguments = parameters.Select((x, i) => $"{x.Prefix}{argument(x.Type, i)}").ToList();
+        string returns;
+        if (method is MethodInfo m)
+        {
+            description.Write(attributes(string.Empty, m.ReturnParameter));
+            returns = EscapeForStacked(m.ReturnType);
+        }
+        else
+        {
+            returns = method.IsStatic || method.DeclaringType.IsValueType || builtin.body == null ? "void" : EscapeForStacked(method.DeclaringType);
+        }
+        var prototype = $@"{returns}
 {identifier}({string.Join(",", arguments)}
 )";
-            void writeDeclaration(string attributes)
-            {
-                functionDeclarations.WriteLine($"{description}\n{attributes}{prototype};");
-                if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
+        void writeDeclaration(string attributes)
+        {
+            functionDeclarations.WriteLine($"{description}\n{attributes}{prototype};");
+            if (method.DeclaringType.IsValueType && !method.IsStatic && !method.IsConstructor) functionDeclarations.WriteLine($@"
 inline {returns}
 {identifier}__v({string.Join(",", arguments.Skip(1).Prepend($"\n\t{Escape(method.DeclaringType)}* RECYCLONE__SPILL a_0"))}
 )
 {{
 {'\t'}{(returns == "void" ? string.Empty : "return ")}{identifier}({
-    string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_0->v__value"))
+string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_0->v__value"))
 });
 }}");
-            }
-            if (builtin.body != null)
+        }
+        if (builtin.body != null)
+        {
+            writeDeclaration(string.Empty);
+            writer = writerForType(method.DeclaringType, builtin.inline > 0);
+            writer.WriteLine(description);
+            if (builtin.inline < 0)
             {
-                writeDeclaration(string.Empty);
-                writer = writerForType(method.DeclaringType, builtin.inline > 0);
-                writer.WriteLine(description);
-                if (builtin.inline < 0)
-                {
-                    writer.Write("RECYCLONE__NOINLINE ");
-                }
-                else
-                {
-                    if (builtin.inline > 1) writer.Write("RECYCLONE__ALWAYS_INLINE ");
-                    if (builtin.inline > 0) writer.Write("inline ");
-                }
-                writer.WriteLine($"{prototype}\n{{\n{builtin.body}}}");
-                return;
-            }
-            var body = method.GetMethodBody();
-            bytes = body?.GetILAsByteArray();
-            var inline = false;
-            if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.NoInlining))
-            {
-                writer = writerForType(method.DeclaringType, false);
-                writer.WriteLine(description);
                 writer.Write("RECYCLONE__NOINLINE ");
             }
             else
             {
-                var aggressive = method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining);
-                inline = aggressive || bytes?.Length <= 64;
-                writer = writerForType(method.DeclaringType, inline);
-                writer.WriteLine(description);
-                if (aggressive && bytes?.Length <= 128) writer.Write("RECYCLONE__ALWAYS_INLINE ");
-                if (inline) writer.Write("inline ");
+                if (builtin.inline > 1) writer.Write("RECYCLONE__ALWAYS_INLINE ");
+                if (builtin.inline > 0) writer.Write("inline ");
             }
-            var dllimport = method.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofDllImportAttribute);
-            if (dllimport != null)
-            {
-                writeDeclaration(string.Empty);
-                var value = (string)dllimport.ConstructorArguments[0].Value;
-                T named<T>(string name, T @default) => (T)dllimport.NamedArguments.FirstOrDefault(x => x.MemberName == name).TypedValue.Value ?? @default;
-                var entryPoint = named(nameof(DllImportAttribute.EntryPoint), method.Name);
-                var callingConvention = named(nameof(DllImportAttribute.CallingConvention), CallingConvention.Winapi);
-                var charSet = named(nameof(DllImportAttribute.CharSet), CharSet.Ansi);
-                var setLastError = named(nameof(DllImportAttribute.SetLastError), false);
-                functionDeclarations.WriteLine($@"// DLL import:
+            writer.WriteLine($"{prototype}\n{{\n{builtin.body}}}");
+            return;
+        }
+        var body = method.GetMethodBody();
+        bytes = body?.GetILAsByteArray();
+        var inline = false;
+        if (method.MethodImplementationFlags.HasFlag(MethodImplAttributes.NoInlining))
+        {
+            writer = writerForType(method.DeclaringType, false);
+            writer.WriteLine(description);
+            writer.Write("RECYCLONE__NOINLINE ");
+        }
+        else
+        {
+            var aggressive = method.MethodImplementationFlags.HasFlag(MethodImplAttributes.AggressiveInlining);
+            inline = aggressive || bytes?.Length <= 64;
+            writer = writerForType(method.DeclaringType, inline);
+            writer.WriteLine(description);
+            if (aggressive && bytes?.Length <= 128) writer.Write("RECYCLONE__ALWAYS_INLINE ");
+            if (inline) writer.Write("inline ");
+        }
+        var dllimport = method.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofDllImportAttribute);
+        if (dllimport != null)
+        {
+            writeDeclaration(string.Empty);
+            var value = (string)dllimport.ConstructorArguments[0].Value;
+            T named<T>(string name, T @default) => (T)dllimport.NamedArguments.FirstOrDefault(x => x.MemberName == name).TypedValue.Value ?? @default;
+            var entryPoint = named(nameof(DllImportAttribute.EntryPoint), method.Name);
+            var callingConvention = named(nameof(DllImportAttribute.CallingConvention), CallingConvention.Winapi);
+            var charSet = named(nameof(DllImportAttribute.CharSet), CharSet.Ansi);
+            var setLastError = named(nameof(DllImportAttribute.SetLastError), false);
+            functionDeclarations.WriteLine($@"// DLL import:
 //{'\t'}Value: {value}
 //{'\t'}EntryPoint: {entryPoint}
 //{'\t'}CallingConvention: {callingConvention}
 //{'\t'}CharSet: {charSet}
 //{'\t'}SetLastError: {setLastError}");
-                writer.WriteLine($@"{prototype}
+            writer.WriteLine($@"{prototype}
 {{
 {'\t'}static auto symbol = f_load_symbol(""{value}""s, ""{entryPoint}"");");
-                GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, callingConvention, charSet, setLastError);
-                writer.WriteLine('}');
-                return;
-            }
-            if (bytes == null)
-            {
-                writeDeclaration(string.Empty);
-                functionDeclarations.WriteLine("// TO BE PROVIDED");
-                return;
-            }
-            writer.WriteLine($@"{prototype}
+            GenerateInvokeUnmanaged(GetReturnType(method), method.GetParameters().Select((x, i) => (x, i)), "symbol", writer, callingConvention, charSet, setLastError);
+            writer.WriteLine('}');
+            return;
+        }
+        if (bytes == null)
+        {
+            writeDeclaration(string.Empty);
+            functionDeclarations.WriteLine("// TO BE PROVIDED");
+            return;
+        }
+        writer.WriteLine($@"{prototype}
 {{");
-            definedIndices = new SortedDictionary<string, (string, int)>();
-            indexToStack = new Dictionary<int, Stack>();
-            log($"{method.DeclaringType}::[{method}]");
-            foreach (var x in body.ExceptionHandlingClauses) log($@"{x.Flags}
+        definedIndices = new SortedDictionary<string, (string, int)>();
+        indexToStack = new Dictionary<int, Stack>();
+        log($"{method.DeclaringType}::[{method}]");
+        foreach (var x in body.ExceptionHandlingClauses) log($@"{x.Flags}
 {'\t'}try: {x.TryOffset:x04} to {x.TryOffset + x.TryLength:x04}
 {'\t'}handler: {x.HandlerOffset:x04} to {x.HandlerOffset + x.HandlerLength:x04}{ x.Flags switch
 {
-    ExceptionHandlingClauseOptions.Clause => $"\n\tcatch: {x.CatchType}",
-    ExceptionHandlingClauseOptions.Filter => $"\n\tfilter: {x.FilterOffset:x04}",
-    _ => string.Empty
+ExceptionHandlingClauseOptions.Clause => $"\n\tcatch: {x.CatchType}",
+ExceptionHandlingClauseOptions.Filter => $"\n\tfilter: {x.FilterOffset:x04}",
+_ => string.Empty
 }}");
-            hasReturn = false;
-            Estimate(0, new Stack(this));
-            foreach (var x in body.ExceptionHandlingClauses)
-                switch (x.Flags)
-                {
-                    case ExceptionHandlingClauseOptions.Clause:
-                        Estimate(x.HandlerOffset, new Stack(this).Push(x.CatchType));
-                        break;
-                    case ExceptionHandlingClauseOptions.Filter:
-                        Estimate(x.FilterOffset, new Stack(this).Push(typeofException));
-                        break;
-                    default:
-                        Estimate(x.HandlerOffset, new Stack(this));
-                        break;
-                }
-            writeDeclaration(hasReturn ? string.Empty : "[[noreturn]] ");
-            log("\n");
-            writer.WriteLine($"\t// init locals: {body.InitLocals}");
-            foreach (var x in body.LocalVariables)
-                // TODO: uninitialized object references in value types might be copied into heap when compiled with SkipLocalsInit.
-                writer.WriteLine($"\t{EscapeForArgument(x.LocalType)} l{x.LocalIndex}{(body.InitLocals || x.LocalType.IsValueType && Define(x.LocalType).IsManaged ? "{}" : string.Empty)};");
-            foreach (var x in definedIndices)
-                for (var i = 0; i < x.Value.Index; ++i)
-                    writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
-            //if (!method.DeclaringType.Name.StartsWith("AllowedBmpCodePointsBitmap")) writer.WriteLine($"\tprintf(\"{Escape(method)}\\n\");");
-            if (!inline) writer.WriteLine("\tf_epoch_point();");
-            var writers = new Stack<TextWriter>();
-            var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
-            var index = 0;
-            while (index < bytes.Length)
+        hasReturn = false;
+        Estimate(0, new Stack(this));
+        foreach (var x in body.ExceptionHandlingClauses)
+            switch (x.Flags)
             {
-                while (tryBegins.Count > 0)
+                case ExceptionHandlingClauseOptions.Clause:
+                    Estimate(x.HandlerOffset, new Stack(this).Push(x.CatchType));
+                    break;
+                case ExceptionHandlingClauseOptions.Filter:
+                    Estimate(x.FilterOffset, new Stack(this).Push(typeofException));
+                    break;
+                default:
+                    Estimate(x.HandlerOffset, new Stack(this));
+                    break;
+            }
+        writeDeclaration(hasReturn ? string.Empty : "[[noreturn]] ");
+        log("\n");
+        writer.WriteLine($"\t// init locals: {body.InitLocals}");
+        foreach (var x in body.LocalVariables)
+            // TODO: uninitialized object references in value types might be copied into heap when compiled with SkipLocalsInit.
+            writer.WriteLine($"\t{EscapeForArgument(x.LocalType)} l{x.LocalIndex}{(body.InitLocals || x.LocalType.IsValueType && Define(x.LocalType).IsManaged ? "{}" : string.Empty)};");
+        foreach (var x in definedIndices)
+            for (var i = 0; i < x.Value.Index; ++i)
+                writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
+        //if (!method.DeclaringType.Name.StartsWith("AllowedBmpCodePointsBitmap")) writer.WriteLine($"\tprintf(\"{Escape(method)}\\n\");");
+        if (!inline) writer.WriteLine("\tf_epoch_point();");
+        var writers = new Stack<TextWriter>();
+        var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));
+        var index = 0;
+        while (index < bytes.Length)
+        {
+            while (tryBegins.Count > 0)
+            {
+                var clause = tryBegins.Peek();
+                if (index < clause.TryOffset) break;
+                tryBegins.Dequeue();
+                tries.Push(clause);
+                if (clause.Flags == ExceptionHandlingClauseOptions.Finally)
                 {
-                    var clause = tryBegins.Peek();
-                    if (index < clause.TryOffset) break;
-                    tryBegins.Dequeue();
-                    tries.Push(clause);
-                    if (clause.Flags == ExceptionHandlingClauseOptions.Finally)
-                    {
-                        writer.WriteLine("{auto finally = f__finally([&]\n{");
-                        writers.Push(writer);
-                        writer = new StringWriter();
-                        writer.WriteLine("});");
-                    }
-                    else
-                    {
-                        writer.WriteLine("try {");
-                    }
+                    writer.WriteLine("{auto finally = f__finally([&]\n{");
+                    writers.Push(writer);
+                    writer = new StringWriter();
+                    writer.WriteLine("});");
                 }
-                if (tries.Count > 0)
+                else
                 {
-                    var clause = tries.Peek();
-                    if (index == (clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : clause.HandlerOffset))
+                    writer.WriteLine("try {");
+                }
+            }
+            if (tries.Count > 0)
+            {
+                var clause = tries.Peek();
+                if (index == (clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : clause.HandlerOffset))
+                {
+                    var s = indexToStack[index];
+                    switch (clause.Flags)
                     {
-                        var s = indexToStack[index];
-                        switch (clause.Flags)
-                        {
-                            case ExceptionHandlingClauseOptions.Clause:
-                                writer.WriteLine($@"// catch {clause.CatchType}
+                        case ExceptionHandlingClauseOptions.Clause:
+                            writer.WriteLine($@"// catch {clause.CatchType}
 }} catch (t__object* e) {{
 {'\t'}if (!e->f_type()->f_is(&t__type_of<{Escape(clause.CatchType)}>::v__instance)) throw;
 {'\t'}{s.Variable} = e;
 {'\t'}f_epoch_point();");
-                                break;
-                            case ExceptionHandlingClauseOptions.Filter:
-                                writer.WriteLine($@"// filter
+                            break;
+                        case ExceptionHandlingClauseOptions.Filter:
+                            writer.WriteLine($@"// filter
 }} catch (t__object* e) {{
 {'\t'}{s.Variable} = e;
 {'\t'}f_epoch_point();");
-                                break;
-                            case ExceptionHandlingClauseOptions.Finally:
-                                writers.Push(writer);
-                                writer = new StringWriter();
-                                break;
-                            case ExceptionHandlingClauseOptions.Fault:
-                                writer.WriteLine($@"// fault
+                            break;
+                        case ExceptionHandlingClauseOptions.Finally:
+                            writers.Push(writer);
+                            writer = new StringWriter();
+                            break;
+                        case ExceptionHandlingClauseOptions.Fault:
+                            writer.WriteLine($@"// fault
 }} catch (...) {{
 {'\t'}f_epoch_point();");
-                                break;
-                        }
-                    }
-                }
-                writer.Write($"L_{index:x04}: // ");
-                var stack = indexToStack[index];
-                var instruction = instructions1[bytes[index++]];
-                if (instruction.OpCode == OpCodes.Prefix1) instruction = instructions2[bytes[index++]];
-                writer.Write(instruction.OpCode.Name);
-                index = instruction.Generate(index, stack);
-                if (tries.Count > 0)
-                {
-                    var clause = tries.Peek();
-                    if (index >= clause.HandlerOffset + clause.HandlerLength)
-                    {
-                        tries.Pop();
-                        if (clause.Flags == ExceptionHandlingClauseOptions.Finally)
-                        {
-                            var f = writer;
-                            var t = writers.Pop();
-                            writer = writers.Pop();
-                            writer.Write(f);
-                            writer.Write(t);
-                        }
-                        writer.WriteLine('}');
+                            break;
                     }
                 }
             }
-            writer.WriteLine('}');
-        }
-
-        public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType)
-        {
-            Define(typeofRuntimeAssembly);
-            Define(typeofRuntimeFieldInfo);
-            Define(typeofRuntimeConstructorInfo);
-            Define(typeofRuntimeMethodInfo);
-            Define(typeofRuntimePropertyInfo);
-            Define(typeofRuntimeType);
-            Escape(finalizeOfObject);
-            var typeofThread = getType(typeof(Thread));
-            Define(typeofThread);
-            Enqueue(getType(typeof(ThreadStart)).GetMethod("Invoke"));
-            Enqueue(getType(typeof(ParameterizedThreadStart)).GetMethod("Invoke"));
-            Define(typeofVoid);
-            Define(typeofString.MakeArrayType());
-            Define(typeofStringBuilder);
-            Define(method.DeclaringType);
-            Enqueue(method);
-            foreach (var x in Bundle) Enqueue(x);
-            foreach (var x in BundleMethods) Enqueue(x);
-            do
+            writer.Write($"L_{index:x04}: // ");
+            var stack = indexToStack[index];
+            var instruction = instructions1[bytes[index++]];
+            if (instruction.OpCode == OpCodes.Prefix1) instruction = instructions2[bytes[index++]];
+            writer.Write(instruction.OpCode.Name);
+            index = instruction.Generate(index, stack);
+            if (tries.Count > 0)
             {
-                ProcessNextMethod(writerForType);
-                while (queuedTypes.Count > 0) Define(queuedTypes.Dequeue());
+                var clause = tries.Peek();
+                if (index >= clause.HandlerOffset + clause.HandlerLength)
+                {
+                    tries.Pop();
+                    if (clause.Flags == ExceptionHandlingClauseOptions.Finally)
+                    {
+                        var f = writer;
+                        var t = writers.Pop();
+                        writer = writers.Pop();
+                        writer.Write(f);
+                        writer.Write(t);
+                    }
+                    writer.WriteLine('}');
+                }
             }
-            while (queuedMethods.Count > 0);
-            processed = true;
-            writerForDeclarations.WriteLine("#include \"base.h\"");
-            if (Target != PlatformID.Win32NT) writerForDeclarations.WriteLine("#include \"waitables.h\"");
-            writerForDeclarations.WriteLine(@"
+        }
+        writer.WriteLine('}');
+    }
+
+    public void Do(MethodInfo method, TextWriter writerForDeclarations, TextWriter writerForDefinitions, Func<Type, bool, TextWriter> writerForType)
+    {
+        Define(typeofRuntimeAssembly);
+        Define(typeofRuntimeFieldInfo);
+        Define(typeofRuntimeConstructorInfo);
+        Define(typeofRuntimeMethodInfo);
+        Define(typeofRuntimePropertyInfo);
+        Define(typeofRuntimeType);
+        Escape(finalizeOfObject);
+        var typeofThread = getType(typeof(Thread));
+        Define(typeofThread);
+        Enqueue(getType(typeof(ThreadStart)).GetMethod("Invoke"));
+        Enqueue(getType(typeof(ParameterizedThreadStart)).GetMethod("Invoke"));
+        Define(typeofVoid);
+        Define(typeofString.MakeArrayType());
+        Define(typeofStringBuilder);
+        Define(method.DeclaringType);
+        Enqueue(method);
+        foreach (var x in Bundle) Enqueue(x);
+        foreach (var x in BundleMethods) Enqueue(x);
+        do
+        {
+            ProcessNextMethod(writerForType);
+            while (queuedTypes.Count > 0) Define(queuedTypes.Dequeue());
+        }
+        while (queuedMethods.Count > 0);
+        processed = true;
+        writerForDeclarations.WriteLine("#include \"base.h\"");
+        if (Target != PlatformID.Win32NT) writerForDeclarations.WriteLine("#include \"waitables.h\"");
+        writerForDeclarations.WriteLine(@"
 namespace il2cxx
 {
 ");
-            writerForDeclarations.Write(typeDeclarations);
-            writerForDeclarations.Write(typeDefinitions);
-            writerForDeclarations.WriteLine(@"
+        writerForDeclarations.Write(typeDeclarations);
+        writerForDeclarations.Write(typeDefinitions);
+        writerForDeclarations.WriteLine(@"
 extern t__runtime_assembly* v__assemblies[];
 extern t__runtime_assembly* const v__entry_assembly;
 extern const std::map<std::string_view, t__type*> v__name_to_type;
 extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
-            writerForDeclarations.Write(functionDeclarations);
-            var assemblyToIdentifier = new Dictionary<Assembly, string>();
-            var genericTypeDefinitionToConstructeds = runtimeDefinitions.Select(x => x.Type).Where(x => x.IsGenericType).GroupBy(x => x.GetGenericTypeDefinition()).ToDictionary(x => x.Key, xs => xs.AsEnumerable());
-            foreach (var definition in runtimeDefinitions)
+        writerForDeclarations.Write(functionDeclarations);
+        var assemblyToIdentifier = new Dictionary<Assembly, string>();
+        var genericTypeDefinitionToConstructeds = runtimeDefinitions.Select(x => x.Type).Where(x => x.IsGenericType).GroupBy(x => x.GetGenericTypeDefinition()).ToDictionary(x => x.Key, xs => xs.AsEnumerable());
+        foreach (var definition in runtimeDefinitions)
+        {
+            var writer = writerForType(definition.Type, false);
+            var assembly = definition.Type.Assembly;
+            if (!assemblyToIdentifier.TryGetValue(assembly, out var name))
             {
-                var writer = writerForType(definition.Type, false);
-                var assembly = definition.Type.Assembly;
-                if (!assemblyToIdentifier.TryGetValue(assembly, out var name))
-                {
-                    name = Identifier(Escape(assembly.GetName().Name));
-                    assemblyToIdentifier.Add(assembly, name);
-                    writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
-                    var exportedTypes = assembly.ExportedTypes.Where(x => typeToRuntime.ContainsKey(x)).ToList();
-                    if (exportedTypes.Count > 0) writer.Write($@"
+                name = Identifier(Escape(assembly.GetName().Name));
+                assemblyToIdentifier.Add(assembly, name);
+                writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
+                var exportedTypes = assembly.ExportedTypes.Where(x => typeToRuntime.ContainsKey(x)).ToList();
+                if (exportedTypes.Count > 0) writer.Write($@"
 static t__type* v__exported_{name}[] = {{
 {string.Join(string.Empty, exportedTypes.Select(x => $"\t&t__type_of<{Escape(x)}>::v__instance,\n"))}{'\t'}nullptr
 }};");
-                    var names = assembly.GetManifestResourceNames();
-                    foreach (var x in names)
-                    {
-                        writer.Write($"\nstatic uint8_t v__resource_{name}__{Escape(x)}[] = \"");
-                        using (var source = assembly.GetManifestResourceStream(x))
-                            while (true)
-                            {
-                                var b = source.ReadByte();
-                                if (b == -1) break;
-                                var c = (char)b;
-                                if (escapes.TryGetValue(c, out var e))
-                                    writer.Write(e);
-                                else if (c < 0x20 || c >= 0x7f)
-                                    writer.Write($"\\{Convert.ToString(c, 8).PadLeft(3, '0')}");
-                                else
-                                    writer.Write(c);
-                            }
-                        writer.Write("\";");
-                    }
-                    writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}, {(exportedTypes.Count > 0 ? $"v__exported_{name}" : "t__type::v__empty_types")}, {{{string.Join(",", names.Select(x => $"\n\t{{u\"{x}\"sv, {{v__resource_{name}__{Escape(x)}, sizeof(v__resource_{name}__{Escape(x)}) - 1}}}}"))}\n}}}};");
+                var names = assembly.GetManifestResourceNames();
+                foreach (var x in names)
+                {
+                    writer.Write($"\nstatic uint8_t v__resource_{name}__{Escape(x)}[] = \"");
+                    using (var source = assembly.GetManifestResourceStream(x))
+                        while (true)
+                        {
+                            var b = source.ReadByte();
+                            if (b == -1) break;
+                            var c = (char)b;
+                            if (escapes.TryGetValue(c, out var e))
+                                writer.Write(e);
+                            else if (c < 0x20 || c >= 0x7f)
+                                writer.Write($"\\{Convert.ToString(c, 8).PadLeft(3, '0')}");
+                            else
+                                writer.Write(c);
+                        }
+                    writer.Write("\";");
                 }
-                WriteRuntimeDefinition(definition, $"v__assembly_{name}", genericTypeDefinitionToConstructeds, writerForDeclarations, writer);
+                writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}, {(exportedTypes.Count > 0 ? $"v__exported_{name}" : "t__type::v__empty_types")}, {{{string.Join(",", names.Select(x => $"\n\t{{u\"{x}\"sv, {{v__resource_{name}__{Escape(x)}, sizeof(v__resource_{name}__{Escape(x)}) - 1}}}}"))}\n}}}};");
             }
-            writerForDeclarations.WriteLine("\n#include \"utilities.h\"");
-            writerForDeclarations.Write(staticDefinitions);
-            writerForDeclarations.WriteLine(@"
+            WriteRuntimeDefinition(definition, $"v__assembly_{name}", genericTypeDefinitionToConstructeds, writerForDeclarations, writer);
+        }
+        writerForDeclarations.WriteLine("\n#include \"utilities.h\"");
+        writerForDeclarations.Write(staticDefinitions);
+        writerForDeclarations.WriteLine(@"
 struct t_static
 {");
-            writerForDeclarations.Write(staticMembers);
-            writerForDeclarations.WriteLine($@"
+        writerForDeclarations.Write(staticMembers);
+        writerForDeclarations.WriteLine($@"
 {'\t'}static t_static* v_instance;
 {'\t'}t_static()
 {'\t'}{{
@@ -374,8 +368,8 @@ struct t_static
 
 struct t_thread_static
 {{");
-            writerForDeclarations.Write(threadStaticMembers);
-            writerForDeclarations.WriteLine($@"
+        writerForDeclarations.Write(threadStaticMembers);
+        writerForDeclarations.WriteLine($@"
 {'\t'}static RECYCLONE__THREAD t_thread_static* v_instance;
 {'\t'}t_thread_static()
 {'\t'}{{
@@ -387,63 +381,63 @@ struct t_thread_static
 {'\t'}}}
 }};
 ");
-            writerForDeclarations.WriteLine(fieldDeclarations);
-            writerForDeclarations.WriteLine('}');
-            writerForDefinitions.WriteLine($@"namespace il2cxx
+        writerForDeclarations.WriteLine(fieldDeclarations);
+        writerForDeclarations.WriteLine('}');
+        writerForDefinitions.WriteLine($@"namespace il2cxx
 {{
 
 #include ""utilities.cc""
 
 t__runtime_assembly* v__assemblies[] = {{
 {
-    string.Join(string.Empty, assemblyToIdentifier.Values.OrderBy(x => x).Select(x => $"\t&v__assembly_{x},\n"))
+string.Join(string.Empty, assemblyToIdentifier.Values.OrderBy(x => x).Select(x => $"\t&v__assembly_{x},\n"))
 }{'\t'}nullptr
 }};
 
 t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
 
 const std::map<std::string_view, t__type*> v__name_to_type{{{
-    string.Join(",", runtimeDefinitions.Where(x => !x.Type.IsGenericParameter).Select(x => $"\n\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))
+string.Join(",", runtimeDefinitions.Where(x => !x.Type.IsGenericParameter).Select(x => $"\n\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))
 }
 }};
 
 const std::map<void*, void*> v__managed_method_to_unmanaged{{{
-    string.Join(",", ldftnMethods.OfType<MethodInfo>().Where(m =>
-    {
-        if (!m.IsStatic) return false;
-        var types = m.GetParameters().Select(x => x.ParameterType);
-        var @return = m.ReturnType;
-        return (@return == typeofVoid ? types : types.Prepend(@return)).All(x => !IsComposite(x) || x == typeofString || Define(x).IsMarshallable);
-    }).Select(m => $@"
+string.Join(",", ldftnMethods.OfType<MethodInfo>().Where(m =>
+{
+    if (!m.IsStatic) return false;
+    var types = m.GetParameters().Select(x => x.ParameterType);
+    var @return = m.ReturnType;
+    return (@return == typeofVoid ? types : types.Prepend(@return)).All(x => !IsComposite(x) || x == typeofString || Define(x).IsMarshallable);
+}).Select(m => $@"
 {'\t'}{{reinterpret_cast<void*>({Escape(m)}), reinterpret_cast<void*>(+[]({
-        string.Join(",", UnmanagedSignature(m.GetParameters(), CharSet.Auto).Select((x, i) => $"\n\t\t{x} a_{i}"))
+    string.Join(",", UnmanagedSignature(m.GetParameters(), CharSet.Auto).Select((x, i) => $"\n\t\t{x} a_{i}"))
 }
 {'\t'}) -> {UnmanagedReturn(m.ReturnType)}
 {'\t'}{{
 {'\t'}{'\t'}return f_epoch_noiger([&]
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}return {Escape(m)}({string.Join(",", m.GetParameters().Select((x, i) =>
-        {
-            if (x.ParameterType.IsByRef) return $"reinterpret_cast<{EscapeForStacked(x.ParameterType)}>(a_{i})";
-            if (x.ParameterType == typeofString) return $"f__new_string(a_{i})";
-            return $"a_{i}";
-        }).Select(x => $"\n\t\t\t\t{x}"))
+    {
+        if (x.ParameterType.IsByRef) return $"reinterpret_cast<{EscapeForStacked(x.ParameterType)}>(a_{i})";
+        if (x.ParameterType == typeofString) return $"f__new_string(a_{i})";
+        return $"a_{i}";
+    }).Select(x => $"\n\t\t\t\t{x}"))
 }
 {'\t'}{'\t'}{'\t'});
 {'\t'}{'\t'}}});
 {'\t'}}})}}"))
 }
 }};");
-            var arguments0 = string.Empty;
-            var arguments1 = string.Empty;
-            if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))
-            {
-                arguments0 = $@"
+        var arguments0 = string.Empty;
+        var arguments1 = string.Empty;
+        if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))
+        {
+            arguments0 = $@"
 {'\t'}{'\t'}auto RECYCLONE__SPILL arguments = f__new_array<{Escape(typeofString.MakeArrayType())}, il2cxx::{EscapeForMember(typeofString)}>(argc);
 {'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f_data()[i] = f__new_string(argv[i]);";
-                arguments1 = "arguments";
-            }
-            writerForDefinitions.WriteLine($@"
+            arguments1 = "arguments";
+        }
+        writerForDefinitions.WriteLine($@"
 t_static* t_static::v_instance;
 
 RECYCLONE__THREAD t_thread_static* t_thread_static::v_instance;
@@ -490,8 +484,8 @@ int main(int argc, char* argv[])
 {'\t'}{'\t'}auto ts = std::make_unique<t_thread_static>();{arguments0}
 {'\t'}{'\t'}try {{
 {'\t'}{'\t'}{'\t'}{(method.ReturnType == typeofVoid
-    ? $"{Escape(method)}({arguments1});\n\t\t\tauto n = 0"
-    : $"auto n = {Escape(method)}({arguments1})"
+? $"{Escape(method)}({arguments1});\n\t\t\tauto n = 0"
+: $"auto n = {Escape(method)}({arguments1})"
 )};
 {'\t'}{'\t'}{'\t'}engine.f_join_foregrounds();
 {'\t'}{'\t'}{'\t'}if (!std::getenv(""IL2CXX_VERIFY_LEAKS"")) std::exit(n);
@@ -508,6 +502,5 @@ int main(int argc, char* argv[])
 {'\t'}}}();
 }}
 #endif");
-        }
     }
 }

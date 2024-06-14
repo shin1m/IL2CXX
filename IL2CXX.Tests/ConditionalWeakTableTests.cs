@@ -9,17 +9,17 @@ class ConditionalWeakTableTests
     static int Default()
     {
         var table = new ConditionalWeakTable<string, string>();
-        string x = null;
-        string y = null;
+        string? x = null;
+        string? y = null;
         WithPadding(() =>
         {
             x = "Hello";
             y = "World";
             table.Add(x, y);
         });
-        if (WithPadding(() => !table.TryGetValue(x, out var z) || z != y)) return 1;
+        if (WithPadding(() => !table.TryGetValue(x!, out var z) || z != y)) return 1;
         var (wx, wy) = WithPadding(() => (
-            new WeakReference<string>(x), new WeakReference<string>(y)
+            new WeakReference<string>(x!), new WeakReference<string>(y!)
         ));
         WithPadding(() => x = y = null);
         GC.Collect();

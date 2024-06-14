@@ -8,7 +8,7 @@ class JsonTests
     class Foo
     {
         public int ID;
-        public string Value;
+        public string? Value;
     }
     enum Bar
     {
@@ -18,7 +18,7 @@ class JsonTests
     static int Deserialize()
     {
         var foo = JsonSerializer.Deserialize<Foo>("{\"ID\":1,\"Value\":\"foo\"}", new JsonSerializerOptions { IncludeFields = true });
-        return foo.ID == 1 && foo.Value == "foo" ? 0 : 1;
+        return foo != null && foo.ID == 1 && foo.Value == "foo" ? 0 : 1;
     }
     static int Serialize()
     {
@@ -44,10 +44,10 @@ class JsonTests
     [OneTimeSetUp]
     public void OneTimeSetUp()
     {
-        var jpi = Type.GetType("System.Text.Json.Serialization.Metadata.JsonPropertyInfo`1, System.Text.Json", true);
-        var odc = Type.GetType("System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1, System.Text.Json", true);
+        var jpi = Type.GetType("System.Text.Json.Serialization.Metadata.JsonPropertyInfo`1, System.Text.Json", true)!;
+        var odc = Type.GetType("System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1, System.Text.Json", true)!;
         var odcOfFoo = odc.MakeGenericType(typeof(Foo));
-        var ec = Type.GetType("System.Text.Json.Serialization.Converters.EnumConverter`1, System.Text.Json", true);
+        var ec = Type.GetType("System.Text.Json.Serialization.Converters.EnumConverter`1, System.Text.Json", true)!;
         var ecOfBar = ec.MakeGenericType(typeof(Bar));
         build = Utilities.Build(Run, [
             odcOfFoo,

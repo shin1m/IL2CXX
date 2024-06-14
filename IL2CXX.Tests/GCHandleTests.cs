@@ -8,7 +8,7 @@ class GCHandleTests
 {
     class Foo
     {
-        public static Foo Resurrected;
+        public static Foo? Resurrected;
 
         bool resurrected;
 
@@ -30,7 +30,7 @@ class GCHandleTests
     }
     static int Weak()
     {
-        Foo x = null;
+        Foo? x = null;
         var h = WithPadding(() =>
         {
             x = new Foo();
@@ -54,7 +54,7 @@ class GCHandleTests
     }
     static int WeakTrackResurrection()
     {
-        Foo x = null;
+        Foo? x = null;
         var h = WithPadding(() =>
         {
             x = new Foo();
@@ -89,7 +89,7 @@ class GCHandleTests
     }
     static int WeakHandles()
     {
-        Foo x = null;
+        Foo? x = null;
         var (w, wtr) = WithPadding(() =>
         {
             x = new Foo();

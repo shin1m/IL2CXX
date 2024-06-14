@@ -11,14 +11,14 @@ partial class Transpiler
     private readonly Queue<Type> queuedTypes = new();
     private readonly HashSet<MethodKey> visitedMethods = new();
     private readonly Queue<MethodBase> queuedMethods = new();
-    private MethodBase method;
-    private byte[] bytes;
-    private SortedDictionary<string, (string Prefix, int Index)> definedIndices;
+    private MethodBase method = typeof(object).GetConstructor(Type.EmptyTypes) ?? throw new Exception();
+    private byte[]? bytes;
+    private readonly SortedDictionary<string, (string Prefix, int Index)> definedIndices = new();
     private bool hasReturn;
-    private Dictionary<int, Stack> indexToStack;
-    private TextWriter writer;
+    private readonly Dictionary<int, Stack> indexToStack = new();
+    private TextWriter writer = TextWriter.Null;
     private readonly Stack<ExceptionHandlingClause> tries = new();
-    private Type constrained;
+    private Type? constrained;
     private bool @volatile;
 
     private void ProcessNextMethod(Func<Type, bool, TextWriter> writerForType)
@@ -27,7 +27,7 @@ partial class Transpiler
         if (!visitedMethods.Add(key)) return;
         method = key.Method;
         var identifier = Escape(method);
-        if (method.IsGenericMethod && ShouldGenerateReflection(method.DeclaringType))
+        if (method.IsGenericMethod && ShouldGenerateReflection(method.DeclaringType ?? throw new Exception()))
         {
             var definition = Define(method.DeclaringType);
             definition.Definitions.WriteLine($@"static t__abstract_type* v__generic_arguments_{identifier}[] = {{
@@ -46,7 +46,7 @@ method.IsAbstract ? "nullptr" : $"reinterpret_cast<void*>({identifier})"
         var builtin = this.builtin.GetBody(this, key);
         var description = new StringWriter();
         description.Write($@"
-// {method.DeclaringType.AssemblyQualifiedName}
+// {method.DeclaringType!.AssemblyQualifiedName}
 // {method}
 // {(method.IsPublic ? "public " : string.Empty)}{(method.IsPrivate ? "private " : string.Empty)}{(method.IsStatic ? "static " : string.Empty)}{(method.IsFinal ? "final " : string.Empty)}{(method.IsVirtual ? "virtual " : string.Empty)}{method.MethodImplementationFlags}");
         string attributes(string prefix, ParameterInfo pi) => string.Join(string.Empty, pi.GetCustomAttributesData().Select(x => $"\n{prefix}// [{x}]"));
@@ -121,8 +121,8 @@ string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_
         if (dllimport != null)
         {
             writeDeclaration(string.Empty);
-            var value = (string)dllimport.ConstructorArguments[0].Value;
-            T named<T>(string name, T @default) => (T)dllimport.NamedArguments.FirstOrDefault(x => x.MemberName == name).TypedValue.Value ?? @default;
+            var value = (string)(dllimport.ConstructorArguments[0].Value ?? throw new Exception());
+            T named<T>(string name, T @default) => (T?)dllimport.NamedArguments.FirstOrDefault(x => x.MemberName == name).TypedValue.Value ?? @default;
             var entryPoint = named(nameof(DllImportAttribute.EntryPoint), method.Name);
             var callingConvention = named(nameof(DllImportAttribute.CallingConvention), CallingConvention.Winapi);
             var charSet = named(nameof(DllImportAttribute.CharSet), CharSet.Ansi);
@@ -148,10 +148,10 @@ string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_
         }
         writer.WriteLine($@"{prototype}
 {{");
-        definedIndices = new SortedDictionary<string, (string, int)>();
-        indexToStack = new Dictionary<int, Stack>();
+        definedIndices.Clear();
+        indexToStack.Clear();
         log($"{method.DeclaringType}::[{method}]");
-        foreach (var x in body.ExceptionHandlingClauses) log($@"{x.Flags}
+        foreach (var x in body!.ExceptionHandlingClauses) log($@"{x.Flags}
 {'\t'}try: {x.TryOffset:x04} to {x.TryOffset + x.TryLength:x04}
 {'\t'}handler: {x.HandlerOffset:x04} to {x.HandlerOffset + x.HandlerLength:x04}{ x.Flags switch
 {
@@ -160,12 +160,12 @@ ExceptionHandlingClauseOptions.Filter => $"\n\tfilter: {x.FilterOffset:x04}",
 _ => string.Empty
 }}");
         hasReturn = false;
-        Estimate(0, new Stack(this));
+        Estimate(0, new(this));
         foreach (var x in body.ExceptionHandlingClauses)
             switch (x.Flags)
             {
                 case ExceptionHandlingClauseOptions.Clause:
-                    Estimate(x.HandlerOffset, new Stack(this).Push(x.CatchType));
+                    Estimate(x.HandlerOffset, new Stack(this).Push(x.CatchType ?? throw new Exception()));
                     break;
                 case ExceptionHandlingClauseOptions.Filter:
                     Estimate(x.FilterOffset, new Stack(this).Push(typeofException));
@@ -219,7 +219,7 @@ _ => string.Empty
                         case ExceptionHandlingClauseOptions.Clause:
                             writer.WriteLine($@"// catch {clause.CatchType}
 }} catch (t__object* e) {{
-{'\t'}if (!e->f_type()->f_is(&t__type_of<{Escape(clause.CatchType)}>::v__instance)) throw;
+{'\t'}if (!e->f_type()->f_is(&t__type_of<{Escape(clause.CatchType ?? throw new Exception())}>::v__instance)) throw;
 {'\t'}{s.Variable} = e;
 {'\t'}f_epoch_point();");
                             break;
@@ -279,12 +279,12 @@ _ => string.Empty
         Escape(finalizeOfObject);
         var typeofThread = getType(typeof(Thread));
         Define(typeofThread);
-        Enqueue(getType(typeof(ThreadStart)).GetMethod("Invoke"));
-        Enqueue(getType(typeof(ParameterizedThreadStart)).GetMethod("Invoke"));
+        Enqueue(getType(typeof(ThreadStart)).GetMethod("Invoke") ?? throw new Exception());
+        Enqueue(getType(typeof(ParameterizedThreadStart)).GetMethod("Invoke") ?? throw new Exception());
         Define(typeofVoid);
         Define(typeofString.MakeArrayType());
         Define(typeofStringBuilder);
-        Define(method.DeclaringType);
+        Define(method.DeclaringType ?? throw new Exception());
         Enqueue(method);
         foreach (var x in Bundle) Enqueue(x);
         foreach (var x in BundleMethods) Enqueue(x);
@@ -317,7 +317,7 @@ extern const std::map<void*, void*> v__managed_method_to_unmanaged;");
             var assembly = definition.Type.Assembly;
             if (!assemblyToIdentifier.TryGetValue(assembly, out var name))
             {
-                name = Identifier(Escape(assembly.GetName().Name));
+                name = Identifier(Escape(assembly.GetName().Name ?? throw new Exception()));
                 assemblyToIdentifier.Add(assembly, name);
                 writerForDeclarations.WriteLine($"\nextern t__runtime_assembly v__assembly_{name};");
                 var exportedTypes = assembly.ExportedTypes.Where(x => typeToRuntime.ContainsKey(x)).ToList();
@@ -329,7 +329,7 @@ static t__type* v__exported_{name}[] = {{
                 foreach (var x in names)
                 {
                     writer.Write($"\nstatic uint8_t v__resource_{name}__{Escape(x)}[] = \"");
-                    using (var source = assembly.GetManifestResourceStream(x))
+                    using (var source = assembly.GetManifestResourceStream(x) ?? throw new Exception())
                         while (true)
                         {
                             var b = source.ReadByte();
@@ -463,7 +463,7 @@ void f__startup(void* a_bottom)
 
 {EscapeForStacked(typeofString)} f__to_string(t__object* a_p)
 {{
-{'\t'}{GenerateVirtualCall(typeofObject.GetMethod(nameof(object.ToString)), "a_p", Enumerable.Empty<string>(), x => $"return {x};")}
+{'\t'}{GenerateVirtualCall(typeofObject.GetMethod(nameof(object.ToString)) ?? throw new Exception(), "a_p", Enumerable.Empty<string>(), x => $"return {x};")}
 }}
 
 }}

@@ -8,7 +8,7 @@ class DependentHandleTests
 {
     static int Default()
     {
-        object x = null;
+        object? x = null;
         using var handle = WithPadding(() =>
         {
             x = "Hello";

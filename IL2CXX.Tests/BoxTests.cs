@@ -4,39 +4,39 @@ namespace IL2CXX.Tests;
 class BoxTests
 {
     enum Foo { X }
-    static object Box<T>(T x) => x;
+    static object? Box<T>(T x) => x;
     static int BoxObject() => Box(string.Empty) is string ? 0 : 1;
     static int BoxValue() => Box(true) is bool ? 0 : 1;
     static int BoxNullable() => Box((int?)0) is int ? 0 : 1;
     static int BoxNull() => Box((int?)null) is null ? 0 : 1;
-    static T Unbox<T>(object x) => (T)x;
-    static int UnboxObject() => Unbox<string>(string.Empty) != null ? 0 : 1;
+    static T Unbox<T>(object? x) => (T)x!;
+    static int UnboxObject() => Unbox<string?>(string.Empty) != null ? 0 : 1;
     static int UnboxValue() => Unbox<int>(1) == 1 ? 0 : 1;
     static int UnboxEnum() => Unbox<int>(Foo.X) == 0 ? 0 : 1;
     static int UnboxNullable() => Unbox<int?>(1) == 1 ? 0 : 1;
     static int UnboxNull() => Unbox<int?>(null) == null ? 0 : 1;
-    static U BoxUnbox<T, U>(T x) => (U)(object)x;
+    static U BoxUnbox<T, U>(T x) => (U)(object?)x!;
     static int BoxUnboxSame() => BoxUnbox<bool, bool>(true) ? 0 : 1;
     static int BoxEnumUnboxInt() => BoxUnbox<Foo, int>(Foo.X) == 0 ? 0 : 1;
     static int BoxValueUnboxNullable() => BoxUnbox<int, int?>(1) == 1 ? 0 : 1;
-    static int BoxNullUnboxNullable() => BoxUnbox<object, int?>(null) == null ? 0 : 1;
+    static int BoxNullUnboxNullable() => BoxUnbox<object?, int?>(null) == null ? 0 : 1;
     static int BoxObjectUnboxNullable() => BoxUnbox<object, int?>(1) == 1 ? 0 : 1;
-    static int BoxValueUnboxAssignable() => BoxUnbox<int, IComparable>(1) != null ? 0 : 1;
-    static int BoxObjectUnboxAssignable() => BoxUnbox<string, IComparable>(string.Empty) != null ? 0 : 1;
-    static U Convert<T, U>(T x) => x is U y ? y : default;
+    static int BoxValueUnboxAssignable() => BoxUnbox<int, IComparable?>(1) != null ? 0 : 1;
+    static int BoxObjectUnboxAssignable() => BoxUnbox<string, IComparable?>(string.Empty) != null ? 0 : 1;
+    static U Convert<T, U>(T x) => x is U y ? y : default!;
     sealed class Bar { }
-    static int ConvertObject() => Convert<object, IComparable>(string.Empty) != null ? 0 : 1;
-    static int ConvertObjectAssignable() => Convert<string, IComparable>(string.Empty) != null ? 0 : 1;
-    static int ConvertObjectUnassignable() => Convert<string, Bar>(string.Empty) == null ? 0 : 1;
-    static int ConvertObjectSealedUnassignable() => Convert<Bar, IComparable>(new()) == null ? 0 : 1;
+    static int ConvertObject() => Convert<object, IComparable?>(string.Empty) != null ? 0 : 1;
+    static int ConvertObjectAssignable() => Convert<string, IComparable?>(string.Empty) != null ? 0 : 1;
+    static int ConvertObjectUnassignable() => Convert<string, Bar?>(string.Empty) == null ? 0 : 1;
+    static int ConvertObjectSealedUnassignable() => Convert<Bar, IComparable?>(new()) == null ? 0 : 1;
     static int ConvertObjectValue() => Convert<string, int>(string.Empty) == 0 ? 0 : 1;
     static int ConvertBoxValue() => Convert<object, int>(1) == 1 ? 0 : 1;
     static int ConvertBoxNullable() => Convert<object, int?>(1) == 1 ? 0 : 1;
-    static int ConvertValueObject() => Convert<int, string>(1) == null ? 0 : 1;
-    static int ConvertValueInterface() => Convert<int, IComparable>(0) != null ? 0 : 1;
+    static int ConvertValueObject() => Convert<int, string?>(1) == null ? 0 : 1;
+    static int ConvertValueInterface() => Convert<int, IComparable?>(0) != null ? 0 : 1;
     static int ConvertValueValue() => Convert<int, int>(1) == 1 ? 0 : 1;
     static int ConvertValueOther() => Convert<int, short>(1) == 0 ? 0 : 1;
-    static int ConvertValueBox() => Convert<int, object>(0) != null ? 0 : 1;
+    static int ConvertValueBox() => Convert<int, object?>(0) != null ? 0 : 1;
 
     static int Run(string[] arguments) => arguments[1] switch
     {

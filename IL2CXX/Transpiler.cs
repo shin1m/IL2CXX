@@ -27,7 +27,11 @@ public partial class Transpiler
         public Stack(Transpiler transpiler)
         {
             this.transpiler = transpiler;
+            Pop = this;
             Indices = new Dictionary<string, int>();
+            Type = transpiler.typeofVoid;
+            VariableType = string.Empty;
+            Variable = string.Empty;
         }
         private Stack(Stack pop, Type type)
         {
@@ -95,7 +99,11 @@ public partial class Transpiler
         public Stack Push(Type type) => new(this, type);
         public IEnumerator<Stack> GetEnumerator()
         {
-            for (var x = this; x != null; x = x.Pop) yield return x;
+            for (var x = this;; x = x.Pop)
+            {
+                yield return x;
+                if (x.Pop == x) break;
+            }
         }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         public string AsSigned => IsPointer ? $"reinterpret_cast<intptr_t>({Variable})" : Variable;
@@ -110,21 +118,21 @@ public partial class Transpiler
     class Instruction
     {
         public OpCode OpCode;
-        public Func<int, Stack, (int, Stack)> Estimate;
-        public Func<int, Stack, int> Generate;
+        public Func<int, Stack, (int, Stack)>? Estimate;
+        public Func<int, Stack, int> Generate = (_, _) => 0;
     }
 
     private static readonly OpCode[] opcodes1 = new OpCode[256];
     private static readonly OpCode[] opcodes2 = new OpCode[256];
     private static readonly Regex unsafeCharacters = new(@"(\W|_)", RegexOptions.Compiled);
     private static string Escape(string name) => unsafeCharacters.Replace(name, m => string.Join(string.Empty, m.Value.Select(x => $"_{(int)x:x}")));
-    private static MethodInfo FinalizeOf(Type x) => x.GetMethod(nameof(Finalize), declaredAndInstance);
+    private static MethodInfo? FinalizeOf(Type x) => x.GetMethod(nameof(Finalize), declaredAndInstance);
 
     static Transpiler()
     {
         foreach (var x in typeof(OpCodes).GetFields(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public))
         {
-            var opcode = (OpCode)x.GetValue(null);
+            var opcode = (OpCode)x.GetValue(null)!;
             (opcode.Size == 1 ? opcodes1 : opcodes2)[opcode.Value & 0xff] = opcode;
         }
     }
@@ -206,42 +214,43 @@ public partial class Transpiler
 
     private Type MakeByRefType(Type type) => type == typeofTypedReference ? typedReferenceByRefType : type.MakeByRefType();
     private Type MakePointerType(Type type) => (type == typeofTypedReference ? typeofTypedReferenceTag : type).MakePointerType();
-    private Type GetElementType(Type type)
+    private Type? GetElementTypeOrNull(Type type)
     {
         var t = type.GetElementType();
         return t == typeofTypedReferenceTag ? typeofTypedReference : t;
     }
+    private Type GetElementType(Type type) => GetElementTypeOrNull(type) ?? throw new Exception();
     // TODO: Nullable.GetUnderlyingType() of MetadataLoadContext does not work.
-    public Type GetNullableUnderlyingType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeofNullable ? type.GetGenericArguments()[0] : null;
-    private byte ParseU1(ref int index) => bytes[index++];
-    private sbyte ParseI1(ref int index) => (sbyte)bytes[index++];
+    public Type? GetNullableUnderlyingType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeofNullable ? type.GetGenericArguments()[0] : null;
+    private byte ParseU1(ref int index) => bytes![index++];
+    private sbyte ParseI1(ref int index) => (sbyte)bytes![index++];
     private ushort ParseU2(ref int index)
     {
-        var x = BitConverter.ToUInt16(bytes, index);
+        var x = BitConverter.ToUInt16(bytes!, index);
         index += 2;
         return x;
     }
     private int ParseI4(ref int index)
     {
-        var x = BitConverter.ToInt32(bytes, index);
+        var x = BitConverter.ToInt32(bytes!, index);
         index += 4;
         return x;
     }
     private long ParseI8(ref int index)
     {
-        var x = BitConverter.ToInt64(bytes, index);
+        var x = BitConverter.ToInt64(bytes!, index);
         index += 8;
         return x;
     }
     private float ParseR4(ref int index)
     {
-        var x = BitConverter.ToSingle(bytes, index);
+        var x = BitConverter.ToSingle(bytes!, index);
         index += 4;
         return x;
     }
     private double ParseR8(ref int index)
     {
-        var x = BitConverter.ToDouble(bytes, index);
+        var x = BitConverter.ToDouble(bytes!, index);
         index += 8;
         return x;
     }
@@ -256,65 +265,65 @@ public partial class Transpiler
         var offset = ParseI4(ref index);
         return index + offset;
     }
-    private static readonly Type typeofEcmaModule = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaModule, System.Reflection.MetadataLoadContext", true);
-    private static readonly PropertyInfo ecmaModuleReader = typeofEcmaModule.GetProperty("Reader", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static MetadataReader GetMetadataReader(Module module) => (MetadataReader)ecmaModuleReader.GetValue(module);
+    private static readonly Type typeofEcmaModule = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaModule, System.Reflection.MetadataLoadContext", true)!;
+    private static readonly PropertyInfo ecmaModuleReader = typeofEcmaModule.GetProperty("Reader", BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new Exception();
+    private static MetadataReader GetMetadataReader(Module module) => (MetadataReader)(ecmaModuleReader.GetValue(module) ?? throw new Exception());
     private MetadataReader GetMetadataReader() => GetMetadataReader(method.Module);
     private string ParseString(ref int index) =>
         //method.Module.ResolveString(ParseI4(ref index));
         GetMetadataReader().GetUserString((UserStringHandle)MetadataTokens.Handle(ParseI4(ref index)));
-    private Type[] GetGenericArguments() => method.IsGenericMethod ? method.GetGenericArguments() : null;
-    private static readonly Type typeofEcmaResolver = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaResolver, System.Reflection.MetadataLoadContext", true);
-    private static readonly MethodBase ecmaResolverResolveType = typeofEcmaResolver.GetMethod("ResolveTypeDefRefOrSpec");
-    private static readonly MethodBase ecmaResolverResolveMethod = typeofEcmaResolver.GetMethod("ResolveMethod").MakeGenericMethod(typeof(MethodBase));
-    private static readonly Type typeofRoType = Type.GetType("System.Reflection.TypeLoading.RoType, System.Reflection.MetadataLoadContext", true);
-    private static readonly Type typeofTypeContext = Type.GetType("System.Reflection.TypeLoading.TypeContext, System.Reflection.MetadataLoadContext", true);
-    private object NewTypeContext(Type[] tas, Type[] mas)
+    private Type[]? GetGenericArguments() => method.IsGenericMethod ? method.GetGenericArguments() : null;
+    private static readonly Type typeofEcmaResolver = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaResolver, System.Reflection.MetadataLoadContext", true)!;
+    private static readonly MethodBase ecmaResolverResolveType = typeofEcmaResolver.GetMethod("ResolveTypeDefRefOrSpec") ?? throw new Exception();
+    private static readonly MethodBase ecmaResolverResolveMethod = typeofEcmaResolver.GetMethod("ResolveMethod")?.MakeGenericMethod(typeof(MethodBase)) ?? throw new Exception();
+    private static readonly Type typeofRoType = Type.GetType("System.Reflection.TypeLoading.RoType, System.Reflection.MetadataLoadContext", true)!;
+    private static readonly Type typeofTypeContext = Type.GetType("System.Reflection.TypeLoading.TypeContext, System.Reflection.MetadataLoadContext", true)!;
+    private object NewTypeContext(Type[]? tas, Type[]? mas)
     {
-        Array rogas(Type[] gas)
+        Array rogas(Type[]? gas)
         {
             if (gas == null) gas = Array.Empty<Type>();
             var ro = Array.CreateInstance(typeofRoType, gas.Length);
             Array.Copy(gas, ro, gas.Length);
             return ro;
         }
-        return Activator.CreateInstance(typeofTypeContext, BindingFlags.Instance | BindingFlags.NonPublic, null, [rogas(tas), rogas(mas)], null);
+        return Activator.CreateInstance(typeofTypeContext, BindingFlags.Instance | BindingFlags.NonPublic, null, [rogas(tas), rogas(mas)], null) ?? throw new Exception();
     }
     private object NewTypeContext() => NewTypeContext(
         method.DeclaringType?.GetGenericArguments(),
         GetGenericArguments()
     );
-    private Type ResolveType(EntityHandle handle) => (Type)ecmaResolverResolveType.Invoke(null, [handle, method.Module, NewTypeContext()]);
+    private Type ResolveType(EntityHandle handle) => (Type)(ecmaResolverResolveType.Invoke(null, [handle, method.Module, NewTypeContext()]) ?? throw new Exception());
     private Type ParseType(ref int index) =>
         //method.Module.ResolveType(ParseI4(ref index), method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
         ResolveType(MetadataTokens.EntityHandle(ParseI4(ref index)));
-    private static readonly MethodInfo methodSpecificationDecodeSignature = typeof(MethodSpecification).GetMethod(nameof(MethodSpecification.DecodeSignature)).MakeGenericMethod(typeofRoType, typeofTypeContext);
+    private static readonly MethodInfo methodSpecificationDecodeSignature = typeof(MethodSpecification).GetMethod(nameof(MethodSpecification.DecodeSignature))?.MakeGenericMethod(typeofRoType, typeofTypeContext) ?? throw new Exception();
     private class GenericMethodSignatureTypeProvider : ISignatureTypeProvider<Type, object>
     {
         private readonly object module;
 
         public GenericMethodSignatureTypeProvider(object module) => this.module = module;
-        private static readonly MethodBase getTypeFromDefinition = typeofEcmaModule.GetMethod(nameof(GetTypeFromDefinition));
-        public Type GetTypeFromDefinition(MetadataReader reader, TypeDefinitionHandle handle, byte rawTypeKind) => (Type)getTypeFromDefinition.Invoke(module, [reader, handle, rawTypeKind]);
-        private static readonly MethodBase getTypeFromReference = typeofEcmaModule.GetMethod(nameof(GetTypeFromReference));
-        public Type GetTypeFromReference(MetadataReader reader, TypeReferenceHandle handle, byte rawTypeKind) => (Type)getTypeFromReference.Invoke(module, [reader, handle, rawTypeKind]);
-        private static readonly MethodBase getTypeFromSpecification = typeofEcmaModule.GetMethod(nameof(GetTypeFromSpecification));
-        public Type GetTypeFromSpecification(MetadataReader reader, object context, TypeSpecificationHandle handle, byte rawTypeKind) => (Type)getTypeFromSpecification.Invoke(module, [reader, context, handle, rawTypeKind]);
+        private static readonly MethodBase getTypeFromDefinition = typeofEcmaModule.GetMethod(nameof(GetTypeFromDefinition)) ?? throw new Exception();
+        public Type GetTypeFromDefinition(MetadataReader reader, TypeDefinitionHandle handle, byte rawTypeKind) => (Type)(getTypeFromDefinition.Invoke(module, [reader, handle, rawTypeKind]) ?? throw new Exception());
+        private static readonly MethodBase getTypeFromReference = typeofEcmaModule.GetMethod(nameof(GetTypeFromReference)) ?? throw new Exception();
+        public Type GetTypeFromReference(MetadataReader reader, TypeReferenceHandle handle, byte rawTypeKind) => (Type)(getTypeFromReference.Invoke(module, [reader, handle, rawTypeKind]) ?? throw new Exception());
+        private static readonly MethodBase getTypeFromSpecification = typeofEcmaModule.GetMethod(nameof(GetTypeFromSpecification)) ?? throw new Exception();
+        public Type GetTypeFromSpecification(MetadataReader reader, object context, TypeSpecificationHandle handle, byte rawTypeKind) => (Type)(getTypeFromSpecification.Invoke(module, [reader, context, handle, rawTypeKind]) ?? throw new Exception());
         public Type GetSZArrayType(Type elementType) => elementType.MakeArrayType();
         public Type GetArrayType(Type elementType, ArrayShape shape) => elementType.MakeArrayType(shape.Rank);
         public Type GetByReferenceType(Type elementType) => elementType.MakeByRefType();
         public Type GetPointerType(Type elementType) => elementType.MakePointerType();
         public Type GetGenericInstantiation(Type genericType, ImmutableArray<Type> typeArguments) => genericType.MakeGenericType(typeArguments.ToArray());
-        private static readonly MethodBase getGenericTypeParameter = typeofEcmaModule.GetMethod(nameof(GetGenericTypeParameter));
-        public Type GetGenericTypeParameter(object context, int index) => (Type)getGenericTypeParameter.Invoke(module, [context, index]);
+        private static readonly MethodBase getGenericTypeParameter = typeofEcmaModule.GetMethod(nameof(GetGenericTypeParameter)) ?? throw new Exception();
+        public Type GetGenericTypeParameter(object context, int index) => (Type)(getGenericTypeParameter.Invoke(module, [context, index]) ?? throw new Exception());
         public Type GetGenericMethodParameter(object context, int index) => Type.MakeGenericMethodParameter(index);
         public Type GetFunctionPointerType(MethodSignature<Type> signature) => throw new NotSupportedException();
-        private static readonly MethodBase getModifiedType = typeofEcmaModule.GetMethod(nameof(GetModifiedType));
-        public Type GetModifiedType(Type modifier, Type unmodifiedType, bool isRequired) => (Type)getModifiedType.Invoke(module, [modifier, unmodifiedType, isRequired]);
-        private static readonly MethodBase getPinnedType = typeofEcmaModule.GetMethod(nameof(GetPinnedType));
-        public Type GetPinnedType(Type elementType) => (Type)getPinnedType.Invoke(module, [elementType]);
-        private static readonly MethodBase getPrimitiveType = typeofEcmaModule.GetMethod(nameof(GetPrimitiveType));
-        public Type GetPrimitiveType(PrimitiveTypeCode typeCode) => (Type)getPrimitiveType.Invoke(module, [typeCode]);
+        private static readonly MethodBase getModifiedType = typeofEcmaModule.GetMethod(nameof(GetModifiedType)) ?? throw new Exception();
+        public Type GetModifiedType(Type modifier, Type unmodifiedType, bool isRequired) => (Type)(getModifiedType.Invoke(module, [modifier, unmodifiedType, isRequired]) ?? throw new Exception());
+        private static readonly MethodBase getPinnedType = typeofEcmaModule.GetMethod(nameof(GetPinnedType)) ?? throw new Exception();
+        public Type GetPinnedType(Type elementType) => (Type)(getPinnedType.Invoke(module, [elementType]) ?? throw new Exception());
+        private static readonly MethodBase getPrimitiveType = typeofEcmaModule.GetMethod(nameof(GetPrimitiveType)) ?? throw new Exception();
+        public Type GetPrimitiveType(PrimitiveTypeCode typeCode) => (Type)(getPrimitiveType.Invoke(module, [typeCode]) ?? throw new Exception());
     }
     private MemberInfo ResolveMemberReference(EntityHandle handle)
     {
@@ -356,7 +365,7 @@ public partial class Transpiler
             ? ResolveFieldDefinition(handle)
             : (FieldInfo)ResolveMemberReference(handle);
     }
-    private MethodBase ResolveMethodDefinition(EntityHandle handle) => (MethodBase)ecmaResolverResolveMethod.Invoke(null, [(MethodDefinitionHandle)handle, method.Module, NewTypeContext()]);
+    private MethodBase ResolveMethodDefinition(EntityHandle handle) => (MethodBase)(ecmaResolverResolveMethod.Invoke(null, [(MethodDefinitionHandle)handle, method.Module, NewTypeContext()]) ?? throw new Exception());
     private MethodBase ParseMethod(ref int index)
     {
         //return method.Module.ResolveMethod(token, method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
@@ -365,18 +374,18 @@ public partial class Transpiler
         MethodBase resolve(EntityHandle handle)
         {
             var m = _resolve(handle);
-            if (m.DeclaringType.FullName == "Interop+Sys")
+            if (m.DeclaringType?.FullName == "Interop+Sys")
             {
-                if (m.Name == "SetPosixSignalHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetPosixSignalHandler));
-                if (m.Name == "SetTerminalInvalidationHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetTerminalInvalidationHandler));
+                if (m.Name == "SetPosixSignalHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetPosixSignalHandler)) ?? throw new Exception();
+                if (m.Name == "SetTerminalInvalidationHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetTerminalInvalidationHandler)) ?? throw new Exception();
             }
-            if (m.DeclaringType.FullName == "Interop+Globalization" && m.Name == "EnumCalendarInfo") return TypeOf<Interop.Globalization>().GetMethod(nameof(Interop.Globalization.EnumCalendarInfo));
+            if (m.DeclaringType?.FullName == "Interop+Globalization" && m.Name == "EnumCalendarInfo") return TypeOf<Interop.Globalization>().GetMethod(nameof(Interop.Globalization.EnumCalendarInfo)) ?? throw new Exception();
             return m;
         }
         var handle = MetadataTokens.EntityHandle(ParseI4(ref index));
         if (handle.Kind != HandleKind.MethodSpecification) return resolve(handle);
         var specification = GetMetadataReader().GetMethodSpecification((MethodSpecificationHandle)handle);
-        return ((MethodInfo)resolve(specification.Method)).MakeGenericMethod(((IEnumerable)methodSpecificationDecodeSignature.Invoke(specification, [method.Module, NewTypeContext()])).Cast<Type>().ToArray());
+        return ((MethodInfo)resolve(specification.Method)).MakeGenericMethod(((IEnumerable)(methodSpecificationDecodeSignature.Invoke(specification, [method.Module, NewTypeContext()]) ?? throw new Exception())).Cast<Type>().ToArray());
     }
     private MemberInfo ParseMember(ref int index)
     {
@@ -473,29 +482,29 @@ public partial class Transpiler
         for (var j = 0; j < n; ++j) parameters[j] = type();
         return (cc, @return, parameters);*/
     }
-    private static readonly Type typeofEcmaField = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaField, System.Reflection.MetadataLoadContext", true);
-    private static readonly FieldInfo ecmaFieldHandle = typeofEcmaField.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static readonly Type typeofEcmaParameter = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaFatMethodParameter, System.Reflection.MetadataLoadContext", true);
-    private static readonly FieldInfo ecmaParameterHandle = typeofEcmaParameter.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static readonly PropertyInfo ecmaModulePEReader = typeofEcmaModule.GetProperty("PEReader", BindingFlags.Instance | BindingFlags.NonPublic);
+    private static readonly Type typeofEcmaField = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaField, System.Reflection.MetadataLoadContext", true)!;
+    private static readonly FieldInfo ecmaFieldHandle = typeofEcmaField.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new Exception();
+    private static readonly Type typeofEcmaParameter = Type.GetType("System.Reflection.TypeLoading.Ecma.EcmaFatMethodParameter, System.Reflection.MetadataLoadContext", true)!;
+    private static readonly FieldInfo ecmaParameterHandle = typeofEcmaParameter.GetField("_handle", BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new Exception();
+    private static readonly PropertyInfo ecmaModulePEReader = typeofEcmaModule.GetProperty("PEReader", BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new Exception();
     private IEnumerable<byte> GetRVAData(FieldInfo field)
     {
-        var handle = (FieldDefinitionHandle)ecmaFieldHandle.GetValue(field);
+        var handle = (FieldDefinitionHandle)ecmaFieldHandle.GetValue(field)!;
         var rva = GetMetadataReader(field.Module).GetFieldDefinition(handle).GetRelativeVirtualAddress();
         var size = field.FieldType.StructLayoutAttribute?.Size ?? 0;
-        if (size <= 0) size = Marshal.SizeOf(Type.GetType(field.FieldType.ToString(), true));
-        return ((PEReader)ecmaModulePEReader.GetValue(field.Module)).GetSectionData(rva).GetContent(0, size);
+        if (size <= 0) size = Marshal.SizeOf(Type.GetType(field.FieldType.ToString(), true)!);
+        return ((PEReader)(ecmaModulePEReader.GetValue(field.Module) ?? throw new Exception())).GetSectionData(rva).GetContent(0, size);
     }
     private IEnumerable<byte> GetDefaultValue(ParameterInfo parameter)
     {
-        var handle = (ParameterHandle)ecmaParameterHandle.GetValue(parameter);
+        var handle = (ParameterHandle)ecmaParameterHandle.GetValue(parameter)!;
         var reader = GetMetadataReader(parameter.Member.Module);
         return reader.GetBlobContent(reader.GetConstant(reader.GetParameter(handle).GetDefaultValue()).Value);
     }
     private Type GetVirtualThisType(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeofSZArrayHelper ? type.GetGenericArguments()[0].MakeArrayType() : type;
     private Type GetThisType(MethodBase method)
     {
-        var type = method.DeclaringType;
+        var type = method.DeclaringType ?? throw new Exception();
         return type.IsValueType ? MakePointerType(type) : GetVirtualThisType(type);
     }
     private Type GetArgumentType(int index)
@@ -513,7 +522,7 @@ public partial class Transpiler
     private void Estimate(int index, Stack stack)
     {
         log($"enter {index:x04}");
-        while (index < bytes.Length)
+        while (index < bytes!.Length)
         {
             if (indexToStack.TryGetValue(index, out var x))
             {
@@ -532,7 +541,7 @@ public partial class Transpiler
         }
         log("exit");
     }
-    private static readonly HashSet<string> invalids = new()
+    private static readonly HashSet<string?> invalids = new()
     {
         "System.RuntimeType",
         "System.Diagnostics.StackFrameHelper",
@@ -555,7 +564,7 @@ public partial class Transpiler
     }
     public void Enqueue(MethodBase method)
     {
-        ThrowIfInvalid(method.DeclaringType);
+        ThrowIfInvalid(method.DeclaringType ?? throw new Exception());
         if (method is MethodInfo mi) ThrowIfInvalid(mi.ReturnType);
         foreach (var x in method.GetParameters()) ThrowIfInvalid(x.ParameterType);
         queuedMethods.Enqueue(method);
@@ -582,7 +591,7 @@ public partial class Transpiler
         }
         else
         {
-            var e = GetElementType(type);
+            var e = GetElementTypeOrNull(type);
             var name = e == null ? null : Escape(e);
             Enqueue(type);
             if (type.IsByRef) return $"{name}&";
@@ -607,7 +616,7 @@ public partial class Transpiler
         if (!Define(type).IsManaged) return false;
         if (type.StructLayoutAttribute?.Value == LayoutKind.Explicit)
         {
-            var map = ((TypeDefinition)Define(type)).ExplicitMap;
+            var map = ((TypeDefinition)Define(type)).ExplicitMap ?? throw new Exception();
             return map[0] && map.Count == Define(typeofIntPtr).UnmanagedSize;
         }
         else
@@ -622,14 +631,14 @@ public partial class Transpiler
     {
         var key = ToKey(method);
         if (methodToIdentifier.TryGetValue(key, out var name)) return name;
-        name = Identifier($"f_{EscapeType(method.DeclaringType)}__{Escape(method.Name)}");
+        name = Identifier($"f_{EscapeType(method.DeclaringType ?? throw new Exception())}__{Escape(method.Name)}");
         methodToIdentifier.Add(key, name);
         return name;
     }
     private string Escape(PropertyInfo property)
     {
         if (propertyToIdentifier.TryGetValue(property, out var name)) return name;
-        name = Identifier($"v__property_{EscapeType(property.DeclaringType)}__{Escape(property.Name)}");
+        name = Identifier($"v__property_{EscapeType(property.DeclaringType ?? throw new Exception())}__{Escape(property.Name)}");
         propertyToIdentifier.Add(property, name);
         return name;
     }
@@ -678,14 +687,14 @@ string.Join(",", arguments.Zip(variables, (a, v) => $"\n\t\t{CastValue(a, v)}"))
     private int EnqueueIndexOf(MethodBase method, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
     {
         Escape(method);
-        var i = Define(method.DeclaringType).GetIndex(method);
+        var i = Define(method.DeclaringType ?? throw new Exception()).GetIndex(method);
         foreach (var ms in concretes) Enqueue(ms[i]);
         return i;
     }
     private (int, int) EnqueueGenericIndexOf(MethodBase method, IEnumerable<IReadOnlyList<MethodInfo>> concretes)
     {
         var gm = ((MethodInfo)method).GetGenericMethodDefinition();
-        var i = Define(method.DeclaringType).GetIndex(gm);
+        var i = Define(method.DeclaringType ?? throw new Exception()).GetIndex(gm);
         var t2i = genericMethodToTypesToIndex[ToKey(gm)];
         var ga = method.GetGenericArguments();
         if (!t2i.TryGetValue(ga, out var j))
@@ -696,13 +705,16 @@ string.Join(",", arguments.Zip(variables, (a, v) => $"\n\t\t{CastValue(a, v)}"))
         foreach (var ms in concretes) Enqueue(ms[i].MakeGenericMethod(ga));
         return (i, j);
     }
-    private string GetVirtualFunctionPointer(MethodBase method) =>
-        $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", method.GetParameters().Select(x => EscapeForStacked(x.ParameterType)).Prepend($"{Escape(GetVirtualThisType(method.DeclaringType.IsInterface ? typeofObject : method.DeclaringType))}*"))})";
+    private string GetVirtualFunctionPointer(MethodBase method)
+    {
+        var type = method.DeclaringType ?? throw new Exception();
+        return $"{EscapeForStacked(GetReturnType(method))}(*)({string.Join(", ", method.GetParameters().Select(x => EscapeForStacked(x.ParameterType)).Prepend($"{Escape(GetVirtualThisType(type.IsInterface ? typeofObject : type))}*"))})";
+    }
     public string GetVirtualFunction(MethodBase method, string target)
     {
         if (!method.IsVirtual) return Escape(method);
         string at(int i) => $"reinterpret_cast<void**>({target}->f_type() + 1)[{i}]";
-        var concretes = runtimeDefinitions.Where(x => x is TypeDefinition && x.Type.IsSubclassOf(method.DeclaringType)).Select(x => x.Methods);
+        var concretes = runtimeDefinitions.Where(x => x is TypeDefinition && x.Type.IsSubclassOf(method.DeclaringType ?? throw new Exception())).Select(x => x.Methods);
         if (method.IsGenericMethod)
         {
             var (i, j) = EnqueueGenericIndexOf(method, concretes);
@@ -715,7 +727,7 @@ string.Join(",", arguments.Zip(variables, (a, v) => $"\n\t\t{CastValue(a, v)}"))
     }
     private string GetInterfaceFunction(MethodBase method, Func<string, string> normal, Func<string, string> generic)
     {
-        var type = method.DeclaringType;
+        var type = method.DeclaringType ?? throw new Exception();
         IEnumerable<IReadOnlyList<MethodInfo>> concretes;
         if (type.IsGenericType)
         {
@@ -724,7 +736,7 @@ string.Join(",", arguments.Zip(variables, (a, v) => $"\n\t\t{CastValue(a, v)}"))
         }
         else
         {
-            concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(x => x.InterfaceToMethods.TryGetValue(type, out var ms) ? ms : null).Where(x => x != null);
+            concretes = runtimeDefinitions.OfType<TypeDefinition>().Select(x => x.InterfaceToMethods.TryGetValue(type, out var ms) ? ms : null).Where(x => x != null)!;
         }
         if (method.IsGenericMethod)
         {
@@ -738,7 +750,7 @@ string.Join(",", arguments.Zip(variables, (a, v) => $"\n\t\t{CastValue(a, v)}"))
     }
     public string GenerateVirtualCall(MethodBase method, string target, IEnumerable<string> variables, Func<string, string> construct)
     {
-        if (method.DeclaringType.IsInterface)
+        if (method.DeclaringType!.IsInterface)
         {
             Enqueue(method);
             var types = string.Join(", ", method.GetParameters().Select(x => x.ParameterType).Prepend(GetReturnType(method)).Select(EscapeForStacked));
@@ -865,8 +877,8 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
             }
         if (typeofSafeHandle.IsAssignableFrom(@return))
         {
-            ConstructorInfo getCI(Type type) => type.GetConstructor(declaredAndInstance, null, [typeofIntPtr, typeofBoolean], null);
-            var ci = getCI(@return) ?? getCI(typeofSafeHandle);
+            ConstructorInfo? getCI(Type type) => type.GetConstructor(declaredAndInstance, null, [typeofIntPtr, typeofBoolean], null);
+            var ci = getCI(@return) ?? getCI(typeofSafeHandle) ?? throw new Exception();
             writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
 {'\t'}{Escape(ci)}(p, result, true);
 {'\t'}return p;");
@@ -879,7 +891,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
     }
     public string GenerateThrow(string name)
     {
-        var m = typeofUtilities.GetMethod($"Throw{name}");
+        var m = typeofUtilities.GetMethod($"Throw{name}") ?? throw new Exception();
         Enqueue(m);
         return $"{Escape(m)}()";
     }
@@ -917,7 +929,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         WriteLiteral(writer, value);
         writer.Write("sv)");
     }
-    private static string ToLiteral(string value)
+    private static string ToLiteral(string? value)
     {
         if (value == null) return "nullptr";
         using var writer = new StringWriter();
@@ -927,7 +939,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
     private void GenerateInvokeFunction(MethodBase method, IEnumerable<string> arguments, TextWriter writer)
     {
         var @return = GetReturnType(method);
-        var @this = GetVirtualThisType(method.DeclaringType);
+        var @this = GetVirtualThisType(method.DeclaringType ?? throw new Exception());
         string construct(string call) => @return == typeofVoid ? $"\t{call};\n\treturn nullptr;\n" : $"\treturn {(@return.IsValueType ? $"f__new_constructed<{Escape(@return)}>({call})" : call)};\n";
         var isConcrete = !method.DeclaringType.IsInterface && (!method.IsVirtual || method.IsFinal);
         if (isConcrete)
@@ -1003,7 +1015,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
         var @return = GetReturnType(method);
         var parameters = method.GetParameters();
-        if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType.IsByRefLike && !method.IsStatic || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike) || method.ContainsGenericParameters || method is ConstructorInfo && builtin.GetBody(this, ToKey(method)).body != null)
+        if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType!.IsByRefLike && !method.IsStatic || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike) || method.ContainsGenericParameters || method is ConstructorInfo && builtin.GetBody(this, ToKey(method)).body != null)
         {
             writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
             return writer.ToString();
@@ -1026,7 +1038,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         if (builtin.GetBody(this, ToKey(method)).body == null) return "t__runtime_constructor_info::f_create";
         using var writer = new StringWriter();
         writer.WriteLine("[](t__runtime_constructor_info*, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
-        var type = method.DeclaringType;
+        var type = method.DeclaringType ?? throw new Exception();
         var parameters = method.GetParameters();
         if (type.IsByRefLike || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike))
         {
@@ -1046,7 +1058,7 @@ string.Join(",", parameters.Select((x, i) => $"\n\t\t{CastValue(x.ParameterType,
         using var writer = new StringWriter();
         writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, void** a_parameters) -> t__object*\n{");
         var @return = GetReturnType(method);
-        if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
+        if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType!.IsByRefLike && !method.IsStatic || method.ContainsGenericParameters)
         {
             writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
             return writer.ToString();

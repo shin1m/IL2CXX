@@ -18,11 +18,11 @@ public struct MethodKey : IEquatable<MethodKey>
             null,
             method.GetParameters().Select(x => x.ParameterType).ToArray(),
             null
-        );
+        ) ?? throw new Exception();
     }
     public static bool operator ==(MethodKey x, MethodKey y) => x.Method == y.Method;
     public static bool operator !=(MethodKey x, MethodKey y) => !(x == y);
     public bool Equals(MethodKey x) => this == x;
-    public override bool Equals(object x) => x is MethodKey y && this == y;
+    public override bool Equals(object? x) => x is MethodKey y && this == y;
     public override int GetHashCode() => Method.GetHashCode();
 }

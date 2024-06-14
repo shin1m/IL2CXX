@@ -6,7 +6,7 @@ namespace IL2CXX;
 partial class DefaultBuiltin
 {
     private static Builtin SetupInterop(this Builtin @this, Func<Type, Type> get, PlatformID target) => @this
-    .For(get(Type.GetType("Interop+Kernel32")), (type, code) =>
+    .For(get(Type.GetType("Interop+Kernel32", true)!), (type, code) =>
     {
         code.For(
             type.GetMethod("GetEnvironmentVariable", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(string)), get(typeof(char)).MakeByRefType(), get(typeof(uint))], null),
@@ -29,21 +29,21 @@ partial class DefaultBuiltin
         code.For(
             type.GetMethod("CreateEventEx", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
-{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]))}(p, new t__event(a_2 & 1, a_2 & 2), true);
+{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]) ?? throw new Exception())}(p, new t__event(a_2 & 1, a_2 & 2), true);
 {'\t'}return p;
 ", 0)
         );
         code.For(
             type.GetMethod("CreateMutexEx", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
-{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]))}(p, new t__mutex(a_2 & 1), true);
+{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]) ?? throw new Exception())}(p, new t__mutex(a_2 & 1), true);
 {'\t'}return p;
 ", 0)
         );
         code.For(
             type.GetMethod("CreateSemaphoreEx", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
-{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]))}(p, new t__semaphore(a_2, a_1), true);
+{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]) ?? throw new Exception())}(p, new t__semaphore(a_2, a_1), true);
 {'\t'}return p;
 ", 0)
         );

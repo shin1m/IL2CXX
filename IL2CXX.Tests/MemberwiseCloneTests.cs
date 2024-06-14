@@ -12,7 +12,7 @@ class MemberwiseCloneTests
     }
     class Bar : ICloneable
     {
-        public string X;
+        public string? X;
         public int Y;
         public Foo Z;
 

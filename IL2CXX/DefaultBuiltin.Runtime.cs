@@ -9,14 +9,14 @@ partial class DefaultBuiltin
     private static void SetupMemberInfo(Func<Type, Type> get, Type type, Builtin.Code code)
     {
         code.For(
-            type.GetProperty(nameof(MemberInfo.DeclaringType)).GetMethod,
+            type.GetProperty(nameof(MemberInfo.DeclaringType))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__declaring_type;\n", 0)
         );
         code.For(
             type.GetMethod(nameof(MemberInfo.GetCustomAttributes), [get(typeof(bool))]),
             transpiler =>
             {
-                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
+                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes)) ?? throw new Exception();
                 transpiler.Enqueue(method);
                 return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, &t__type_of<{transpiler.Escape(transpiler.typeofAttribute)}>::v__instance, a_1);\n", 0);
             }
@@ -25,7 +25,7 @@ partial class DefaultBuiltin
             type.GetMethod(nameof(MemberInfo.GetCustomAttributes), [get(typeof(Type)), get(typeof(bool))]),
             transpiler =>
             {
-                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes));
+                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.GetAttributes)) ?? throw new Exception();
                 transpiler.Enqueue(method);
                 return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(method)}(a_0, a_1, a_2);\n", 0);
             }
@@ -34,7 +34,7 @@ partial class DefaultBuiltin
             type.GetMethod(nameof(MemberInfo.GetCustomAttributesData)),
             transpiler =>
             {
-                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.Get));
+                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.Get)) ?? throw new Exception();
                 transpiler.Enqueue(method);
                 return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__custom_attributes) {{
 {'\t'}{'\t'}std::cerr << ""no custom attributes: "";
@@ -46,14 +46,14 @@ partial class DefaultBuiltin
             }
         );
         code.For(
-            type.GetProperty(nameof(MemberInfo.Name)).GetMethod,
+            type.GetProperty(nameof(MemberInfo.Name))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 0)
         );
         code.For(
             type.GetMethod(nameof(MemberInfo.IsDefined)),
             transpiler =>
             {
-                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.IsDefined));
+                var method = get(typeof(RuntimeCustomAttributeData)).GetMethod(nameof(RuntimeCustomAttributeData.IsDefined)) ?? throw new Exception();
                 transpiler.Enqueue(method);
                 return ($"\treturn {transpiler.Escape(method)}(a_0, a_1, a_2);\n", 0);
             }
@@ -83,7 +83,7 @@ partial class DefaultBuiltin
     {
         SetupMemberInfo(get, type, code);
         code.For(
-            type.GetProperty(nameof(MethodBase.Attributes)).GetMethod,
+            type.GetProperty(nameof(MethodBase.Attributes))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__attributes;\n", 0)
         );
         code.For(
@@ -95,13 +95,13 @@ partial class DefaultBuiltin
     .For(get(typeof(RuntimeAssembly)), (type, code) =>
     {
         code.For(
-            type.GetProperty(nameof(Assembly.EntryPoint)).GetMethod,
+            type.GetProperty(nameof(Assembly.EntryPoint))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_0->v__entry_point == reinterpret_cast<t__runtime_method_info*>(-1)) throw std::runtime_error(""no entry point: "" + f__string(a_0->v__full_name));
 {'\t'}return a_0->v__entry_point;
 ", 0)
         );
         code.For(
-            type.GetProperty(nameof(Assembly.FullName)).GetMethod,
+            type.GetProperty(nameof(Assembly.FullName))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__full_name);\n", 0)
         );
         code.For(
@@ -119,7 +119,7 @@ partial class DefaultBuiltin
             transpiler =>
             {
                 var type = get(typeof(UnmanagedMemoryStream));
-                var constructor = type.GetConstructor([get(typeof(byte*)), get(typeof(long))]);
+                var constructor = type.GetConstructor([get(typeof(byte*)), get(typeof(long))]) ?? throw new Exception();
                 transpiler.Enqueue(constructor);
                 return (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}auto i = a_0->v__resources.find(f__string_view(a_1));
 {'\t'}if (i == a_0->v__resources.end()) return nullptr;
@@ -130,7 +130,7 @@ partial class DefaultBuiltin
             }
         );
         code.For(
-            type.GetProperty(nameof(RuntimeAssembly.Name)).GetMethod,
+            type.GetProperty(nameof(RuntimeAssembly.Name))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 1)
         );
     })
@@ -155,7 +155,7 @@ partial class DefaultBuiltin
                 }
                 var typeofROC = get(typeof(ReadOnlyCollection<CustomAttributeTypedArgument>));
                 var typeofCATA = get(typeof(CustomAttributeTypedArgument));
-                var constructCATA = escape(typeofCATA.GetConstructor([transpiler.typeofType, transpiler.typeofObject]));
+                var constructCATA = escape(typeofCATA.GetConstructor([transpiler.typeofType, transpiler.typeofObject]) ?? throw new Exception());
                 var newCATAs = $"f__new_array<{transpiler.Escape(get(typeof(CustomAttributeTypedArgument[])))}, {transpiler.EscapeForMember(typeofCATA)}>";
                 var typeofCANA = get(typeof(CustomAttributeNamedArgument));
                 var typeofCAD = get(typeof(RuntimeCustomAttributeData));
@@ -200,7 +200,7 @@ partial class DefaultBuiltin
 {'\t'}{'\t'}{'\t'}auto a = ca->v_named_arguments[i];
 {'\t'}{'\t'}{'\t'}{transpiler.EscapeForStacked(typeofCATA)} ta{{}};
 {'\t'}{'\t'}{'\t'}{constructCATA}(&ta, a->v_type, value(a));
-{'\t'}{'\t'}{'\t'}{escape(typeofCANA.GetConstructor([get(typeof(MemberInfo)), typeofCATA]))}(&nas->f_data()[i], a->v_member, ta);
+{'\t'}{'\t'}{'\t'}{escape(typeofCANA.GetConstructor([get(typeof(MemberInfo)), typeofCATA]) ?? throw new Exception())}(&nas->f_data()[i], a->v_member, ta);
 {'\t'}{'\t'}}}
 {'\t'}{'\t'}auto RECYCLONE__SPILL cad = f__new_zerod<{transpiler.Escape(typeofCAD)}>();
 {'\t'}{'\t'}{escape(typeofCAD.GetConstructors()[0])}(cad, ca->v_constructor, cas, nas);
@@ -227,11 +227,11 @@ partial class DefaultBuiltin
     {
         SetupMemberInfo(get, type, code);
         code.For(
-            type.GetProperty(nameof(FieldInfo.Attributes)).GetMethod,
+            type.GetProperty(nameof(FieldInfo.Attributes))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__attributes;\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(FieldInfo.FieldType)).GetMethod,
+            type.GetProperty(nameof(FieldInfo.FieldType))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__field_type;\n", 0)
         );
         code.For(
@@ -324,7 +324,7 @@ partial class DefaultBuiltin
 ", 0)
         );
         code.For(
-            type.GetProperty(nameof(MethodInfo.ReturnType)).GetMethod,
+            type.GetProperty(nameof(MethodInfo.ReturnType))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__return_type;\n", 0)
         );
     })
@@ -332,7 +332,7 @@ partial class DefaultBuiltin
     {
         SetupMemberInfo(get, type, code);
         code.For(
-            type.GetProperty(nameof(PropertyInfo.Attributes)).GetMethod,
+            type.GetProperty(nameof(PropertyInfo.Attributes))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__attributes;\n", 0)
         );
         code.For(
@@ -340,7 +340,7 @@ partial class DefaultBuiltin
             transpiler => GetParameters(get, transpiler)
         );
         code.For(
-            type.GetProperty(nameof(PropertyInfo.GetMethod)).GetMethod,
+            type.GetProperty(nameof(PropertyInfo.GetMethod))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__get;\n", 0)
         );
         code.For(
@@ -350,7 +350,7 @@ partial class DefaultBuiltin
 ", 0)
         );
         code.For(
-            type.GetProperty(nameof(PropertyInfo.SetMethod)).GetMethod,
+            type.GetProperty(nameof(PropertyInfo.SetMethod))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__set;\n", 0)
         );
         code.For(
@@ -363,7 +363,7 @@ partial class DefaultBuiltin
 ", 0)
         );
         code.For(
-            type.GetProperty(nameof(PropertyInfo.PropertyType)).GetMethod,
+            type.GetProperty(nameof(PropertyInfo.PropertyType))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__property_type;\n", 0)
         );
     })
@@ -371,15 +371,15 @@ partial class DefaultBuiltin
     {
         SetupMemberInfo(get, type, code);
         code.For(
-            type.GetProperty(nameof(Type.Assembly)).GetMethod,
+            type.GetProperty(nameof(Type.Assembly))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__assembly;\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.BaseType)).GetMethod,
+            type.GetProperty(nameof(Type.BaseType))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__base;\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.FullName)).GetMethod,
+            type.GetProperty(nameof(Type.FullName))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__full_name);\n", 0)
         );
         code.For(
@@ -549,19 +549,19 @@ partial class DefaultBuiltin
             transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_1 && static_cast<t__type*>(a_1)->f_assignable_to(a_0);\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.IsByRefLike)).GetMethod,
+            type.GetProperty(nameof(Type.IsByRefLike))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__by_ref_like;\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.IsConstructedGenericType)).GetMethod,
+            type.GetProperty(nameof(Type.IsConstructedGenericType))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_definition && a_0->v__generic_definition != a_0;\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.IsGenericType)).GetMethod,
+            type.GetProperty(nameof(Type.IsGenericType))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_definition;\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.IsGenericTypeDefinition)).GetMethod,
+            type.GetProperty(nameof(Type.IsGenericTypeDefinition))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__generic_definition && a_0->v__generic_definition == a_0;\n", 0)
         );
         code.For(
@@ -580,7 +580,7 @@ partial class DefaultBuiltin
 ", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.Namespace)).GetMethod,
+            type.GetProperty(nameof(Type.Namespace))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__namespace);\n", 0)
         );
         code.For(
@@ -588,7 +588,7 @@ partial class DefaultBuiltin
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__display_name);\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(Type.TypeHandle)).GetMethod,
+            type.GetProperty(nameof(Type.TypeHandle))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn {a_0};\n", 0)
         );
         code.For(
@@ -746,9 +746,9 @@ partial class DefaultBuiltin
             type.GetMethod(nameof(RuntimeType.ValueGetHashCode)),
             transpiler =>
             {
-                var marvin = get(Type.GetType("System.Marvin", true));
-                var seed = marvin.GetProperty("DefaultSeed").GetMethod;
-                var compute = marvin.GetMethod("ComputeHash32", [get(typeof(byte)).MakeByRefType(), get(typeof(uint)), get(typeof(uint)), get(typeof(uint))]);
+                var marvin = get(Type.GetType("System.Marvin", true)!);
+                var seed = marvin.GetProperty("DefaultSeed")!.GetMethod ?? throw new Exception();
+                var compute = marvin.GetMethod("ComputeHash32", [get(typeof(byte)).MakeByRefType(), get(typeof(uint)), get(typeof(uint)), get(typeof(uint))]) ?? throw new Exception();
                 transpiler.Enqueue(seed);
                 transpiler.Enqueue(compute);
                 return ($@"{'\t'}auto seed = {transpiler.Escape(seed)}();
@@ -768,7 +768,7 @@ partial class DefaultBuiltin
             type.GetMethod(nameof(RuntimeTimer.Call)),
             transpiler =>
             {
-                var m = get(Type.GetType("System.Threading.TimerQueue")).GetMethod("AppDomainTimerCallback", BindingFlags.Static | BindingFlags.NonPublic);
+                var m = get(Type.GetType("System.Threading.TimerQueue", true)!).GetMethod("AppDomainTimerCallback", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception();
                 transpiler.Enqueue(m);
                 return ($"\t{transpiler.Escape(m)}(a_0);\n", 1);
             }

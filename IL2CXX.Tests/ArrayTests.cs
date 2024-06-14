@@ -5,7 +5,7 @@ namespace IL2CXX.Tests;
 [Parallelizable]
 class ArrayTests
 {
-    static int AssertEquals(string[] xs, string[] ys)
+    static int AssertEquals(string?[] xs, string?[] ys)
     {
         foreach (var x in xs) Console.WriteLine(x ?? "(null)");
         var n = xs.Length;
@@ -20,7 +20,7 @@ class ArrayTests
     }
     static int Clear()
     {
-        string[] xs = { "Hello", "World", "Good", "Bye" };
+        string?[] xs = { "Hello", "World", "Good", "Bye" };
         Array.Clear(xs, 1, 2);
         return AssertEquals(xs, ["Hello", null, null, "Bye"]);
     }
@@ -77,8 +77,8 @@ class ArrayTests
     }
     static int IListTCopyTo()
     {
-        IList<string> xs = new[] { "World" };
-        string[] ys = { "Hello", null };
+        IList<string?> xs = new[] { "World" };
+        string?[] ys = { "Hello", null };
         xs.CopyTo(ys, 1);
         return AssertEquals(ys, ["Hello", "World"]);
     }

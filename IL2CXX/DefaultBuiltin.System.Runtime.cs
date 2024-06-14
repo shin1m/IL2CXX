@@ -76,11 +76,11 @@ partial class DefaultBuiltin
     .For(get(typeof(GCSettings)), (type, code) =>
     {
         code.For(
-            type.GetProperty(nameof(GCSettings.IsServerGC)).GetMethod,
+            type.GetProperty(nameof(GCSettings.IsServerGC))!.GetMethod,
             transpiler => ("\treturn false;\n", 1)
         );
         code.For(
-            type.GetProperty(nameof(GCSettings.LatencyMode)).GetMethod,
+            type.GetProperty(nameof(GCSettings.LatencyMode))!.GetMethod,
             transpiler => ("\treturn 1;\n", 1)
         );
     })
@@ -96,7 +96,7 @@ partial class DefaultBuiltin
 {'\t'}static_cast<t__type*>(a_1)->f_destroy_unmanaged(a_0);
 ", 1)
         );
-        var gdffpi = type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic);
+        var gdffpi = type.GetMethod("GetDelegateForFunctionPointerInternal", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception();
         code.For(gdffpi, transpiler => ($@"{'\t'}auto type = static_cast<t__type*>(a_1);
 {'\t'}auto p = static_cast<{transpiler.EscapeForStacked(get(typeof(Delegate)))}>(type->f_new_zerod());
 {'\t'}p->v__5ftarget = p;
@@ -141,13 +141,13 @@ partial class DefaultBuiltin
             type.GetMethod("IsPinnable", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ("\treturn true;\n", 1)
         );
-        var ptsh = type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(IntPtr)), get(typeof(object)), get(typeof(bool))], null);
+        var ptsh = type.GetMethod("PtrToStructureHelper", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(IntPtr)), get(typeof(object)), get(typeof(bool))], null) ?? throw new Exception();
         code.For(ptsh, transpiler => ($"\ta_1->f_type()->f_from_unmanaged(a_1, a_0);\n", 1));
         code.For(
             type.GetMethod(nameof(Marshal.PtrToStructure), [get(typeof(IntPtr)), get(typeof(Type))]),
             transpiler =>
             {
-                var create = get(typeof(Activator)).GetMethod(nameof(Activator.CreateInstance), [get(typeof(Type)), get(typeof(bool))]);
+                var create = get(typeof(Activator)).GetMethod(nameof(Activator.CreateInstance), [get(typeof(Type)), get(typeof(bool))]) ?? throw new Exception();
                 transpiler.Enqueue(create);
                 transpiler.Enqueue(ptsh);
                 return (transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0) return nullptr;
@@ -160,7 +160,7 @@ partial class DefaultBuiltin
 ", 0);
             }
         );
-        var soh = type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic);
+        var soh = type.GetMethod("SizeOfHelper", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception();
         code.For(soh, transpiler => ($@"{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (a_1 && type->v__unmanaged_size <= 0) throw std::runtime_error(""not marshalable"");
 {'\t'}return type->v__unmanaged_size;
@@ -205,11 +205,11 @@ partial class DefaultBuiltin
     .For(get(typeof(RuntimeFeature)), (type, code) =>
     {
         code.For(
-            type.GetProperty(nameof(RuntimeFeature.IsDynamicCodeCompiled)).GetMethod,
+            type.GetProperty(nameof(RuntimeFeature.IsDynamicCodeCompiled))!.GetMethod,
             transpiler => ($"\treturn false;\n", 1)
         );
         code.For(
-            type.GetProperty(nameof(RuntimeFeature.IsDynamicCodeSupported)).GetMethod,
+            type.GetProperty(nameof(RuntimeFeature.IsDynamicCodeSupported))!.GetMethod,
             transpiler => ($"\treturn false;\n", 1)
         );
     })
@@ -269,7 +269,7 @@ partial class DefaultBuiltin
 ", 1)
         );
         code.For(
-            type.GetProperty(nameof(RuntimeHelpers.OffsetToStringData)).GetMethod,
+            type.GetProperty(nameof(RuntimeHelpers.OffsetToStringData))!.GetMethod,
             transpiler => ($"\treturn offsetof({transpiler.Escape(get(typeof(string)))}, v__5ffirstChar);\n", 1)
         );
         // TODO
@@ -316,10 +316,10 @@ partial class DefaultBuiltin
             transpiler => ("\tdelete static_cast<t__dependent_handle*>(a_0.v__5fvalue);\n", 1)
         );
     })
-    .For(get(Type.GetType("System.Runtime.Intrinsics.Scalar`1", true)), (type, code) =>
+    .For(get(Type.GetType("System.Runtime.Intrinsics.Scalar`1", true)!), (type, code) =>
     {
         code.ForGeneric(
-            type.GetProperty("AllBitsSet").GetMethod,
+            type.GetProperty("AllBitsSet")!.GetMethod,
             (transpiler, types) =>
             {
                 var e = transpiler.EscapeForStacked(types[0]);
@@ -330,7 +330,7 @@ partial class DefaultBuiltin
             }
         );
         code.ForGeneric(
-            type.GetProperty("One").GetMethod,
+            type.GetProperty("One")!.GetMethod,
             (transpiler, types) => ("\treturn 1;\n", 1)
         );
     })
@@ -342,7 +342,7 @@ partial class DefaultBuiltin
     .For(get(typeof(Vector128<>)), SetupIntrinsicsVectorOfT)
     .For(get(typeof(Vector256<>)), SetupIntrinsicsVectorOfT)
     .For(get(typeof(Vector512<>)), SetupIntrinsicsVectorOfT)
-    .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch", true)), (type, code) =>
+    .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch", true)!), (type, code) =>
     {
         // TODO
         code.For(

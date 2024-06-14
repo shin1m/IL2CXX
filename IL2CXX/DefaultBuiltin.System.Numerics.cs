@@ -30,7 +30,7 @@ partial class DefaultBuiltin
     private static void SetupVector(Func<Type, Type> get, Type type, Builtin.Code code, Type typeofVectorOfT, string squareRoot)
     {
         code.For(
-            type.GetProperty(nameof(Vector.IsHardwareAccelerated)).GetMethod,
+            type.GetProperty(nameof(Vector.IsHardwareAccelerated))!.GetMethod,
             transpiler => ("\treturn false;\n", 1)
         );
         var typeofVectorOfT0 = typeofVectorOfT.MakeGenericType(Type.MakeGenericMethodParameter(0));
@@ -186,8 +186,8 @@ partial class DefaultBuiltin
 {'\t'}return true;
 ", 1);
         });
-        equality(type.GetMethod("op_Equality"));
-        equality(type.GetMethod(nameof(Equals), [type]));
+        equality(type.GetMethod("op_Equality") ?? throw new Exception());
+        equality(type.GetMethod(nameof(Equals), [type]) ?? throw new Exception());
     }
     private static Builtin SetupSystemNumerics(this Builtin @this, Func<Type, Type> get) => @this
     .For(get(typeof(BitOperations)), (type, code) =>
@@ -218,7 +218,7 @@ partial class DefaultBuiltin
         foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector.Widen))) code.For(x, transpiler =>
         {
             var ps = x.GetParameters().Select(x => x.ParameterType).ToList();
-            var e = transpiler.EscapeForStacked(ps[1].GetElementType().GenericTypeArguments[0]);
+            var e = transpiler.EscapeForStacked(ps[1].GetElementType()!.GenericTypeArguments[0]);
             return ($@"{'\t'}auto p0 = reinterpret_cast<{transpiler.EscapeForStacked(ps[0].GenericTypeArguments[0])}*>(&a_0);
 {'\t'}auto n = sizeof(a_1) / sizeof({e});
 {'\t'}auto p1 = reinterpret_cast<{e}*>(a_1);

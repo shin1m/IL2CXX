@@ -13,29 +13,29 @@ partial class Transpiler
     private static Type ReplaceGenericMethodParameter(Type type)
     {
         if (type.IsGenericMethodParameter) return Type.MakeGenericMethodParameter(type.GenericParameterPosition);
-        if (type.IsSZArray) return ReplaceGenericMethodParameter(type.GetElementType()).MakeArrayType();
-        if (type.IsArray) return ReplaceGenericMethodParameter(type.GetElementType()).MakeArrayType(type.GetArrayRank());
-        if (type.IsByRef) return ReplaceGenericMethodParameter(type.GetElementType()).MakeByRefType();
-        if (type.IsPointer) return ReplaceGenericMethodParameter(type.GetElementType()).MakePointerType();
+        if (type.IsSZArray) return ReplaceGenericMethodParameter(type.GetElementType() ?? throw new Exception()).MakeArrayType();
+        if (type.IsArray) return ReplaceGenericMethodParameter(type.GetElementType() ?? throw new Exception()).MakeArrayType(type.GetArrayRank());
+        if (type.IsByRef) return ReplaceGenericMethodParameter(type.GetElementType() ?? throw new Exception()).MakeByRefType();
+        if (type.IsPointer) return ReplaceGenericMethodParameter(type.GetElementType() ?? throw new Exception()).MakePointerType();
         if (type.IsGenericTypeParameter) return type;
         if (type.ContainsGenericParameters) return type.GetGenericTypeDefinition().MakeGenericType(type.GetGenericArguments().Select(ReplaceGenericMethodParameter).ToArray());
         return type;
     }
     public static MethodInfo GetBaseDefinition(MethodInfo method)
     {
-        if (!method.IsVirtual || method.DeclaringType.IsInterface) return method;
+        if (!method.IsVirtual || method.DeclaringType!.IsInterface) return method;
         var name = method.Name;
         var g = method.GetGenericArguments().Length;
         var ps = method.GetParameters().Select(x => x.ParameterType).Select(ReplaceGenericMethodParameter).ToArray();
-        MethodInfo get(Type t) => t.GetMethod(name, g, exactInstance, null, ps, null);
+        MethodInfo get(Type t) => t.GetMethod(name, g, exactInstance, null, ps, null) ?? throw new Exception();
         var gas = method.IsGenericMethodDefinition ? null : method.GetGenericArguments();
-        while (!method.Attributes.HasFlag(MethodAttributes.NewSlot)) method = get(get(method.DeclaringType.BaseType).DeclaringType);
+        while (!method.Attributes.HasFlag(MethodAttributes.NewSlot)) method = get(get(method.DeclaringType!.BaseType ?? throw new Exception()).DeclaringType ?? throw new Exception());
         return gas != null && method.IsGenericMethodDefinition ? method.MakeGenericMethod(gas) : method;
     }
     private MethodInfo GetConcrete(MethodInfo method, Type type)
     {
         var ct = (TypeDefinition)Define(type);
-        var methods = method.DeclaringType.IsInterface ? ct.InterfaceToMethods[method.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods;
+        var methods = method.DeclaringType!.IsInterface ? ct.InterfaceToMethods[method.DeclaringType] : (IReadOnlyList<MethodInfo>)ct.Methods;
         var dt = Define(method.DeclaringType);
         return method.IsGenericMethod
             ? methods[dt.GetIndex(method.GetGenericMethodDefinition())].MakeGenericMethod(method.GetGenericArguments())
@@ -43,7 +43,7 @@ partial class Transpiler
     }
     private MethodInfo GetInterfaceStaticConcrete(MethodInfo method, Type type)
     {
-        if (!method.DeclaringType.IsInterface) throw new ArgumentException(nameof(method));
+        if (!method.DeclaringType!.IsInterface) throw new ArgumentException(nameof(method));
         var methods = ((TypeDefinition)Define(type)).InterfaceStaticMethods;
         return method.IsGenericMethod
             ? methods[method.GetGenericMethodDefinition()].MakeGenericMethod(method.GetGenericArguments())
@@ -52,7 +52,7 @@ partial class Transpiler
     private string ExplicitName(Type type)
     {
         if (type.IsGenericTypeParameter) return type.Name;
-        var prefix = type.IsNested ? $"{ExplicitName(type.DeclaringType)}." : type.Namespace == null ? string.Empty : $"{type.Namespace}.";
+        var prefix = type.IsNested ? $"{ExplicitName(type.DeclaringType ?? throw new Exception())}." : type.Namespace == null ? string.Empty : $"{type.Namespace}.";
         if (!type.IsGenericType) return prefix + type.Name;
         var name = type.GetGenericTypeDefinition().Name;
         var i = name.IndexOf('`');
@@ -67,12 +67,12 @@ partial class Transpiler
             var m = ims[i];
             var g = m.GetGenericArguments().Length;
             var ps = m.GetParameters().Select(x => x.ParameterType).Select(ReplaceGenericMethodParameter).ToArray();
-            MethodInfo get(Type t, string name)
+            MethodInfo? get(Type t, string name)
             {
                 var m = t.GetMethod(name, g, exactInstance | BindingFlags.Static, null, ps, null);
-                return m == null || m.DeclaringType == t ? m : get(m.DeclaringType, name);
+                return m == null || m.DeclaringType == t ? m : get(m.DeclaringType ?? throw new Exception(), name);
             }
-            MethodInfo find(Type t)
+            MethodInfo? find(Type t)
             {
                 var i = Array.IndexOf(t.GetInterfaces(), @interface);
                 if (i < 0) return null;
@@ -82,10 +82,16 @@ partial class Transpiler
                 );
                 return get(t, $"{prefix}.{m.Name}") ?? get(t, m.Name) ?? (t.BaseType == null ? null : find(t.BaseType));
             }
-            tms[i] = find(type) ?? type.GetInterfaces().Select(find).FirstOrDefault(x => x != null);
-            if (tms[i] != null) continue;
-            if (m.IsAbstract) throw new Exception($"{type} -> {@interface}::[{m}]");
-            tms[i] = m;
+            var tm = find(type) ?? type.GetInterfaces().Select(find).FirstOrDefault(x => x != null);
+            if (tm == null)
+            {
+                if (m.IsAbstract) throw new Exception($"{type} -> {@interface}::[{m}]");
+                tms[i] = m;
+            }
+            else
+            {
+                tms[i] = tm;
+            }
         }
         return new InterfaceMapping
         {
@@ -122,7 +128,7 @@ partial class Transpiler
 
     public class RuntimeDefinition : IEqualityComparer<Type[]>
     {
-        bool IEqualityComparer<Type[]>.Equals(Type[] x, Type[] y) => x.SequenceEqual(y);
+        bool IEqualityComparer<Type[]>.Equals(Type[]? x, Type[]? y) => x == null || y == null ? x == y : x.SequenceEqual(y);
         int IEqualityComparer<Type[]>.GetHashCode(Type[] x) => x.Select(y => y.GetHashCode()).Aggregate((y, z) => y % z);
 
         public readonly Type Type;
@@ -137,7 +143,7 @@ partial class Transpiler
         public readonly StringWriter Definitions = new();
         public bool HasMethods;
         public bool HasProperties;
-        public string Attributes;
+        public string? Attributes;
 
         public RuntimeDefinition(Type type) => Type = type;
         protected void Add(MethodInfo method, Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex)
@@ -161,13 +167,13 @@ partial class Transpiler
     }
     class TypeDefinition : RuntimeDefinition
     {
-        public readonly TypeDefinition Base;
+        public readonly TypeDefinition? Base;
         public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new();
         public readonly Dictionary<MethodInfo, MethodInfo> InterfaceStaticMethods = new();
-        public readonly string Delegate;
+        public readonly string? Delegate;
         public bool HasFields;
         public bool HasConstructors;
-        public List<bool> ExplicitMap;
+        public List<bool>? ExplicitMap;
 
         public TypeDefinition(Type type, Transpiler transpiler) : base(type)
         {
@@ -183,7 +189,7 @@ partial class Transpiler
                     IsBlittable = true;
                     UnmanagedSize = Type == transpiler.typeofIntPtr || Type == transpiler.typeofUIntPtr
                         ? transpiler.Is64Bit ? 8 : 4
-                        : Marshal.SizeOf(Type.GetType(Type.ToString(), true));
+                        : Marshal.SizeOf(Type.GetType(Type.ToString(), true)!);
                 }
             }
             else if (Type.IsEnum)
@@ -221,7 +227,7 @@ partial class Transpiler
             }
             if (Type.IsSubclassOf(transpiler.typeofDelegate) && Type != transpiler.typeofMulticastDelegate)
             {
-                var invoke = (MethodInfo)Type.GetMethod("Invoke");
+                var invoke = (MethodInfo)(Type.GetMethod("Invoke") ?? throw new Exception());
                 transpiler.Enqueue(invoke);
                 var @return = invoke.ReturnType;
                 var parameters = invoke.GetParameters().Select(x => x.ParameterType);
@@ -281,7 +287,7 @@ string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1
     {
         byte b => [b],
         sbyte b => [(byte)b],
-        _ => (byte[])typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), [value.GetType()]).Invoke(null, [value])
+        _ => (byte[])(typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), [value.GetType()])!.Invoke(null, [value]) ?? throw new Exception())
     };
     private string WriteAttributes(MemberInfo member, string name, TextWriter writer)
     {
@@ -291,24 +297,24 @@ string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1
         string attributeData(CustomAttributeTypedArgument a, string name)
         {
             var type = a.ArgumentType;
-            if (type == typeofString) return $"const_cast<char16_t*>({ToLiteral((string)a.Value)})";
-            if (type == typeofType) return $"&t__type_of<{Escape((Type)a.Value)}>::v__instance";
+            if (type == typeofString) return $"const_cast<char16_t*>({ToLiteral((string?)a.Value)})";
+            if (type == typeofType) return $"&t__type_of<{Escape((Type)(a.Value ?? throw new Exception()))}>::v__instance";
             if (type.IsSZArray)
             {
-                var elements = (IReadOnlyCollection<CustomAttributeTypedArgument>)a.Value;
+                var elements = (IReadOnlyCollection<CustomAttributeTypedArgument>)(a.Value ?? throw new Exception());
                 var e = type.GetElementType();
                 if (e == typeofString)
-                    writer.WriteLine($@"static const char16_t* {name}__elements[] = {{{string.Join(", ", elements.Select(x => ToLiteral((string)x.Value)))}}};
+                    writer.WriteLine($@"static const char16_t* {name}__elements[] = {{{string.Join(", ", elements.Select(x => ToLiteral((string?)x.Value)))}}};
 static std::pair<size_t, const char16_t**> {name}__data{{{elements.Count}, {name}__elements}};");
                 else if (e == typeofType)
-                    writer.WriteLine($@"static t__type* {name}__elements[] = {{{string.Join(", ", elements.Select(x => $"&t__type_of<{Escape((Type)x.Value)}>::v__instance"))}}};
+                    writer.WriteLine($@"static t__type* {name}__elements[] = {{{string.Join(", ", elements.Select(x => $"&t__type_of<{Escape((Type)(x.Value ?? throw new Exception()))}>::v__instance"))}}};
 static std::pair<size_t, t__type**> {name}__data{{{elements.Count}, {name}__elements}};");
                 else
-                    writer.WriteLine($@"static uint8_t {name}__elements[] = {{{string.Join(", ", elements.SelectMany(x => GetBytes(x.Value)).Select(x => $"0x{x:x02}"))}}};
+                    writer.WriteLine($@"static uint8_t {name}__elements[] = {{{string.Join(", ", elements.SelectMany(x => GetBytes(x.Value ?? throw new Exception())).Select(x => $"0x{x:x02}"))}}};
 static std::pair<size_t, uint8_t*> {name}__data{{{elements.Count}, {name}__elements}};");
                 return $"&{name}__data";
             }
-            writer.WriteLine($"static uint8_t {name}__data[] = {{{string.Join(", ", GetBytes(a.Value).Select(x => $"0x{x:x02}"))}}};");
+            writer.WriteLine($"static uint8_t {name}__data[] = {{{string.Join(", ", GetBytes(a.Value ?? throw new Exception()).Select(x => $"0x{x:x02}"))}}};");
             return $"{name}__data";
         }
         foreach (var (x, i) in attributes.Select((x, i) => (x, i)))
@@ -328,7 +334,7 @@ static std::pair<size_t, uint8_t*> {name}__data{{{elements.Count}, {name}__eleme
             if (x.NamedArguments.Count > 0)
             {
                 nas = $"{aname}__nas";
-                foreach (var (y, j) in x.NamedArguments.Select((x, i) => (x, i))) writer.WriteLine($"static t__custom_attribute::t_named {nas}{j}{{&t__type_of<{Escape(y.TypedValue.ArgumentType)}>::v__instance, {attributeData(y.TypedValue, $"{nas}{j}")}, &v__{(y.IsField ? "field" : "property")}_{Escape(y.MemberInfo.DeclaringType)}__{Escape(y.MemberInfo.Name)}}};");
+                foreach (var (y, j) in x.NamedArguments.Select((x, i) => (x, i))) writer.WriteLine($"static t__custom_attribute::t_named {nas}{j}{{&t__type_of<{Escape(y.TypedValue.ArgumentType)}>::v__instance, {attributeData(y.TypedValue, $"{nas}{j}")}, &v__{(y.IsField ? "field" : "property")}_{Escape(y.MemberInfo.DeclaringType ?? throw new Exception())}__{Escape(y.MemberInfo.Name)}}};");
                 writer.WriteLine($@"static t__custom_attribute::t_named* {nas}[] = {{
 {string.Join(string.Empty, x.NamedArguments.Select((_, i) => $"\t&{nas}{i},\n"))}{'\t'}nullptr
 }};");
@@ -407,8 +413,9 @@ struct {Escape(type)}
         }
         else
         {
-            typeToRuntime.Add(type, null);
+            typeToRuntime.Add(type, null!);
             var td = new TypeDefinition(type, this);
+            typeToRuntime[type] = definition = td;
             void enqueue(MethodInfo m, MethodInfo concrete)
             {
                 if (m.IsGenericMethod)
@@ -430,7 +437,6 @@ struct {Escape(type)}
                     var id = typeToRuntime[i];
                     foreach (var m in id.Methods) enqueue(m, ms[id.GetIndex(m)]);
                 }
-            typeToRuntime[type] = definition = td;
             var identifier = Escape(type);
             var builtinStaticMembers = builtin.GetStaticMembers(this, type);
             var fields = Enumerable.Empty<FieldInfo>();
@@ -554,7 +560,7 @@ struct t__static_{identifier}
 ";
                             if (IsComposite(element)) members += $@"{'\t'}void f__scan(t_scan<t__type> a_scan)
 {'\t'}{{
-{'\t'}{'\t'}{Escape(type.BaseType)}::f__scan(a_scan);
+{'\t'}{'\t'}{Escape(type.BaseType ?? throw new Exception())}::f__scan(a_scan);
 {'\t'}{'\t'}auto p = f_data();
 {'\t'}{'\t'}for (size_t i = 0; i < v__length; ++i) {scan(element, "p[i]")};
 {'\t'}}}
@@ -567,13 +573,13 @@ struct t__static_{identifier}
                             var layout = type.StructLayoutAttribute;
                             var kind = layout?.Value ?? LayoutKind.Auto;
                             pack = layout?.Pack ?? 0;
-                            CustomAttributeData getMarshalAs(FieldInfo x) => x.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofMarshalAsAttribute);
-                            UnmanagedType? getMarshalAsValue(CustomAttributeData x) => (UnmanagedType?)(int?)x?.ConstructorArguments[0].Value;
+                            CustomAttributeData? getMarshalAs(FieldInfo x) => x.GetCustomAttributesData().FirstOrDefault(x => x.AttributeType == typeofMarshalAsAttribute);
+                            UnmanagedType? getMarshalAsValue(CustomAttributeData? x) => (UnmanagedType?)(int?)x?.ConstructorArguments[0].Value;
                             if (kind != LayoutKind.Auto)
                             {
                                 td.IsBlittable = fields.All(x => Define(x.FieldType).IsBlittable);
                                 var defaultAlignment = pack > 0 ? pack : Define(typeofIntPtr).Alignment;
-                                var sizeofTChar = layout.CharSet == CharSet.Unicode ? 2 : 1;
+                                var sizeofTChar = layout!.CharSet == CharSet.Unicode ? 2 : 1;
                                 td.Alignment = Math.Min(fields.Select(x => x.FieldType == typeofString
                                     ? getMarshalAsValue(getMarshalAs(x)) == UnmanagedType.ByValTStr
                                         ? sizeofTChar
@@ -600,11 +606,11 @@ struct t__static_{identifier}
                                     {
                                         var marshalAs = getMarshalAs(x);
                                         var value = getMarshalAsValue(marshalAs);
-                                        var unicode = layout.CharSet == CharSet.Unicode;
+                                        var unicode = layout!.CharSet == CharSet.Unicode;
                                         if (value == UnmanagedType.ByValTStr)
                                         {
                                             if (unicode) pad(align(Math.Min(2, td.Alignment)));
-                                            var size = (int)marshalAs.NamedArguments.First(x => x.MemberName == nameof(MarshalAsAttribute.SizeConst)).TypedValue.Value;
+                                            var size = (int)marshalAs!.NamedArguments.First(x => x.MemberName == nameof(MarshalAsAttribute.SizeConst)).TypedValue.Value!;
                                             sb.AppendLine($"\t{(unicode ? "char16_t" : "char")} {name}[{size}];");
                                             i += size * (unicode ? 2 : 1);
                                         }
@@ -649,7 +655,7 @@ struct t__static_{identifier}
                                 {
                                     foreach (var x in fields) generateField(x, Escape(x));
                                 }
-                                td.UnmanagedSize = Math.Max(align(td.Alignment), layout.Size);
+                                td.UnmanagedSize = Math.Max(align(td.Alignment), layout!.Size);
                                 pad(td.UnmanagedSize);
                                 var at = $"{Escape(type)}{(type.IsValueType ? "::t_value" : string.Empty)}*";
                                 var fs = fields.Select(Escape);
@@ -674,11 +680,11 @@ struct t__static_{identifier}
                             }
                             var slots = fields.Where(x => IsComposite(x.FieldType)).Select(x => (Type: x.FieldType, Name: Escape(x)));
                             var constructs = fields.Select(Escape);
-                            List<string> mergedFields = null;
-                            int fieldOffset(FieldInfo x) => (int)x.GetCustomAttributesData().First(x => x.AttributeType == typeofFieldOffsetAttribute).ConstructorArguments[0].Value;
+                            List<string>? mergedFields = null;
+                            int fieldOffset(FieldInfo x) => (int)x.GetCustomAttributesData().First(x => x.AttributeType == typeofFieldOffsetAttribute).ConstructorArguments[0].Value!;
                             if (kind == LayoutKind.Explicit)
                             {
-                                td.UnmanagedSize = Math.Max(td.Alignment, layout.Size);
+                                td.UnmanagedSize = Math.Max(td.Alignment, layout!.Size);
                                 var map = Enumerable.Repeat(false, td.UnmanagedSize).ToList();
                                 var rn = Define(typeofIntPtr).UnmanagedSize;
                                 foreach (var x in fields)
@@ -719,7 +725,7 @@ struct t__static_{identifier}
 {indent}{{
 {indent}{'\t'}struct
 {indent}{'\t'}{{
-{string.Join(string.Empty, mergedFields.Select(x => $"{indent}\t\t{x};\n"))}{indent}{'\t'}}} v__merged;");
+{string.Join(string.Empty, mergedFields!.Select(x => $"{indent}\t\t{x};\n"))}{indent}{'\t'}}} v__merged;");
                                     foreach (var x in fields) sb.AppendLine($@"{indent}{'\t'}struct
 {indent}{'\t'}{{
 {indent}{'\t'}{'\t'}char o[{fieldOffset(x)}];
@@ -906,7 +912,7 @@ extern t__runtime_method_info* v__generic_methods_{name}[];");
             }
             definition.Attributes = WriteAttributes(type, identifier, definition.Definitions);
         }
-        if (type.IsGenericParameter && ShouldGenerateReflection(type.DeclaringType)) definition.Attributes = WriteAttributes(type, Escape(type), definition.Definitions);
+        if (type.IsGenericParameter && ShouldGenerateReflection(type.DeclaringType ?? throw new Exception())) definition.Attributes = WriteAttributes(type, Escape(type), definition.Definitions);
         runtimeDefinitions.Add(definition);
         if (type.IsEnum && ShouldGenerateReflection(type) || typeofAttribute.IsAssignableFrom(type))
             try
@@ -985,7 +991,8 @@ struct t__type_of<{identifier}> : {@base}
 {{");
         writerForDefinitions.Write($@"
 t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instance, {(type.BaseType == null ? "nullptr" : $"&t__type_of<{Escape(type.BaseType)}>::v__instance")}, {interfaces}, {{");
-        if (definition is TypeDefinition td)
+        var td = definition as TypeDefinition;
+        if (td != null)
         {
             void writeMethods(IEnumerable<MethodInfo> methods, Func<int, MethodInfo, string, string> pointer, Func<int, int, MethodInfo, string, string> genericPointer, Func<MethodInfo, MethodInfo> origin, string indent)
             {
@@ -993,7 +1000,7 @@ t__type_of<{identifier}>::t__type_of() : {@base}(&t__type_of<t__type>::v__instan
 {indent}void* v_method{i} = {(
 m.IsAbstract ? "nullptr" :
 m.IsGenericMethod ? $"&v_generic__{Escape(m)}" :
-methodToIdentifier.ContainsKey(ToKey(m)) ? $"reinterpret_cast<void*>({pointer(i, m, $"{Escape(m)}{(m.DeclaringType.IsValueType ? "__v" : string.Empty)}")})" :
+methodToIdentifier.ContainsKey(ToKey(m)) ? $"reinterpret_cast<void*>({pointer(i, m, $"{Escape(m)}{(m.DeclaringType!.IsValueType ? "__v" : string.Empty)}")})" :
 "nullptr"
 )};");
                 foreach (var (m, i) in methods.Where(x => !x.IsAbstract && x.IsGenericMethod).Select((x, i) => (x, i))) writerForDeclarations.WriteLine($@"{indent}struct
@@ -1003,7 +1010,7 @@ string.Join(string.Empty, genericMethodToTypesToIndex[ToKey(origin(m))].OrderBy(
 {
     var x = m.MakeGenericMethod(p.Key);
     return $@"{indent}{'\t'}// {x}
-{indent}{'\t'}void* v_method{p.Value} = reinterpret_cast<void*>({genericPointer(i, p.Value, x, $"{Escape(x)}{(x.DeclaringType.IsValueType ? "__v" : string.Empty)}")});
+{indent}{'\t'}void* v_method{p.Value} = reinterpret_cast<void*>({genericPointer(i, p.Value, x, $"{Escape(x)}{(x.DeclaringType!.IsValueType ? "__v" : string.Empty)}")});
 ";
 }))
 }{indent}}} v_generic__{Escape(m)};");
@@ -1038,10 +1045,6 @@ string.Join(string.Empty, genericMethodToTypesToIndex[ToKey(origin(m))].OrderBy(
                 writerForDeclarations.WriteLine($@"{'\t'}static void f_do_to_unmanaged(const t__object* a_this, void* a_p);
 {'\t'}static void f_do_from_unmanaged(t__object* a_this, const void* a_p);
 {'\t'}static void f_do_destroy_unmanaged(void* a_p);");
-        }
-        else
-        {
-            td = null;
         }
         var szarray = "nullptr";
         try

@@ -24,7 +24,7 @@ partial class DefaultBuiltin
         );
     })
     // TODO
-    .For(get(Type.GetType("System.Resources.RuntimeResourceSet")), (type, code) =>
+    .For(get(Type.GetType("System.Resources.RuntimeResourceSet", true)!), (type, code) =>
     {
         code.For(
             type.GetMethod("GetString", [get(typeof(string)), get(typeof(bool))]),

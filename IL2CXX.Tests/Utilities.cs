@@ -14,7 +14,7 @@ static class Utilities
         public void Dispose() => dispose();
     }
 
-    static int Spawn(string command, string arguments, string workingDirectory, IEnumerable<(string, string)> environment, Action<string> output, Action<string> error)
+    static int Spawn(string command, string? arguments, string workingDirectory, IEnumerable<(string, string)> environment, Action<string?> output, Action<string?> error)
     {
         var si = new ProcessStartInfo(command)
         {
@@ -25,8 +25,8 @@ static class Utilities
             WorkingDirectory = workingDirectory
         };
         foreach (var (name, value) in environment) si.Environment.Add(name, value);
-        using var process = Process.Start(si);
-        static void forward(StreamReader reader, Action<string> write)
+        using var process = Process.Start(si) ?? throw new Exception();
+        static void forward(StreamReader reader, Action<string?> write)
         {
             while (!reader.EndOfStream) write(reader.ReadLine());
         }
@@ -39,9 +39,9 @@ static class Utilities
         return process.ExitCode;
     }
 
-    public static string Build(MethodInfo method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null, IEnumerable<MethodInfo> bundleMethods = null)
+    public static string Build(MethodInfo method, IEnumerable<Type>? bundle = null, IEnumerable<Type>? generateReflection = null, IEnumerable<MethodInfo>? bundleMethods = null)
     {
-        Console.Error.WriteLine($"{method.DeclaringType.Name}::[{method}]");
+        Console.Error.WriteLine($"{method.DeclaringType!.Name}::[{method}]");
         var build = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{method.DeclaringType.Name}-{method.Name}-build");
         if (Directory.Exists(build)) Directory.Delete(build, true);
         Directory.CreateDirectory(build);
@@ -52,8 +52,8 @@ static class Utilities
         using (var main = File.CreateText(Path.Combine(build, "main.cc")))
         {
             var assembly = context.LoadFromAssemblyPath(method.Module.Assembly.Location);
-            var type = assembly.GetType(method.DeclaringType.FullName, true);
-            method = type.GetMethod(method.Name, BindingFlags.Static | BindingFlags.NonPublic);
+            var type = assembly.GetType(method.DeclaringType!.FullName ?? throw new Exception(), true)!;
+            method = type.GetMethod(method.Name, BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception();
             declarations.WriteLine(@"#ifndef DECLARATIONS_H
 #define DECLARATIONS_H");
             StreamWriter newDefinitions()
@@ -68,7 +68,7 @@ namespace il2cxx
             var definitions = newDefinitions();
             using var disposer = new Disposer(() => definitions.Dispose());
             main.WriteLine("#include \"declarations.h\"\n");
-            Type get(Type x) => context.LoadFromAssemblyName(x.Assembly.FullName).GetType(x.FullName, true);
+            Type get(Type x) => context.LoadFromAssemblyName(x.Assembly.FullName ?? throw new Exception()).GetType(x.FullName ?? throw new Exception(), true)!;
             var target = Environment.OSVersion.Platform;
             var reflection = generateReflection?.Select(get).ToHashSet() ?? new HashSet<Type>();
             new Transpiler(get, DefaultBuiltin.Create(get, target), _ => { }, target, Environment.Is64BitOperatingSystem)
@@ -77,11 +77,11 @@ namespace il2cxx
                 BundleMethods = bundleMethods?.Select(x =>
                 {
                     var gd = x.GetGenericMethodDefinition();
-                    return get(x.DeclaringType).GetMethod(
+                    return get(x.DeclaringType ?? throw new Exception()).GetMethod(
                         gd.Name, gd.GetGenericArguments().Length,
                         BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null,
                         gd.GetParameters().Select(x => x.ParameterType).Select(x => x.IsGenericMethodParameter ? Type.MakeGenericMethodParameter(x.GenericParameterPosition) : get(x)).ToArray(), null
-                    ).MakeGenericMethod(x.GetGenericArguments().Select(get).ToArray());
+                    )!.MakeGenericMethod(x.GetGenericArguments().Select(get).ToArray());
                 }) ?? Enumerable.Empty<MethodInfo>(),
                 GenerateReflection = reflection.Contains
             }.Do(method, declarations, main, (type, inline) =>
@@ -127,9 +127,9 @@ target_compile_definitions(runco PRIVATE RECYCLONE__COOPERATIVE)
         Assert.That(Spawn(cmake, "--build .", build, Enumerable.Empty<(string, string)>(), Console.Error.WriteLine, Console.Error.WriteLine), Is.Zero);
         return build;
     }
-    public static string Build(Func<int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null, IEnumerable<MethodInfo> bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
-    public static string Build(Func<string[], int> method, IEnumerable<Type> bundle = null, IEnumerable<Type> generateReflection = null, IEnumerable<MethodInfo> bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
-    public static void Run(string build, bool cooperative, string arguments, bool verify = true)
+    public static string Build(Func<int> method, IEnumerable<Type>? bundle = null, IEnumerable<Type>? generateReflection = null, IEnumerable<MethodInfo>? bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
+    public static string Build(Func<string[], int> method, IEnumerable<Type>? bundle = null, IEnumerable<Type>? generateReflection = null, IEnumerable<MethodInfo>? bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
+    public static void Run(string build, bool cooperative, string? arguments, bool verify = true)
     {
         IEnumerable<(string, string)> environment = new[]
         {

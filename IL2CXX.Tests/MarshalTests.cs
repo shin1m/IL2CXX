@@ -58,7 +58,7 @@ class MarshalTests
         try
         {
             Marshal.StructureToPtr((object)x, p, false);
-            return (Name)Marshal.PtrToStructure(p, typeof(Name));
+            return (Name)(Marshal.PtrToStructure(p, typeof(Name)) ?? throw new Exception());
         }
         finally
         {

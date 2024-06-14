@@ -150,7 +150,7 @@ partial class Transpiler
             [("void*", "int32_t")] = typeofVoidPointer,
             [("void*", "void*")] = typeofVoidPointer
         };
-        finalizeOfObject = FinalizeOf(typeofObject);
+        finalizeOfObject = FinalizeOf(typeofObject) ?? throw new Exception();
         for (int i = 0; i < 256; ++i)
         {
             instructions1[i] = new Instruction { OpCode = opcodes1[i] };
@@ -188,7 +188,7 @@ partial class Transpiler
             OpCodes.Ldloc_3
         }.ForEach((opcode, i) => instructions1[opcode.Value].For(x =>
         {
-            x.Estimate = (index, stack) => (index, stack.Push(method.GetMethodBody().LocalVariables[i].LocalType));
+            x.Estimate = (index, stack) => (index, stack.Push(method.GetMethodBody()!.LocalVariables[i].LocalType));
             x.Generate = (index, stack) =>
             {
                 writer.WriteLine($"\n\t{indexToStack[index].Variable} = l{i};");
@@ -206,7 +206,7 @@ partial class Transpiler
             x.Estimate = (index, stack) => (index, stack.Pop);
             x.Generate = (index, stack) =>
             {
-                writer.WriteLine($"\n\tl{i} = {CastValue(method.GetMethodBody().LocalVariables[i].LocalType, stack.Variable)};");
+                writer.WriteLine($"\n\tl{i} = {CastValue(method.GetMethodBody()!.LocalVariables[i].LocalType, stack.Variable)};");
                 return index;
             };
         }));
@@ -253,7 +253,7 @@ partial class Transpiler
             x.Estimate = (index, stack) =>
             {
                 var i = ParseU1(ref index);
-                return (index, stack.Push(method.GetMethodBody().LocalVariables[i].LocalType));
+                return (index, stack.Push(method.GetMethodBody()!.LocalVariables[i].LocalType));
             };
             x.Generate = (index, stack) =>
             {
@@ -267,7 +267,7 @@ partial class Transpiler
             x.Estimate = (index, stack) =>
             {
                 var i = ParseU1(ref index);
-                var type = method.GetMethodBody().LocalVariables[i].LocalType;
+                var type = method.GetMethodBody()!.LocalVariables[i].LocalType;
                 return (index, stack.Push(MakePointerType(type)));
             };
             x.Generate = (index, stack) =>
@@ -283,7 +283,7 @@ partial class Transpiler
             x.Generate = (index, stack) =>
             {
                 var i = ParseU1(ref index);
-                writer.WriteLine($" {i}\n\tl{i} = {CastValue(method.GetMethodBody().LocalVariables[i].LocalType, stack.Variable)};");
+                writer.WriteLine($" {i}\n\tl{i} = {CastValue(method.GetMethodBody()!.LocalVariables[i].LocalType, stack.Variable)};");
                 return index;
             };
         });
@@ -466,7 +466,7 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
                     stack = stack.Pop;
                 }
                 writer.WriteLine(";");
-                Trace.Assert(stack.Pop == null);
+                Trace.Assert(stack.Pop == stack);
                 return index;
             };
         });
@@ -768,7 +768,7 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
             x.Generate = (index, stack) =>
             {
                 var m = (MethodInfo)ParseMethod(ref index);
-                writer.WriteLine($" {m.DeclaringType}::[{m}]");
+                writer.WriteLine($" {m.DeclaringType ?? throw new Exception()}::[{m}]");
                 var after = indexToStack[index];
                 string generateVirtual(string target) => GenerateVirtualCall(GetBaseDefinition(m), target,
                     stack.Take(m.GetParameters().Length).Select(y => y.Variable).Reverse(),
@@ -804,7 +804,7 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
                         {
                             void generateValueMethod(string name)
                             {
-                                var rm = typeofRuntimeType.GetMethod(name);
+                                var rm = typeofRuntimeType.GetMethod(name) ?? throw new Exception();
                                 writer.WriteLine($"\t{after.Variable} = {GenerateCall(rm, Escape(rm), stack.Take(rm.GetParameters().Length - 2).Select(y => y.Variable).Append(@this.Variable).Append($"&t__type_of<{Escape(constrained)}>::v__instance").Reverse())};");
                             }
                             if (cm == typeofObject.GetMethod(nameof(GetType)))
@@ -866,12 +866,12 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Estimate = (index, stack) =>
             {
                 var m = ParseMethod(ref index);
-                return (index, stack.ElementAt(m.GetParameters().Length).Push(m.DeclaringType));
+                return (index, stack.ElementAt(m.GetParameters().Length).Push(m.DeclaringType ?? throw new Exception()));
             };
             x.Generate = (index, stack) =>
             {
                 var m = ParseMethod(ref index);
-                var t = m.DeclaringType;
+                var t = m.DeclaringType ?? throw new Exception();
                 writer.WriteLine($@" {t}::[{m}]");
                 var after = indexToStack[index];
                 Enqueue(m);
@@ -964,7 +964,7 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.WriteLine($" {f.DeclaringType}::[{f}]");
+                writer.WriteLine($" {f.DeclaringType ?? throw new Exception()}::[{f}]");
                 withVolatile(() =>
                 {
                     GenerateCheckNull(stack);
@@ -988,7 +988,7 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.WriteLine($" {f.DeclaringType}::[{f}]");
+                writer.WriteLine($" {f.DeclaringType ?? throw new Exception()}::[{f}]");
                 GenerateCheckNull(stack);
                 writer.Write($"\t{indexToStack[index].Variable} = &");
                 writer.Write(stack.Type.IsValueType
@@ -1005,7 +1005,7 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.WriteLine($" {f.DeclaringType}::[{f}]");
+                writer.WriteLine($" {f.DeclaringType ?? throw new Exception()}::[{f}]");
                 withVolatile(() =>
                 {
                     GenerateCheckNull(stack.Pop);
@@ -1021,8 +1021,8 @@ GenerateCheckNull("p") + generateVirtual("p")
             };
         });
         string @static(FieldInfo x) => x.GetCustomAttributesData().Any(x => x.AttributeType == typeofThreadStaticAttribute)
-            ? $"t_thread_static::v_instance->v_{Escape(x.DeclaringType)}.{Escape(x)}"
-            : $"t_static::v_instance->v_{Escape(x.DeclaringType)}->{Escape(x)}";
+            ? $"t_thread_static::v_instance->v_{Escape(x.DeclaringType ?? throw new Exception())}.{Escape(x)}"
+            : $"t_static::v_instance->v_{Escape(x.DeclaringType ?? throw new Exception())}->{Escape(x)}";
         instructions1[OpCodes.Ldsfld.Value].For(x =>
         {
             x.Estimate = (index, stack) =>
@@ -1048,7 +1048,7 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.Write($" {f.DeclaringType}::[{f}]\n\t{indexToStack[index].Variable} = ");
+                writer.Write($" {f.DeclaringType ?? throw new Exception()}::[{f}]\n\t{indexToStack[index].Variable} = ");
                 writer.WriteLine(f.Attributes.HasFlag(FieldAttributes.HasFieldRVA)
                     ? $"v__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}__data;"
                     : $"&{@static(f)};"
@@ -1123,7 +1123,7 @@ GenerateCheckNull("p") + generateVirtual("p")
                     writer.WriteLine($"\t{after.Variable} = reinterpret_cast<t__object*>(1);");
                     return true;
                 }
-                var next = instructions1[bytes[index]].OpCode;
+                var next = instructions1[bytes![index]].OpCode;
                 if (justTrue(next)) return index;
                 void boxIfValue()
                 {
@@ -1293,7 +1293,7 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 writer.WriteLine();
-                GenerateArrayAccess(stack.Pop, stack, y => indexToStack[index].Assign($"{(stack.Pop.Type.GetElementType().IsPointer ? "reinterpret_cast" : "static_cast")}<intptr_t>({y})"));
+                GenerateArrayAccess(stack.Pop, stack, y => indexToStack[index].Assign($"{(stack.Pop.Type.GetElementType()!.IsPointer ? "reinterpret_cast" : "static_cast")}<intptr_t>({y})"));
                 return index;
             };
         });
@@ -1313,7 +1313,7 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 writer.WriteLine();
-                GenerateArrayAccess(stack.Pop.Pop, stack.Pop, y => $"{(stack.Pop.Pop.Type.GetElementType().IsPointer ? $"reinterpret_cast<intptr_t&>({y})" : y)} = reinterpret_cast<intptr_t>({stack.Variable})");
+                GenerateArrayAccess(stack.Pop.Pop, stack.Pop, y => $"{(stack.Pop.Pop.Type.GetElementType()!.IsPointer ? $"reinterpret_cast<intptr_t&>({y})" : y)} = reinterpret_cast<intptr_t>({stack.Variable})");
                 return index;
             };
         });
@@ -1454,7 +1454,7 @@ GenerateCheckNull("p") + generateVirtual("p")
                 writer.WriteLine($@" {member}
 {'\t'}{indexToStack[index].Variable} = {member switch
 {
-FieldInfo f => $"&v__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}",
+FieldInfo f => $"&v__field_{Escape(f.DeclaringType ?? throw new Exception())}__{Escape(f.Name)}",
 MethodBase m => $"&v__method_{Escape(m)}",
 Type t => $"&t__type_of<{Escape(t)}>::v__instance",
 _ => throw new Exception()
@@ -1586,7 +1586,7 @@ _ => throw new Exception()
             {
                 var m = ParseMethod(ref index);
                 Enqueue(m);
-                var function = m.DeclaringType.IsInterface
+                var function = m.DeclaringType!.IsInterface
                     ? $@"{GetInterfaceFunction(m,
                         y => $"f__resolve<{y}>",
                         y => $"f__generic_resolve<{y}>"
@@ -1602,7 +1602,7 @@ _ => throw new Exception()
             x.Generate = (index, stack) =>
             {
                 var i = ParseI4(ref index);
-                writer.WriteLine($" {i}\n\tl{i} = {CastValue(method.GetMethodBody().LocalVariables[i].LocalType, stack.Variable)};");
+                writer.WriteLine($" {i}\n\tl{i} = {CastValue(method.GetMethodBody()!.LocalVariables[i].LocalType, stack.Variable)};");
                 return index;
             };
         });
@@ -1614,7 +1614,7 @@ _ => throw new Exception()
                 writer.Write($@"
 {'\t'}{{auto n = {stack.AsUnsigned};
 {'\t'}{indexToStack[index].Variable} = alloca(n);");
-                if (method.GetMethodBody().InitLocals) writer.Write($"\n\tstd::memset({indexToStack[index].Variable}, 0, n);");
+                if (method.GetMethodBody()!.InitLocals) writer.Write($"\n\tstd::memset({indexToStack[index].Variable}, 0, n);");
                 writer.WriteLine('}');
                 return index;
             };

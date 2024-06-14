@@ -10,18 +10,18 @@ partial class DefaultBuiltin
         code.ForGeneric(type.TypeInitializer, (transpiler, types) =>
         {
             var t = types[0];
-            Type concrete = null;
+            Type? concrete = null;
             if (t == get(typeof(bool)))
             {
-                concrete = get(Type.GetType("System.Collections.Generic.ByteEqualityComparer", true));
+                concrete = get(Type.GetType("System.Collections.Generic.ByteEqualityComparer", true)!);
             }
             else if (t.IsAssignableTo(get(typeof(IEquatable<>)).MakeGenericType(types)))
             {
-                concrete = get(Type.GetType("System.Collections.Generic.GenericEqualityComparer`1", true)).MakeGenericType(types);
+                concrete = get(Type.GetType("System.Collections.Generic.GenericEqualityComparer`1", true)!).MakeGenericType(types);
             }
             else if (transpiler.GetNullableUnderlyingType(t) is Type nv)
             {
-                if (nv.IsAssignableTo(get(typeof(IEquatable<>)).MakeGenericType(nv))) concrete = get(Type.GetType("System.Collections.Generic.NullableEqualityComparer`1", true)).MakeGenericType(nv);
+                if (nv.IsAssignableTo(get(typeof(IEquatable<>)).MakeGenericType(nv))) concrete = get(Type.GetType("System.Collections.Generic.NullableEqualityComparer`1", true)!).MakeGenericType(nv);
             }
             else if (t.IsEnum)
             {
@@ -35,12 +35,12 @@ partial class DefaultBuiltin
                     case TypeCode.Int64:
                     case TypeCode.UInt64:
                     case TypeCode.UInt16:
-                        concrete = get(Type.GetType("System.Collections.Generic.EnumEqualityComparer`1", true)).MakeGenericType(types);
+                        concrete = get(Type.GetType("System.Collections.Generic.EnumEqualityComparer`1", true)!).MakeGenericType(types);
                         break;
                 }
             }
-            if (concrete == null) concrete = get(Type.GetType("System.Collections.Generic.ObjectEqualityComparer`1", true)).MakeGenericType(types);
-            var constructor = concrete.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null);
+            if (concrete == null) concrete = get(Type.GetType("System.Collections.Generic.ObjectEqualityComparer`1", true)!).MakeGenericType(types);
+            var constructor = concrete.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null) ?? throw new Exception();
             transpiler.Enqueue(constructor);
             return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(concrete)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
@@ -48,14 +48,14 @@ partial class DefaultBuiltin
 ", 0);
         });
     })
-    .For(get(Type.GetType("System.Collections.Generic.ArraySortHelper`1")), (type, code) =>
+    .For(get(Type.GetType("System.Collections.Generic.ArraySortHelper`1", true)!), (type, code) =>
     {
         code.ForGeneric(
             type.GetMethod("CreateArraySortHelper", BindingFlags.Static | BindingFlags.NonPublic),
             (transpiler, types) =>
             {
-                var concrete = (get(typeof(IComparable<>)).MakeGenericType(types).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`1")) : type).MakeGenericType(types);
-                var constructor = concrete.GetConstructor(Type.EmptyTypes);
+                var concrete = (get(typeof(IComparable<>)).MakeGenericType(types).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`1", true)!) : type).MakeGenericType(types);
+                var constructor = concrete.GetConstructor(Type.EmptyTypes) ?? throw new Exception();
                 transpiler.Enqueue(constructor);
                 return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(concrete)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
@@ -64,14 +64,14 @@ partial class DefaultBuiltin
             }
         );
     })
-    .For(get(Type.GetType("System.Collections.Generic.ArraySortHelper`2")), (type, code) =>
+    .For(get(Type.GetType("System.Collections.Generic.ArraySortHelper`2", true)!), (type, code) =>
     {
         code.ForGeneric(
             type.GetMethod("CreateArraySortHelper", BindingFlags.Static | BindingFlags.NonPublic),
             (transpiler, types) =>
             {
-                var concrete = (get(typeof(IComparable<>)).MakeGenericType([types[0]]).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`2")) : type).MakeGenericType(types);
-                var constructor = concrete.GetConstructor(Type.EmptyTypes);
+                var concrete = (get(typeof(IComparable<>)).MakeGenericType([types[0]]).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`2", true)!) : type).MakeGenericType(types);
+                var constructor = concrete.GetConstructor(Type.EmptyTypes) ?? throw new Exception();
                 transpiler.Enqueue(constructor);
                 return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(concrete)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
@@ -80,7 +80,7 @@ partial class DefaultBuiltin
             }
         );
     })
-    .For(get(Type.GetType("System.Collections.Generic.ComparerHelpers")), (type, code) =>
+    .For(get(Type.GetType("System.Collections.Generic.ComparerHelpers", true)!), (type, code) =>
     {
         // TODO
         code.For(

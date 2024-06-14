@@ -23,7 +23,7 @@ partial class DefaultBuiltin
             transpiler => (string.Empty, 1)
         );
         code.For(
-            type.GetProperty(nameof(Debugger.IsAttached)).GetMethod,
+            type.GetProperty(nameof(Debugger.IsAttached))!.GetMethod,
             transpiler => ("\treturn false;\n", 1)
         );
         code.For(
@@ -52,11 +52,11 @@ partial class DefaultBuiltin
         );
         // TODO
         code.For(
-            type.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.NonPublic, [type.GetNestedType("TraceFormat", BindingFlags.NonPublic), get(typeof(StringBuilder))]),
+            type.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.NonPublic, [type.GetNestedType("TraceFormat", BindingFlags.NonPublic) ?? throw new Exception(), get(typeof(StringBuilder))]),
             transpiler => (string.Empty, 0)
         );
     })
-    .For(get(Type.GetType("System.Diagnostics.Tracing.EventPipeEventDispatcher")), (type, code) =>
+    .For(get(Type.GetType("System.Diagnostics.Tracing.EventPipeEventDispatcher", true)!), (type, code) =>
     {
         code.For(
             type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
@@ -78,7 +78,7 @@ partial class DefaultBuiltin
             transpiler => ("\treturn {};\n", 0)
         );
         code.For(
-            type.GetProperty("IsSupported", BindingFlags.Static | BindingFlags.NonPublic).GetMethod,
+            type.GetProperty("IsSupported", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
             transpiler => ("\treturn false;\n", 0)
         );
         code.For(
@@ -110,7 +110,7 @@ partial class DefaultBuiltin
             transpiler => (string.Empty, 0)
         );
     })
-    .For(get(Type.GetType("System.Diagnostics.Tracing.FrameworkEventSource")), (type, code) =>
+    .For(get(Type.GetType("System.Diagnostics.Tracing.FrameworkEventSource", true)!), (type, code) =>
     {
         code.For(
             type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),

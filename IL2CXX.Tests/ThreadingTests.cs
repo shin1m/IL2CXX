@@ -189,7 +189,7 @@ class ThreadingTests
     static int WaitAndPulse()
     {
         var monitor = new object();
-        Action action = () => { };
+        Action? action = () => { };
         var t = new Thread(() =>
         {
             Console.WriteLine("start");
@@ -239,7 +239,7 @@ class ThreadingTests
     {
         var monitor = new object();
         var done = 0;
-        Action action = null;
+        Action? action = null;
         void send(Action x)
         {
             lock (monitor)
@@ -325,7 +325,7 @@ class ThreadingTests
         var done = false;
         using var timer = new Timer(x =>
         {
-            lock (x)
+            lock (x!)
             {
                 done = true;
                 Monitor.Pulse(x);

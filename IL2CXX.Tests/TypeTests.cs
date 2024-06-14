@@ -26,11 +26,11 @@ class TypeTests
     }
     class Bar<T> where T : Bar, IFoo
     {
-        public T Foo;
+        public T? Foo;
         public void Do()
         {
-            Foo.Do();
-            Foo.Be();
+            Foo?.Do();
+            Foo?.Be();
         }
     }
 
@@ -75,18 +75,18 @@ class TypeTests
             C1 = c1;
             C2 = c2;
         }
-        public Answer[] N0 { get; set; }
-        public string N1 { get; set; }
-        public Type[] N2 { get; set; }
+        public Answer[]? N0 { get; set; }
+        public string? N1 { get; set; }
+        public Type[]? N2 { get; set; }
     }
     [Foo(Answer.Yes, ["foo"], typeof(IFoo), N0 = [Answer.No], N1 = "bar", N2 = [typeof(Bar)])]
     class Zot
     {
         public static Zot Be(string x, string y) => new Zot($"{x}, {y}!");
 
-        public string X;
+        public string? X;
         public int Y;
-        public string Z { get; set; }
+        public string? Z { get; set; }
         public int W { get; set; }
         public Zot() { }
         public Zot(string x) => X = x;
@@ -97,15 +97,15 @@ class TypeTests
     static int GetField()
     {
         var zot = new Zot { X = "foo", Y = 1 };
-        if (!(typeof(Zot).GetField(nameof(Zot.X)).GetValue(zot) is string x && x == "foo")) return 1;
-        return typeof(Zot).GetField(nameof(Zot.Y)).GetValue(zot) is int y && y == 1 ? 0 : 2;
+        if (!(typeof(Zot).GetField(nameof(Zot.X))!.GetValue(zot) is string x && x == "foo")) return 1;
+        return typeof(Zot).GetField(nameof(Zot.Y))!.GetValue(zot) is int y && y == 1 ? 0 : 2;
     }
     static int SetField()
     {
         var zot = new Zot();
-        typeof(Zot).GetField(nameof(Zot.X)).SetValue(zot, "foo");
+        typeof(Zot).GetField(nameof(Zot.X))!.SetValue(zot, "foo");
         if (zot.X != "foo") return 1;
-        typeof(Zot).GetField(nameof(Zot.Y)).SetValue(zot, 1);
+        typeof(Zot).GetField(nameof(Zot.Y))!.SetValue(zot, 1);
         return zot.Y == 1 ? 0 : 2;
     }
     static int GetFields()
@@ -154,8 +154,8 @@ class TypeTests
     static int GetMethod()
     {
         var zot = new Zot { X = "Hello", Y = 1 };
-        if (!(typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)]).Invoke(zot, ["World"]) is string x && x == "Hello, World!")) return 1;
-        return typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(int)]).Invoke(zot, [2]) is int y && y == 3 ? 0 : 2;
+        if (!(typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)])!.Invoke(zot, ["World"]) is string x && x == "Hello, World!")) return 1;
+        return typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(int)])!.Invoke(zot, [2]) is int y && y == 3 ? 0 : 2;
     }
     static int GetMethods()
     {
@@ -167,22 +167,22 @@ class TypeTests
     }
     static int CreateDelegate()
     {
-        var f = typeof(Zot).GetMethod(nameof(Zot.Be)).CreateDelegate<Func<string, string, Zot>>();
+        var f = typeof(Zot).GetMethod(nameof(Zot.Be))!.CreateDelegate<Func<string, string, Zot>>();
         return f("Hello", "World").X == "Hello, World!" ? 0 : 1;
     }
     static int CreateDelegateWithNull()
     {
-        var f = typeof(Zot).GetMethod(nameof(Zot.Be)).CreateDelegate<Func<string, string, Zot>>(null);
+        var f = typeof(Zot).GetMethod(nameof(Zot.Be))!.CreateDelegate<Func<string, string, Zot>>(null);
         return f("Hello", "World").X == "Hello, World!" ? 0 : 1;
     }
     static int CreateDelegateWithTarget()
     {
-        var f = typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)]).CreateDelegate<Func<string, string>>(new Zot("Hello"));
+        var f = typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)])!.CreateDelegate<Func<string, string>>(new Zot("Hello"));
         return f("World") == "Hello, World!" ? 0 : 1;
     }
     static int CreateDelegateAsStatic()
     {
-        var f = typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)]).CreateDelegate<Func<Zot, string, string>>();
+        var f = typeof(Zot).GetMethod(nameof(Zot.Do), [typeof(string)])!.CreateDelegate<Func<Zot, string, string>>();
         return f(new Zot("Hello"), "World") == "Hello, World!" ? 0 : 1;
     }
     static int DynamicInvoke()
@@ -192,21 +192,21 @@ class TypeTests
     }
     static int MakeGenericMethod()
     {
-        var f = typeof(Zot).GetMethod(nameof(Zot.Do), 2, [Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1)]).MakeGenericMethod(typeof(string), typeof(int)).CreateDelegate<Func<string, int, string>>(new Zot("Hello"));
+        var f = typeof(Zot).GetMethod(nameof(Zot.Do), 2, [Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1)])!.MakeGenericMethod(typeof(string), typeof(int)).CreateDelegate<Func<string, int, string>>(new Zot("Hello"));
         return f("World", 1) == "Hello, World 1!" ? 0 : 1;
     }
     static int GetProperty()
     {
         var zot = new Zot { Z = "foo", W = 1 };
-        if (!(typeof(Zot).GetProperty(nameof(Zot.Z)).GetValue(zot) is string x && x == "foo")) return 1;
-        return typeof(Zot).GetProperty(nameof(Zot.W)).GetValue(zot) is int y && y == 1 ? 0 : 2;
+        if (!(typeof(Zot).GetProperty(nameof(Zot.Z))!.GetValue(zot) is string x && x == "foo")) return 1;
+        return typeof(Zot).GetProperty(nameof(Zot.W))!.GetValue(zot) is int y && y == 1 ? 0 : 2;
     }
     static int SetProperty()
     {
         var zot = new Zot();
-        typeof(Zot).GetProperty(nameof(Zot.Z)).SetValue(zot, "foo");
+        typeof(Zot).GetProperty(nameof(Zot.Z))!.SetValue(zot, "foo");
         if (zot.Z != "foo") return 1;
-        typeof(Zot).GetProperty(nameof(Zot.W)).SetValue(zot, 1);
+        typeof(Zot).GetProperty(nameof(Zot.W))!.SetValue(zot, 1);
         return zot.W == 1 ? 0 : 2;
     }
     static int GetProperties()
@@ -220,8 +220,8 @@ class TypeTests
     static int GetCustomAttributesData()
     {
         var cas = typeof(Zot).GetCustomAttributesData();
-        if (cas.Count != 1) return 1;
-        var ca = cas[0];
+        if (cas.Count != 3) return 3;
+        var ca = cas[2];
         if (ca.AttributeType != typeof(FooAttribute)) return 2;
         if (ca.ConstructorArguments.Count != 3) return 3;
         {
@@ -232,7 +232,7 @@ class TypeTests
         {
             var a = ca.ConstructorArguments[1];
             if (a.ArgumentType != typeof(string[])) return 6;
-            if (!(a.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (string)xs[0].Value == "foo")) return 7;
+            if (!(a.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (string?)xs[0].Value == "foo")) return 7;
         }
         {
             var a = ca.ConstructorArguments[2];
@@ -244,7 +244,7 @@ class TypeTests
             var a = ca.NamedArguments[0];
             if (a.MemberName != nameof(FooAttribute.N0)) return 11;
             if (a.TypedValue.ArgumentType != typeof(Answer[])) return 12;
-            if (!(a.TypedValue.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (int)xs[0].Value == (int)Answer.No)) return 13;
+            if (!(a.TypedValue.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (int?)xs[0].Value == (int)Answer.No)) return 13;
         }
         {
             var a = ca.NamedArguments[1];
@@ -256,21 +256,21 @@ class TypeTests
             var a = ca.NamedArguments[2];
             if (a.MemberName != nameof(FooAttribute.N2)) return 17;
             if (a.TypedValue.ArgumentType != typeof(Type[])) return 18;
-            if (!(a.TypedValue.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (Type)xs[0].Value == typeof(Bar))) return 19;
+            if (!(a.TypedValue.Value is ReadOnlyCollection<CustomAttributeTypedArgument> xs && xs.Count == 1 && (Type?)xs[0].Value == typeof(Bar))) return 19;
         }
         return 0;
     }
     static int GetCustomAttributes()
     {
         var cas = typeof(Zot).GetCustomAttributes().ToList();
-        if (cas.Count != 1) return 1;
-        if (!(cas[0] is FooAttribute foo)) return 2;
+        if (cas.Count != 3) return 3;
+        if (!(cas[2] is FooAttribute foo)) return 2;
         if (foo.C0 != Answer.Yes) return 3;
         if (!(foo.C1.Length == 1 && foo.C1[0] == "foo")) return 4;
         if (foo.C2 != typeof(IFoo)) return 5;
-        if (!(foo.N0.Length == 1 && foo.N0[0] == Answer.No)) return 6;
+        if (!(foo.N0?.Length == 1 && foo.N0[0] == Answer.No)) return 6;
         if (foo.N1 != "bar") return 7;
-        if (!(foo.N2.Length == 1 && foo.N2[0] == typeof(Bar))) return 8;
+        if (!(foo.N2?.Length == 1 && foo.N2[0] == typeof(Bar))) return 8;
         return 0;
     }
     static int GetCustomAttributesOfT() => typeof(Zot).GetCustomAttributes<FooAttribute>().Count() == 1 ? 0 : 1;
@@ -282,7 +282,7 @@ class TypeTests
         return exported.Contains(typeof(TypeTestsExported)) ? 0 : 2;
     }
     static int AssemblyGetName() => typeof(Zot).Assembly.GetName().Name == "IL2CXX.Tests" ? 0 : 1;
-    static int AssemblyGetType() => typeof(Zot).Assembly.GetType(typeof(Zot).FullName) == typeof(Zot) ? 0 : 1;
+    static int AssemblyGetType() => typeof(Zot).Assembly.GetType(typeof(Zot).FullName ?? throw new Exception()) == typeof(Zot) ? 0 : 1;
 
     static int Run(string[] arguments) => arguments[1] switch
     {
@@ -334,7 +334,7 @@ class TypeTests
         typeof(Zot),
         typeof(Func<string, string>)
     ], [
-        typeof(Zot).GetMethod(nameof(Zot.Do), 2, [Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1)]).MakeGenericMethod(typeof(string), typeof(int))
+        typeof(Zot).GetMethod(nameof(Zot.Do), 2, [Type.MakeGenericMethodParameter(0), Type.MakeGenericMethodParameter(1)])!.MakeGenericMethod(typeof(string), typeof(int))
     ]);
     [Test]
     public void Test(

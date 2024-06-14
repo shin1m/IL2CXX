@@ -6,7 +6,7 @@ class WeakReferenceTests
 {
     class Foo
     {
-        public static Foo Resurrected;
+        public static Foo? Resurrected;
 
         bool resurrected;
 
@@ -27,7 +27,7 @@ class WeakReferenceTests
     }
     static int Default()
     {
-        Foo x = null;
+        Foo? x = null;
         var w = WithPadding(() =>
         {
             x = new Foo();
@@ -40,7 +40,7 @@ class WeakReferenceTests
     }
     static int TrackResurrection()
     {
-        Foo x = null;
+        Foo? x = null;
         var w = WithPadding(() =>
         {
             x = new Foo();
@@ -67,7 +67,7 @@ class WeakReferenceTests
     }
     static int DefaultOfT()
     {
-        Foo x = null;
+        Foo? x = null;
         var w = WithPadding(() =>
         {
             x = new Foo();
@@ -80,7 +80,7 @@ class WeakReferenceTests
     }
     static int TrackResurrectionOfT()
     {
-        Foo x = null;
+        Foo? x = null;
         var w = WithPadding(() =>
         {
             x = new Foo();

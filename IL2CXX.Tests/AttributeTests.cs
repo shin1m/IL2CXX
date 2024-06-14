@@ -32,12 +32,12 @@ class AttributeTests
         return 0;
     }
     static int GetForType() => Get(typeof(Bar));
-    static int GetForMethod() => Get(typeof(Bar).GetMethod(nameof(Foo.Do)));
-    static int GetForProperty() => Get(typeof(Bar).GetProperty(nameof(Foo.X)));
+    static int GetForMethod() => Get(typeof(Bar).GetMethod(nameof(Foo.Do)) ?? throw new Exception());
+    static int GetForProperty() => Get(typeof(Bar).GetProperty(nameof(Foo.X)) ?? throw new Exception());
     static int IsDefined(MemberInfo member) => Attribute.IsDefined(member, typeof(FooAttribute)) ? 0 : 1;
     static int IsDefinedForType() => IsDefined(typeof(Bar));
-    static int IsDefinedForMethod() => IsDefined(typeof(Bar).GetMethod(nameof(Foo.Do)));
-    static int IsDefinedForProperty() => IsDefined(typeof(Bar).GetProperty(nameof(Foo.X)));
+    static int IsDefinedForMethod() => IsDefined(typeof(Bar).GetMethod(nameof(Foo.Do)) ?? throw new Exception());
+    static int IsDefinedForProperty() => IsDefined(typeof(Bar).GetProperty(nameof(Foo.X)) ?? throw new Exception());
 
     static int Run(string[] arguments) => arguments[1] switch
     {

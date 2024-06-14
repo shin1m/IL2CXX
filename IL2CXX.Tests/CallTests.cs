@@ -8,7 +8,7 @@ class CallTests
         public object Value;
 
         public Foo(object value) => Value = value;
-        public override string ToString() => Value.ToString();
+        public override string? ToString() => Value.ToString();
     }
     struct Bar
     {
@@ -17,12 +17,12 @@ class CallTests
         public Bar(string value) => Value = value;
         public override string ToString() => Value.ToString();
     }
-    class Bar<T>
+    class Bar<T> where T : notnull
     {
         public T Value;
 
         public Bar(T value) => Value = value;
-        public string AsString() => Value.ToString();
+        public string? AsString() => Value.ToString();
     }
     static int CallVirtual()
     {
@@ -53,11 +53,11 @@ class CallTests
 
     abstract class Foo1
     {
-        public abstract string AsString(object x);
+        public abstract string? AsString(object x);
     }
     class Bar1 : Foo1
     {
-        public override string AsString(object x) => x.ToString();
+        public override string? AsString(object x) => x.ToString();
     }
     static int CallAbstract()
     {
@@ -67,11 +67,11 @@ class CallTests
 
     abstract class Foo2
     {
-        public abstract string AsString<T>(T x);
+        public abstract string? AsString<T>(T x) where T : notnull;
     }
     class Bar2 : Foo2
     {
-        public override string AsString<T>(T x) => x.ToString();
+        public override string? AsString<T>(T x) => x.ToString();
     }
     static int CallAbstractGeneric()
     {
@@ -82,13 +82,13 @@ class CallTests
 
     interface IFoo3
     {
-        string AsString(object x);
+        string? AsString(object x);
     }
     class Foo3 : IFoo3
     {
-        public string AsString(object x) => x.ToString();
+        public string? AsString(object x) => x.ToString();
     }
-    static string Bar3(IFoo3 x, object y) => x.AsString(y);
+    static string? Bar3(IFoo3 x, object y) => x.AsString(y);
     static int CallInterface()
     {
         Console.WriteLine(Bar3(new Foo3(), "Hello, World!"));
@@ -97,20 +97,20 @@ class CallTests
 
     interface IFoo4
     {
-        string AsString<T>(T x);
+        string? AsString<T>(T x) where T : notnull;
     }
     class Foo4 : IFoo4
     {
-        public string AsString<T>(T x) => x.ToString();
+        public string? AsString<T>(T x) where T : notnull => x.ToString();
     }
-    static string Bar4<T>(IFoo4 x, T y) => x.AsString(y);
+    static string? Bar4<T>(IFoo4 x, T y) where T : notnull => x.AsString(y);
     static int CallInterfaceGeneric()
     {
         Console.WriteLine(Bar4(new Foo4(), "Hello, World!"));
         return 0;
     }
 
-    static event Action<string> Log;
+    static event Action<string>? Log;
     static int Event()
     {
         var logs = string.Empty;

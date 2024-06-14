@@ -35,27 +35,28 @@ class StreamTests
         stream.Write([0, 1]);
         return stream.TryGetBuffer(out var xs) && BytesEquals(xs, 0, 1) ? 0 : 1;
     }
+    static string CurrentFilePath => Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory) ?? throw new Exception(), FileName);
     static int ReadFile()
     {
-        using var stream = File.OpenRead(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName));
+        using var stream = File.OpenRead(CurrentFilePath);
         var xs = new byte[4];
         return stream.Read(xs) == 2 && BytesEquals(xs.AsSpan(0, 2), 0, 1) ? 0 : 1;
     }
     static int WriteFile()
     {
-        using (var stream = File.OpenWrite(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName))) stream.Write([0, 1]);
+        using (var stream = File.OpenWrite(CurrentFilePath)) stream.Write([0, 1]);
         return 0;
     }
     static int ReadTextFile()
     {
-        using var reader = File.OpenText(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName));
+        using var reader = File.OpenText(CurrentFilePath);
         if (reader.ReadLine() != "Hello, World!") return 1;
         if (reader.ReadLine() != "Good bye.") return 2;
         return reader.ReadLine() == null ? 0 : 3;
     }
     static int WriteTextFile()
     {
-        using (var writer = File.CreateText(Path.Combine(Path.GetDirectoryName(Environment.CurrentDirectory), FileName)))
+        using (var writer = File.CreateText(CurrentFilePath))
         {
             writer.WriteLine("Hello, World!");
             writer.WriteLine("Good bye.");

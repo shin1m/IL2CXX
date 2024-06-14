@@ -9,7 +9,7 @@ class FinalizerTests
         public static int Finalized;
 
         string message;
-        Foo foo;
+        Foo? foo;
 
         public Foo(bool cyclic)
         {
@@ -56,7 +56,7 @@ class FinalizerTests
 
     class Bar
     {
-        public static Bar Resurrected;
+        public static Bar? Resurrected;
         public static int Finalized;
 
         bool resurrected;

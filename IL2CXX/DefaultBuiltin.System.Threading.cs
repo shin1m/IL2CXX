@@ -127,7 +127,7 @@ partial class DefaultBuiltin
     })
     .For(get(typeof(Thread)), (type, code) =>
     {
-        var helper = type.GetNestedType("StartHelper", BindingFlags.NonPublic);
+        var helper = type.GetNestedType("StartHelper", BindingFlags.NonPublic) ?? throw new Exception();
         code.Base = "t__thread";
         code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(get(typeof(ExecutionContext)))} v__5fexecutionContext;
 {'\t'}{transpiler.EscapeForMember(get(typeof(SynchronizationContext)))} v__5fsynchronizationContext;
@@ -157,7 +157,7 @@ partial class DefaultBuiltin
             type.GetMethod("StartCore", declaredAndInstance),
             transpiler =>
             {
-                var run = helper.GetMethod("Run", declaredAndInstance);
+                var run = helper.GetMethod("Run", declaredAndInstance) ?? throw new Exception();
                 transpiler.Enqueue(run);
                 return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}f_engine()->f_start(a_0, [a_0]
 {'\t'}{{
@@ -236,21 +236,21 @@ partial class DefaultBuiltin
         );
         // TODO
         code.For(
-            type.GetProperty(nameof(Thread.IsAlive)).GetMethod,
+            type.GetProperty(nameof(Thread.IsAlive))!.GetMethod,
             transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
         // TODO
         code.For(
-            type.GetProperty(nameof(Thread.IsThreadPoolThread)).GetMethod,
+            type.GetProperty(nameof(Thread.IsThreadPoolThread))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__pool;\n", 1)
         );
         // TODO
         code.For(
-            type.GetProperty(nameof(Thread.IsThreadPoolThread)).SetMethod,
+            type.GetProperty(nameof(Thread.IsThreadPoolThread))!.SetMethod,
             transpiler => ("\ta_0->v__pool = a_1;\n", 1)
         );
         code.For(
-            type.GetProperty(nameof(Thread.ManagedThreadId)).GetMethod,
+            type.GetProperty(nameof(Thread.ManagedThreadId))!.GetMethod,
             transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
         );
         code.For(
@@ -281,7 +281,7 @@ partial class DefaultBuiltin
         );
         // TODO
         code.For(
-            type.GetProperty("OptimalMaxSpinWaitsPerSpinIteration", BindingFlags.Static | BindingFlags.NonPublic).GetMethod,
+            type.GetProperty("OptimalMaxSpinWaitsPerSpinIteration", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
             transpiler => ("\treturn 7;\n", 1)
         );
         code.For(
@@ -365,7 +365,7 @@ partial class DefaultBuiltin
             );
         }
     })
-    .For(get(Type.GetType("System.Threading.LowLevelLifoSemaphore")), (type, code) =>
+    .For(get(Type.GetType("System.Threading.LowLevelLifoSemaphore", true)!), (type, code) =>
     {
         if (target != PlatformID.Win32NT)
             code.For(

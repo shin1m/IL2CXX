@@ -9,23 +9,32 @@ public class Builtin : IBuiltin
 
     public class Code
     {
-        public string Base;
-        public Func<Transpiler, string> StaticMembers;
-        public Func<Transpiler, (string, bool, string)> Members;
-        public Func<Transpiler, Type[], (string, bool, string)> GenericMembers;
-        public Func<Transpiler, string> Initialize;
+        public string? Base;
+        public Func<Transpiler, string>? StaticMembers;
+        public Func<Transpiler, (string, bool, string?)>? Members;
+        public Func<Transpiler, Type[], (string, bool, string?)>? GenericMembers;
+        public Func<Transpiler, string>? Initialize;
         public Dictionary<MethodKey, Func<Transpiler, (string body, int inline)>> MethodToBody = new();
         public Dictionary<MethodKey, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new();
         public Dictionary<MethodKey, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new();
-        public Func<Transpiler, MethodBase, (string body, int inline)> AnyToBody;
+        public Func<Transpiler, MethodBase, (string body, int inline)>? AnyToBody;
 
-        public void For(MethodBase method, Func<Transpiler, (string body, int inline)> body)
+        public void For(MethodBase? method, Func<Transpiler, (string body, int inline)> body)
         {
+            if (method == null) throw new Exception();
             if (method.ReflectedType != method.DeclaringType) throw new InvalidOperationException($"{method.ReflectedType} != {method.DeclaringType}");
             MethodToBody[ToKey(method)] = body;
         }
-        public void ForGeneric(MethodBase method, Func<Transpiler, Type[], (string body, int inline)> body) => GenericMethodToBody.Add(ToKey(method), body);
-        public void ForTree(MethodInfo method, Func<Transpiler, Type, (string body, int inline)> body) => MethodTreeToBody.Add(ToKey(method), body);
+        public void ForGeneric(MethodBase? method, Func<Transpiler, Type[], (string body, int inline)> body)
+        {
+            if (method == null) throw new Exception();
+            GenericMethodToBody.Add(ToKey(method), body);
+        }
+        public void ForTree(MethodInfo? method, Func<Transpiler, Type, (string body, int inline)> body)
+        {
+            if (method == null) throw new Exception();
+            MethodTreeToBody.Add(ToKey(method), body);
+        }
     }
 
     public Dictionary<Type, Code> TypeToCode = new();
@@ -39,23 +48,23 @@ public class Builtin : IBuiltin
         return this;
     }
 
-    public string GetBase(Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Base : null;
-    public string GetStaticMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.StaticMembers?.Invoke(transpiler) : null;
-    public (string members, bool managed, string unmanaged) GetMembers(Transpiler transpiler, Type type)
+    public string? GetBase(Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Base : null;
+    public string? GetStaticMembers(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.StaticMembers?.Invoke(transpiler) : null;
+    public (string members, bool managed, string? unmanaged) GetMembers(Transpiler transpiler, Type type)
     {
         if (TypeToCode.TryGetValue(type, out var code) && code.Members != null) return code.Members(transpiler);
         if (type.IsGenericType && TypeToCode.TryGetValue(type.GetGenericTypeDefinition(), out code) && code.GenericMembers != null) return code.GenericMembers(transpiler, type.GetGenericArguments());
         return default;
     }
-    public string GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
+    public string? GetInitialize(Transpiler transpiler, Type type) => TypeToCode.TryGetValue(type, out var code) ? code.Initialize?.Invoke(transpiler) : null;
     public (string body, int inline) GetBody(Transpiler transpiler, MethodKey key)
     {
         var method = key.Method;
-        var type = method.DeclaringType;
+        var type = method.DeclaringType ?? throw new Exception();
         if (type.IsArray)
         {
             var rank = type.GetArrayRank();
-            var element = type.GetElementType();
+            var element = type.GetElementType() ?? throw new Exception();
             if (method == type.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, rank).ToArray())) return ((transpiler.CheckRange ? string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tif (a_{i} < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n")) : string.Empty) + $@"{'\t'}auto n = {string.Join(" * ", Enumerable.Range(0, rank).Select(i => $"a_{i}"))};
 {'\t'}auto extra = sizeof({transpiler.EscapeForMember(element)}) * n;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
@@ -67,12 +76,12 @@ public class Builtin : IBuiltin
             if (rank == 1)
             {
                 var indices = 0;
-                for (var t = element; t.IsArray; t = t.GetElementType())
+                for (var t = element; t.IsArray; t = t.GetElementType() ?? throw new Exception())
                 {
                     ++indices;
                     if (method == type.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, indices + 1).ToArray()))
                     {
-                        var c = element.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, indices).ToArray());
+                        var c = element.GetConstructor(Enumerable.Repeat(transpiler.typeofInt32, indices).ToArray()) ?? throw new Exception();
                         transpiler.Enqueue(c);
                         return ((transpiler.CheckRange ? $"\tif (a_0 < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto extra = sizeof({transpiler.EscapeForMember(element)}) * a_0;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
@@ -93,9 +102,9 @@ public class Builtin : IBuiltin
 }{'\t'}{'\t'}i = i * bounds[{i}].v_length + j;
 {'\t'}}}
 "))}";
-            if (key == ToKey(type.GetMethod("Get"))) return (prepare() + "\treturn a_0->f_data()[i];\n", 1);
-            if (key == ToKey(type.GetMethod("Set"))) return (prepare() + $"\ta_0->f_data()[i] = a_{rank + 1};\n", 1);
-            var address = type.GetMethod("Address");
+            if (key == ToKey(type.GetMethod("Get") ?? throw new Exception())) return (prepare() + "\treturn a_0->f_data()[i];\n", 1);
+            if (key == ToKey(type.GetMethod("Set") ?? throw new Exception())) return (prepare() + $"\ta_0->f_data()[i] = a_{rank + 1};\n", 1);
+            var address = type.GetMethod("Address") ?? throw new Exception();
             if (key == ToKey(address)) return (prepare() + $"\treturn reinterpret_cast<{transpiler.EscapeForStacked(address.ReturnType)}>(a_0->f_data() + i);\n", 1);
         }
         if (type.IsSubclassOf(transpiler.typeofDelegate) && type != transpiler.typeofMulticastDelegate)
@@ -111,15 +120,15 @@ public class Builtin : IBuiltin
 {'\t'}}}
 {'\t'}return p;
 ", 1);
-            var invoke = type.GetMethod("Invoke");
+            var invoke = type.GetMethod("Invoke") ?? throw new Exception();
             if (key == ToKey(invoke))
             {
                 var @return = invoke.ReturnType;
                 var parameters = invoke.GetParameters().Select(x => x.ParameterType);
                 return ($"\treturn reinterpret_cast<{transpiler.EscapeForStacked(@return)}(*)({string.Join(", ", parameters.Prepend(transpiler.typeofObject).Select(x => transpiler.EscapeForStacked(x)))})>(a_0->v__5fmethodPtr.v__5fvalue)({string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1}")).Prepend("a_0->v__5ftarget"))});\n", 1);
             }
-            if (key == ToKey(type.GetMethod("BeginInvoke"))) return ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0);
-            if (key == ToKey(type.GetMethod("EndInvoke"))) return ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0);
+            if (key == ToKey(type.GetMethod("BeginInvoke") ?? throw new Exception())) return ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0);
+            if (key == ToKey(type.GetMethod("EndInvoke") ?? throw new Exception())) return ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0);
         }
         if (TypeToCode.TryGetValue(type, out var code))
         {
@@ -136,7 +145,7 @@ public class Builtin : IBuiltin
                 MethodBase gm;
                 if (method == type.TypeInitializer)
                 {
-                    gm = gt.TypeInitializer;
+                    gm = gt.TypeInitializer ?? throw new Exception();
                 }
                 else
                 {
@@ -152,18 +161,21 @@ public class Builtin : IBuiltin
         {
             if (mi.IsGenericMethod) mi = mi.GetGenericMethodDefinition();
             var origin = Transpiler.GetBaseDefinition(mi);
-            for (var t = mi.DeclaringType;;)
+            for (var t = mi.DeclaringType ?? throw new Exception();;)
             {
                 if (TypeToCode.TryGetValue(t, out var c) && c.MethodTreeToBody.TryGetValue(ToKey(mi), out var body)) return body(transpiler, type);
                 if (mi == origin) break;
-                do
+                while (true)
                 {
-                    t = t.BaseType;
-                    mi = t.GetMethods(declaredAndInstance).FirstOrDefault(x => Transpiler.GetBaseDefinition(x) == origin);
-                } while (mi == null);
+                    t = t.BaseType ?? throw new Exception();
+                    var m = t.GetMethods(declaredAndInstance).FirstOrDefault(x => Transpiler.GetBaseDefinition(x) == origin);
+                    if (m == null) continue;
+                    mi = m;
+                    break;
+                }
             }
         }
-        if (method.DeclaringType.FullName != null && TypeNameToMethodNameToBody.TryGetValue(method.DeclaringType.FullName, out var name2body) && name2body.TryGetValue(method.ToString(), out var body2)) return body2(transpiler, method);
-        return MethodNameToBody.TryGetValue(method.ToString(), out var body3) ? body3(transpiler, method) : default;
+        if (method.DeclaringType.FullName is string name && TypeNameToMethodNameToBody.TryGetValue(name, out var name2body) && name2body.TryGetValue(method.ToString() ?? throw new Exception(), out var body2)) return body2(transpiler, method);
+        return MethodNameToBody.TryGetValue(method.ToString() ?? throw new Exception(), out var body3) ? body3(transpiler, method) : default;
     }
 }

@@ -14,7 +14,7 @@ class SZArrayHelper<T> : IList<T>, IReadOnlyList<T>
         public bool MoveNext() => ++index < array.Length;
         public void Reset() => index = -1;
         public T Current => array[index];
-        object IEnumerator.Current => Current;
+        object? IEnumerator.Current => Current;
     }
 
     public int Count => throw new NotImplementedException();

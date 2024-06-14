@@ -19,7 +19,7 @@ partial class DefaultBuiltin
         );
         if (target == PlatformID.Win32NT)
             code.For(
-                type.GetProperty(nameof(Assembly.Location)).GetMethod,
+                type.GetProperty(nameof(Assembly.Location))!.GetMethod,
                 transpiler => ($@"{'\t'}char cs[MAX_PATH];
 {'\t'}auto n = GetModuleFileNameA(NULL, cs, sizeof(cs));
 {'\t'}if (n == 0) throw std::system_error(GetLastError(), std::system_category());
@@ -28,7 +28,7 @@ partial class DefaultBuiltin
             );
         else
             code.For(
-                type.GetProperty(nameof(Assembly.Location)).GetMethod,
+                type.GetProperty(nameof(Assembly.Location))!.GetMethod,
                 transpiler => ($@"{'\t'}char cs[PATH_MAX];
 {'\t'}auto r = readlink(""/proc/self/exe"", cs, sizeof(cs));
 {'\t'}if (r == -1) throw std::system_error(errno, std::generic_category());
@@ -41,19 +41,19 @@ partial class DefaultBuiltin
         code.Members = transpiler => ($@"{'\t'}{transpiler.EscapeForMember(get(typeof(ConstructorInfo)))} v_m_5fctor;
 {'\t'}{transpiler.EscapeForMember(get(typeof(Module)))} v_m_5fscope;
 {'\t'}//{transpiler.EscapeForMember(get(typeof(MemberInfo[])))} v_m_5fmembers;
-{'\t'}//{transpiler.EscapeForMember(get(Type.GetType("System.Reflection.CustomAttributeCtorParameter[]")))} v_m_5fctorParams;
-{'\t'}//{transpiler.EscapeForMember(get(Type.GetType("System.Reflection.CustomAttributeNamedParameter[]")))} v_m_5fnamedParams;
+{'\t'}//{transpiler.EscapeForMember(get(Type.GetType("System.Reflection.CustomAttributeCtorParameter[]", true)!))} v_m_5fctorParams;
+{'\t'}//{transpiler.EscapeForMember(get(Type.GetType("System.Reflection.CustomAttributeNamedParameter[]", true)!))} v_m_5fnamedParams;
 {'\t'}{transpiler.EscapeForMember(get(typeof(object)))} v_m_5ftypedCtorArgs;
 {'\t'}{transpiler.EscapeForMember(get(typeof(object)))} v_m_5fnamedArgs;
 ", true, null);
         // TODO
         code.For(
-            type.GetProperty(nameof(CustomAttributeData.ConstructorArguments)).GetMethod,
+            type.GetProperty(nameof(CustomAttributeData.ConstructorArguments))!.GetMethod,
             transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
         // TODO
         code.For(
-            type.GetProperty(nameof(CustomAttributeData.NamedArguments)).GetMethod,
+            type.GetProperty(nameof(CustomAttributeData.NamedArguments))!.GetMethod,
             transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
     })
@@ -78,11 +78,11 @@ partial class DefaultBuiltin
     .For(get(typeof(ParameterInfo)), (type, code) =>
     {
         code.For(
-            type.GetProperty(nameof(ParameterInfo.DefaultValue)).GetMethod,
+            type.GetProperty(nameof(ParameterInfo.DefaultValue))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v_DefaultValueImpl;\n", 0)
         );
         code.For(
-            type.GetProperty(nameof(ParameterInfo.HasDefaultValue)).GetMethod,
+            type.GetProperty(nameof(ParameterInfo.HasDefaultValue))!.GetMethod,
             transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v_AttrsImpl & {(int)ParameterAttributes.HasDefault};\n", 0)
         );
     })
@@ -126,7 +126,7 @@ partial class DefaultBuiltin
     {
         code.Members = transpiler => (string.Empty, false, null);
         code.For(
-            type.GetProperty(nameof(MetadataUpdater.IsSupported)).GetMethod,
+            type.GetProperty(nameof(MetadataUpdater.IsSupported))!.GetMethod,
             transpiler => ("\treturn false;\n", 1)
         );
         code.AnyToBody = (transpiler, method) => ($"\t{transpiler.GenerateThrow("NotSupported")};\n", 0);

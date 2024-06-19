@@ -229,7 +229,7 @@ partial class Transpiler
             x.Estimate = (index, stack) =>
             {
                 var i = ParseU1(ref index);
-                return (index, stack.Push(MakePointerType(GetArgumentType(i))));
+                return (index, stack.Push(MakePointerType(GetArgumentType(i)), true));
             };
             x.Generate = (index, stack) =>
             {
@@ -268,7 +268,7 @@ partial class Transpiler
             {
                 var i = ParseU1(ref index);
                 var type = method.GetMethodBody()!.LocalVariables[i].LocalType;
-                return (index, stack.Push(MakePointerType(type)));
+                return (index, stack.Push(MakePointerType(type), true));
             };
             x.Generate = (index, stack) =>
             {
@@ -628,7 +628,16 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
             x.Generate = (index, stack) =>
             {
                 writer.WriteLine();
-                withVolatile(() => writer.WriteLine($"\tf__store(*static_cast<{EscapeForValue(typeofObject)}*>({stack.Pop.Variable}), {stack.Variable});"));
+                withVolatile(() => writer.WriteLine(
+                    stack.Pop.OnStack switch
+                    {
+                        true => "\tf__copy({0}, {1});",
+                        false => "\tf__assign({0}, {1});",
+                        _ => "\tf__store({0}, {1});"
+                    },
+                    $"*static_cast<{EscapeForValue(typeofObject)}*>({stack.Pop.Variable})",
+                    $"{stack.Variable}"
+                ));
                 return index;
             };
         });
@@ -677,6 +686,8 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
                 return index;
             };
         }));
+        instructions1[OpCodes.Add.Value].Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfAdd[(stack.Pop.VariableType, stack.VariableType)], stack.Pop.OnStack ?? stack.OnStack));
+        instructions1[OpCodes.Sub.Value].Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfAdd[(stack.Pop.VariableType, stack.VariableType)], stack.Type.IsValueType ? stack.Pop.OnStack : null));
         new[]
         {
             (OpCode: OpCodes.Div, Operator: "/", Type: typeOfAdd),
@@ -964,14 +975,15 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.WriteLine($" {f.DeclaringType ?? throw new Exception()}::[{f}]");
+                var t = f.DeclaringType ?? throw new Exception();
+                writer.WriteLine($" {t}::[{f}]");
                 withVolatile(() =>
                 {
                     GenerateCheckNull(stack);
                     writer.Write($"\t{indexToStack[index].Variable} = ");
                     writer.Write(stack.Type.IsValueType
                         ? $"const_cast<std::remove_volatile_t<decltype({stack.Variable})>&>({stack.Variable})."
-                        : $"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
+                        : $"static_cast<{Escape(t)}{(t.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
                     );
                     writer.WriteLine($"{Escape(f)};");
                 });
@@ -983,17 +995,19 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Estimate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                return (index, stack.Pop.Push(MakePointerType(f.FieldType)));
+                var t = f.DeclaringType ?? throw new Exception();
+                return (index, stack.Pop.Push(MakePointerType(f.FieldType), t.IsByRefLike ? true : t.IsValueType ? stack.OnStack : false));
             };
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.WriteLine($" {f.DeclaringType ?? throw new Exception()}::[{f}]");
+                var t = f.DeclaringType ?? throw new Exception();
+                writer.WriteLine($" {t}::[{f}]");
                 GenerateCheckNull(stack);
                 writer.Write($"\t{indexToStack[index].Variable} = &");
                 writer.Write(stack.Type.IsValueType
                     ? $"{stack.Variable}."
-                    : $"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
+                    : $"static_cast<{Escape(t)}{(t.IsValueType ? "::t_value" : string.Empty)}*>({stack.Variable})->"
                 );
                 writer.WriteLine($"{Escape(f)};");
                 return index;
@@ -1005,15 +1019,18 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.WriteLine($" {f.DeclaringType ?? throw new Exception()}::[{f}]");
+                var t = f.DeclaringType ?? throw new Exception();
+                writer.WriteLine($" {t}::[{f}]");
                 withVolatile(() =>
                 {
                     GenerateCheckNull(stack.Pop);
                     writer.WriteLine(
-                        f.DeclaringType.IsByRefLike ? "\tf__copy({0}, {1});" :
-                        f.DeclaringType.IsValueType && Define(f.FieldType).IsManaged ? "\tf__store({0}, {1});" :
-                        "\t{0} = {1};",
-                        $"static_cast<{Escape(f.DeclaringType)}{(f.DeclaringType.IsValueType ? "::t_value" : string.Empty)}*>({stack.Pop.Variable})->{Escape(f)}",
+                        t.IsValueType && Define(f.FieldType).IsManaged ?
+                            stack.Pop.OnStack == true || t.IsByRefLike ? "\tf__copy({0}, {1});" :
+                            stack.Pop.OnStack == false ? "\tf__assign({0}, {1});" :
+                            "\tf__store({0}, {1});"
+                        : "\t{0} = {1};",
+                        $"static_cast<{Escape(t)}{(t.IsValueType ? "::t_value" : string.Empty)}*>({stack.Pop.Variable})->{Escape(f)}",
                         CastValue(f.FieldType, stack.Variable)
                     );
                 });
@@ -1043,14 +1060,15 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Estimate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                return (index, stack.Push(MakePointerType(f.FieldType)));
+                return (index, stack.Push(MakePointerType(f.FieldType), false));
             };
             x.Generate = (index, stack) =>
             {
                 var f = ParseField(ref index);
-                writer.Write($" {f.DeclaringType ?? throw new Exception()}::[{f}]\n\t{indexToStack[index].Variable} = ");
+                var t = f.DeclaringType ?? throw new Exception();
+                writer.Write($" {t}::[{f}]\n\t{indexToStack[index].Variable} = ");
                 writer.WriteLine(f.Attributes.HasFlag(FieldAttributes.HasFieldRVA)
-                    ? $"v__field_{Escape(f.DeclaringType)}__{Escape(f.Name)}__data;"
+                    ? $"v__field_{Escape(t)}__{Escape(f.Name)}__data;"
                     : $"&{@static(f)};"
                 );
                 return index;
@@ -1075,9 +1093,11 @@ GenerateCheckNull("p") + generateVirtual("p")
                 var t = ParseType(ref index);
                 writer.WriteLine($" {t}");
                 withVolatile(() => writer.WriteLine(
-                    t.IsByRefLike ? "\tf__copy({0}, {1});" :
-                    Define(t).IsManaged ? "\tf__store({0}, {1});" :
-                    "\t{0} = {1};",
+                    Define(t).IsManaged ?
+                        stack.Pop.OnStack == true || t.IsByRefLike ? "\tf__copy({0}, {1});" :
+                        stack.Pop.OnStack == false ? "\tf__assign({0}, {1});" :
+                        "\tf__store({0}, {1});"
+                    : "\t{0} = {1};",
                     $"*static_cast<{EscapeForValue(t)}*>({stack.Pop.Variable})",
                     CastValue(t, stack.Variable)
                 ));
@@ -1254,15 +1274,14 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Estimate = (index, stack) =>
             {
                 var t = ParseType(ref index);
-                return (index, stack.Pop.Pop.Push(MakePointerType(t)));
+                Trace.Assert(stack.Pop.Type == t.MakeArrayType());
+                return (index, stack.Pop.Pop.Push(MakePointerType(t), false));
             };
             x.Generate = (index, stack) =>
             {
                 var t = ParseType(ref index);
-                var array = stack.Pop;
-                Trace.Assert(array.Type == t.MakeArrayType());
                 writer.WriteLine($" {t}");
-                GenerateArrayAccess(array, stack, y => $"{indexToStack[index].Variable} = &{y}");
+                GenerateArrayAccess(stack.Pop, stack, y => $"{indexToStack[index].Variable} = &{y}");
                 return index;
             };
         });
@@ -1496,6 +1515,8 @@ _ => throw new Exception()
                 return index;
             };
         }));
+        instructions1[OpCodes.Add_Ovf_Un.Value].Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfDiv_Un[(stack.Pop.VariableType, stack.VariableType)], stack.Pop.OnStack ?? stack.OnStack));
+        instructions1[OpCodes.Sub_Ovf_Un.Value].Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfDiv_Un[(stack.Pop.VariableType, stack.VariableType)], stack.Type.IsValueType ? stack.Pop.OnStack : null));
         instructions1[OpCodes.Endfinally.Value].For(x =>
         {
             x.Estimate = (index, stack) => (int.MaxValue, stack);
@@ -1666,9 +1687,11 @@ _ => throw new Exception()
                 var t = ParseType(ref index);
                 writer.WriteLine($" {t}");
                 writer.WriteLine(
-                    t.IsByRefLike ? "\tf__store({0}, {1});" :
-                    Define(t).IsManaged ? "\tf__store({0}, {1});" :
-                    "\t{0} = {1};",
+                    Define(t).IsManaged ?
+                        stack.OnStack == true || t.IsByRefLike ? "\tf__copy({0}, {1});" :
+                        stack.OnStack == false ? "\tf__assign({0}, {1});" :
+                        "\tf__store({0}, {1});"
+                    : "\t{0} = {1};",
                     $"*static_cast<{EscapeForValue(t)}*>({stack.Variable})",
                     $"({EscapeForStacked(t)}){{}}"
                 );

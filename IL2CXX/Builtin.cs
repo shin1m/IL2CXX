@@ -14,9 +14,9 @@ public class Builtin : IBuiltin
         public Func<Transpiler, (string, bool, string?)>? Members;
         public Func<Transpiler, Type[], (string, bool, string?)>? GenericMembers;
         public Func<Transpiler, string>? Initialize;
-        public Dictionary<MethodKey, Func<Transpiler, (string body, int inline)>> MethodToBody = new();
-        public Dictionary<MethodKey, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = new();
-        public Dictionary<MethodKey, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = new();
+        public Dictionary<MethodKey, Func<Transpiler, (string body, int inline)>> MethodToBody = [];
+        public Dictionary<MethodKey, Func<Transpiler, Type[], (string body, int inline)>> GenericMethodToBody = [];
+        public Dictionary<MethodKey, Func<Transpiler, Type, (string body, int inline)>> MethodTreeToBody = [];
         public Func<Transpiler, MethodBase, (string body, int inline)>? AnyToBody;
 
         public void For(MethodBase? method, Func<Transpiler, (string body, int inline)> body)
@@ -37,9 +37,9 @@ public class Builtin : IBuiltin
         }
     }
 
-    public Dictionary<Type, Code> TypeToCode = new();
-    public Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>>> TypeNameToMethodNameToBody = new();
-    public Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>> MethodNameToBody = new();
+    public Dictionary<Type, Code> TypeToCode = [];
+    public Dictionary<string, Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>>> TypeNameToMethodNameToBody = [];
+    public Dictionary<string, Func<Transpiler, MethodBase, (string body, int inline)>> MethodNameToBody = [];
 
     public Builtin For(Type type, Action<Type, Code> action)
     {

@@ -275,7 +275,7 @@ class RuntimeCustomAttributeData : CustomAttributeData
 }
 static class RuntimeTimer
 {
-    private static readonly Dictionary<int, DateTime> id2at = new();
+    private static readonly Dictionary<int, DateTime> id2at = [];
     private static Thread? thread;
 
     public static void Call(int id) => throw new NotImplementedException();

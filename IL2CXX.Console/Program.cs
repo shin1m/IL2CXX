@@ -194,7 +194,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
                 }
                 else
                 {
-                    paths = new();
+                    paths = [];
                     type2paths.Add(type, paths);
                 }
                 var escaped = transpiler.EscapeType(type);

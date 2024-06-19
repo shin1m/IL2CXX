@@ -8,16 +8,16 @@ using static MethodKey;
 partial class Transpiler
 {
     private readonly StringWriter functionDeclarations = new();
-    private readonly Queue<Type> queuedTypes = new();
-    private readonly HashSet<MethodKey> visitedMethods = new();
-    private readonly Queue<MethodBase> queuedMethods = new();
+    private readonly Queue<Type> queuedTypes = [];
+    private readonly HashSet<MethodKey> visitedMethods = [];
+    private readonly Queue<MethodBase> queuedMethods = [];
     private MethodBase method = typeof(object).GetConstructor(Type.EmptyTypes) ?? throw new Exception();
     private byte[]? bytes;
-    private readonly SortedDictionary<string, (string Prefix, int Index)> definedIndices = new();
+    private readonly SortedDictionary<string, (string Prefix, int Index)> definedIndices = [];
     private bool hasReturn;
-    private readonly Dictionary<int, Stack> indexToStack = new();
+    private readonly Dictionary<int, Stack> indexToStack = [];
     private TextWriter writer = TextWriter.Null;
-    private readonly Stack<ExceptionHandlingClause> tries = new();
+    private readonly Stack<ExceptionHandlingClause> tries = [];
     private Type? constrained;
     private bool @volatile;
 

@@ -20,6 +20,7 @@ public partial class Transpiler
         public readonly Stack Pop;
         public readonly Dictionary<string, int> Indices;
         public readonly Type Type;
+        public readonly bool? OnStack;
         public readonly string VariableType;
         public readonly bool IsPointer;
         public readonly string Variable;
@@ -28,17 +29,18 @@ public partial class Transpiler
         {
             this.transpiler = transpiler;
             Pop = this;
-            Indices = new Dictionary<string, int>();
+            Indices = [];
             Type = transpiler.typeofVoid;
             VariableType = string.Empty;
             Variable = string.Empty;
         }
-        private Stack(Stack pop, Type type)
+        private Stack(Stack pop, Type type, bool? onStack)
         {
             transpiler = pop.transpiler;
             Pop = pop;
-            Indices = new Dictionary<string, int>(Pop.Indices);
+            Indices = new(Pop.Indices);
             Type = type;
+            OnStack = onStack;
             string prefix;
             if (Type.IsByRef || Type.IsPointer || Type == transpiler.typeofIntPtr || Type == transpiler.typeofUIntPtr)
             {
@@ -96,7 +98,7 @@ public partial class Transpiler
             transpiler.definedIndices.TryGetValue(VariableType, out var defined);
             if (index > defined.Index) transpiler.definedIndices[VariableType] = (prefix, index);
         }
-        public Stack Push(Type type) => new(this, type);
+        public Stack Push(Type type, bool? onStack = null) => new(this, type, onStack);
         public IEnumerator<Stack> GetEnumerator()
         {
             for (var x = this;; x = x.Pop)
@@ -206,11 +208,11 @@ public partial class Transpiler
     private readonly MethodInfo finalizeOfObject;
     private readonly Instruction[] instructions1 = new Instruction[256];
     private readonly Instruction[] instructions2 = new Instruction[256];
-    private readonly HashSet<string> identifiers = new();
-    private readonly Dictionary<Type, string> typeToIdentifier = new();
-    private readonly Dictionary<MethodKey, string> methodToIdentifier = new();
-    private readonly Dictionary<PropertyInfo, string> propertyToIdentifier = new();
-    private readonly HashSet<MethodBase> ldftnMethods = new();
+    private readonly HashSet<string> identifiers = [];
+    private readonly Dictionary<Type, string> typeToIdentifier = [];
+    private readonly Dictionary<MethodKey, string> methodToIdentifier = [];
+    private readonly Dictionary<PropertyInfo, string> propertyToIdentifier = [];
+    private readonly HashSet<MethodBase> ldftnMethods = [];
 
     private Type MakeByRefType(Type type) => type == typeofTypedReference ? typedReferenceByRefType : type.MakeByRefType();
     private Type MakePointerType(Type type) => (type == typeofTypedReference ? typeofTypedReferenceTag : type).MakePointerType();
@@ -541,8 +543,7 @@ public partial class Transpiler
         }
         log("exit");
     }
-    private static readonly HashSet<string?> invalids = new()
-    {
+    private static readonly HashSet<string?> invalids = [
         "System.RuntimeType",
         "System.Diagnostics.StackFrameHelper",
         "System.Reflection.RuntimeAssembly",
@@ -552,7 +553,7 @@ public partial class Transpiler
         "System.Reflection.Emit.InternalModuleBuilder",
         "System.Runtime.CompilerServices.QCallAssembly",
         "System.Runtime.CompilerServices.QCallTypeHandle"
-    };
+    ];
     private void ThrowIfInvalid(Type type)
     {
         if (invalids.Contains(type.FullName)) throw new Exception($"{type} in {method.DeclaringType} :: {method}");

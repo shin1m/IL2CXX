@@ -138,8 +138,8 @@ partial class Transpiler
         public int UnmanagedSize;
         public bool HasUnmanaged;
         public bool IsMarshallable => IsBlittable || HasUnmanaged || Type.GetTypeCode(Type) == TypeCode.Boolean;
-        public readonly List<MethodInfo> Methods = new();
-        public readonly Dictionary<MethodKey, int> MethodToIndex = new();
+        public readonly List<MethodInfo> Methods = [];
+        public readonly Dictionary<MethodKey, int> MethodToIndex = [];
         public readonly StringWriter Definitions = new();
         public bool HasMethods;
         public bool HasProperties;
@@ -168,8 +168,8 @@ partial class Transpiler
     class TypeDefinition : RuntimeDefinition
     {
         public readonly TypeDefinition? Base;
-        public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = new();
-        public readonly Dictionary<MethodInfo, MethodInfo> InterfaceStaticMethods = new();
+        public readonly Dictionary<Type, MethodInfo[]> InterfaceToMethods = [];
+        public readonly Dictionary<MethodInfo, MethodInfo> InterfaceStaticMethods = [];
         public readonly string? Delegate;
         public bool HasFields;
         public bool HasConstructors;
@@ -276,9 +276,9 @@ string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1
     private readonly StringWriter staticMembers = new();
     private readonly StringWriter threadStaticMembers = new();
     private readonly StringWriter fieldDeclarations = new();
-    private readonly List<RuntimeDefinition> runtimeDefinitions = new();
-    private readonly Dictionary<Type, RuntimeDefinition> typeToRuntime = new();
-    private readonly Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex = new();
+    private readonly List<RuntimeDefinition> runtimeDefinitions = [];
+    private readonly Dictionary<Type, RuntimeDefinition> typeToRuntime = [];
+    private readonly Dictionary<MethodKey, Dictionary<Type[], int>> genericMethodToTypesToIndex = [];
     private bool processed;
 
     private IEnumerable<MethodInfo> GetMethods(Type type) => type.GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Instance | (type.IsInterface ? BindingFlags.Default : BindingFlags.Static) | BindingFlags.Public | BindingFlags.NonPublic).Where(x => !invalids.Contains(x.ReturnType.FullName));
@@ -697,7 +697,7 @@ struct t__static_{identifier}
                                 }
                                 td.UnmanagedSize = map.Count;
                                 td.ExplicitMap = map;
-                                mergedFields = new();
+                                mergedFields = [];
                                 var ss = new List<(Type, string)>();
                                 for (var i = 0; i < map.Count;)
                                     if (map[i])

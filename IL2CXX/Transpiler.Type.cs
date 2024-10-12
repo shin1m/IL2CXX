@@ -726,11 +726,15 @@ struct t__static_{identifier}
 {indent}{'\t'}struct
 {indent}{'\t'}{{
 {string.Join(string.Empty, mergedFields!.Select(x => $"{indent}\t\t{x};\n"))}{indent}{'\t'}}} v__merged;");
-                                    foreach (var x in fields) sb.AppendLine($@"{indent}{'\t'}struct
+                                    foreach (var x in fields)
+                                    {
+                                        var i = fieldOffset(x);
+                                        sb.AppendLine($@"{indent}{'\t'}struct
 {indent}{'\t'}{{
-{indent}{'\t'}{'\t'}char o[{fieldOffset(x)}];
-{indent}{'\t'}{'\t'}{EscapeForMember(x.FieldType)} v;
+{(i > 0 ? $"{indent}\t\tchar o[{i}];\n" : "")
+}{indent}{'\t'}{'\t'}{EscapeForMember(x.FieldType)} v;
 {indent}{'\t'}}} v_{Escape(x.Name)};");
+                                    }
                                     sb.AppendLine($@"{indent}}};
 
 {indent}t_value() = default;

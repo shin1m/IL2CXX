@@ -42,7 +42,7 @@ public partial class Transpiler
             Type = type;
             OnStack = onStack;
             string prefix;
-            if (Type.IsByRef || Type.IsPointer || Type == transpiler.typeofIntPtr || Type == transpiler.typeofUIntPtr)
+            if (Type.IsByRef || Type.IsPointer || Type.IsFunctionPointer || Type == transpiler.typeofIntPtr || Type == transpiler.typeofUIntPtr)
             {
                 VariableType = "void*";
                 IsPointer = true;
@@ -605,6 +605,7 @@ public partial class Transpiler
         type.IsInterface ? Escape(typeofObject, @object, value) :
         primitives.TryGetValue(type, out var x) ? x :
         type.IsEnum ? primitives[type.GetEnumUnderlyingType()] :
+        type.IsFunctionPointer ? Escape(typeofIntPtr, @object, value) :
         string.Format(type.IsValueType ? value : @object, Escape(type));
     public string EscapeForValue(Type type) => Escape(type, "{0}*", "{0}::t_value");
     public string EscapeForMember(Type type) => Escape(type, "t_slot_of<{0}>", "{0}::t_value");
@@ -817,7 +818,11 @@ string.Join(",", arguments.Zip(variables, (a, v) => $"\n\t\t{CastValue(a, v)}"))
             {
                 var e = GetElementType(x.ParameterType);
                 var @out = x.GetCustomAttributesData().Any(x => x.AttributeType == typeofOutAttribute);
-                if (@out) writer.WriteLine($"\tf__store(*a_{i}, ({EscapeForStacked(e)}){{}});");
+                if (@out)
+                {
+                    var s = EscapeForStacked(e);
+                    writer.WriteLine("\tf__store(*a_{0}, {1});", i, s.EndsWith('*') ? "nullptr" : $"{s}{{}}");
+                }
                 if (typeofSafeHandle.IsAssignableFrom(e))
                 {
                     writer.WriteLine($"\tvoid* p{i};");

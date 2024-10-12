@@ -147,7 +147,7 @@ partial class DefaultBuiltin
 ", true, null);
         code.For(
             type.GetMethod("Initialize", declaredAndInstance),
-            transpiler => ("\ta_0->v__priority == 2;\n", 1)
+            transpiler => ("\ta_0->v__priority = 2;\n", 1)
         );
         code.For(
             type.GetMethod("InternalFinalize", declaredAndInstance),
@@ -197,9 +197,9 @@ partial class DefaultBuiltin
 {'\t'}{{
 {'\t'}{'\t'}for (; a_0 > 0; --a_0) {{
 #ifdef _MSC_VER
-#if defined(HOST_X86) || defined(HOST_AMD64)
+#if defined(_M_IX86) || defined(_M_X64)
 {'\t'}{'\t'}{'\t'}_mm_pause();
-#elif defined(HOST_ARM) || defined(HOST_ARM64)
+#elif defined(_M_ARM) || defined(_M_ARM64)
 {'\t'}{'\t'}{'\t'}__yield();
 #else
 #error

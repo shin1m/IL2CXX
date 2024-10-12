@@ -430,12 +430,14 @@ partial class Transpiler
             x.Estimate = (index, stack) =>
             {
                 var (_, @return, parameters) = ParseSignature(ref index);
+                @return = @return.UnderlyingSystemType;
                 stack = stack.ElementAt(parameters.Length + 1);
                 return (index, @return == typeofVoid ? stack : stack.Push(@return));
             };
             x.Generate = (index, stack) =>
             {
                 var (cc, @return, parameters) = ParseSignature(ref index);
+                @return = @return.UnderlyingSystemType;
                 writer.WriteLine($@" {cc} {@return}({string.Join(", ", parameters.AsEnumerable())})
 {'\t'}{(
 @return == typeofVoid ? string.Empty : $"{indexToStack[index].Variable} = "
@@ -1686,6 +1688,7 @@ _ => throw new Exception()
             {
                 var t = ParseType(ref index);
                 writer.WriteLine($" {t}");
+                var s = EscapeForStacked(t);
                 writer.WriteLine(
                     Define(t).IsManaged ?
                         stack.OnStack == true || t.IsByRefLike ? "\tf__copy({0}, {1});" :
@@ -1693,7 +1696,7 @@ _ => throw new Exception()
                         "\tf__store({0}, {1});"
                     : "\t{0} = {1};",
                     $"*static_cast<{EscapeForValue(t)}*>({stack.Variable})",
-                    $"({EscapeForStacked(t)}){{}}"
+                    s.EndsWith('*') ? "nullptr" : $"{s}{{}}"
                 );
                 return index;
             };

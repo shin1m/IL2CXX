@@ -62,8 +62,7 @@ inline RECYCLONE__ALWAYS_INLINE void f__copy(auto& a_field, auto&& a_value)
 	std::memcpy(&a_field, const_cast<std::remove_volatile_t<std::remove_reference_t<decltype(a_value)>>*>(&a_value), sizeof(std::remove_reference_t<decltype(a_field)>));
 }
 
-template<typename T>
-inline RECYCLONE__ALWAYS_INLINE void f__assign(T*& a_field, T* a_value)
+inline RECYCLONE__ALWAYS_INLINE void f__assign(auto*& a_field, auto&& a_value)
 {
 	reinterpret_cast<t_slot<t__type>&>(a_field) = a_value;
 }

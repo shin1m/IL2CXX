@@ -250,7 +250,7 @@ add_executable({name}
 }{string.Join(string.Empty, names.Select(x => $"\t{x}\n"))
 }{'\t'}main.cc
 {'\t'})
-target_compile_options({name} PRIVATE ""-fno-rtti"")
+target_compile_options({name} PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fno-rtti> $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 target_precompile_headers({name} PRIVATE declarations.h){
 (options.Target == PlatformID.Other ? $@"
 set_target_properties({name} PROPERTIES OUTPUT_NAME dotnet.native)
@@ -262,7 +262,7 @@ target_link_libraries({name} recyclone dl
 {'\t'})
 " : $@"
 target_include_directories({name} PRIVATE src .)
-target_link_libraries({name} recyclone dl)
+target_link_libraries({name} recyclone  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:dl>)
 ")}");
     return 0;
 }, _ => 1);

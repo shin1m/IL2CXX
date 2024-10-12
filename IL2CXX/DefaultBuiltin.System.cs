@@ -1403,5 +1403,9 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             type.GetProperty("PredefinedCulturesOnly", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
             transpiler => ("\treturn true;\n", 1)
         );
+        code.For(
+            type.GetProperty("UseNls", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
+            transpiler => ("\treturn false;\n", 1)
+        );
     });
 }

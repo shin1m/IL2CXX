@@ -330,10 +330,15 @@ static t__type* v__exported_{name}[] = {{
                 {
                     writer.Write($"\nstatic uint8_t v__resource_{name}__{Escape(x)}[] = \"");
                     using (var source = assembly.GetManifestResourceStream(x) ?? throw new Exception())
-                        while (true)
+                        for (var n = 0; ;)
                         {
                             var b = source.ReadByte();
                             if (b == -1) break;
+                            if (++n > 8192)
+                            {
+                                writer.Write("\"\n\"");
+                                n = 0;
+                            }
                             var c = (char)b;
                             if (escapes.TryGetValue(c, out var e))
                                 writer.Write(e);

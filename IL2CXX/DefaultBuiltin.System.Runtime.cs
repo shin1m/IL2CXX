@@ -220,7 +220,7 @@ partial class DefaultBuiltin
             (transpiler, types) => {
                 var t = transpiler.EscapeForValue(types[0]);
                 return ($@"{'\t'}auto p = static_cast<t__runtime_field_info*>(a_0.v__field);
-{'\t'}return {{static_cast<{t}*>(p->f_address(nullptr)), p->v__field_type->v__size / sizeof({t})}};
+{'\t'}return {{static_cast<{t}*>(p->f_address(nullptr)), static_cast<int32_t>(p->v__field_type->v__size / sizeof({t}))}};
 ", 1);
             }
         );
@@ -342,7 +342,7 @@ partial class DefaultBuiltin
     .For(get(typeof(Vector128<>)), SetupIntrinsicsVectorOfT)
     .For(get(typeof(Vector256<>)), SetupIntrinsicsVectorOfT)
     .For(get(typeof(Vector512<>)), SetupIntrinsicsVectorOfT)
-    .ForIf(get(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch", true)!), (type, code) =>
+    .ForIf(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch") is Type t ? get(t) : null, (type, code) =>
     {
         // TODO
         code.For(

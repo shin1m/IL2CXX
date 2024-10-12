@@ -371,19 +371,7 @@ public partial class Transpiler
     private MethodBase ParseMethod(ref int index)
     {
         //return method.Module.ResolveMethod(token, method.DeclaringType?.GetGenericArguments(), GetGenericArguments());
-        //MethodBase resolve(EntityHandle handle) => handle.Kind == HandleKind.MethodDefinition ? ResolveMethodDefinition(handle) : (MethodBase)ResolveMemberReference(handle);
-        MethodBase _resolve(EntityHandle handle) => handle.Kind == HandleKind.MethodDefinition ? ResolveMethodDefinition(handle) : (MethodBase)ResolveMemberReference(handle);
-        MethodBase resolve(EntityHandle handle)
-        {
-            var m = _resolve(handle);
-            if (m.DeclaringType?.FullName == "Interop+Sys")
-            {
-                if (m.Name == "SetPosixSignalHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetPosixSignalHandler)) ?? throw new Exception();
-                if (m.Name == "SetTerminalInvalidationHandler") return TypeOf<Interop.Sys>().GetMethod(nameof(Interop.Sys.SetTerminalInvalidationHandler)) ?? throw new Exception();
-            }
-            if (m.DeclaringType?.FullName == "Interop+Globalization" && m.Name == "EnumCalendarInfo") return TypeOf<Interop.Globalization>().GetMethod(nameof(Interop.Globalization.EnumCalendarInfo)) ?? throw new Exception();
-            return m;
-        }
+        MethodBase resolve(EntityHandle handle) => handle.Kind == HandleKind.MethodDefinition ? ResolveMethodDefinition(handle) : (MethodBase)ResolveMemberReference(handle);
         var handle = MetadataTokens.EntityHandle(ParseI4(ref index));
         if (handle.Kind != HandleKind.MethodSpecification) return resolve(handle);
         var specification = GetMetadataReader().GetMethodSpecification((MethodSpecificationHandle)handle);

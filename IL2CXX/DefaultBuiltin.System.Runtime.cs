@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Runtime;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Loader;
@@ -52,7 +51,7 @@ partial class DefaultBuiltin
             (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
         );
     }
-    private static Builtin ForIf(this Builtin @this, Type type, Action<Type, Builtin.Code> action) => type == null ? @this : @this.For(type, action);
+    private static Builtin ForIf(this Builtin @this, Type? type, Action<Type, Builtin.Code> action) => type == null ? @this : @this.For(type, action);
     private static Builtin SetupSystemRuntime(this Builtin @this, Func<Type, Type> get) => @this
     .For(get(typeof(GCHandle)), (type, code) =>
     {

@@ -2,7 +2,7 @@
 	path = IL2CXX/src/recyclone
 	url = https://github.com/shin1m/recyclone.git
 [submodule "examples/Platformer2D/MonoGame.Samples"]
-	path = examples/Platformer2D/MonoGame.Samples
+	path = externals/MonoGame.Samples
 	url = https://github.com/MonoGame/MonoGame.Samples.git
 [submodule "externals/bepuphysics2"]
 	path = externals/bepuphysics2

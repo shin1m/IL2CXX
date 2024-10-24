@@ -1,0 +1,10 @@
+#!/bin/bash
+dotnet build ../../externals/MonoGame.Samples/AutoPong/AutoPong.DesktopGL -c Release || exit $?
+dotnet run --project ../../IL2CXX.Console --target Unix\
+ --out out ../../externals/MonoGame.Samples/AutoPong/AutoPong.DesktopGL/bin/Release/net8.0/AutoPong.DesktopGL.dll\
+ --reflection 'Program, AutoPong.DesktopGL'\
+ || exit $?
+mkdir out/build || exit $?
+cd out/build || exit $?
+CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-Oz' .. || exit $?
+cmake --build . -j8 || exit $?

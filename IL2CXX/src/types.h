@@ -9,6 +9,8 @@ namespace il2cxx
 
 using namespace recyclone;
 
+struct t__weak_pointer;
+struct t__extension;
 struct t__type;
 
 template<typename T>
@@ -16,12 +18,78 @@ using t_slot_of = recyclone::t_slot_of<T, t__type>;
 
 struct t__object : t_object<t__type>
 {
+	t__extension* v_extension;
+
 	using t_object<t__type>::t_object;
+	t__extension* f_extension();
 	void f__scan(t_scan<t__type>)
 	{
 	}
 	void f_construct(t__object*) const
 	{
+	}
+};
+
+struct t__weak_pointers
+{
+	t__weak_pointer* v_previous;
+	t__weak_pointer* v_next;
+
+	t__weak_pointers();
+};
+
+struct t__weak_pointer : t__weak_pointers
+{
+	t__object* v_target;
+	t_object<t__type>* v_dependent = nullptr;
+	const bool v_final = false;
+
+	void f_attach(t_root<t_slot_of<t__object>>& a_target);
+	t_object<t__type>* f_detach();
+
+	t__weak_pointer(t__object* a_target, bool a_final);
+	t__weak_pointer(t__object* a_target, t_object<t__type>* a_dependent);
+	~t__weak_pointer();
+	std::pair<t_object<t__type>*, t_object<t__type>*> f_get() const;
+	void f_target__(t__object* a_p);
+	void f_dependent__(t_object<t__type>* a_p);
+};
+
+inline t__weak_pointers::t__weak_pointers() : v_previous(static_cast<t__weak_pointer*>(this)), v_next(static_cast<t__weak_pointer*>(this))
+{
+}
+
+struct t__extension
+{
+	t__weak_pointers v_weak_pointers;
+	t_slot<t__type> v_weak_pointers__cycle{};
+	std::mutex v_weak_pointers__mutex;
+	std::recursive_timed_mutex v_mutex;
+	std::thread::id v_owner;
+	std::condition_variable_any v_condition;
+
+	~t__extension();
+	void f_detach();
+	void f_scan(t_scan<t__type> a_scan);
+	void f_lock()
+	{
+		v_mutex.lock();
+		v_owner = std::this_thread::get_id();
+	}
+	bool f_try_lock_for(auto a_timeout)
+	{
+		auto b = v_mutex.try_lock_for(a_timeout);
+		if (b) v_owner = std::this_thread::get_id();
+		return b;
+	}
+	void f_unlock()
+	{
+		v_owner = {};
+		v_mutex.unlock();
+	}
+	bool f_locked() const
+	{
+		return v_owner == std::this_thread::get_id();
 	}
 };
 
@@ -199,6 +267,7 @@ struct t__type : t__abstract_type
 	static constexpr t__runtime_property_info* v__empty_properties[] = {nullptr};
 	static void f_be(t__object* a_p, t__type* a_type)
 	{
+		//a_p->v_type = a_p->v__type = a_type;
 		a_p->v_type = a_type;
 	}
 
@@ -286,10 +355,20 @@ struct t__type : t__abstract_type
 		a_p->f_be(this);
 	}
 	static void f_do_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan);
-	void (*f_scan)(t_object<t__type>*, t_scan<t__type>) = f_do_scan;
+	void (*f_scan_)(t_object<t__type>*, t_scan<t__type>) = f_do_scan;
+	void f_scan(t_object<t__type>* a_this, t_scan<t__type> a_scan)
+	{
+		if (auto p = std::atomic_ref(static_cast<t__object*>(a_this)->v_extension).load(std::memory_order_consume)) p->f_scan(a_scan);
+		f_scan_(a_this, a_scan);
+	}
 	void f_finalize(t_object<t__type>* a_this, t_scan<t__type> a_scan)
 	{
 		f_scan(a_this, a_scan);
+		delete static_cast<t__object*>(a_this)->v_extension;
+	}
+	void f_prepare_for_finalizer(t_object<t__type>* a_this)
+	{
+		if (auto p = static_cast<t__object*>(a_this)->v_extension) p->f_detach();
 	}
 	static t__object* f_do_clone(const t__object* a_this);
 	t__object* (*f_clone)(const t__object*) = f_do_clone;

@@ -359,7 +359,7 @@ class ThreadingTests
         nameof(WaitAndPulseAll) => WaitAndPulseAll(),
         nameof(WaitTimeout) => WaitTimeout(),
         nameof(TryEnter) => TryEnter(),
-        //nameof(IsEntered) => IsEntered(),
+        nameof(IsEntered) => IsEntered(),
         nameof(Timer) => Timer(),
         _ => -1
     };
@@ -385,8 +385,8 @@ class ThreadingTests
             nameof(WaitAndPulse),
             nameof(WaitAndPulseAll),
             nameof(WaitTimeout),
-            nameof(TryEnter)
-            //nameof(IsEntered) //Not implemented
+            nameof(TryEnter),
+            nameof(IsEntered)
         )] string name,
         [Values(false, true)] bool cooperative
     ) => Utilities.Run(build, cooperative, name);

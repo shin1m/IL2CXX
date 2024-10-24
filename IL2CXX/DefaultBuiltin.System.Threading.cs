@@ -68,7 +68,7 @@ partial class DefaultBuiltin
             type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}a_0->f_extension()->v_mutex.lock();
+{'\t'}{'\t'}a_0->f_extension()->f_lock();
 {'\t'}}});
 {'\t'}*a_1 = true;
 ", 1)
@@ -77,7 +77,7 @@ partial class DefaultBuiltin
             type.GetMethod("ReliableEnterTimeout", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}*a_2 = a_0->f_extension()->v_mutex.try_lock_for(std::chrono::milliseconds(a_1));
+{'\t'}{'\t'}*a_2 = a_0->f_extension()->f_try_lock_for(std::chrono::milliseconds(a_1));
 {'\t'}}});
 ", 1)
         );
@@ -85,19 +85,18 @@ partial class DefaultBuiltin
             type.GetMethod(nameof(Monitor.Enter), [get(typeof(object))]),
             transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}a_0->f_extension()->v_mutex.lock();
+{'\t'}{'\t'}a_0->f_extension()->f_lock();
 {'\t'}}});
 ", 1)
         );
         code.For(
             type.GetMethod(nameof(Monitor.Exit)),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_mutex.unlock();\n", 1)
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->f_unlock();\n", 1)
         );
-        // TODO
         code.For(
             type.GetMethod("IsEnteredNative", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ($@"{'\t'}auto p = a_0->f_extension();
-{'\t'}return p->v_mutex.locked();
+{'\t'}return p->f_locked();
 ", 1)
         );
         code.For(

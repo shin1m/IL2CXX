@@ -1125,7 +1125,7 @@ type == typeofVoid || type.ContainsGenericParameters ? "0" : $"sizeof({EscapeFor
         writerForDefinitions.Write(td?.Delegate);
         if (definition is TypeDefinition)
         {
-            if (type.BaseType != null && !(type.IsAbstract && type.IsSealed)) writerForDefinitions.WriteLine($@"{'\t'}t__type::f_scan = f_do_scan;
+            if (type.BaseType != null && !(type.IsAbstract && type.IsSealed)) writerForDefinitions.WriteLine($@"{'\t'}f_scan_ = f_do_scan;
 {'\t'}f_clone = f_do_clone;");
             if (type != typeofVoid && type.IsValueType) writerForDefinitions.WriteLine($@"{'\t'}f_clear = f_do_clear;
 {'\t'}f_copy = f_do_copy;

@@ -26,16 +26,16 @@ struct t__normal_handle : t__handle
 	virtual void f_target__(t__object* a_value);
 };
 
-struct t__weak_handle : t__handle, t_weak_pointer<t__type>
+struct t__weak_handle : t__handle, t__weak_pointer
 {
-	t__weak_handle(t__object* a_target, bool a_final) : t_weak_pointer<t__type>(a_target, a_final)
+	t__weak_handle(t__object* a_target, bool a_final) : t__weak_pointer(a_target, a_final)
 	{
 	}
 	virtual t__object* f_target() const;
 	virtual void f_target__(t__object* a_value);
 };
 
-using t__dependent_handle = t_weak_pointer<t__type>;
+using t__dependent_handle = t__weak_pointer;
 
 }
 

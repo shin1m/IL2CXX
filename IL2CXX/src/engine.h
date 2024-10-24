@@ -26,7 +26,9 @@ struct t_engine : recyclone::t_engine<t__type>
 	using recyclone::t_engine<t__type>::t_engine;
 	RECYCLONE__ALWAYS_INLINE constexpr t__object* f_allocate(size_t a_size)
 	{
-		return static_cast<t__object*>(recyclone::t_engine<t__type>::f_allocate(a_size));
+		auto p = static_cast<t__object*>(recyclone::t_engine<t__type>::f_allocate(a_size));
+		p->v_extension = nullptr;
+		return p;
 	}
 	void f_start(t__thread* RECYCLONE__SPILL a_thread, auto a_main);
 	void f_background__(t__thread* RECYCLONE__SPILL a_thread, bool a_value);
@@ -79,7 +81,7 @@ template<typename T>
 T* f__new_zerod()
 {
 	t__new<T> p(0);
-	std::memset(static_cast<t_object<t__type>*>(p) + 1, 0, sizeof(T) - sizeof(t_object<t__type>));
+	std::memset(static_cast<t__object*>(p) + 1, 0, sizeof(T) - sizeof(t__object));
 	return p;
 }
 

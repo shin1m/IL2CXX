@@ -910,7 +910,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
             if (escapes.TryGetValue(c, out var e))
                 writer.Write(e);
             else if (char.IsSurrogate(c))
-                writer.Write($"\"\"\\x{(ushort)c:X4}\"\"");
+                writer.Write($"\" u\"\\x{(ushort)c:X4}\"\"");
             else if (c < 0x20 || c >= 0x7f)
                 writer.Write($"\\u{(ushort)c:X4}");
             else

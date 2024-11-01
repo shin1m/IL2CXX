@@ -338,6 +338,29 @@ class ThreadingTests
         }
         return 0;
     }
+    class Foo { }
+    class Bar
+    {
+        public Foo Field;
+    }
+    static int InterlockedExchange()
+    {
+        var foo0 = new Foo();
+        var bar = new Bar { Field = foo0 };
+        var foo1 = new Foo();
+        if (Interlocked.Exchange(ref bar.Field, foo1) != foo0) return 1;
+        return bar.Field == foo1 ? 0 : 2;
+    }
+    static int InterlockedCompareExchange()
+    {
+        var foo0 = new Foo();
+        var bar = new Bar { Field = foo0 };
+        var foo1 = new Foo();
+        if (Interlocked.CompareExchange(ref bar.Field, foo1, new()) != foo0) return 1;
+        if (bar.Field == foo1) return 2;
+        if (Interlocked.CompareExchange(ref bar.Field, foo1, bar.Field) != foo0) return 3;
+        return bar.Field == foo1 ? 0 : 2;
+    }
 
     static int Run(string[] arguments) => arguments[1] switch
     {
@@ -361,6 +384,8 @@ class ThreadingTests
         nameof(TryEnter) => TryEnter(),
         nameof(IsEntered) => IsEntered(),
         nameof(Timer) => Timer(),
+        nameof(InterlockedExchange) => InterlockedExchange(),
+        nameof(InterlockedCompareExchange) => InterlockedCompareExchange(),
         _ => -1
     };
 
@@ -386,7 +411,9 @@ class ThreadingTests
             nameof(WaitAndPulseAll),
             nameof(WaitTimeout),
             nameof(TryEnter),
-            nameof(IsEntered)
+            nameof(IsEntered),
+            nameof(InterlockedExchange),
+            nameof(InterlockedCompareExchange)
         )] string name,
         [Values(false, true)] bool cooperative
     ) => Utilities.Run(build, cooperative, name);

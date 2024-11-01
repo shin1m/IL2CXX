@@ -83,17 +83,25 @@ inline RECYCLONE__ALWAYS_INLINE void f__store(auto& a_field, auto&& a_value)
 template<typename T>
 inline T* f__exchange(T*& a_target, T* a_desired)
 {
-	return t_thread<t__type>::f_current()->f_on_stack(&a_target)
-		? std::atomic_ref(a_target).exchange(a_desired, std::memory_order_relaxed)
-		: reinterpret_cast<t_slot_of<T>&>(a_target).f_exchange(a_desired);
+	if (t_thread<t__type>::f_current()->f_on_stack(&a_target)) return std::atomic_ref(a_target).exchange(a_desired, std::memory_order_relaxed);
+	if (a_desired) t_slot<t__type>::f_increment(a_desired);
+	a_desired = std::atomic_ref(a_target).exchange(a_desired, std::memory_order_relaxed);
+	if (a_desired) t_slot<t__type>::f_decrement(a_desired);
+	return a_desired;
 }
 
 template<typename T>
 inline bool f__compare_exchange(T*& a_target, T*& a_expected, T* a_desired)
 {
-	return t_thread<t__type>::f_current()->f_on_stack(&a_target)
-		? std::atomic_ref(a_target).compare_exchange_strong(a_expected, a_desired)
-		: reinterpret_cast<t_slot_of<T>&>(a_target).f_compare_exchange(a_expected, a_desired);
+	if (t_thread<t__type>::f_current()->f_on_stack(&a_target)) return std::atomic_ref(a_target).compare_exchange_strong(a_expected, a_desired);
+	if (a_desired) t_slot<t__type>::f_increment(a_desired);
+	if (std::atomic_ref(a_target).compare_exchange_strong(a_expected, a_desired)) {
+		if (a_expected) t_slot<t__type>::f_decrement(a_expected);
+		return true;
+	} else {
+		if (a_desired) t_slot<t__type>::f_decrement(a_desired);
+		return false;
+	}
 }
 
 template<typename T>

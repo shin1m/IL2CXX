@@ -1,9 +1,10 @@
 #!/bin/bash
 BASE=$(cd $(dirname $0) && pwd)
+SOURCE=$BASE/../../externals/MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL
 cd $BASE
-dotnet build ../../externals/MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL -c Release || exit $?
+dotnet build $SOURCE -c Release || exit $?
 dotnet run --project ../../IL2CXX.Console --target Unix\
- --out out ../../externals/MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL/bin/Release/net8.0/Platformer2D.DesktopGL.dll\
+ --out out $SOURCE/bin/Release/net8.0/Platformer2D.DesktopGL.dll\
  --reflection\
   'Microsoft.Xna.Framework.Content.CharReader, MonoGame.Framework'\
   'Microsoft.Xna.Framework.Content.Int32Reader, MonoGame.Framework'\
@@ -22,4 +23,4 @@ mkdir out/build || exit $?
 cd out/build || exit $?
 CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-Oz' .. || exit $?
 cmake --build . -j8 || exit $?
-cp -a $BASE/../../externals/MonoGame.Samples/Platformer2D/Platformer2D.DesktopGL/bin/Release/net8.0/Content . || exit $?
+cp -a $SOURCE/bin/Release/net8.0/Content . || exit $?

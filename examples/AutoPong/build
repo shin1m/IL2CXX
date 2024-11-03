@@ -1,7 +1,8 @@
 #!/bin/bash
-dotnet build ../../externals/MonoGame.Samples/AutoPong/AutoPong.DesktopGL -c Release || exit $?
+SOURCE=../../externals/MonoGame.Samples/AutoPong/AutoPong.DesktopGL
+dotnet build $SOURCE -c Release || exit $?
 dotnet run --project ../../IL2CXX.Console --target Unix\
- --out out ../../externals/MonoGame.Samples/AutoPong/AutoPong.DesktopGL/bin/Release/net8.0/AutoPong.DesktopGL.dll\
+ --out out $SOURCE/bin/Release/net8.0/AutoPong.DesktopGL.dll\
  --reflection 'Program, AutoPong.DesktopGL'\
  || exit $?
 mkdir out/build || exit $?

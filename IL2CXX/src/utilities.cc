@@ -171,7 +171,7 @@ std::string_view v__mscorlib = "mscorlib"sv;
 
 inline std::string_view f__sv(std::string_view::const_iterator a_first, std::string_view::const_iterator a_last)
 {
-	return {&*a_first, static_cast<size_t>(a_last - a_first)};
+	return {a_first, a_last};
 }
 
 std::pair<std::string_view::const_iterator, std::string_view::const_iterator> f__match_type(std::string_view a_x, std::string_view a_y)

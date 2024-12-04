@@ -1,0 +1,12 @@
+diff -r\
+ -x .npmrc\
+ -x CMakeLists.txt\
+ -x bin\
+ -x build\
+ -x node_modules\
+ -x package-lock.json\
+ -x *.c\
+ -x *.h\
+ -x *.in\
+ -x jiterpreter*\
+ $DOTNET_RUNTIME/src/mono/wasm/runtime runtime

@@ -461,9 +461,8 @@ async function initializeModules(es6Modules: [RuntimeModuleExportsInternal, Nati
     await configureRuntimeStartup(globalObjectsRoot.module);
     loaderHelpers.runtimeModuleLoaded.promise_control.resolve();
 
-    emscriptenFactory((originalModule: EmscriptenModuleInternal) => {
+    emscriptenFactory(() => {
         Object.assign(module, {
-            ready: originalModule.ready,
             __dotnet_runtime: {
                 initializeReplacements, configureEmscriptenStartup, configureWorkerStartup, passEmscriptenInternals
             }
@@ -521,7 +520,17 @@ async function createEmscriptenWorker(): Promise<EmscriptenModuleInternal> {
 
     const promises = importModules();
     const es6Modules = await Promise.all(promises);
-    await initializeModules(es6Modules as any);
+    const { initializeExports, initializeReplacements, configureRuntimeStartup, configureEmscriptenStartup, configureWorkerStartup, setRuntimeGlobals, passEmscriptenInternals } = es6Modules[0] as RuntimeModuleExportsInternal;
+    setRuntimeGlobals(globalObjectsRoot);
+    initializeExports(globalObjectsRoot);
+    await configureRuntimeStartup(globalObjectsRoot.module);
+    loaderHelpers.runtimeModuleLoaded.promise_control.resolve();
+
+    Object.assign(module, {
+        __dotnet_runtime: {
+            initializeReplacements, configureEmscriptenStartup, configureWorkerStartup, passEmscriptenInternals
+        }
+    });
 
     return module;
 }

@@ -15,7 +15,7 @@ const ENABLE_AOT_PROFILER = process.env.ENABLE_AOT_PROFILER === "1";
 var methodIndexByName = undefined;
 var gitHash = undefined;
 
-function setup(linkerSetup) {
+function setup(linkerSetup, ready) {
     const pthreadReplacements = {};
     const dotnet_replacements = {
         fetch: globalThis.fetch,
@@ -47,7 +47,7 @@ function setup(linkerSetup) {
         Module.__dotnet_runtime.configureWorkerStartup(Module);
     } else {
         #endif
-        Module.__dotnet_runtime.configureEmscriptenStartup(Module);
+        ready = Module.__dotnet_runtime.configureEmscriptenStartup(Module, ready);
         #if USE_PTHREADS
     }
     #endif
@@ -56,12 +56,13 @@ function setup(linkerSetup) {
     noExitRuntime = dotnet_replacements.noExitRuntime;
     fetch = dotnet_replacements.fetch;
     require = dotnet_replacements.require;
-    _scriptDir = __dirname = scriptDirectory = dotnet_replacements.scriptDirectory;
+    _scriptName = __dirname = scriptDirectory = dotnet_replacements.scriptDirectory;
     #if USE_PTHREADS
     PThread.loadWasmModuleToWorker = pthreadReplacements.loadWasmModuleToWorker;
     PThread.threadInitTLS = pthreadReplacements.threadInitTLS;
     PThread.allocateUnusedWorker = pthreadReplacements.allocateUnusedWorker;
     #endif
+    return ready;
 }
 
 const DotnetSupportLib = {
@@ -92,14 +93,15 @@ function injectDependencies() {
         createWasmImportStubsFrom(methodIndexByName.mono_wasm_legacy_interop_imports);
     }
 
-    DotnetSupportLib["$DOTNET__postset"] = `DOTNET.setup({ ` +
+    DotnetSupportLib["$DOTNET__postset"] = `const DOTNET_setup = ready => DOTNET.setup({ ` +
         `linkerDisableLegacyJsInterop: ${DISABLE_LEGACY_JS_INTEROP ? "true" : "false"},` +
         `linkerWasmEnableSIMD: ${WASM_ENABLE_SIMD ? "true" : "false"},` +
         `linkerWasmEnableEH: ${WASM_ENABLE_EH ? "true" : "false"},` +
         `linkerEnableAotProfiler: ${ENABLE_AOT_PROFILER ? "true" : "false"}, ` +
         `linkerEnableBrowserProfiler: ${ENABLE_BROWSER_PROFILER ? "true" : "false"}, ` +
         `gitHash: "${gitHash}", ` +
-        `});`;
+        `}, ready);` +
+        `if (!ENVIRONMENT_IS_PTHREAD) readyPromise = DOTNET_setup(readyPromise);`;
 
     autoAddDeps(DotnetSupportLib, "$DOTNET");
     mergeInto(LibraryManager.library, DotnetSupportLib);
@@ -108,7 +110,7 @@ function injectDependencies() {
 
 // var methodIndexByName wil be appended below by the MSBuild in wasm.proj
 
-    var gitHash = "51e720c15a3fec9070535947b9c5074cdd7002cf";
+    var gitHash = "5c06b86e60635179f4ebc67712cd63c0ff07ac1b";
     var methodIndexByName = {
   "mono_wasm_imports": {
     "mono_wasm_schedule_timer": 0,

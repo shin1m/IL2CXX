@@ -145,7 +145,6 @@ export type LoaderHelpers = {
     out(message: string): void;
     err(message: string): void;
 
-    hasDebuggingEnabled(config: MonoConfig): boolean,
     retrieve_asset_download(asset: AssetEntry): Promise<ArrayBuffer>;
     onDownloadResourceProgress?: (resourcesLoaded: number, totalResources: number) => void;
     logDownloadStatsToConsole: () => void;
@@ -155,6 +154,7 @@ export type LoaderHelpers = {
     invokeLibraryInitializers: (functionName: string, args: any[]) => Promise<void>,
     libraryInitializers?: { scriptName: string, exports: any }[];
 
+    isDebuggingSupported(): boolean,
     isChromium: boolean,
     isFirefox: boolean
 
@@ -451,7 +451,6 @@ export declare interface EmscriptenModuleInternal {
     mainScriptUrlOrBlob?: string;
     ENVIRONMENT_IS_PTHREAD?: boolean;
     wasmModule: WebAssembly.Instance | null;
-    ready: Promise<unknown>;
     asm: { memory?: WebAssembly.Memory };
     wasmMemory?: WebAssembly.Memory;
     getWasmIndirectFunctionTable: any;
@@ -493,7 +492,7 @@ export type passEmscriptenInternalsType = (internals: EmscriptenInternals) => vo
 export type setGlobalObjectsType = (globalObjects: GlobalObjects) => void;
 export type initializeExportsType = (globalObjects: GlobalObjects) => RuntimeAPI;
 export type initializeReplacementsType = (replacements: EmscriptenReplacements) => void;
-export type configureEmscriptenStartupType = (module: DotnetModuleInternal) => void;
+export type configureEmscriptenStartupType = (module: DotnetModuleInternal, ready: Promise<unknown>) => Promise<unknown>;
 export type configureRuntimeStartupType = (module: DotnetModuleInternal) => Promise<void>;
 export type configureWorkerStartupType = (module: DotnetModuleInternal) => Promise<void>
 

@@ -62,7 +62,7 @@ export async function configureRuntimeStartup (module: DotnetModuleInternal): Pr
 
 // we are making emscripten startup async friendly
 // emscripten is executing the events without awaiting it and so we need to block progress via PromiseControllers above
-export function configureEmscriptenStartup(module: DotnetModuleInternal): void {
+export function configureEmscriptenStartup(module: DotnetModuleInternal, ready: Promise<unknown>): Promise<unknown> {
     const mark = startMeasure();
 
     if (!module.locateFile) {
@@ -94,7 +94,7 @@ export function configureEmscriptenStartup(module: DotnetModuleInternal): void {
     module.postRun = [() => postRunAsync(userpostRun)];
     // execution order == [6] ==
 
-    module.ready.then(async () => {
+    ready.then(async () => {
         // wait for previous stage
         await runtimeHelpers.afterPostRun.promise;
         // startup end
@@ -105,7 +105,6 @@ export function configureEmscriptenStartup(module: DotnetModuleInternal): void {
     }).catch(err => {
         runtimeHelpers.dotnetReady.promise_control.reject(err);
     });
-    module.ready = runtimeHelpers.dotnetReady.promise;
     // execution order == [*] ==
     if (!module.onAbort) {
         module.onAbort = (error) => {
@@ -117,6 +116,7 @@ export function configureEmscriptenStartup(module: DotnetModuleInternal): void {
             loaderHelpers.mono_exit(code, null);
         };
     }
+    return runtimeHelpers.dotnetReady.promise;
 }
 
 function instantiateWasm(
@@ -548,7 +548,7 @@ async function mono_wasm_before_memory_snapshot() {
     if (runtimeHelpers.config.browserProfilerOptions)
         mono_wasm_init_browser_profiler(runtimeHelpers.config.browserProfilerOptions);
 
-    mono_wasm_load_runtime("unused", runtimeHelpers.config.debugLevel);
+    mono_wasm_load_runtime();
 
     // we didn't have snapshot yet and the feature is enabled. Take snapshot now.
     if (runtimeHelpers.config.startupMemoryCache) {
@@ -561,17 +561,21 @@ async function mono_wasm_before_memory_snapshot() {
     endMeasure(mark, MeasuredBlock.memorySnapshot);
 }
 
-export function mono_wasm_load_runtime(unused?: string, debugLevel?: number): void {
+export function mono_wasm_load_runtime(): void {
     mono_log_debug("mono_wasm_load_runtime");
     try {
         const mark = startMeasure();
+        let debugLevel = runtimeHelpers.config.debugLevel;
         if (debugLevel == undefined) {
             debugLevel = 0;
             if (runtimeHelpers.config.debugLevel) {
                 debugLevel = 0 + debugLevel;
             }
         }
-        cwraps.mono_wasm_load_runtime(unused || "unused", debugLevel);
+        if (!loaderHelpers.isDebuggingSupported() || !runtimeHelpers.config.resources!.pdb) {
+            debugLevel = 0;
+        }
+        cwraps.mono_wasm_load_runtime("unused", debugLevel);
         endMeasure(mark, MeasuredBlock.loadRuntime);
 
     } catch (err: any) {

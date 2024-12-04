@@ -1,15 +1,19 @@
 https://github.com/dotnet/runtime
-	v8.0.6
+	v8.0.11
 Emscripten
-	3.1.55
+	3.1.72
 
 cd <DOTNET_RUNTIME>
 	git diff <CURRENT> -- src/mono/wasm/runtime
 	git diff <CURRENT> -- src/native/libs
-	EMSDK_PATH=... ./build.sh -os browser -c Release
+	cd src/mono/wasm && make provision-wasm
+	rm -rf artifacts
+	EMSDK_PATH=<DOTNET_RUNTIME>/src/mono/wasm ./build.sh -os browser -c Release
 
 # edit $DOTNET_RUNTIME/src/native/libs/System.Globalization.Native/CMakeLists.txt
 # find_library(ICUUC icuuc) -> find_library(ICUUC icu_common)
 # find_library(ICUUC icui18n) -> find_library(ICUUC icu_i18n)
+embuilder build icu
 DOTNET_RUNTIME=<DOTNET_RUNTIME> ./build-native
+
 diff <DOTNET_RUNTIME>/artifacts/obj/wasm/pinvoke-table.h src/pinvoke-table.h

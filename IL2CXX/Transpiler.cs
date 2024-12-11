@@ -558,7 +558,7 @@ public partial class Transpiler
         foreach (var x in method.GetParameters()) ThrowIfInvalid(x.ParameterType);
         queuedMethods.Enqueue(method);
     }
-    private static bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum);
+    private static bool IsComposite(Type x) => !(x.IsByRef || x.IsPointer || x.IsPrimitive || x.IsEnum || x.IsFunctionPointer);
     private string Identifier(string name)
     {
         var x = name;

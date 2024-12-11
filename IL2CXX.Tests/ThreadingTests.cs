@@ -341,7 +341,7 @@ class ThreadingTests
     class Foo { }
     class Bar
     {
-        public Foo Field;
+        public required Foo Field;
     }
     static int InterlockedExchange()
     {

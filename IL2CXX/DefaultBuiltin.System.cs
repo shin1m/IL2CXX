@@ -541,17 +541,14 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
     {
         code.For(
             type.GetMethod("_Collect", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}if (!(a_1 & 2)) {{
-{'\t'}{'\t'}f_engine()->f_tick();
+            transpiler => ($@"{'\t'}auto engine = f_engine();
+{'\t'}if (!(a_1 & 2)) {{
+{'\t'}{'\t'}engine->f_tick();
 {'\t'}}} else if (a_1 & 4) {{
-{'\t'}{'\t'}f_engine()->f_wait();
-{'\t'}{'\t'}f_engine()->f_wait();
-{'\t'}{'\t'}if (uint32_t(a_0) > 1) {{
-{'\t'}{'\t'}{'\t'}f_engine()->f_wait();
-{'\t'}{'\t'}{'\t'}f_engine()->f_wait();
-{'\t'}{'\t'}}}
+{'\t'}{'\t'}size_t n = uint32_t(a_0) > 1 ? 5 : 2;
+{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) engine->f_wait();
 {'\t'}}} else {{
-{'\t'}{'\t'}f_engine()->f_collect();
+{'\t'}{'\t'}engine->f_collect();
 {'\t'}}}
 ", 0)
         );
@@ -589,7 +586,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
         );
         code.For(
             type.GetProperty(nameof(GC.MaxGeneration))!.GetMethod,
-            transpiler => ("\treturn 0;\n", 1)
+            transpiler => ("\treturn 0;\n", 2)
         );
     })
     .For(get(typeof(WeakReference)), (type, code) =>

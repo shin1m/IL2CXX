@@ -27,6 +27,10 @@ partial class DefaultBuiltin
             transpiler => ("\treturn false;\n", 1)
         );
         code.For(
+            type.GetMethod(nameof(Debugger.IsLogging)),
+            transpiler => ("\treturn false;\n", 1)
+        );
+        code.For(
             type.GetMethod(nameof(Debugger.Log)),
             transpiler => (string.Empty, 1)
         );

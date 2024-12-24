@@ -1104,6 +1104,14 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 ", 0)
         );
         code.For(
+            type.GetMethod(nameof(Environment.FailFast), BindingFlags.Static | BindingFlags.NonPublic, [get(typeof(string)), get(typeof(Exception)), get(typeof(string))]),
+            transpiler => ($@"{'\t'}std::cerr << f__string(a_0) << std::endl;
+{'\t'}std::cerr << f__string(f__to_string(a_1)) << std::endl;
+{'\t'}std::cerr << f__string(a_2) << std::endl;
+{'\t'}std::abort();
+", 0)
+        );
+        code.For(
             type.GetMethod(nameof(Environment.GetEnvironmentVariable), [get(typeof(string))]),
             transpiler => ($@"{'\t'}auto p = std::getenv(f__string(a_0).c_str());
 {'\t'}return p ? f__new_string(p) : nullptr;

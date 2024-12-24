@@ -106,7 +106,7 @@ class WeakReferenceTests
         return w.TryGetTarget(out var z) && z == y ? 0 : 1;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Default) => Default(),
         nameof(TrackResurrection) => TrackResurrection(),

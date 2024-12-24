@@ -94,7 +94,7 @@ class FinalizerTests
         return Bar.Finalized == 1 ? 0 : 2;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(CollectAndWait) => CollectAndWait(),
         nameof(Suppress) => Suppress(),

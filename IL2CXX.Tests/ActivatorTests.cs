@@ -45,7 +45,7 @@ class ActivatorTests
         return 0;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(CreateInstance) => CreateInstance(),
         nameof(CreateInstance1) => CreateInstance1(),

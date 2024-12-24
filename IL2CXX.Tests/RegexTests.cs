@@ -7,7 +7,7 @@ class RegexTests
 {
     static int Compiled() => new Regex(@"^[a-zA-Z0-9]\d{2}[a-zA-Z0-9](-\d{3}){2}[a-zA-Z0-9]$", RegexOptions.Compiled).IsMatch("A08Z-931-468A") ? 0 : 1;
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Compiled) => Compiled(),
         _ => -1

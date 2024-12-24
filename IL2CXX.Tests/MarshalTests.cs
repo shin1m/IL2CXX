@@ -182,7 +182,7 @@ class MarshalTests
         return 0;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(SizeOfType) => SizeOfType(),
         nameof(SizeOfTypeOfT) => SizeOfTypeOfT(),

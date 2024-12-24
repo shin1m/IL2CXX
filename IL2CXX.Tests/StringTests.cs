@@ -31,7 +31,7 @@ class StringTests
     static int ToLowerInvariant() => AssertEquals("Hello, World!".ToLowerInvariant(), "hello, world!");
     static int Surrogate() => "\uD8000\uDB800\uDC00".Length == 5 ? 0 : 1;
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Equality) => Equality(),
         nameof(Concatenation) => Concatenation(),

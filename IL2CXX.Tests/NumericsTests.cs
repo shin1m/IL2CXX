@@ -288,7 +288,7 @@ class NumericsTests
         return x.X == -1f ? 0 : 1;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(BitIsPow2) => BitIsPow2(),
         nameof(BitRoundUpToPowerOf2) => BitRoundUpToPowerOf2(),

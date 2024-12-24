@@ -142,7 +142,7 @@ class CallTests
         return trim.Target is string x && x == " Hello " ? 0 : 1;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(CallVirtual) => CallVirtual(),
         nameof(ConstrainedCallVirtual) => ConstrainedCallVirtual(),

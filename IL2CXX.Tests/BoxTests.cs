@@ -38,7 +38,7 @@ class BoxTests
     static int ConvertValueOther() => Convert<int, short>(1) == 0 ? 0 : 1;
     static int ConvertValueBox() => Convert<int, object?>(0) != null ? 0 : 1;
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(BoxObject) => BoxObject(),
         nameof(BoxValue) => BoxValue(),

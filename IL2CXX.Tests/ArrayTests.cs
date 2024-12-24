@@ -116,7 +116,7 @@ class ArrayTests
     static int New1() => AssertEquals(new string[1], [null]);
     static int New2() => (new string[1, 1])[0, 0] == null ? 0 : 1;
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(IsReadOnly) => IsReadOnly(),
         nameof(Clear) => Clear(),

@@ -16,7 +16,7 @@ class InlineArrayTests
     }
     static int Unmanaged() => Marshal.SizeOf<Foo>() == 64 ? 0 : 1;
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(One) => One(),
         nameof(Three) => Three(),

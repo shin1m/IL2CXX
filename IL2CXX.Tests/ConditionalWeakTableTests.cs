@@ -73,7 +73,7 @@ class ConditionalWeakTableTests
         return table.TryGetValue(x, out _) ? 3 : 0;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Default) => Default(),
         nameof(AddOrUpdate) => AddOrUpdate(),

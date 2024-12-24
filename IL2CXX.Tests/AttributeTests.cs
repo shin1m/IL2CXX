@@ -39,7 +39,7 @@ class AttributeTests
     static int IsDefinedForMethod() => IsDefined(typeof(Bar).GetMethod(nameof(Foo.Do)) ?? throw new Exception());
     static int IsDefinedForProperty() => IsDefined(typeof(Bar).GetProperty(nameof(Foo.X)) ?? throw new Exception());
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(GetForType) => GetForType(),
         nameof(GetForMethod) => GetForMethod(),

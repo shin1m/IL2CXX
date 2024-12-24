@@ -157,7 +157,7 @@ class NumberTests
         return new string(cs, 0, n) == "Bar" ? 0 : 3;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Unchecked) => Unchecked(),
         nameof(CheckedBinary) => CheckedBinary(),

@@ -87,7 +87,7 @@ unsafe class UnsafeTests
         return x == 1 ? 0 : 1;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Add) => Add(),
         nameof(AddByteOffset) => AddByteOffset(),

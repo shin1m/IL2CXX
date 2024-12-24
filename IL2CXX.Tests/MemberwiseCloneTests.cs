@@ -31,7 +31,7 @@ class MemberwiseCloneTests
         return y.X == "foo" && y.Y == 1 && y.Z.X == "bar" && y.Z.Y == 2 ? 0 : 1;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(CloneValue) => CloneValue(),
         nameof(CloneObject) => CloneObject(),

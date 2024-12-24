@@ -362,7 +362,7 @@ class ThreadingTests
         return bar.Field == foo1 ? 0 : 2;
     }
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Foreground) => Foreground(),
         nameof(Background) => Background(),

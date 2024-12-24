@@ -284,7 +284,7 @@ class TypeTests
     static int AssemblyGetName() => typeof(Zot).Assembly.GetName().Name == "IL2CXX.Tests" ? 0 : 1;
     static int AssemblyGetType() => typeof(Zot).Assembly.GetType(typeof(Zot).FullName ?? throw new Exception()) == typeof(Zot) ? 0 : 1;
 
-    static int Run(string[] arguments) => arguments[1] switch
+    static int Run(string[] arguments) => arguments[0] switch
     {
         nameof(Generic) => Generic(),
         nameof(IsGenericTypeDefinition) => IsGenericTypeDefinition(),

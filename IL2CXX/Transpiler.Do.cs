@@ -438,8 +438,8 @@ string.Join(",", ldftnMethods.OfType<MethodInfo>().Where(m =>
         if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))
         {
             arguments0 = $@"
-{'\t'}{'\t'}auto RECYCLONE__SPILL arguments = f__new_array<{Escape(typeofString.MakeArrayType())}, il2cxx::{EscapeForMember(typeofString)}>(argc);
-{'\t'}{'\t'}for (int i = 0; i < argc; ++i) arguments->f_data()[i] = f__new_string(argv[i]);";
+{'\t'}{'\t'}auto RECYCLONE__SPILL arguments = f__new_array<{Escape(typeofString.MakeArrayType())}, il2cxx::{EscapeForMember(typeofString)}>(argc - 1);
+{'\t'}{'\t'}for (int i = 1; i < argc; ++i) arguments->f_data()[i - 1] = f__new_string(argv[i]);";
             arguments1 = "arguments";
         }
         writerForDefinitions.WriteLine($@"

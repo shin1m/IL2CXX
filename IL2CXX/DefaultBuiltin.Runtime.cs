@@ -711,26 +711,7 @@ partial class DefaultBuiltin
         );
         code.For(
             type.GetMethod("IsPrimitiveImpl", declaredAndInstance),
-            transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}switch (a_0->v__cor_element_type) {{
-{'\t'}case 2:
-{'\t'}case 3:
-{'\t'}case 4:
-{'\t'}case 5:
-{'\t'}case 6:
-{'\t'}case 7:
-{'\t'}case 8:
-{'\t'}case 9:
-{'\t'}case 10:
-{'\t'}case 11:
-{'\t'}case 12:
-{'\t'}case 13:
-{'\t'}case 24:
-{'\t'}case 25:
-{'\t'}{'\t'}return true;
-{'\t'}default:
-{'\t'}{'\t'}return false;
-{'\t'}}}
-", 0)
+            transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->f_primitive();\n", 0)
         );
         code.For(
             type.GetMethod("IsPointerImpl", declaredAndInstance),

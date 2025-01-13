@@ -7,7 +7,7 @@ T* f__new_constructed(auto&&... a_xs)
 }
 
 template<typename T_array, typename T_element>
-T_array* f__new_array(size_t a_length)
+T_array* f__new_array(uint32_t a_length)
 {
 	t__new<T_array> p(sizeof(T_element) * a_length);
 	p->v__length = a_length;
@@ -155,7 +155,7 @@ inline std::string f__string(t_System_2eString* a_p)
 }
 t_System_2eString* f__to_string(t__object* a_p);
 
-t_System_2eArray* f__new_array(t__type* a_type, size_t a_length, auto a_do)
+t_System_2eArray* f__new_array(t__type* a_type, uint32_t a_length, auto a_do)
 {
 	auto a = sizeof(t_System_2eArray) + sizeof(t_System_2eArray::t__bound);
 	auto n = a_type->v__size * a_length;

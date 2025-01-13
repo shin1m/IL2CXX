@@ -115,6 +115,83 @@ class ArrayTests
     }
     static int New1() => AssertEquals(new string[1], [null]);
     static int New2() => (new string[1, 1])[0, 0] == null ? 0 : 1;
+    static int BufferBlockCopy()
+    {
+        int[] xs = { 0x00010203, 0x04050607 };
+        int[] ys = { 0x08090a0b, 0x0c0d0e0f };
+        Buffer.BlockCopy(xs, 3, ys, 1, 2);
+        if (ys[0] != 0x0807000b) return 1;
+        if (ys[1] != 0x0c0d0e0f) return 2;
+        return 0;
+    }
+    static int BufferBlockCopyNull()
+    {
+        try
+        {
+            Buffer.BlockCopy(null!, 0, Array.Empty<int>(), 0, 0);
+            return 1;
+        }
+        catch (ArgumentNullException) { }
+        try
+        {
+            Buffer.BlockCopy(Array.Empty<int>(), 0, null!, 0, 0);
+            return 2;
+        }
+        catch (ArgumentNullException) { }
+        return 0;
+    }
+    static int BufferBlockCopyInvalid()
+    {
+        string[] xs = { "foo", "bar" };
+        int[] ys = { 0, 1 };
+        try
+        {
+            Buffer.BlockCopy(xs, 0, ys, 0, 0);
+            return 1;
+        }
+        catch (ArgumentException) { }
+        try
+        {
+            Buffer.BlockCopy(ys, 0, xs, 0, 0);
+            return 2;
+        }
+        catch (ArgumentException) { }
+        try
+        {
+            Buffer.BlockCopy(ys, 4, ys, 0, 5);
+            return 3;
+        }
+        catch (ArgumentException) { }
+        try
+        {
+            Buffer.BlockCopy(ys, 0, ys, 4, 5);
+            return 4;
+        }
+        catch (ArgumentException) { }
+        return 0;
+    }
+    static int BufferBlockCopyOutOfRange()
+    {
+        try
+        {
+            Buffer.BlockCopy(Array.Empty<int>(), -1, Array.Empty<int>(), 0, 0);
+            return 1;
+        }
+        catch (ArgumentException) { }
+        try
+        {
+            Buffer.BlockCopy(Array.Empty<int>(), 0, Array.Empty<int>(), -1, 0);
+            return 2;
+        }
+        catch (ArgumentException) { }
+        try
+        {
+            Buffer.BlockCopy(Array.Empty<int>(), 0, Array.Empty<int>(), 0, -1);
+            return 3;
+        }
+        catch (ArgumentException) { }
+        return 0;
+    }
 
     static int Run(string[] arguments) => arguments[0] switch
     {
@@ -137,6 +214,10 @@ class ArrayTests
         nameof(ReverseT) => ReverseT(),
         nameof(New1) => New1(),
         nameof(New2) => New2(),
+        nameof(BufferBlockCopy) => BufferBlockCopy(),
+        nameof(BufferBlockCopyNull) => BufferBlockCopyNull(),
+        nameof(BufferBlockCopyInvalid) => BufferBlockCopyInvalid(),
+        nameof(BufferBlockCopyOutOfRange) => BufferBlockCopyOutOfRange(),
         _ => -1
     };
 
@@ -165,7 +246,11 @@ class ArrayTests
             nameof(Reverse),
             nameof(ReverseT),
             nameof(New1),
-            nameof(New2)
+            nameof(New2),
+            nameof(BufferBlockCopy),
+            nameof(BufferBlockCopyNull),
+            nameof(BufferBlockCopyInvalid),
+            nameof(BufferBlockCopyOutOfRange)
         )] string name,
         [Values] bool cooperative
     ) => Utilities.Run(build, cooperative, name);

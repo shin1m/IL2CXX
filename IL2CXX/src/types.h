@@ -18,7 +18,7 @@ using t_slot_of = recyclone::t_slot_of<T, t__type>;
 
 struct t__object : t_object<t__type>
 {
-	t__extension* v_extension;
+	t__extension* v_extension = nullptr;
 
 	using t_object<t__type>::t_object;
 	t__extension* f_extension();
@@ -364,7 +364,9 @@ struct t__type : t__abstract_type
 	void f_finalize(t_object<t__type>* a_this, t_scan<t__type> a_scan)
 	{
 		f_scan(a_this, a_scan);
-		delete static_cast<t__object*>(a_this)->v_extension;
+		auto p = static_cast<t__object*>(a_this);
+		delete p->v_extension;
+		p->v_extension = nullptr;
 	}
 	void f_prepare_for_finalizer(t_object<t__type>* a_this)
 	{
@@ -397,6 +399,7 @@ struct t__type : t__abstract_type
 	static void f_do_destroy_unmanaged_blittable(void* a_p);
 	void (*f_destroy_unmanaged)(void*) = f_do_destroy_unmanaged;
 	bool f_is(t__abstract_type* a_type) const;
+	bool f_primitive() const;
 	bool f_assignable_to_value(t__type* a_type) const
 	{
 		assert(a_type->v__value_type);
@@ -633,9 +636,10 @@ T_r f__generic_method(t__object* a_this, T_an... a_n, void** a_site)
 	return a_this->f_type() == &t__type_of<T_type>::v__instance ? A_method(static_cast<T_type*>(a_this), a_n...) : f__generic_invoke<T_interface, A_i, A_j, T_r, T_an...>(a_this, a_n..., a_site);
 }
 
-inline auto f__copy(auto a_in, size_t a_n, auto a_out)
+template<typename T>
+inline T* f__overlappable_copy(const T* a_in, size_t a_n, T* a_out)
 {
-	return a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
+	return std::is_trivially_copyable_v<T> ? static_cast<T*>(std::memmove(a_out, a_in, a_n * sizeof(T))) : a_in < a_out ? std::copy_backward(a_in, a_in + a_n, a_out + a_n) : std::copy_n(a_in, a_n, a_out);
 }
 
 }

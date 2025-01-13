@@ -184,12 +184,12 @@ void t__type::f_do_clear_pointer(void* a_p, size_t a_n)
 
 void t__type::f_do_copy(const void* a_from, size_t a_n, void* a_to)
 {
-	f__copy(static_cast<const t_slot<t__type>*>(a_from), a_n, static_cast<t_slot<t__type>*>(a_to));
+	f__overlappable_copy(static_cast<const t_slot<t__type>*>(a_from), a_n, static_cast<t_slot<t__type>*>(a_to));
 }
 
 void t__type::f_do_copy_pointer(const void* a_from, size_t a_n, void* a_to)
 {
-	f__copy(static_cast<void* const*>(a_from), a_n, static_cast<void**>(a_to));
+	f__overlappable_copy(static_cast<void* const*>(a_from), a_n, static_cast<void**>(a_to));
 }
 
 t__object* t__type::f_do_box(void* a_p)
@@ -244,6 +244,29 @@ bool t__type::f_is(t__abstract_type* a_type) const
 		p = p->v__base;
 	} while (p);
 	return false;
+}
+
+bool t__type::f_primitive() const
+{
+	switch (v__cor_element_type) {
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	case 8:
+	case 9:
+	case 10:
+	case 11:
+	case 12:
+	case 13:
+	case 24:
+	case 25:
+		return true;
+	default:
+		return false;
+	}
 }
 
 bool t__type::f_assignable_to_variant(t__type* a_type) const

@@ -317,11 +317,12 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
     {
         code.Members = transpiler => ($@"{'\t'}struct t__bound
 {'\t'}{{
-{'\t'}{'\t'}size_t v_length;
-{'\t'}{'\t'}int v_lower;
+{'\t'}{'\t'}uint32_t v_length;
+{'\t'}{'\t'}int32_t v_lower;
 {'\t'}}};
-{'\t'}size_t v__length;
-{'\t'}t__bound* f_bounds()
+{'\t'}uint32_t v__length;
+{(transpiler.Is64Bit ? $@"{'\t'}uint32_t v__padding;
+" : string.Empty)}{'\t'}t__bound* f_bounds()
 {'\t'}{{
 {'\t'}{'\t'}return reinterpret_cast<t__bound*>(this + 1);
 {'\t'}}}
@@ -824,7 +825,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
         );
         code.For(
             type.GetProperty("Chars")!.GetMethod,
-            transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "a_0->v__5fstringLength") + "\treturn (&a_0->v__5ffirstChar)[a_1];\n", 1)
+            transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "static_cast<uint32_t>(a_0->v__5fstringLength)") + "\treturn (&a_0->v__5ffirstChar)[static_cast<uint32_t>(a_1)];\n", 1)
         );
     })
     .For(get(typeof(sbyte)), (type, code) => SetupPrimitive(get, type, code))
@@ -1335,7 +1336,14 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
         var methods = GenericMethods(type);
         code.For(
             type.GetMethod(nameof(Buffer.BlockCopy)),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_2") + "\tf__copy(reinterpret_cast<char*>(a_0->f_bounds() + a_0->f_type()->v__rank) + a_1, a_4, reinterpret_cast<char*>(a_2->f_bounds() + a_2->f_type()->v__rank) + a_3);\n", 1)
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_2") + $@"{'\t'}auto t0 = a_0->f_type();
+{'\t'}auto e0 = t0->v__element;
+{'\t'}auto t1 = a_2->f_type();
+{'\t'}auto e1 = t1->v__element;
+{'\t'}if (!e0->f_primitive() || !e1->f_primitive() || a_0->v__length * e0->v__size < a_1 + a_4 || a_2->v__length * e1->v__size < a_3 + a_4) {transpiler.GenerateThrow("Argument")};
+{'\t'}if (a_1 < 0 || a_3 < 0 || a_4 < 0) {transpiler.GenerateThrow("ArgumentOutOfRange")};
+{'\t'}std::memmove(reinterpret_cast<char*>(a_2->f_bounds() + t1->v__rank) + a_3, reinterpret_cast<char*>(a_0->f_bounds() + t0->v__rank) + a_1, a_4);
+", 0)
         );
         code.ForGeneric(
             methods.First(x => x.Name == "Memmove" && x.GetGenericArguments().Length == 1),

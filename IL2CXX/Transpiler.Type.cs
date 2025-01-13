@@ -1173,7 +1173,7 @@ void t__type_of<{identifier}>::f_do_clear(void* a_p, size_t a_n)
 }}
 void t__type_of<{identifier}>::f_do_copy(const void* a_from, size_t a_n, void* a_to)
 {{
-{'\t'}f__copy(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));
+{'\t'}f__overlappable_copy(static_cast<const decltype({identifier}::v__value)*>(a_from), a_n, static_cast<decltype({identifier}::v__value)*>(a_to));
 }}
 t__object* t__type_of<{identifier}>::f_do_box(void* a_p)
 {{

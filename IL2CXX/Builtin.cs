@@ -69,7 +69,7 @@ public class Builtin : IBuiltin
 {'\t'}auto extra = sizeof({transpiler.EscapeForMember(element)}) * n;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = n;
-{string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tp->v__bounds[{i}] = {{static_cast<size_t>(a_{i}), 0}};\n"))
+{string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tp->v__bounds[{i}] = {{static_cast<uint32_t>(a_{i}), 0}};\n"))
 }{'\t'}std::memset(p->f_data(), 0, extra);
 {'\t'}return p;
 ", 0);
@@ -86,7 +86,7 @@ public class Builtin : IBuiltin
                         return ((transpiler.CheckRange ? $"\tif (a_0 < 0) [[unlikely]] {transpiler.GenerateThrow("IndexOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto extra = sizeof({transpiler.EscapeForMember(element)}) * a_0;
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = a_0;
-{'\t'}p->v__bounds[0] = {{static_cast<size_t>(a_0), 0}};
+{'\t'}p->v__bounds[0] = {{static_cast<uint32_t>(a_0), 0}};
 {'\t'}std::memset(p->f_data(), 0, extra);
 {'\t'}for (size_t i = 0; i < a_0; ++i) p->f_data()[i] = {transpiler.Escape(c)}({string.Join(", ", Enumerable.Range(1, indices).Select(i => $"a_{i}"))});
 {'\t'}return p;

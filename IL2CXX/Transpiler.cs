@@ -645,7 +645,7 @@ public partial class Transpiler
         if (!stack.Type.IsByRef && !stack.Type.IsPointer && !stack.Type.IsValueType) writer.Write(GenerateCheckNull(stack.Variable));
     }
     public string GenerateCheckArgumentNull(string variable) => CheckNull ? $"\tif (!{variable}) [[unlikely]] {GenerateThrow("ArgumentNull")};\n" : string.Empty;
-    public string GenerateCheckRange(string index, string length) => CheckRange ? $"\tif (static_cast<size_t>({index}) >= {length}) [[unlikely]] {GenerateThrow("IndexOutOfRange")};\n" : string.Empty;
+    public string GenerateCheckRange(string index, string length) => CheckRange ? $"\tif (static_cast<uint32_t>({index}) >= {length}) [[unlikely]] {GenerateThrow("IndexOutOfRange")};\n" : string.Empty;
     private void GenerateArrayAccess(Stack array, Stack index, Func<string, string> access)
     {
         GenerateCheckNull(array);

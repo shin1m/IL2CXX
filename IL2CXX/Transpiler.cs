@@ -16,6 +16,8 @@ public partial class Transpiler
     struct TypedReferenceTag { }
     class Stack : IEnumerable<Stack>
     {
+        public static readonly object Unknown = new();
+
         private readonly Transpiler transpiler;
         public readonly Stack Pop;
         public readonly Dictionary<string, int> Indices;
@@ -24,6 +26,7 @@ public partial class Transpiler
         public readonly string VariableType;
         public readonly bool IsPointer;
         public readonly string Variable;
+        public object? CompiledValue = Unknown;
 
         public Stack(Transpiler transpiler)
         {
@@ -206,6 +209,10 @@ public partial class Transpiler
     private readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un;
     private readonly IReadOnlyDictionary<(string, string), Type> typeOfShl;
     private readonly MethodInfo finalizeOfObject;
+    private readonly MethodInfo methodGetTypeFromHandle;
+    private readonly MethodInfo methodIsValueTypeGet;
+    private readonly MethodInfo methodTypeEquality;
+    private readonly MethodInfo methodTypeInequality;
     private readonly Instruction[] instructions1 = new Instruction[256];
     private readonly Instruction[] instructions2 = new Instruction[256];
     private readonly HashSet<string> identifiers = [];

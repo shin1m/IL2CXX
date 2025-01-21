@@ -151,6 +151,10 @@ partial class Transpiler
             [("void*", "void*")] = typeofVoidPointer
         };
         finalizeOfObject = FinalizeOf(typeofObject) ?? throw new Exception();
+        methodGetTypeFromHandle = typeofType.GetMethod(nameof(Type.GetTypeFromHandle)) ?? throw new Exception();
+        methodIsValueTypeGet = typeofType.GetProperty(nameof(Type.IsValueType))?.GetMethod ?? throw new Exception();
+        methodTypeEquality = typeofType.GetMethod("op_Equality") ?? throw new Exception();
+        methodTypeInequality = typeofType.GetMethod("op_Inequality") ?? throw new Exception();
         for (int i = 0; i < 256; ++i)
         {
             instructions1[i] = new Instruction { OpCode = opcodes1[i] };
@@ -421,7 +425,46 @@ partial class Transpiler
                     m = GetInterfaceStaticConcrete((MethodInfo)m, constrained);
                     constrained = null;
                 }
-                GenerateCall(m, Escape(m), stack, indexToStack[index]);
+                var after = indexToStack[index];
+                if (m.DeclaringType == typeofType)
+                {
+                    if (m == methodGetTypeFromHandle)
+                    {
+                        if (stack.CompiledValue is Type t) after.CompiledValue = t;
+                    }
+                    else if (m == methodIsValueTypeGet)
+                    {
+                        if (stack.CompiledValue is Type t)
+                        {
+                            after.CompiledValue = t.IsValueType;
+                            writer.WriteLine($"\t{after.Variable} = {(t.IsValueType ? 1 : 0)};");
+                            return index;
+                        }
+                    }
+                    else if (m == methodTypeEquality)
+                    {
+                        if (stack.Pop.CompiledValue is Type t0 && stack.CompiledValue is Type t1)
+                        {
+                            after.CompiledValue = t0 == t1;
+                            writer.WriteLine($"\t{after.Variable} = {(t0 == t1 ? 1 : 0)};");
+                            return index;
+                        }
+                    }
+                    else if (m == methodTypeInequality)
+                    {
+                        if (stack.Pop.CompiledValue is Type t0 && stack.CompiledValue is Type t1)
+                        {
+                            after.CompiledValue = t0 != t1;
+                            writer.WriteLine($"\t{after.Variable} = {(t0 != t1 ? 1 : 0)};");
+                            return index;
+                        }
+                    }
+                    else if (stack.CompiledValue is Type t)
+                    {
+                        Console.Error.WriteLine($"{m}: {t}");
+                    }
+                }
+                GenerateCall(m, Escape(m), stack, after);
                 return index;
             };
         });
@@ -1472,13 +1515,15 @@ GenerateCheckNull("p") + generateVirtual("p")
             x.Generate = (index, stack) =>
             {
                 var member = ParseMember(ref index);
+                var after = indexToStack[index];
+                after.CompiledValue = member;
                 writer.WriteLine($@" {member}
-{'\t'}{indexToStack[index].Variable} = {member switch
+{'\t'}{after.Variable} = {member switch
 {
-FieldInfo f => $"&v__field_{Escape(f.DeclaringType ?? throw new Exception())}__{Escape(f.Name)}",
-MethodBase m => $"&v__method_{Escape(m)}",
-Type t => $"&t__type_of<{Escape(t)}>::v__instance",
-_ => throw new Exception()
+    FieldInfo f => $"&v__field_{Escape(f.DeclaringType ?? throw new Exception())}__{Escape(f.Name)}",
+    MethodBase m => $"&v__method_{Escape(m)}",
+    Type t => $"&t__type_of<{Escape(t)}>::v__instance",
+    _ => throw new Exception()
 }};");
                 return index;
             };

@@ -124,6 +124,7 @@ string.Join(", ", arguments.Skip(1).Select((x, i) => $"a_{i + 1}").Prepend($"&a_
             var value = (string)(dllimport.ConstructorArguments[0].Value ?? throw new Exception());
             T named<T>(string name, T @default) => (T?)dllimport.NamedArguments.FirstOrDefault(x => x.MemberName == name).TypedValue.Value ?? @default;
             var entryPoint = named(nameof(DllImportAttribute.EntryPoint), method.Name);
+            if (value == "QCall") throw new Exception($"QCall {entryPoint} for {method.DeclaringType} :: {method}");
             var callingConvention = named(nameof(DllImportAttribute.CallingConvention), CallingConvention.Winapi);
             var charSet = named(nameof(DllImportAttribute.CharSet), CharSet.Ansi);
             var setLastError = named(nameof(DllImportAttribute.SetLastError), false);
@@ -183,7 +184,6 @@ _ => string.Empty
         foreach (var x in definedIndices)
             for (var i = 0; i < x.Value.Index; ++i)
                 writer.WriteLine($"\t{x.Key} {x.Value.Prefix}{i};");
-        //if (!method.DeclaringType.Name.StartsWith("AllowedBmpCodePointsBitmap")) writer.WriteLine($"\tprintf(\"{Escape(method)}\\n\");");
         if (!inline) writer.WriteLine("\tf_epoch_point();");
         var writers = new Stack<TextWriter>();
         var tryBegins = new Queue<ExceptionHandlingClause>(body.ExceptionHandlingClauses.OrderBy(x => x.TryOffset).ThenByDescending(x => x.HandlerOffset + x.HandlerLength));

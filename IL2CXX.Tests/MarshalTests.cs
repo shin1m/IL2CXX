@@ -23,7 +23,13 @@ class MarshalTests
         Console.WriteLine($"{n}");
         return n == 8 ? 0 : 1;
     }
-    static int SizeOfInstance()
+    static int SizeOfObject()
+    {
+        var n = Marshal.SizeOf((object)new Point { X = 0, Y = 1 });
+        Console.WriteLine($"{n}");
+        return n == 8 ? 0 : 1;
+    }
+    static int SizeOfValue()
     {
         var n = Marshal.SizeOf(new Point { X = 0, Y = 1 });
         Console.WriteLine($"{n}");
@@ -41,7 +47,7 @@ class MarshalTests
     {
         var n = Marshal.SizeOf<Name>();
         Console.WriteLine($"{n}");
-        return n == Marshal.SizeOf<IntPtr>() + 4 ? 0 : 1;
+        return n == Marshal.SizeOf<nint>() + 4 ? 0 : 1;
     }
     static int StructureToPtr(Func<Name, Name> f)
     {
@@ -138,16 +144,16 @@ class MarshalTests
         return x.B.Count == 1 ? 0 : 1;
     }
 
-    static void Foo(IntPtr x, IntPtr y) { }
-    static int GetFunctionPointerForDelegate() => Marshal.GetFunctionPointerForDelegate((Action<IntPtr, IntPtr>)Foo) == IntPtr.Zero ? 1 : 0;
-    delegate IntPtr BarDelegate(IntPtr x, ref IntPtr y);
-    static IntPtr Bar(IntPtr x, ref IntPtr y) => new IntPtr((int)x + (int)y);
-    static int GetDelegateForFunctionPointer(Func<IntPtr, BarDelegate> get)
+    static void Foo(nint x, nint y) { }
+    static int GetFunctionPointerForDelegate() => Marshal.GetFunctionPointerForDelegate((Action<nint, nint>)Foo) == nint.Zero ? 1 : 0;
+    delegate nint BarDelegate(nint x, ref nint y);
+    static nint Bar(nint x, ref nint y) => new nint((int)x + (int)y);
+    static int GetDelegateForFunctionPointer(Func<nint, BarDelegate> get)
     {
         var p = Marshal.GetFunctionPointerForDelegate((BarDelegate)Bar);
         var d = get(p);
-        var y = new IntPtr(2);
-        if (d(new IntPtr(1), ref y) != new IntPtr(3)) return 1;
+        var y = new nint(2);
+        if (d(new nint(1), ref y) != new nint(3)) return 1;
         return p == Marshal.GetFunctionPointerForDelegate(d) ? 0 : 1;
     }
     static int GetDelegateForFunctionPointer() => GetDelegateForFunctionPointer(x => (BarDelegate)Marshal.GetDelegateForFunctionPointer(x, typeof(BarDelegate)));
@@ -186,7 +192,8 @@ class MarshalTests
     {
         nameof(SizeOfType) => SizeOfType(),
         nameof(SizeOfTypeOfT) => SizeOfTypeOfT(),
-        nameof(SizeOfInstance) => SizeOfInstance(),
+        nameof(SizeOfObject) => SizeOfObject(),
+        nameof(SizeOfValue) => SizeOfValue(),
         nameof(SizeOfByValTStr) => SizeOfByValTStr(),
         nameof(StructureToPtr) => StructureToPtr(),
         nameof(StructureToPtrOfT) => StructureToPtrOfT(),
@@ -209,7 +216,8 @@ class MarshalTests
         [Values(
             nameof(SizeOfType),
             nameof(SizeOfTypeOfT),
-            nameof(SizeOfInstance),
+            nameof(SizeOfObject),
+            nameof(SizeOfValue),
             nameof(SizeOfByValTStr),
             nameof(StructureToPtr),
             nameof(StructureToPtrOfT),

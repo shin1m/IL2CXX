@@ -113,13 +113,13 @@ class NumberTests
     }
     static int ToInt32()
     {
-        var x = new IntPtr(32);
+        var x = new nint(32);
         return x.ToInt32() == 32 ? 0 : 1;
     }
     static unsafe int ToPointer()
     {
-        var x = new IntPtr(32);
-        return new IntPtr(x.ToPointer()) == x ? 0 : 1;
+        var x = new nint(32);
+        return new nint(x.ToPointer()) == x ? 0 : 1;
     }
     enum Names
     {

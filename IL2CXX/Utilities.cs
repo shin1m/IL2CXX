@@ -40,4 +40,6 @@ static class Utilities
     public static void ThrowTarget() => throw new TargetException();
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void ThrowTargetParameterCount() => throw new TargetParameterCountException();
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ThrowThreadState() => throw new ThreadStateException();
 }

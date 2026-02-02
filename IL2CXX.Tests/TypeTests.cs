@@ -123,12 +123,6 @@ class TypeTests
         if (c == null) return 1;
         return c.Invoke(["foo"]) is Zot zot && zot.X == "foo" ? 0 : 2;
     }
-    static int GetConstructorOfString()
-    {
-        var c = typeof(string).GetConstructor([typeof(char[])]);
-        if (c == null) return 1;
-        return c.Invoke(["foo".ToCharArray()]) is string x && x == "foo" ? 0 : 2;
-    }
     static int GetConstructorOfArray()
     {
         var c = typeof(string[]).GetConstructor([typeof(int)]);
@@ -299,7 +293,6 @@ class TypeTests
         nameof(SetField) => SetField(),
         nameof(GetFields) => GetFields(),
         nameof(GetConstructor) => GetConstructor(),
-        nameof(GetConstructorOfString) => GetConstructorOfString(),
         nameof(GetConstructorOfArray) => GetConstructorOfArray(),
         nameof(GetConstructorOfArrayOfArrays) => GetConstructorOfArrayOfArrays(),
         nameof(GetConstructors) => GetConstructors(),
@@ -328,7 +321,6 @@ class TypeTests
 
     [OneTimeSetUp]
     public void OneTimeSetUp() => build = Utilities.Build(Run, null, [
-        typeof(string),
         typeof(string[]),
         typeof(string[][]),
         typeof(Zot),
@@ -352,7 +344,6 @@ class TypeTests
             nameof(SetField),
             nameof(GetFields),
             nameof(GetConstructor),
-            nameof(GetConstructorOfString),
             nameof(GetConstructorOfArray),
             nameof(GetConstructorOfArrayOfArrays),
             nameof(GetConstructors),

@@ -10,7 +10,7 @@ partial class DefaultBuiltin
     {
         code.For(
             type.GetConstructor([get(typeof(string)), get(typeof(Assembly))]),
-            transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
+            transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(type)}>();
 {'\t'}return p;
 ", 0)
         );

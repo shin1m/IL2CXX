@@ -121,8 +121,8 @@ partial class DefaultBuiltin
             }
         );
     })
-    .For(get(typeof(IntPtr)), ForIntPtr("intptr_t"))
-    .For(get(typeof(UIntPtr)), ForIntPtr("uintptr_t"))
+    .For(get(typeof(nint)), ForIntPtr("intptr_t"))
+    .For(get(typeof(nuint)), ForIntPtr("uintptr_t"))
     .For(get(typeof(Type)), (type, code) =>
     {
         code.For(
@@ -236,7 +236,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 ", false, null);
         code.For(
             type.GetProperty(nameof(RuntimeFieldHandle.Value))!.GetMethod,
-            transpiler => ($"\treturn {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{a_0->v__field}};\n", 1)
+            transpiler => ($"\treturn {transpiler.EscapeForStacked(get(typeof(nint)))}{{a_0->v__field}};\n", 1)
         );
     })
     .For(get(typeof(RuntimeMethodHandle)), (type, code) =>
@@ -553,6 +553,15 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}}}
 ", 0)
         );
+        // TODO
+        code.For(
+            type.GetMethod("_StartNoGCRegion", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+        );
+        code.For(
+            type.GetMethod("_EndNoGCRegion", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+        );
         code.For(
             type.GetMethod(nameof(GC.SuppressFinalize)),
             transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_type()->f_suppress_finalize(a_0);\n", 1)
@@ -565,13 +574,27 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             type.GetMethod(nameof(GC.WaitForPendingFinalizers)),
             transpiler => ("\tf_engine()->f_finalize();\n", 1)
         );
-        code.For(
-            type.GetMethod("AllocateNewArray", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}return f__new_array(static_cast<t__type*>(static_cast<void*>(a_0))->v__element, a_1, [&](auto a_p, auto a_n)
-{'\t'}{{
-{'\t'}{'\t'}if (!a_2) std::memset(a_p, 0, a_n);
-{'\t'}}});
-", 0)
+        code.ForGeneric(
+            type.GetMethod(nameof(GC.AllocateUninitializedArray)),
+            (transpiler, types) =>
+            {
+                var t = types[0];
+                var a = transpiler.Escape(t.MakeArrayType());
+                var e = transpiler.Escape(t);
+                return (transpiler.Define(t).IsManaged ? $@"{'\t'}t__new<{a}> p(sizeof({e}) * a_0);
+{'\t'}p->v__length = a_0;
+{'\t'}p->v__bounds[0] = {{a_0, 0}};
+{'\t'}return p;
+" : $"\treturn f__new_array<{a}, {e}>(a_0);\n", 1);
+            }
+        );
+        code.ForGeneric(
+            type.GetMethod(nameof(GC.AllocateArray)),
+            (transpiler, types) =>
+            {
+                var t = types[0];
+                return ($"\treturn f__new_array<{transpiler.Escape(t.MakeArrayType())}, {transpiler.Escape(t)}>(a_0);\n", 0);
+            }
         );
         // TODO
         code.For(
@@ -594,7 +617,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
     {
         code.For(
             type.GetMethod("Create", declaredAndInstance),
-            transpiler => ($"\ta_0->v__5ftaggedHandle = {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
+            transpiler => ($"\ta_0->v__5ftaggedHandle = {transpiler.EscapeForStacked(get(typeof(nint)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
         );
         code.For(
             type.GetMethod("Finalize", declaredAndInstance),
@@ -621,7 +644,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
     {
         code.ForGeneric(
             type.GetMethod("Create", declaredAndInstance),
-            (transpiler, types) => ($"\ta_0->v__5ftaggedHandle = {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
+            (transpiler, types) => ($"\ta_0->v__5ftaggedHandle = {transpiler.EscapeForStacked(get(typeof(nint)))}{{new t__weak_handle(a_1, a_2)}};\n", 1)
         );
         code.ForGeneric(
             type.GetMethod("Finalize", declaredAndInstance),
@@ -658,19 +681,6 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             type.GetMethod("InternalEqualTypes", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => ("\treturn a_0->f_type() == a_1->f_type();\n", 1)
         );
-        code.For(
-            type.GetMethod("InternalAllocLike", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($"\treturn static_cast<{transpiler.EscapeForStacked(transpiler.typeofMulticastDelegate)}>(a_0->f_type()->f_new_zerod());\n", 1)
-        );
-        // TODO
-        code.For(
-            type.GetMethod("GetInvokeMethod", declaredAndInstance),
-            transpiler => ("\treturn {};\n", 1)
-        );
-        code.For(
-            type.GetMethod("GetMulticastInvoke", declaredAndInstance),
-            transpiler => ("\treturn a_0->f_type()->v__multicast_invoke;\n", 1)
-        );
         // TODO
         code.For(
             type.GetMethod("GetMethodImpl", declaredAndInstance),
@@ -697,6 +707,17 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             type.GetMethod("InvocationListLogicallyNull", declaredAndInstance),
             transpiler => ("\treturn !a_0->v__5finvocationList;\n", 1)
         );
+        code.For(
+            type.GetMethod("NewMulticastDelegate", declaredAndInstance, [get(typeof(object[])), get(typeof(int)), get(typeof(bool))]),
+            transpiler => ($@"{'\t'}auto type = a_0->f_type();
+{'\t'}auto p = static_cast<{transpiler.EscapeForStacked(transpiler.typeofMulticastDelegate)}>(type->f_new_zeroed());
+{'\t'}p->v__5ftarget = p;
+{'\t'}p->v__5fmethodPtr = type->v__multicast_invoke;
+{'\t'}p->v__5finvocationList = a_1;
+{'\t'}p->v__5finvocationCount = a_2;
+{'\t'}return p;
+", 0)
+        );
     })
     .For(get(typeof(Activator)), (type, code) =>
     {
@@ -710,7 +731,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
                 var constructor = t.GetConstructor(Type.EmptyTypes);
                 if (constructor == null) return ("\tthrow std::runtime_error(\"no parameterless constructor\");\n", 0);
                 transpiler.Enqueue(constructor);
-                return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(t)}>();
+                return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(t)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}return p;
 ", 0);
@@ -731,7 +752,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (type->v__generic_definition) for (auto p = type->v__generic_arguments; *p; ++p) if ((*p)->f_type() != &t__type_of<t__type>::v__instance) {transpiler.GenerateThrow("Argument")};
 {'\t'}auto n = a_3 ? a_3->v__length : 0;
-{'\t'}if (type->v__value_type && n <= 0) return type->f_new_zerod();
+{'\t'}if (type->v__value_type && n <= 0) return type->f_new_zeroed();
 {'\t'}if (!type->v__constructors) std::cerr << ""no constructors: "" << f__string(type->v__full_name) << std::endl;
 {'\t'}t__runtime_constructor_info* constructor = nullptr;
 {'\t'}type->f_each_constructor(a_1, [&](auto a_x)
@@ -746,7 +767,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}{'\t'}return false;
 {'\t'}}});
 {'\t'}if (!constructor) throw std::runtime_error(""no matching constructor found: "" + f__string(type->v__full_name));
-{'\t'}auto p = type->f_new_zerod();
+{'\t'}auto p = type->f_new_zeroed();
 {'\t'}constructor->v__invoke(p, a_1, a_2, n > 0 ? a_3 : nullptr, a_4);
 {'\t'}return p;
 ", 0)
@@ -756,27 +777,17 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
     {
         code.Initialize = transpiler => $"\t\t{transpiler.Escape(type.GetField(nameof(string.Empty)) ?? throw new Exception())} = f__new_string(u\"\"sv);";
         code.For(
-            type.GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic),
+            type.GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic, [get(typeof(nint))]),
             transpiler => ("\treturn f__new_string(a_0);\n", 2)
         );
         // TODO
         code.For(
-            type.GetMethod("SetTrailByte", BindingFlags.Instance | BindingFlags.NonPublic),
+            type.GetMethod(nameof(string.Intern)),
             transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
         // TODO
         code.For(
-            type.GetMethod("TryGetTrailByte", BindingFlags.Instance | BindingFlags.NonPublic),
-            transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-        );
-        // TODO
-        code.For(
-            type.GetMethod("Intern", BindingFlags.Instance | BindingFlags.NonPublic),
-            transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
-        );
-        // TODO
-        code.For(
-            type.GetMethod("IsInterned", BindingFlags.Instance | BindingFlags.NonPublic),
+            type.GetMethod(nameof(string.IsInterned)),
             transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
         code.For(
@@ -1351,11 +1362,11 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
         );
         var @byte = get(typeof(byte)).MakeByRefType();
         code.For(
-            type.GetMethod("_Memmove", BindingFlags.Static | BindingFlags.NonPublic, [@byte, @byte, get(typeof(UIntPtr))]),
+            type.GetMethod("MemmoveInternal", BindingFlags.Static | BindingFlags.NonPublic, [@byte, @byte, get(typeof(nuint))]),
             transpiler => ("\tstd::memmove(a_0, a_1, a_2);\n", -1)
         );
         code.For(
-            type.GetMethod("_ZeroMemory", BindingFlags.Static | BindingFlags.NonPublic),
+            type.GetMethod("ZeroMemoryInternal", BindingFlags.Static | BindingFlags.NonPublic, [@byte, get(typeof(nuint))]),
             transpiler => ("\tstd::memset(a_0, 0, a_1);\n", -1)
         );
     })
@@ -1377,7 +1388,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
     {
         var @byte = get(typeof(byte)).MakeByRefType();
         code.For(
-            type.GetMethod("SequenceEqual", [@byte, @byte, get(typeof(UIntPtr))]),
+            type.GetMethod("SequenceEqual", [@byte, @byte, get(typeof(nuint))]),
             transpiler => ("\treturn std::memcmp(a_0, a_1, a_2) == 0;\n", 1)
         );
     })
@@ -1391,6 +1402,16 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
         }) code.ForGeneric(
             type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic),
             (transpiler, types) => (string.Empty, 1)
+        );
+    })
+    .For(get(typeof(FileLoadException)), (type, code) =>
+    {
+        code.For(
+            type.GetMethod("FormatFileLoadExceptionMessage", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ($@"{'\t'}char cs[16];
+{'\t'}auto [p, ec] = std::to_chars(cs, cs + sizeof(cs), a_1, 16);
+{'\t'}return f__new_string(std::u16string(f__string_view(a_0)) + u"": 0x"" + f__u16string({{cs, p}}));
+", 0)
         );
     })
     .For(get(typeof(Stream)), (type, code) =>

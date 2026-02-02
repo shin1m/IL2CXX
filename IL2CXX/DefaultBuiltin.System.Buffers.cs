@@ -7,7 +7,7 @@ partial class DefaultBuiltin
     {
         code.For(
             type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
-            transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
+            transpiler => ($"\treturn f__new_zeroed<{transpiler.Escape(type)}>();\n", 0)
         );
         code.For(
             type.GetMethod("BufferAllocated", declaredAndInstance),

@@ -150,7 +150,7 @@ bool t__thread::f_priority(HANDLE a_handle, int32_t a_priority)
 
 t__object* t__runtime_constructor_info::f_create(t__runtime_constructor_info* RECYCLONE__SPILL a_this, int32_t a_binding_flags, t__object* RECYCLONE__SPILL a_binder, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL a_culture)
 {
-	auto p = a_this->v__declaring_type->f_new_zerod();
+	auto p = a_this->v__declaring_type->f_new_zeroed();
 	a_this->v__invoke(p, a_binding_flags, a_binder, a_parameters, a_culture);
 	return p;
 }
@@ -328,7 +328,7 @@ bool t__type::f_assignable_to(t__type* a_type) const
 	return a_type->v__multicast_invoke && a_type->v__generic_definition && f_assignable_to_variant(a_type) || f_is(a_type);
 }
 
-t__object* t__type::f_new_zerod()
+t__object* t__type::f_new_zeroed()
 {
 	auto RECYCLONE__SPILL p = f_engine()->f_allocate(v__managed_size);
 	std::memset(p + 1, 0, v__managed_size - sizeof(t__object));

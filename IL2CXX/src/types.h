@@ -418,7 +418,7 @@ struct t__type : t__abstract_type
 	}
 	bool f_assignable_to_variant_interface(t__type* a_type) const;
 	bool f_assignable_to(t__type* a_type) const;
-	t__object* f_new_zerod();
+	t__object* f_new_zeroed();
 	static constexpr int32_t bf_declared_only = 2;
 	static constexpr int32_t bf_instance = 4;
 	static constexpr int32_t bf_static = 8;

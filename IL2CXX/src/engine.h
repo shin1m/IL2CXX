@@ -76,7 +76,7 @@ struct t__new
 };
 
 template<typename T>
-T* f__new_zerod()
+T* f__new_zeroed()
 {
 	t__new<T> p(0);
 	std::memset(static_cast<t__object*>(p) + 1, 0, sizeof(T) - sizeof(t__object));
@@ -86,10 +86,10 @@ T* f__new_zerod()
 template<typename T_thread, typename T_thread_static>
 T_thread* t_engine::f_initialize(void(*a_finalize)(t_object<t__type>*))
 {
-	auto RECYCLONE__SPILL thread = f__new_zerod<T_thread>();
+	auto RECYCLONE__SPILL thread = f__new_zeroed<T_thread>();
 	thread->v_internal = v_thread__main;
 	v_current_thread = thread;
-	auto RECYCLONE__SPILL finalizer = f__new_zerod<T_thread>();
+	auto RECYCLONE__SPILL finalizer = f__new_zeroed<T_thread>();
 	f_start(finalizer, [this, a_finalize]
 	{
 		auto ts = std::make_unique<T_thread_static>();

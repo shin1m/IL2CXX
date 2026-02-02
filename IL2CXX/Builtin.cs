@@ -70,7 +70,7 @@ public class Builtin : IBuiltin
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = n;
 {string.Join(string.Empty, Enumerable.Range(0, rank).Select(i => $"\tp->v__bounds[{i}] = {{static_cast<uint32_t>(a_{i}), 0}};\n"))
-}{'\t'}std::memset(p->f_data(), 0, extra);
+}{'\t'}std::memset(static_cast<void*>(p->f_data()), 0, extra);
 {'\t'}return p;
 ", 0);
             if (rank == 1)
@@ -87,7 +87,7 @@ public class Builtin : IBuiltin
 {'\t'}t__new<{transpiler.Escape(type)}> p(extra);
 {'\t'}p->v__length = a_0;
 {'\t'}p->v__bounds[0] = {{static_cast<uint32_t>(a_0), 0}};
-{'\t'}std::memset(p->f_data(), 0, extra);
+{'\t'}std::memset(static_cast<void*>(p->f_data()), 0, extra);
 {'\t'}for (size_t i = 0; i < a_0; ++i) p->f_data()[i] = {transpiler.Escape(c)}({string.Join(", ", Enumerable.Range(1, indices).Select(i => $"a_{i}"))});
 {'\t'}return p;
 ", 0);
@@ -109,7 +109,7 @@ public class Builtin : IBuiltin
         }
         if (type.IsSubclassOf(transpiler.typeofDelegate) && type != transpiler.typeofMulticastDelegate)
         {
-            if (method == type.GetConstructor([transpiler.typeofObject, transpiler.typeofIntPtr])) return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
+            if (method == type.GetConstructor([transpiler.typeofObject, transpiler.typeofIntPtr])) return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(type)}>();
 {'\t'}if (a_0) {{
 {'\t'}{'\t'}p->v__5ftarget = a_0;
 {'\t'}{'\t'}p->v__5fmethodPtr = a_1;

@@ -58,6 +58,11 @@ partial class DefaultBuiltin
                 return ($"\treturn {transpiler.Escape(method)}(a_0, a_1, a_2);\n", 0);
             }
         );
+        // TODO
+        code.For(
+            type.GetProperty(nameof(MemberInfo.ReflectedType))!.GetMethod,
+            transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__declaring_type;\n", 0)
+        );
     }
     private static (string body, int inline) GetParameters(Func<Type, Type> get, Transpiler transpiler)
     {
@@ -67,7 +72,7 @@ partial class DefaultBuiltin
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(ParameterInfo[])))}, {identifier}>(n);
 {'\t'}for (size_t i = 0; i < n; ++i) {{
 {'\t'}{'\t'}auto q = a_0->v__parameters[i];
-{'\t'}{'\t'}auto RECYCLONE__SPILL pi = f__new_zerod<{identifier}>();
+{'\t'}{'\t'}auto RECYCLONE__SPILL pi = f__new_zeroed<{identifier}>();
 {'\t'}{'\t'}pi->v_AttrsImpl = q->v__attributes;
 {'\t'}{'\t'}auto t = q->v__parameter_type;
 {'\t'}{'\t'}pi->v_ClassImpl = t;
@@ -123,7 +128,7 @@ partial class DefaultBuiltin
                 transpiler.Enqueue(constructor);
                 return (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}auto i = a_0->v__resources.find(f__string_view(a_1));
 {'\t'}if (i == a_0->v__resources.end()) return nullptr;
-{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(type)}>();
+{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(type)}>();
 {'\t'}{transpiler.Escape(constructor)}(p, i->second.first, i->second.second);
 {'\t'}return p;
 ", 0);
@@ -177,7 +182,7 @@ partial class DefaultBuiltin
 {'\t'}{'\t'}{'\t'}auto ps = static_cast<uint8_t*>(p);
 {'\t'}{'\t'}{'\t'}for (size_t i = 0; i < n; ++i, ps += e->v__size) {constructCATA}(&vs->f_data()[i], e, e->f_box(ps));
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}auto RECYCLONE__SPILL roc = f__new_zerod<{transpiler.Escape(typeofROC)}>();
+{'\t'}{'\t'}auto RECYCLONE__SPILL roc = f__new_zeroed<{transpiler.Escape(typeofROC)}>();
 {'\t'}{'\t'}{escape(typeofROC.GetConstructors()[0])}(roc, vs);
 {'\t'}{'\t'}return roc;
 {'\t'}}};
@@ -202,7 +207,7 @@ partial class DefaultBuiltin
 {'\t'}{'\t'}{'\t'}{constructCATA}(&ta, a->v_type, value(a));
 {'\t'}{'\t'}{'\t'}{escape(typeofCANA.GetConstructor([get(typeof(MemberInfo)), typeofCATA]) ?? throw new Exception())}(&nas->f_data()[i], a->v_member, ta);
 {'\t'}{'\t'}}}
-{'\t'}{'\t'}auto RECYCLONE__SPILL cad = f__new_zerod<{transpiler.Escape(typeofCAD)}>();
+{'\t'}{'\t'}auto RECYCLONE__SPILL cad = f__new_zeroed<{transpiler.Escape(typeofCAD)}>();
 {'\t'}{'\t'}{escape(typeofCAD.GetConstructors()[0])}(cad, ca->v_constructor, cas, nas);
 {'\t'}{'\t'}p->f_data()[i] = cad;
 {'\t'}}}
@@ -257,7 +262,7 @@ partial class DefaultBuiltin
             transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__function) {transpiler.GenerateThrow("NotSupported")};
 {'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
-{'\t'}auto RECYCLONE__SPILL p = type->f_new_zerod();
+{'\t'}auto RECYCLONE__SPILL p = type->f_new_zeroed();
 {'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
 {'\t'}q->v__5ftarget = p;
 {'\t'}q->v__5fmethodPtr = type->v__invoke_static;
@@ -271,7 +276,7 @@ partial class DefaultBuiltin
             transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckArgumentNull("a_1") + $@"{'\t'}if (!a_0->v__function) {transpiler.GenerateThrow("NotSupported")};
 {'\t'}if (a_1->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_1);
-{'\t'}auto RECYCLONE__SPILL p = type->f_new_zerod();
+{'\t'}auto RECYCLONE__SPILL p = type->f_new_zeroed();
 {'\t'}auto q = static_cast<{transpiler.EscapeForStacked(get(typeof(MulticastDelegate)))}>(p);
 {'\t'}if (a_2) {{
 {'\t'}{'\t'}q->v__5ftarget = a_2;

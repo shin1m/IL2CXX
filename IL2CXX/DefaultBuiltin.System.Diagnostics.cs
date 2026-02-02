@@ -64,11 +64,11 @@ partial class DefaultBuiltin
     {
         code.For(
             type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
-            transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
+            transpiler => ($"\treturn f__new_zeroed<{transpiler.Escape(type)}>();\n", 0)
         );
         code.For(
             type.GetMethod("SendCommand", declaredAndInstance),
-            transpiler => (string.Empty, 0)
+            transpiler => (string.Empty, 1)
         );
     })
     .For(get(typeof(EventSource)), (type, code) =>
@@ -79,23 +79,23 @@ partial class DefaultBuiltin
         );
         code.For(
             type.GetMethod("GetCustomAttributeHelper", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ("\treturn {};\n", 0)
+            transpiler => ("\treturn {};\n", 1)
         );
         code.For(
             type.GetProperty("IsSupported", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
-            transpiler => ("\treturn false;\n", 0)
+            transpiler => ("\treturn false;\n", 1)
         );
         code.For(
             type.GetMethod("Initialize", declaredAndInstance),
-            transpiler => (string.Empty, 0)
+            transpiler => (string.Empty, 1)
         );
         code.For(
             type.GetMethod("ReportOutOfBandMessage", declaredAndInstance),
-            transpiler => (string.Empty, 0)
+            transpiler => (string.Empty, 1)
         );
         code.For(
             type.GetMethod("SendCommand", declaredAndInstance),
-            transpiler => (string.Empty, 0)
+            transpiler => (string.Empty, 1)
         );
         code.For(
             type.GetMethod(nameof(EventSource.SetCurrentThreadActivityId), [get(typeof(Guid))]),
@@ -107,18 +107,18 @@ partial class DefaultBuiltin
         );
         code.For(
             type.GetMethod("WriteEventCore", declaredAndInstance),
-            transpiler => (string.Empty, 0)
+            transpiler => (string.Empty, 1)
         );
         code.For(
             type.GetMethod("WriteEventWithRelatedActivityIdCore", declaredAndInstance),
-            transpiler => (string.Empty, 0)
+            transpiler => (string.Empty, 1)
         );
     })
     .For(get(Type.GetType("System.Diagnostics.Tracing.FrameworkEventSource", true)!), (type, code) =>
     {
         code.For(
             type.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null),
-            transpiler => ($"\treturn f__new_zerod<{transpiler.Escape(type)}>();\n", 0)
+            transpiler => ($"\treturn f__new_zeroed<{transpiler.Escape(type)}>();\n", 0)
         );
         code.For(
             type.GetMethod("ThreadPoolEnqueueWorkObject"),
@@ -127,6 +127,64 @@ partial class DefaultBuiltin
         code.For(
             type.GetMethod("ThreadTransferSendObj"),
             transpiler => (string.Empty, 0)
+        );
+    })
+    .For(get(Type.GetType("System.Diagnostics.Tracing.NativeRuntimeEventSource", true)!), (type, code) =>
+    {
+        code.For(
+            type.GetMethod("LogContentionLockCreated", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogContentionStart", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogContentionStop", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolWorkerThreadStart", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolWorkerThreadStop", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolWorkerThreadWait", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolMinMaxThreads", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolWorkerThreadAdjustmentSample", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolWorkerThreadAdjustmentAdjustment", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolWorkerThreadAdjustmentStats", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolWorkingThreadCount", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+    })
+    .For(get(Type.GetType("System.Diagnostics.Tracing.XplatEventLogger", true)!), (type, code) =>
+    {
+        code.For(
+            type.GetMethod("GetClrConfig", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ("\treturn nullptr;\n", 1)
+        );
+        code.For(
+            type.GetMethod("IsEventSourceLoggingEnabled", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ("\treturn false;\n", 1)
         );
     });
 }

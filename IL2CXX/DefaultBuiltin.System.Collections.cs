@@ -42,7 +42,7 @@ partial class DefaultBuiltin
             if (concrete == null) concrete = get(Type.GetType("System.Collections.Generic.ObjectEqualityComparer`1", true)!).MakeGenericType(types);
             var constructor = concrete.GetConstructor(declaredAndInstance, null, Type.EmptyTypes, null) ?? throw new Exception();
             transpiler.Enqueue(constructor);
-            return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(concrete)}>();
+            return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(concrete)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}t_static::v_instance->v_{transpiler.Escape(type.MakeGenericType(types))}->v__3cDefault_3ek_5f_5fBackingField = p;
 ", 0);
@@ -57,7 +57,7 @@ partial class DefaultBuiltin
                 var concrete = (get(typeof(IComparable<>)).MakeGenericType(types).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`1", true)!) : type).MakeGenericType(types);
                 var constructor = concrete.GetConstructor(Type.EmptyTypes) ?? throw new Exception();
                 transpiler.Enqueue(constructor);
-                return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(concrete)}>();
+                return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(concrete)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}return p;
 ", 0);
@@ -73,7 +73,7 @@ partial class DefaultBuiltin
                 var concrete = (get(typeof(IComparable<>)).MakeGenericType([types[0]]).IsAssignableFrom(types[0]) ? get(Type.GetType("System.Collections.Generic.GenericArraySortHelper`2", true)!) : type).MakeGenericType(types);
                 var constructor = concrete.GetConstructor(Type.EmptyTypes) ?? throw new Exception();
                 transpiler.Enqueue(constructor);
-                return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(concrete)}>();
+                return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(concrete)}>();
 {'\t'}{transpiler.Escape(constructor)}(p);
 {'\t'}return p;
 ", 0);

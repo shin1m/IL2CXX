@@ -26,24 +26,19 @@ partial class DefaultBuiltin
 {'\t'}return true;
 ", 0)
         );
+        var swh = get(typeof(SafeWaitHandle));
+        var swhc = swh.GetConstructor([get(typeof(nint)), get(typeof(bool))]) ?? throw new Exception();
         code.For(
             type.GetMethod("CreateEventEx", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
-{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]) ?? throw new Exception())}(p, new t__event(a_2 & 1, a_2 & 2), true);
-{'\t'}return p;
-", 0)
-        );
-        code.For(
-            type.GetMethod("CreateMutexEx", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
-{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]) ?? throw new Exception())}(p, new t__mutex(a_2 & 1), true);
+            transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(swh)}>();
+{'\t'}{transpiler.Escape(swhc)}(p, new t__event(a_2 & 1, a_2 & 2), true);
 {'\t'}return p;
 ", 0)
         );
         code.For(
             type.GetMethod("CreateSemaphoreEx", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zerod<{transpiler.Escape(get(typeof(SafeWaitHandle)))}>();
-{'\t'}{transpiler.Escape(get(typeof(SafeWaitHandle)).GetConstructor([get(typeof(IntPtr)), get(typeof(bool))]) ?? throw new Exception())}(p, new t__semaphore(a_2, a_1), true);
+            transpiler => ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(swh)}>();
+{'\t'}{transpiler.Escape(swhc)}(p, new t__semaphore(a_2, a_1), true);
 {'\t'}return p;
 ", 0)
         );
@@ -70,6 +65,10 @@ partial class DefaultBuiltin
             transpiler => ($@"{'\t'}static_cast<t__event*>(a_0->v_handle.v__5fvalue)->f_set();
 {'\t'}return true;
 ", 0)
+        );
+        code.For(
+            type.GetMethod("FormatMessage", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
     });
 }

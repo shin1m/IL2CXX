@@ -26,6 +26,7 @@ abstract class RuntimeFieldInfo : FieldInfo
     public override object GetValue(object? @this) => throw new NotImplementedException();
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
+    public override Type ReflectedType => throw new NotImplementedException();
     public override void SetValue(object? @this, object? value, BindingFlags bindingFlags, Binder? binder, CultureInfo? culture) => throw new NotImplementedException();
 }
 abstract class RuntimeConstructorInfo : ConstructorInfo
@@ -39,6 +40,7 @@ abstract class RuntimeConstructorInfo : ConstructorInfo
     public override object Invoke(BindingFlags bindingFlags, Binder? binder, object?[]? parameters, CultureInfo? culture) => throw new NotImplementedException();
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
+    public override Type ReflectedType => throw new NotImplementedException();
 }
 abstract class RuntimeMethodInfo : MethodInfo
 {
@@ -64,6 +66,7 @@ abstract class RuntimeMethodInfo : MethodInfo
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override MethodInfo MakeGenericMethod(params Type[] types) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
+    public override Type ReflectedType => throw new NotImplementedException();
     public override Type ReturnType => throw new NotImplementedException();
 }
 abstract class RuntimePropertyInfo : PropertyInfo
@@ -80,6 +83,7 @@ abstract class RuntimePropertyInfo : PropertyInfo
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
     public override Type PropertyType => throw new NotImplementedException();
+    public override Type ReflectedType => throw new NotImplementedException();
     public override MethodInfo SetMethod => throw new NotImplementedException();
     public override void SetValue(object? @this, object? value, BindingFlags bindingFlags, Binder? binder, object?[]? index, CultureInfo? culture) => throw new NotImplementedException();
 }
@@ -126,13 +130,14 @@ abstract class RuntimeType : Type
     public override Type MakeGenericType(params Type[] arguments) => throw new NotImplementedException();
     public override string Namespace => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
+    public override Type ReflectedType => throw new NotImplementedException();
     public override string ToString() => throw new NotImplementedException();
     public override RuntimeTypeHandle TypeHandle => throw new NotImplementedException();
     public override Type UnderlyingSystemType => this;
 
-    public static bool ValueEquals(RuntimeType type, IntPtr x, object y) => throw new NotImplementedException();
-    public static int ValueGetHashCode(RuntimeType type, IntPtr x) => throw new NotImplementedException();
-    public static string ValueToString(RuntimeType type, IntPtr x) => throw new NotImplementedException();
+    public static bool ValueEquals(RuntimeType type, nint x, object y) => throw new NotImplementedException();
+    public static int ValueGetHashCode(RuntimeType type, nint x) => throw new NotImplementedException();
+    public static string ValueToString(RuntimeType type, nint x) => throw new NotImplementedException();
 }
 abstract class RuntimeGenericParameter : Type
 {
@@ -279,7 +284,7 @@ static class RuntimeTimer
     private static Thread? thread;
 
     public static void Call(int id) => throw new NotImplementedException();
-    public static IntPtr Create(uint duration, int id)
+    public static nint Create(uint duration, int id)
     {
         lock (id2at)
         {
@@ -318,10 +323,10 @@ static class RuntimeTimer
             }
             id2at.Add(id, DateTime.Now + TimeSpan.FromMilliseconds(duration));
             Monitor.Pulse(id2at);
-            return (IntPtr)id;
+            return (nint)id;
         }
     }
-    public static bool Change(IntPtr handle, uint duration)
+    public static bool Change(nint handle, uint duration)
     {
         lock (id2at)
         {
@@ -330,7 +335,7 @@ static class RuntimeTimer
         }
         return true;
     }
-    public static bool Delete(IntPtr handle)
+    public static bool Delete(nint handle)
     {
         lock (id2at) id2at.Remove((int)handle);
         return true;

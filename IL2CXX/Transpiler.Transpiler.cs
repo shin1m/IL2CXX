@@ -61,8 +61,8 @@ partial class Transpiler
         typeofDouble = get(typeof(double));
         typeofSingle = get(typeof(float));
         typeofVoid = get(typeof(void));
-        typeofIntPtr = get(typeof(IntPtr));
-        typeofUIntPtr = get(typeof(UIntPtr));
+        typeofIntPtr = get(typeof(nint));
+        typeofUIntPtr = get(typeof(nuint));
         typeofNullable = get(typeof(Nullable<>));
         typeofString = get(typeof(string));
         typeofStringBuilder = get(typeof(StringBuilder));
@@ -152,6 +152,7 @@ partial class Transpiler
         };
         finalizeOfObject = FinalizeOf(typeofObject) ?? throw new Exception();
         methodGetTypeFromHandle = typeofType.GetMethod(nameof(Type.GetTypeFromHandle)) ?? throw new Exception();
+        methodIsPrimitiveGet = typeofType.GetProperty(nameof(Type.IsPrimitive))?.GetMethod ?? throw new Exception();
         methodIsValueTypeGet = typeofType.GetProperty(nameof(Type.IsValueType))?.GetMethod ?? throw new Exception();
         methodTypeEquality = typeofType.GetMethod("op_Equality") ?? throw new Exception();
         methodTypeInequality = typeofType.GetMethod("op_Inequality") ?? throw new Exception();
@@ -432,6 +433,15 @@ partial class Transpiler
                     {
                         if (stack.CompiledValue is Type t) after.CompiledValue = t;
                     }
+                    else if (m == methodIsPrimitiveGet)
+                    {
+                        if (stack.CompiledValue is Type t)
+                        {
+                            after.CompiledValue = t.IsPrimitive;
+                            writer.WriteLine($"\t{after.Variable} = {(t.IsPrimitive ? 1 : 0)};");
+                            return index;
+                        }
+                    }
                     else if (m == methodIsValueTypeGet)
                     {
                         if (stack.CompiledValue is Type t)
@@ -461,7 +471,7 @@ partial class Transpiler
                     }
                     else if (stack.CompiledValue is Type t)
                     {
-                        Console.Error.WriteLine($"{m}: {t}");
+                        Console.Error.WriteLine($"calling typeof({t}).{m} in {method.DeclaringType}::[{method}]");
                     }
                 }
                 GenerateCall(m, Escape(m), stack, after);
@@ -656,6 +666,7 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
         {
             x.Estimate = (index, stack) =>
             {
+                if (stack.Type == typeofIntPtr) return (index, stack.Pop.Push(typeofObject));
                 var t = GetElementType(stack.Type);
                 return (index, stack.Pop.Push(t.IsValueType ? typeofObject : t));
             };
@@ -944,7 +955,7 @@ GenerateCheckNull("p") + generateVirtual("p")
                 else if (builtin.GetBody(this, ToKey(m)).body != null)
                     writer.WriteLine($"\t{after.Variable} = {call(arguments)};");
                 else
-                    writer.WriteLine($@"{'\t'}{{auto RECYCLONE__SPILL p = f__new_zerod<{Escape(t)}>();
+                    writer.WriteLine($@"{'\t'}{{auto RECYCLONE__SPILL p = f__new_zeroed<{Escape(t)}>();
 {'\t'}{call(arguments.Prepend("\n\t\tp"))};
 {'\t'}{after.Variable} = p;}}");
                 return index;

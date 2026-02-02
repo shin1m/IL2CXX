@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Win32.SafeHandles;
 
 namespace IL2CXX;
 
@@ -7,55 +8,80 @@ partial class DefaultBuiltin
     private static Builtin SetupSystemThreading(this Builtin @this, Func<Type, Type> get, PlatformID target) => @this
     .For(get(typeof(Interlocked)), (type, code) =>
     {
+        (string, int) cei(Transpiler transpiler) => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}std::atomic_ref(*a_0).compare_exchange_strong(a_2, a_1);
+{'\t'}return a_2;
+", 1);
         code.For(
             type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(int)).MakeByRefType(), get(typeof(int)), get(typeof(int))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}std::atomic_ref(*a_0).compare_exchange_strong(a_2, a_1);
-{'\t'}return a_2;
-", 1)
+            cei
         );
         code.For(
             type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(long)).MakeByRefType(), get(typeof(long)), get(typeof(long))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}std::atomic_ref(*a_0).compare_exchange_strong(a_2, a_1);
-{'\t'}return a_2;
-", 1)
+            cei
         );
-        code.For(
-            type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr)), get(typeof(IntPtr))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}void* p = a_2;
+        (string, int) cen(Transpiler transpiler, Type t) => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}void* p = a_2;
 {'\t'}std::atomic_ref(a_0->v__5fvalue).compare_exchange_strong(p, a_1);
-{'\t'}return {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{p}};
-", 1)
-        );
+{'\t'}return {transpiler.EscapeForStacked(t)}{{p}};
+", 1);
         code.For(
-            type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(object)).MakeByRefType(), get(typeof(object)), get(typeof(object))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto p = a_2;
+            type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(nint)).MakeByRefType(), get(typeof(nint)), get(typeof(nint))]),
+            transpiler => cen(transpiler, get(typeof(nint)))
+        );
+        (string, int) ceo(Transpiler transpiler) => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto p = a_2;
 {'\t'}f__compare_exchange(*a_0, p, a_1);
 {'\t'}return p;
-", 1)
+", 1);
+        code.For(
+            type.GetMethod(nameof(Interlocked.CompareExchange), [get(typeof(object)).MakeByRefType(), get(typeof(object)), get(typeof(object))]),
+            ceo
         );
+        var t = Type.MakeGenericMethodParameter(0);
+        code.ForGeneric(
+            type.GetMethod(nameof(Interlocked.CompareExchange), 1, [t.MakeByRefType(), t, t]),
+            (transpiler, types) =>
+            {
+                var t = types[0];
+                if (!t.IsValueType) return ceo(transpiler);
+                if (!t.IsPrimitive && !t.IsEnum) return (transpiler.GenerateThrow("NotSupported"), 1);
+                return t == transpiler.typeofIntPtr || t == transpiler.typeofUIntPtr ? cen(transpiler, t) : cei(transpiler);
+            }
+        );
+        (string, int) ei(Transpiler transpiler) => (transpiler.GenerateCheckNull("a_0") + "\treturn std::atomic_ref(*a_0).exchange(a_1);\n", 1);
         code.For(
             type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(int)).MakeByRefType(), get(typeof(int))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).exchange(a_1);\n", 1)
+            ei
         );
         code.For(
             type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(long)).MakeByRefType(), get(typeof(long))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).exchange(a_1);\n", 1)
+            ei
         );
+        (string, int) en(Transpiler transpiler, Type t) => (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.EscapeForStacked(t)}{{std::atomic_ref(a_0->v__5fvalue).exchange(a_1)}};\n", 1);
         code.For(
-            type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(IntPtr)).MakeByRefType(), get(typeof(IntPtr))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $"\treturn {transpiler.EscapeForStacked(get(typeof(IntPtr)))}{{std::atomic_ref(a_0->v__5fvalue).exchange(a_1)}};\n", 1)
+            type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(nint)).MakeByRefType(), get(typeof(nint))]),
+            transpiler => en(transpiler, get(typeof(nint)))
         );
+        (string, int) eo(Transpiler transpiler) => (transpiler.GenerateCheckNull("a_0") + "\treturn f__exchange(*a_0, a_1);\n", 1);
         code.For(
             type.GetMethod(nameof(Interlocked.Exchange), [get(typeof(object)).MakeByRefType(), get(typeof(object))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn f__exchange(*a_0, a_1);\n", 1)
+            eo
+        );
+        code.ForGeneric(
+            type.GetMethod(nameof(Interlocked.Exchange), 1, [t.MakeByRefType(), t]),
+            (transpiler, types) =>
+            {
+                var t = types[0];
+                if (!t.IsValueType) return eo(transpiler);
+                if (!t.IsPrimitive && !t.IsEnum) return (transpiler.GenerateThrow("NotSupported"), 1);
+                return t == transpiler.typeofIntPtr || t == transpiler.typeofUIntPtr ? en(transpiler, t) : ei(transpiler);
+            }
         );
         code.For(
             type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(int)).MakeByRefType(), get(typeof(int))], null),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).fetch_add(a_1);\n", 1)
+            transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn std::atomic_ref(*a_0).fetch_add(a_1);\n", 1)
         );
         code.For(
             type.GetMethod("ExchangeAdd", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(long)).MakeByRefType(), get(typeof(long))], null),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn std::atomic_ref(*a_0).fetch_add(a_1);\n", 1)
+            transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn std::atomic_ref(*a_0).fetch_add(a_1);\n", 1)
         );
         code.For(
             type.GetMethod(nameof(Interlocked.MemoryBarrier)),
@@ -65,23 +91,6 @@ partial class DefaultBuiltin
     .For(get(typeof(Monitor)), (type, code) =>
     {
         code.For(
-            type.GetMethod("ReliableEnter", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}f_epoch_region([&]
-{'\t'}{{
-{'\t'}{'\t'}a_0->f_extension()->f_lock();
-{'\t'}}});
-{'\t'}*a_1 = true;
-", 1)
-        );
-        code.For(
-            type.GetMethod("ReliableEnterTimeout", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}f_epoch_region([&]
-{'\t'}{{
-{'\t'}{'\t'}*a_2 = a_0->f_extension()->f_try_lock_for(std::chrono::milliseconds(a_1));
-{'\t'}}});
-", 1)
-        );
-        code.For(
             type.GetMethod(nameof(Monitor.Enter), [get(typeof(object))]),
             transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -90,38 +99,119 @@ partial class DefaultBuiltin
 ", 1)
         );
         code.For(
+            type.GetMethod(nameof(Monitor.Enter), [get(typeof(object)), get(typeof(bool)).MakeByRefType()]),
+            transpiler => ($@"{'\t'}if (*a_1) {transpiler.GenerateThrow("Argument")};
+{'\t'}{transpiler.GenerateCheckArgumentNull("a_0")
+}{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}a_0->f_extension()->f_lock();
+{'\t'}}});
+{'\t'}*a_1 = true;
+", 1)
+        );
+        code.For(
             type.GetMethod(nameof(Monitor.Exit)),
             transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->f_unlock();\n", 1)
         );
         code.For(
-            type.GetMethod("IsEnteredNative", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}auto p = a_0->f_extension();
-{'\t'}return p->f_locked();
+            type.GetMethod(nameof(Monitor.TryEnter), [get(typeof(object))]),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return a_0->f_extension()->f_try_lock_for(std::chrono::milliseconds::zero());
+{'\t'}}});
 ", 1)
         );
         code.For(
-            type.GetMethod("ObjPulse", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ("\ta_0->f_extension()->v_condition.notify_one();\n", 1)
-        );
-        code.For(
-            type.GetMethod("ObjPulseAll", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ("\ta_0->f_extension()->v_condition.notify_all();\n", 1)
-        );
-        code.For(
-            type.GetMethod("ObjWait", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($@"{'\t'}return f_epoch_region([&]
+            type.GetMethod(nameof(Monitor.TryEnter), [get(typeof(object)), get(typeof(bool)).MakeByRefType()]),
+            transpiler => ($@"{'\t'}if (*a_1) {transpiler.GenerateThrow("Argument")};
+{'\t'}{transpiler.GenerateCheckArgumentNull("a_0")
+}{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}auto p = a_1->f_extension();
+{'\t'}{'\t'}*a_1 = a_0->f_extension()->f_try_lock_for(std::chrono::milliseconds::zero());
+{'\t'}}});
+", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(Monitor.TryEnter), [get(typeof(object)), get(typeof(int))]),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_1 < -1) {transpiler.GenerateThrow("ArgumentOutOfRange")};
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return a_0->f_extension()->f_try_lock_for(std::chrono::milliseconds(a_1));
+{'\t'}}});
+", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(Monitor.TryEnter), [get(typeof(object)), get(typeof(int)), get(typeof(bool)).MakeByRefType()]),
+            transpiler => ($@"{'\t'}if (*a_2) {transpiler.GenerateThrow("Argument")};
+{'\t'}{transpiler.GenerateCheckArgumentNull("a_0")
+}{'\t'}if (a_1 < -1) {transpiler.GenerateThrow("ArgumentOutOfRange")};
+{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}*a_2 = a_0->f_extension()->f_try_lock_for(std::chrono::milliseconds(a_1));
+{'\t'}}});
+", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(Monitor.IsEntered)),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\treturn a_0->f_extension()->f_locked();\n", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(Monitor.Wait), [get(typeof(object)), get(typeof(int))]),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_1 < -1) {transpiler.GenerateThrow("ArgumentOutOfRange")};
+{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}auto p = a_0->f_extension();
 {'\t'}{'\t'}std::unique_lock lock(p->v_mutex, std::adopt_lock);
 {'\t'}{'\t'}auto finally = f__finally([&]
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}{'\t'}lock.release();
 {'\t'}{'\t'}}});
-{'\t'}{'\t'}if (a_0 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_0)) == std::cv_status::no_timeout;
+{'\t'}{'\t'}if (a_1 != -1) return p->v_condition.wait_for(lock, std::chrono::milliseconds(a_1)) == std::cv_status::no_timeout;
 {'\t'}{'\t'}p->v_condition.wait(lock);
 {'\t'}{'\t'}return true;
 {'\t'}}});
 ", 0)
+        );
+        code.For(
+            type.GetMethod(nameof(Monitor.Pulse), [get(typeof(object))]),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_condition.notify_one();\n", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(Monitor.PulseAll), [get(typeof(object))]),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + "\ta_0->f_extension()->v_condition.notify_all();\n", 1)
+        );
+    })
+    .For(get(typeof(Mutex)), (type, code) =>
+    {
+        if (target == PlatformID.Win32NT) return;
+        var swh = get(typeof(SafeWaitHandle));
+        var swhc = swh.GetConstructor([get(typeof(nint)), get(typeof(bool))]) ?? throw new Exception();
+        code.For(
+            type.GetMethod("CreateMutexCore", BindingFlags.Instance | BindingFlags.NonPublic, [get(typeof(bool))]),
+            transpiler =>
+            {
+                var set = type.GetProperty(nameof(WaitHandle.SafeWaitHandle))!.SetMethod!;
+                transpiler.Enqueue(set);
+                transpiler.Enqueue(swhc);
+                return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(swh)}>();
+{'\t'}{transpiler.Escape(swhc)}(p, new t__mutex(a_1), true);
+{'\t'}{transpiler.Escape(set)}(a_0, p);
+", 0);
+            }
+        );
+        code.For(
+            type.GetMethod("CreateMutexCore", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler =>
+            {
+                transpiler.Enqueue(swhc);
+                return ($@"{'\t'}*a_3 = 0;
+{'\t'}*a_4 = nullptr;
+{'\t'}if (a_1 || !a_2) throw std::runtime_error(""NotImplementedException "" + IL2CXX__AT());
+{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(swh)}>();
+{'\t'}{transpiler.Escape(swhc)}(p, new t__mutex(a_1), true);
+{'\t'}return p;
+", 0);
+            }
         );
     })
     .For(get(typeof(Thread)), (type, code) =>
@@ -133,6 +223,7 @@ partial class DefaultBuiltin
 {'\t'}{transpiler.EscapeForMember(get(typeof(string)))} v__5fname;
 {'\t'}{transpiler.EscapeForMember(helper)} v__5fstartHelper;
 {'\t'}{transpiler.EscapeForMember(get(typeof(bool)))} v__5fmayNeedResetForThreadPool;
+{'\t'}{transpiler.EscapeForMember(get(typeof(bool)))} v__dead;
 {'\t'}{transpiler.EscapeForMember(get(typeof(bool)))} v__pool;
 
 {'\t'}void f__scan(t_scan<t__type> a_scan)
@@ -165,6 +256,7 @@ partial class DefaultBuiltin
 {'\t'}{'\t'}auto ts = std::make_unique<t_thread_static>();
 {'\t'}{'\t'}try {{
 {'\t'}{'\t'}{'\t'}{transpiler.Escape(run)}(p);
+{'\t'}{'\t'}{'\t'}a_0->v__dead = true;
 {'\t'}{'\t'}{'\t'}return;
 {'\t'}{'\t'}}} catch (t__object* p) {{
 {'\t'}{'\t'}{'\t'}std::cerr << ""caught: "" << f__string(f__to_string(p)) << std::endl;
@@ -222,16 +314,21 @@ partial class DefaultBuiltin
         );
         // TODO
         code.For(
-            type.GetMethod("GetThreadStateNative", BindingFlags.Instance | BindingFlags.NonPublic),
+            type.GetProperty(nameof(Thread.ThreadState))!.GetMethod,
             transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
         code.For(
-            type.GetMethod("IsBackgroundNative", declaredAndInstance),
-            transpiler => ("\treturn a_0->v__background;\n", 1)
+            type.GetProperty(nameof(Thread.IsBackground))!.GetMethod,
+            transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_0->v__dead) {transpiler.GenerateThrow("ThreadState")};
+{'\t'}return a_0->v__background;
+", 1)
         );
         code.For(
-            type.GetMethod("SetBackgroundNative", declaredAndInstance),
-            transpiler => ("\tf_engine()->f_background__(a_0, a_1);\n", 1)
+            type.GetProperty(nameof(Thread.IsBackground))!.SetMethod,
+            transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_0->v__dead) {transpiler.GenerateThrow("ThreadState")};
+{'\t'}f_engine()->f_background__(a_0, a_1);
+{'\t'}if (!a_1) a_0->v__5fmayNeedResetForThreadPool = true;
+", 1)
         );
         // TODO
         code.For(
@@ -241,7 +338,9 @@ partial class DefaultBuiltin
         // TODO
         code.For(
             type.GetProperty(nameof(Thread.IsThreadPoolThread))!.GetMethod,
-            transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn a_0->v__pool;\n", 1)
+            transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_0->v__dead) {transpiler.GenerateThrow("ThreadState")};
+{'\t'}return a_0->v__pool;
+", 1)
         );
         // TODO
         code.For(
@@ -253,12 +352,16 @@ partial class DefaultBuiltin
             transpiler => ("\treturn reinterpret_cast<intptr_t>(static_cast<t__object*>(a_0));\n", 1)
         );
         code.For(
-            type.GetMethod("GetPriorityNative", declaredAndInstance),
-            transpiler => ("\treturn a_0->v__priority;\n", 1)
+            type.GetProperty(nameof(Thread.Priority))!.GetMethod,
+            transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_0->v__dead) {transpiler.GenerateThrow("ThreadState")};
+{'\t'}return a_0->v__priority;
+", 1)
         );
         code.For(
-            type.GetMethod("SetPriorityNative", declaredAndInstance),
-            transpiler => ("\tf_engine()->f_priority__(a_0, a_1);\n", 1)
+            type.GetProperty(nameof(Thread.Priority))!.SetMethod,
+            transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}f_engine()->f_priority__(a_0, a_1);
+{'\t'}a_0->v__5fmayNeedResetForThreadPool = true;
+", 1)
         );
         code.For(
             type.GetMethod("GetCurrentProcessorNumber", BindingFlags.Static | BindingFlags.NonPublic),
@@ -275,8 +378,8 @@ partial class DefaultBuiltin
 ", 1)
         );
         code.For(
-            type.GetMethod("GetCurrentThreadNative", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ($"\treturn static_cast<{transpiler.Escape(type)}*>(t_engine::v_current_thread);\n", 1)
+            type.GetProperty(nameof(Thread.CurrentThread))!.GetMethod,
+            transpiler => ($"\treturn t_thread_static::v_instance->v_{transpiler.Escape(type)}.{transpiler.Escape(type.GetField("t_currentThread", BindingFlags.Static | BindingFlags.NonPublic) ?? throw new Exception())} = static_cast<{transpiler.Escape(type)}*>(t_engine::v_current_thread);\n", 1)
         );
         // TODO
         code.For(
@@ -292,21 +395,13 @@ partial class DefaultBuiltin
             transpiler => ("\tstd::this_thread::yield();\n", 1)
         );
     })
-    // TODO
-    .For(get(typeof(ThreadPool)), (type, code) =>
-    {
-        code.For(
-            type.GetMethod("InitializeConfig", BindingFlags.Static | BindingFlags.NonPublic),
-            transpiler => ("\treturn true;\n", 1)
-        );
-    })
     .For(get(typeof(WaitHandle)), (type, code) =>
     {
         if (target == PlatformID.Win32NT)
         {
             // TODO
             code.For(
-                type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                type.GetMethod("SignalAndWait", BindingFlags.Static | BindingFlags.NonPublic, [get(typeof(nint)), get(typeof(nint)), get(typeof(int))]),
                 transpiler => ($@"{'\t'}return f_epoch_region([&]
 {'\t'}{{
 {'\t'}{'\t'}return SignalObjectAndWait(a_0, a_1, a_2, TRUE);
@@ -317,15 +412,15 @@ partial class DefaultBuiltin
                 type.GetMethod("WaitOneCore", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}return f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}return WaitForSingleObjectEx(a_0, a_1, TRUE);
+{'\t'}{'\t'}return WaitForSingleObjectEx(a_0, a_1, a_2 ? FALSE : TRUE);
 {'\t'}}});
 ", 0)
             );
             code.For(
-                type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int))], null),
+                type.GetMethod("WaitMultipleIgnoringSyncContextCore", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}return f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}return WaitForMultipleObjectsEx(a_1, reinterpret_cast<const HANDLE*>(a_0), a_2, a_3, TRUE);
+{'\t'}{'\t'}return WaitForMultipleObjectsEx(a_0.v__5flength, reinterpret_cast<const HANDLE*>(a_0.v__5freference), a_1, a_2, TRUE);
 {'\t'}}});
 ", 0)
             );
@@ -333,7 +428,7 @@ partial class DefaultBuiltin
         else
         {
             code.For(
-                type.GetMethod("SignalAndWaitNative", BindingFlags.Static | BindingFlags.NonPublic),
+                type.GetMethod("SignalAndWait", BindingFlags.Static | BindingFlags.NonPublic, [get(typeof(nint)), get(typeof(nint)), get(typeof(int))]),
                 transpiler => ($@"{'\t'}return f_epoch_region([&]
 {'\t'}{{
 {'\t'}{'\t'}static_cast<t__waitable*>(a_0.v__5fvalue)->f_signal();
@@ -350,14 +445,14 @@ partial class DefaultBuiltin
 ", 0)
             );
             code.For(
-                type.GetMethod("WaitMultipleIgnoringSyncContext", BindingFlags.Static | BindingFlags.NonPublic, null, [get(typeof(IntPtr*)), get(typeof(int)), get(typeof(bool)), get(typeof(int))], null),
+                type.GetMethod("WaitMultipleIgnoringSyncContextCore", BindingFlags.Static | BindingFlags.NonPublic),
                 transpiler => ($@"{'\t'}return f_epoch_region([&]() -> int32_t
 {'\t'}{{
-{'\t'}{'\t'}if (a_2) {{
-{'\t'}{'\t'}{'\t'}return t__waitable::f_wait_all(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3)) ? 0 : 0x102;
+{'\t'}{'\t'}if (a_1) {{
+{'\t'}{'\t'}{'\t'}return t__waitable::f_wait_all(reinterpret_cast<t__waitable**>(a_0.v__5freference), a_0.v__5flength, a_2 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_2)) ? 0 : 0x102;
 {'\t'}{'\t'}}} else {{
-{'\t'}{'\t'}{'\t'}auto i = t__waitable::f_wait_any(reinterpret_cast<t__waitable**>(a_0), a_1, a_3 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_3));
-{'\t'}{'\t'}{'\t'}return i < a_1 ? i : 0x102;
+{'\t'}{'\t'}{'\t'}auto i = t__waitable::f_wait_any(reinterpret_cast<t__waitable**>(a_0.v__5freference), a_0.v__5flength, a_2 == -1 ? std::chrono::milliseconds::max() : std::chrono::milliseconds(a_2));
+{'\t'}{'\t'}{'\t'}return i < a_0.v__5flength ? i : 0x102;
 {'\t'}{'\t'}}}
 {'\t'}}});
 ", 0)

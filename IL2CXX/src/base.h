@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "handles.h"
+#include <charconv>
 #include <iostream>
 #include <limits>
 #include <random>

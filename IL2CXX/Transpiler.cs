@@ -210,6 +210,7 @@ public partial class Transpiler
     private readonly IReadOnlyDictionary<(string, string), Type> typeOfShl;
     private readonly MethodInfo finalizeOfObject;
     private readonly MethodInfo methodGetTypeFromHandle;
+    private readonly MethodInfo methodIsPrimitiveGet;
     private readonly MethodInfo methodIsValueTypeGet;
     private readonly MethodInfo methodTypeEquality;
     private readonly MethodInfo methodTypeInequality;
@@ -880,7 +881,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         {
             ConstructorInfo? getCI(Type type) => type.GetConstructor(declaredAndInstance, null, [typeofIntPtr, typeofBoolean], null);
             var ci = getCI(@return) ?? getCI(typeofSafeHandle) ?? throw new Exception();
-            writer.WriteLine($@"{'\t'}auto p = f__new_zerod<{Escape(@return)}>();
+            writer.WriteLine($@"{'\t'}auto p = f__new_zeroed<{Escape(@return)}>();
 {'\t'}{Escape(ci)}(p, result, true);
 {'\t'}return p;");
             Enqueue(ci);

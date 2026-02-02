@@ -121,8 +121,8 @@ partial class DefaultBuiltin
             {
                 var t = x.GetParameters()[0].ParameterType.GenericTypeArguments[0];
                 var e =
-                    t == get(typeof(IntPtr)) ? unsigned ? "uintptr_t" : "intptr_t" :
-                    t == get(typeof(UIntPtr)) ? "uintptr_t" :
+                    t == get(typeof(nint)) ? unsigned ? "uintptr_t" : "intptr_t" :
+                    t == get(typeof(nuint)) ? "uintptr_t" :
                     string.Format(unsigned ? "std::make_unsigned_t<{0}>" : "{0}", transpiler.EscapeForStacked(t));
                 return ($@"{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
 {'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) p0[i] {@operator}= a_1;
@@ -195,12 +195,12 @@ partial class DefaultBuiltin
         string native0(MethodInfo x)
         {
             var t = x.GetParameters()[0].ParameterType;
-            return t == get(typeof(IntPtr)) ? "static_cast<intptr_t>(a_0)" : t == get(typeof(UIntPtr)) ? "static_cast<uintptr_t>(a_0)" : "a_0";
+            return t == get(typeof(nint)) ? "static_cast<intptr_t>(a_0)" : t == get(typeof(nuint)) ? "static_cast<uintptr_t>(a_0)" : "a_0";
         }
         string unsigned0(MethodInfo x)
         {
             var t = x.GetParameters()[0].ParameterType;
-            return t == get(typeof(IntPtr)) || t == get(typeof(UIntPtr)) ? "static_cast<uintptr_t>(a_0)" : "static_cast<std::make_unsigned_t<decltype(a_0)>>(a_0)";
+            return t == get(typeof(nint)) || t == get(typeof(nuint)) ? "static_cast<uintptr_t>(a_0)" : "static_cast<std::make_unsigned_t<decltype(a_0)>>(a_0)";
         }
         var methods = type.GetMethods();
         foreach (var x in methods.Where(x => x.Name == nameof(BitOperations.IsPow2))) code.For(x, transpiler => ($"\treturn std::has_single_bit({unsigned0(x)});\n", 1));

@@ -12,7 +12,7 @@ T_array* f__new_array(uint32_t a_length)
 	t__new<T_array> p(sizeof(T_element) * a_length);
 	p->v__length = a_length;
 	p->v__bounds[0] = {a_length, 0};
-	std::memset(p->f_data(), 0, sizeof(T_element) * a_length);
+	std::memset(static_cast<void*>(p->f_data()), 0, sizeof(T_element) * a_length);
 	return p;
 }
 
@@ -93,7 +93,7 @@ inline auto f__marshal_in(T& a_x, const t_slot_of<U>& a_y) -> decltype(a_x.f_in(
 template<typename T, typename U>
 inline auto f__marshal_out(const T& a_x, t_slot_of<U>& a_y) -> decltype(a_x.f_out(a_y))
 {
-	auto RECYCLONE__SPILL p = f__new_zerod<U>();
+	auto RECYCLONE__SPILL p = f__new_zeroed<U>();
 	a_x.f_out(p);
 	f__store(a_y, p);
 }

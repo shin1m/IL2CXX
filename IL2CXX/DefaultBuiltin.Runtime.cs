@@ -120,6 +120,18 @@ partial class DefaultBuiltin
 ", 0)
         );
         code.For(
+            type.GetMethod(nameof(Assembly.GetManifestResourceNames)),
+            transpiler =>
+            {
+                return (transpiler.GenerateCheckNull("a_0") + $@"
+{'\t'}auto n = a_0->v__resources.size();
+{'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(string[])))}, {transpiler.Escape(get(typeof(string)))}>(n);
+{'\t'}for (auto q = p->f_data(); auto& x : a_0->v__resources) *q++ = f__new_string(x.first);
+{'\t'}return p;
+", 0);
+            }
+        );
+        code.For(
             type.GetMethod(nameof(Assembly.GetManifestResourceStream), [get(typeof(string))]),
             transpiler =>
             {
@@ -442,7 +454,7 @@ partial class DefaultBuiltin
 {'\t'}if (!a_0->v__fields) throw std::runtime_error(""no fields: "" + f__string(a_0->v__full_name));
 {'\t'}size_t n = 0;
 {'\t'}for (auto p = a_0->v__fields; *p; ++p) ++n;
-{'\t'}return f__new_array(a_0, n, [&](auto a_p, auto a_n)
+{'\t'}return f__new_array(a_0->v__szarray, n, [&](auto a_p, auto a_n)
 {'\t'}{{
 {'\t'}{'\t'}for (size_t i = 0; i < n; ++i) {{
 {'\t'}{'\t'}{'\t'}std::memcpy(a_p, a_0->v__fields[i]->f_address(nullptr), a_0->v__size);

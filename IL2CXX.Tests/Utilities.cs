@@ -131,10 +131,9 @@ target_compile_definitions(runco PRIVATE RECYCLONE__COOPERATIVE)
     public static string Build(Func<string[], int> method, IEnumerable<Type>? bundle = null, IEnumerable<Type>? generateReflection = null, IEnumerable<MethodInfo>? bundleMethods = null) => Build(method.Method, bundle, generateReflection, bundleMethods);
     public static void Run(string build, bool cooperative, string? arguments, bool verify = true)
     {
-        IEnumerable<(string, string)> environment = new[]
-        {
-            ("IL2CXX_VERBOSE", string.Empty),
-        };
+        IEnumerable<(string, string)> environment = [
+            ("IL2CXX_VERBOSE", string.Empty)
+        ];
         if (verify) environment = environment.Append(("IL2CXX_VERIFY_LEAKS", string.Empty));
         var name = cooperative ? "runco" : "run";
         var path = Path.Combine(build, name);

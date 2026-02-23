@@ -435,7 +435,7 @@ string.Join(",", ldftnMethods.OfType<MethodInfo>().Where(m =>
 }};");
         var arguments0 = string.Empty;
         var arguments1 = string.Empty;
-        if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual(new[] { typeofString.MakeArrayType() }))
+        if (method.GetParameters().Select(x => x.ParameterType).SequenceEqual([typeofString.MakeArrayType()]))
         {
             arguments0 = $@"
 {'\t'}{'\t'}auto RECYCLONE__SPILL arguments = f__new_array<{Escape(typeofString.MakeArrayType())}, il2cxx::{EscapeForMember(typeofString)}>(argc - 1);

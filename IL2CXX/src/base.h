@@ -165,10 +165,14 @@ void* f_load_symbol(const std::string& a_path, const char* a_name);
 inline void* f_load_symbol(const std::string& a_path, const char* a_name)
 {
 #ifdef __unix__
-	auto handle = dlopen(a_path.c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
+	auto flags = RTLD_LAZY/* | RTLD_GLOBAL*/;
+	auto handle = dlopen(a_path.c_str(), flags);
 	if (handle == NULL) {
-		handle = dlopen(a_path == "libc" ? LIBC_SO : (a_path + ".so").c_str(), RTLD_LAZY/* | RTLD_GLOBAL*/);
-		if (handle == NULL) throw std::runtime_error("unable to dlopen " + a_path + ": " + dlerror());
+		handle = dlopen(a_path == "libc" ? LIBC_SO : (a_path + ".so").c_str(), flags);
+		if (handle == NULL) {
+			handle = dlopen(("lib" + a_path + ".so").c_str(), flags);
+			if (handle == NULL) throw std::runtime_error("unable to dlopen " + a_path + ": " + dlerror());
+		}
 	}
 	return dlsym(handle, a_name);
 #endif
@@ -234,6 +238,13 @@ inline std::enable_if_t<std::is_signed_v<U>, bool> __builtin_mul_overflow(S a_x,
 		x == -1 && y == std::numeric_limits<U>::min();
 }
 #endif
+
+template<typename T>
+inline T f_saturate(auto a_x)
+{
+	using l = std::numeric_limits<T>;
+	return a_x <= l::min() ? l::min() : a_x >= l::max() ? l::max() : std::isnan(a_x) ? 0 : static_cast<T>(a_x);
+}
 
 }
 

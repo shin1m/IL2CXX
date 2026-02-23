@@ -13,9 +13,10 @@ partial class DefaultBuiltin
             type.GetMethod(nameof(Assembly.GetEntryAssembly)),
             transpiler => ("\treturn v__entry_assembly;\n", 1)
         );
+        // TODO
         code.For(
             type.GetMethod(nameof(Assembly.GetExecutingAssembly)),
-            transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+            transpiler => ("\treturn v__entry_assembly;\n", 1)
         );
         if (target == PlatformID.Win32NT)
             code.For(

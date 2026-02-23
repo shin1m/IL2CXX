@@ -37,6 +37,8 @@ class ArrayTests
         Array.Copy(xs, 1, ys, 2, 3);
         return AssertEquals(ys, [null, null, "World", "Good", "Bye", null]);
     }
+    static int CreateInstance() => AssertEquals((string[])Array.CreateInstance(typeof(string), 2), [null, null]);
+    static int CreateInstanceFromArrayType() => AssertEquals((string[])Array.CreateInstanceFromArrayType(typeof(string[]), 2), [null, null]);
     static int ResizeLarger()
     {
         string[] xs = { "Hello", "World", "Good", "Bye" };
@@ -199,6 +201,8 @@ class ArrayTests
         nameof(Clear) => Clear(),
         nameof(ClearAll) => ClearAll(),
         nameof(Copy) => Copy(),
+        nameof(CreateInstance) => CreateInstance(),
+        nameof(CreateInstanceFromArrayType) => CreateInstanceFromArrayType(),
         nameof(ResizeLarger) => ResizeLarger(),
         nameof(ResizeSmaller) => ResizeSmaller(),
         nameof(IListIsReadOnly) => IListIsReadOnly(),
@@ -232,6 +236,8 @@ class ArrayTests
             nameof(Clear),
             nameof(ClearAll),
             nameof(Copy),
+            nameof(CreateInstance),
+            nameof(CreateInstanceFromArrayType),
             nameof(ResizeLarger),
             nameof(ResizeSmaller),
             nameof(IListIsReadOnly),

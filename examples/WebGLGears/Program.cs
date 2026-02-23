@@ -503,7 +503,8 @@ void main()
             normal_matrix.Translation = default;
             normal_matrix = Matrix4x4.Transpose(normal_matrix);
         }
-        var normal_matrix_values = new[] {
+        var normal_matrix_values = new[]
+        {
             normal_matrix.M11, normal_matrix.M12, normal_matrix.M13,
             normal_matrix.M21, normal_matrix.M22, normal_matrix.M23,
             normal_matrix.M31, normal_matrix.M32, normal_matrix.M33

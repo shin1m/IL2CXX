@@ -76,6 +76,19 @@ class NumberTests
             var x = 257;
             if (x != 257.0f) return 6;
         }
+        if (float.ConvertToInteger<int>(float.MinValue) != int.MinValue) return 7;
+        if (float.ConvertToInteger<int>(float.MaxValue) != int.MaxValue) return 8;
+        if (float.ConvertToInteger<int>(float.NaN) != 0) return 9;
+        if (float.ConvertToInteger<long>(float.MinValue) != long.MinValue) return 10;
+        if (float.ConvertToInteger<long>(float.MaxValue) != long.MaxValue) return 11;
+        if (float.ConvertToInteger<long>(float.NaN) != 0L) return 12;
+        if (float.ConvertToInteger<uint>(float.MinValue) != uint.MinValue) return 13;
+        if (float.ConvertToInteger<uint>(float.MaxValue) != uint.MaxValue) return 14;
+        if (float.ConvertToInteger<uint>(float.NaN) != 0) return 15;
+        if (float.ConvertToInteger<ulong>(float.MinValue) != ulong.MinValue) return 16;
+        if (float.ConvertToInteger<ulong>(float.MaxValue) != ulong.MaxValue) return 17;
+        if (float.ConvertToInteger<ulong>(float.NaN) != 0L) return 18;
+        if (float.ConvertToIntegerNative<int>(0f) != 0) return 19;
         return 0;
     }
     static int Double()
@@ -95,6 +108,19 @@ class NumberTests
             var x = 257;
             if (x != 257.0) return 6;
         }
+        if (double.ConvertToInteger<int>(double.MinValue) != int.MinValue) return 7;
+        if (double.ConvertToInteger<int>(double.MaxValue) != int.MaxValue) return 8;
+        if (double.ConvertToInteger<int>(double.NaN) != 0) return 9;
+        if (double.ConvertToInteger<long>(double.MinValue) != long.MinValue) return 10;
+        if (double.ConvertToInteger<long>(double.MaxValue) != long.MaxValue) return 11;
+        if (double.ConvertToInteger<long>(double.NaN) != 0L) return 12;
+        if (double.ConvertToInteger<uint>(double.MinValue) != uint.MinValue) return 13;
+        if (double.ConvertToInteger<uint>(double.MaxValue) != uint.MaxValue) return 14;
+        if (double.ConvertToInteger<uint>(double.NaN) != 0) return 15;
+        if (double.ConvertToInteger<ulong>(double.MinValue) != ulong.MinValue) return 16;
+        if (double.ConvertToInteger<ulong>(double.MaxValue) != ulong.MaxValue) return 17;
+        if (double.ConvertToInteger<ulong>(double.NaN) != 0L) return 18;
+        if (double.ConvertToIntegerNative<int>(0.0) != 0) return 19;
         return 0;
     }
     static int Unordered()
@@ -140,6 +166,13 @@ class NumberTests
     static int EnumGetValues() => Enum.GetValues(typeof(Names)).Cast<Names>().SequenceEqual([Names.Foo, Names.Bar, Names.Zot]) ? 0 : 1;
     static int EnumGetValuesOfT() => Enum.GetValues<Names>().Cast<Names>().SequenceEqual([Names.Foo, Names.Bar, Names.Zot]) ? 0 : 1;
     static int EnumHasFlag() => Flags.XY.HasFlag(Flags.Y) ? 0 : 1;
+    static int EnumIsDefinedOfT()
+    {
+        if (!Enum.IsDefined(Names.Foo)) return 1;
+        if (!Enum.IsDefined(Names.Bar)) return 2;
+        if (!Enum.IsDefined(Names.Zot)) return 3;
+        return Enum.IsDefined((Names)3) ? 4 : 0;
+    }
     static int EnumToStringDefault() => Names.Bar.ToString() == "Bar" ? 0 : 1;
     static int EnumToStringG() => Names.Bar.ToString("g") == "Bar" ? 0 : 1;
     static int EnumISpanFormattableTryFormat()
@@ -176,6 +209,7 @@ class NumberTests
         nameof(EnumGetValues) => EnumGetValues(),
         nameof(EnumGetValuesOfT) => EnumGetValuesOfT(),
         nameof(EnumHasFlag) => EnumHasFlag(),
+        nameof(EnumIsDefinedOfT) => EnumIsDefinedOfT(),
         nameof(EnumToStringDefault) => EnumToStringDefault(),
         nameof(EnumToStringG) => EnumToStringG(),
         nameof(EnumISpanFormattableTryFormat) => EnumISpanFormattableTryFormat(),
@@ -209,6 +243,7 @@ class NumberTests
             nameof(EnumGetValues),
             nameof(EnumGetValuesOfT),
             nameof(EnumHasFlag),
+            nameof(EnumIsDefinedOfT),
             nameof(EnumToStringDefault),
             nameof(EnumToStringG),
             nameof(EnumISpanFormattableTryFormat),

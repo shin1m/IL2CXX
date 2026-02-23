@@ -11,6 +11,7 @@ class RuntimeAssembly : Assembly
     public string Name => throw new NotImplementedException();
     public override object[] GetCustomAttributes(Type attributeType, bool inherit) => Array.Empty<Attribute>();
     public override Type[] GetExportedTypes() => throw new NotImplementedException();
+    public override string[] GetManifestResourceNames() => throw new NotImplementedException();
     public override Stream GetManifestResourceStream(string name) => throw new NotImplementedException();
     public override AssemblyName GetName(bool copiedName) => new(FullName);
     public override Type? GetType(string name, bool throwOnError, bool ignoreCase) => Type.GetType($"{name}, {FullName}", throwOnError, ignoreCase);

@@ -158,11 +158,11 @@ t_System_2eString* f__to_string(t__object* a_p);
 t_System_2eArray* f__new_array(t__type* a_type, uint32_t a_length, auto a_do)
 {
 	auto a = sizeof(t_System_2eArray) + sizeof(t_System_2eArray::t__bound);
-	auto n = a_type->v__size * a_length;
+	auto n = a_type->v__element->v__size * a_length;
 	auto p = static_cast<t_System_2eArray*>(f_engine()->f_allocate(a + n));
 	p->v__length = a_length;
 	p->f_bounds()[0] = {a_length, 0};
 	a_do(reinterpret_cast<char*>(p) + a, n);
-	a_type->v__szarray->f_finish(p);
+	a_type->f_finish(p);
 	return p;
 }

@@ -155,7 +155,8 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
         var reflection = options.Reflection!.Select(load).ToHashSet();
         if (options.Target == PlatformID.Other)
         {
-            var types = new[] {
+            var types = new[]
+            {
                 load("System.Runtime.InteropServices.JavaScript.JavaScriptExports, System.Runtime.InteropServices.JavaScript"),
                 assembly.GetType("System.Runtime.InteropServices.JavaScript.__GeneratedInitializer")
             }.Where(x => x != null);

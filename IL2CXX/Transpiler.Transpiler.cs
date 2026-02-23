@@ -151,8 +151,10 @@ partial class Transpiler
             [("void*", "void*")] = typeofVoidPointer
         };
         finalizeOfObject = FinalizeOf(typeofObject) ?? throw new Exception();
+        methodGetTypeCode = typeofType.GetMethod(nameof(Type.GetTypeCode)) ?? throw new Exception();
         methodGetTypeFromHandle = typeofType.GetMethod(nameof(Type.GetTypeFromHandle)) ?? throw new Exception();
         methodIsPrimitiveGet = typeofType.GetProperty(nameof(Type.IsPrimitive))?.GetMethod ?? throw new Exception();
+        methodIsSealedGet = typeofType.GetProperty(nameof(Type.IsSealed))?.GetMethod ?? throw new Exception();
         methodIsValueTypeGet = typeofType.GetProperty(nameof(Type.IsValueType))?.GetMethod ?? throw new Exception();
         methodTypeEquality = typeofType.GetMethod("op_Equality") ?? throw new Exception();
         methodTypeInequality = typeofType.GetMethod("op_Inequality") ?? throw new Exception();
@@ -359,7 +361,7 @@ partial class Transpiler
             {
                 var r = ParseR4(ref index);
                 var i = new SingleUnion { Single = r }.Int32;
-                var literal = i == 0 ? "0.0f" : $"{(i < 0 ? "-" : string.Empty)}0x1.{(i & 0x7fffff) << 1:x6}p{(i >> 23 & 0xff) - 127}f";
+                var literal = (i < 0 ? "-" : string.Empty) + ((i & 0x7fffffff) == 0 ? "0.0f" : $"0x1.{(i & 0x7fffff) << 1:x6}p{(i >> 23 & 0xff) - 127}f");
                 writer.Write($" {literal}\n\t{indexToStack[index].Variable} = ");
                 if (float.IsPositiveInfinity(r))
                     writer.WriteLine("std::numeric_limits<float>::infinity();");
@@ -379,7 +381,7 @@ partial class Transpiler
             {
                 var r = ParseR8(ref index);
                 var i = new DoubleUnion { Double = r }.Int64;
-                var literal = i == 0 ? "0.0" : $"{(i < 0 ? "-" : string.Empty)}0x1.{i & 0xfffffffffffff:x13}p{(i >> 52 & 0x7ff) - 1023}";
+                var literal = (i < 0 ? "-" : string.Empty) + ((i & 0x7fffffffffffffff) == 0 ? "0.0" : $"0x1.{i & 0xfffffffffffff:x13}p{(i >> 52 & 0x7ff) - 1023}");
                 writer.Write($" {literal}\n\t{indexToStack[index].Variable} = ");
                 if (double.IsPositiveInfinity(r))
                     writer.WriteLine("std::numeric_limits<double>::infinity();");
@@ -429,7 +431,16 @@ partial class Transpiler
                 var after = indexToStack[index];
                 if (m.DeclaringType == typeofType)
                 {
-                    if (m == methodGetTypeFromHandle)
+                    if (m == methodGetTypeCode)
+                    {
+                        if (stack.CompiledValue is Type t)
+                        {
+                            after.CompiledValue = Type.GetTypeCode(t);
+                            writer.WriteLine($"\t{after.Variable} = {(int)Type.GetTypeCode(t)};");
+                            return index;
+                        }
+                    }
+                    else if (m == methodGetTypeFromHandle)
                     {
                         if (stack.CompiledValue is Type t) after.CompiledValue = t;
                     }
@@ -439,6 +450,15 @@ partial class Transpiler
                         {
                             after.CompiledValue = t.IsPrimitive;
                             writer.WriteLine($"\t{after.Variable} = {(t.IsPrimitive ? 1 : 0)};");
+                            return index;
+                        }
+                    }
+                    else if (m == methodIsSealedGet)
+                    {
+                        if (stack.CompiledValue is Type t)
+                        {
+                            after.CompiledValue = t.IsSealed;
+                            writer.WriteLine($"\t{after.Variable} = {(t.IsSealed ? 1 : 0)};");
                             return index;
                         }
                     }
@@ -783,8 +803,6 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
         {
             (OpCode: OpCodes.Conv_I1, Type: typeofSByte),
             (OpCode: OpCodes.Conv_I2, Type: typeofInt16),
-            (OpCode: OpCodes.Conv_I4, Type: typeofInt32),
-            (OpCode: OpCodes.Conv_I8, Type: typeofInt64),
             (OpCode: OpCodes.Conv_R4, Type: typeofSingle),
             (OpCode: OpCodes.Conv_R8, Type: typeofDouble)
         }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
@@ -793,6 +811,19 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
             x.Generate = (index, stack) =>
             {
                 writer.WriteLine($"\n\t{indexToStack[index].Variable} = static_cast<{primitives[set.Type]}>({stack.AsSigned});");
+                return index;
+            };
+        }));
+        new[]
+        {
+            (OpCode: OpCodes.Conv_I4, Type: typeofInt32),
+            (OpCode: OpCodes.Conv_I8, Type: typeofInt64)
+        }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
+        {
+            x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
+            x.Generate = (index, stack) =>
+            {
+                writer.WriteLine($"\n\t{indexToStack[index].Variable} = {(stack.VariableType == "double" ? "il2cxx::f_saturate" : "static_cast")}<{primitives[set.Type]}>({stack.AsSigned});");
                 return index;
             };
         }));
@@ -812,7 +843,18 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
         new[]
         {
             (OpCode: OpCodes.Conv_U4, Type: typeofUInt32),
-            (OpCode: OpCodes.Conv_U8, Type: typeofUInt64),
+            (OpCode: OpCodes.Conv_U8, Type: typeofUInt64)
+        }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
+        {
+            x.Estimate = (index, stack) => (index, stack.Pop.Push(set.Type));
+            x.Generate = (index, stack) =>
+            {
+                writer.WriteLine($"\n\t{indexToStack[index].Variable} = {(stack.VariableType == "double" ? "il2cxx::f_saturate" : "static_cast")}<{primitives[set.Type]}>({stack.AsUnsigned});");
+                return index;
+            };
+        }));
+        new[]
+        {
             (OpCode: OpCodes.Conv_U2, Type: typeofUInt16),
             (OpCode: OpCodes.Conv_U1, Type: typeofByte),
             (OpCode: OpCodes.Conv_R_Un, Type: typeofDouble)
@@ -1274,7 +1316,7 @@ GenerateCheckNull("p") + generateVirtual("p")
                         }
                         return isinst();
                     }
-                    if (t0 == t || t.IsEnum && t0 == t.GetEnumUnderlyingType()) return label0();
+                    if (t0 == t || t.IsEnum && t0 == t.GetEnumUnderlyingType() || t0.IsEnum && t == t0.GetEnumUnderlyingType()) return label0();
                     if (GetNullableUnderlyingType(t0) == t)
                     {
                         label0();

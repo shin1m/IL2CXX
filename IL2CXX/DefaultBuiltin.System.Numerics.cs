@@ -33,6 +33,7 @@ partial class DefaultBuiltin
             type.GetProperty(nameof(Vector.IsHardwareAccelerated))!.GetMethod,
             transpiler => ("\treturn false;\n", 1)
         );
+        return;
         var typeofVectorOfT0 = typeofVectorOfT.MakeGenericType(Type.MakeGenericMethodParameter(0));
         void relation(string name, string @operator) => code.ForGeneric(
             type.GetMethod(name, 1, [typeofVectorOfT0, typeofVectorOfT0]),
@@ -92,13 +93,21 @@ partial class DefaultBuiltin
         unary1(nameof(Vector.Ceiling), (value, x) => $"{value} = std::ceil({x})");
         unary1(nameof(Vector.Floor), (value, x) => $"{value} = std::floor({x})");
         var methods = type.GetMethods();
+        var saturatings = new HashSet<string>
+        {
+            "ConvertToInt32",
+            "ConvertToInt64",
+            "ConvertToUInt32",
+            "ConvertToUInt64"
+        };
         foreach (var x in methods.Where(x => x.Name.StartsWith("ConvertTo"))) code.For(x, transpiler =>
         {
             var e = transpiler.EscapeForStacked(x.GetParameters()[0].ParameterType.GenericTypeArguments[0]);
+            var t = transpiler.EscapeForStacked(x.ReturnType.GenericTypeArguments[0]);
             return ($@"{'\t'}{transpiler.EscapeForStacked(x.ReturnType)} value;
-{'\t'}auto p = reinterpret_cast<{transpiler.EscapeForStacked(x.ReturnType.GenericTypeArguments[0])}*>(&value);
+{'\t'}auto p = reinterpret_cast<{t}*>(&value);
 {'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
-{'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) p[i] = p0[i];
+{'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) p[i] = {(saturatings.Contains(x.Name) ? $"il2cxx::f_saturate<{t}>(p0[i])" : "p0[i]")};
 {'\t'}return value;
 ", 1);
         });
@@ -136,6 +145,7 @@ partial class DefaultBuiltin
     }
     private static void SetupVectorOfT(Type type, Builtin.Code code)
     {
+        return;
         void additive(string name, string @operator) => code.ForGeneric(
             type.GetMethod(name),
             (transpiler, types) => VectorOfTBinary(type, transpiler, types, (value, x, y) => $"{value} = {x} {@operator} {y}")
@@ -177,7 +187,7 @@ partial class DefaultBuiltin
 {'\t'}return value;
 ", 1)
         );
-        void equality(MethodInfo method) => code.ForGeneric(method, (transpiler, types) =>
+        void equality(MethodInfo? method) => code.ForGeneric(method, (transpiler, types) =>
         {
             var e = transpiler.EscapeForStacked(types[0]);
             return ($@"{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
@@ -186,8 +196,8 @@ partial class DefaultBuiltin
 {'\t'}return true;
 ", 1);
         });
-        equality(type.GetMethod("op_Equality") ?? throw new Exception());
-        equality(type.GetMethod(nameof(Equals), [type]) ?? throw new Exception());
+        equality(type.GetMethod("op_Equality"));
+        equality(type.GetMethod(nameof(Equals), [type]));
     }
     private static Builtin SetupSystemNumerics(this Builtin @this, Func<Type, Type> get) => @this
     .For(get(typeof(BitOperations)), (type, code) =>
@@ -215,7 +225,7 @@ partial class DefaultBuiltin
     .For(get(typeof(Vector)), (type, code) =>
     {
         SetupVector(get, type, code, get(typeof(Vector<>)), nameof(Vector.SquareRoot));
-        foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector.Widen))) code.For(x, transpiler =>
+        /*foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector.Widen))) code.For(x, transpiler =>
         {
             var ps = x.GetParameters().Select(x => x.ParameterType).ToList();
             var e = transpiler.EscapeForStacked(ps[1].GetElementType()!.GenericTypeArguments[0]);
@@ -226,11 +236,11 @@ partial class DefaultBuiltin
 {'\t'}auto p2 = reinterpret_cast<{e}*>(a_2);
 {'\t'}for (size_t i = 0; i < n; ++i) p2[i] = p0[n + i];
 ", 1);
-        });
+        });*/
     })
     .For(get(typeof(Vector<>)), (type, code) =>
     {
-        code.GenericMembers = (transpiler, types) => ($@"{'\t'}{'\t'}double _[{(transpiler.Is64Bit ? 4 : 2)}];
+        /*code.GenericMembers = (transpiler, types) => ($@"{'\t'}{'\t'}double _[{(transpiler.Is64Bit ? 4 : 2)}];
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
@@ -247,7 +257,7 @@ partial class DefaultBuiltin
 {'\t'}for (size_t i = 0; i < sizeof(*a_0) / sizeof({e}); ++i) p[i] = a_1;
 ", 1);
             }
-        );
+        );*/
         SetupVectorOfT(type, code);
     })
     .For(get(typeof(Vector3)), (type, code) =>

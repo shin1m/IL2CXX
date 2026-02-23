@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Reflection;
 using System.Text;
 
@@ -6,22 +7,6 @@ namespace IL2CXX;
 
 partial class DefaultBuiltin
 {
-    private static void SetupPrimitive(Func<Type, Type> get, Type type, Builtin.Code code)
-    {
-        code.For(
-            type.GetMethod(nameof(GetHashCode)),
-            transpiler => ("\treturn static_cast<int32_t>(*a_0);\n", 1)
-        );
-        code.For(
-            type.GetMethod(nameof(ToString), Type.EmptyTypes),
-            transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
-        );
-        // TODO
-        code.For(
-            type.GetMethod(nameof(ToString), [get(typeof(string)), get(typeof(IFormatProvider))]),
-            transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
-        );
-    }
     private static Action<Type, Builtin.Code> ForIntPtr(string native) => (type, code) =>
     {
         code.Members = transpiler => ($@"{'\t'}{'\t'}void* v__5fvalue;
@@ -55,12 +40,11 @@ partial class DefaultBuiltin
 {'\t'}{'\t'}{'\t'}return !(*this == std::forward<decltype(a_value)>(a_value));
 {'\t'}{'\t'}}}
 ", false, null);
-        code.For(
-            type.GetMethod(nameof(ToString), Type.EmptyTypes),
-            transpiler => ("\treturn f__new_string(std::to_string(*a_0));\n", 0)
-        );
     };
-
+    private static void ForFloatingPoint(Func<Type, Type> get, Type type, Builtin.Code code) => code.ForGeneric(
+        type.GetMethod(nameof(IFloatingPoint<>.ConvertToIntegerNative)),
+        (transpiler, types) => ("\treturn a_0;\n", 1)
+    );
     private static Builtin SetupSystem(this Builtin @this, Func<Type, Type> get) => @this
     .For(get(typeof(object)), (type, code) =>
     {
@@ -117,7 +101,7 @@ partial class DefaultBuiltin
             (transpiler, actual) =>
             {
                 var identifier = transpiler.Escape(actual);
-                return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({identifier})) == 0;\n", 1);
+                return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({transpiler.EscapeForValue(actual)})) == 0;\n", 1);
             }
         );
     })
@@ -192,6 +176,14 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}t__type_of<t__generic_method_parameter>::v__instance.f_finish(p);
 {'\t'}return q;
 ", 0)
+        );
+    })
+    .For(get(typeof(TypeLoadException)), (type, code) =>
+    {
+        // TODO
+        code.For(
+            type.GetMethod("SetMessageField", declaredAndInstance),
+            transpiler => (string.Empty, 0)
         );
     })
     .For(get(typeof(ModuleHandle)), (type, code) =>
@@ -367,8 +359,21 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
         // TODO
         code.For(
             type.GetMethod(nameof(Array.CreateInstance), [get(typeof(Type)), get(typeof(int))]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__szarray) throw std::runtime_error(""no szarray: "" + f__string(type->v__full_name));
+{'\t'}return f__new_array(type->v__szarray, a_1, [&](auto a_p, auto a_n)
+{'\t'}{{
+{'\t'}{'\t'}std::memset(a_p, 0, a_n);
+{'\t'}}});
+", 0)
+        );
+        code.For(
+            type.GetMethod(nameof(Array.CreateInstanceFromArrayType), [get(typeof(Type)), get(typeof(int))]),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + (transpiler.CheckRange ? $"\tif (a_1 < 0) [[unlikely]] {transpiler.GenerateThrow("ArgumentOutOfRange")};\n" : string.Empty) + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_0);
+{'\t'}if (!type->v__array) throw std::runtime_error(""must be array: "" + f__string(type->v__full_name));
+{'\t'}if (type->v__rank != 1) throw std::runtime_error(""rank must be 1: "" + f__string(type->v__full_name));
 {'\t'}return f__new_array(type, a_1, [&](auto a_p, auto a_n)
 {'\t'}{{
 {'\t'}{'\t'}std::memset(a_p, 0, a_n);
@@ -839,16 +844,8 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             transpiler => (transpiler.GenerateCheckNull("a_0") + transpiler.GenerateCheckRange("a_1", "static_cast<uint32_t>(a_0->v__5fstringLength)") + "\treturn (&a_0->v__5ffirstChar)[static_cast<uint32_t>(a_1)];\n", 1)
         );
     })
-    .For(get(typeof(sbyte)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(short)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(byte)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(ushort)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(int)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(uint)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(long)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(ulong)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(float)), (type, code) => SetupPrimitive(get, type, code))
-    .For(get(typeof(double)), (type, code) => SetupPrimitive(get, type, code))
+    .For(get(typeof(float)), (type, code) => ForFloatingPoint(get, type, code))
+    .For(get(typeof(double)), (type, code) => ForFloatingPoint(get, type, code))
     .For(get(typeof(Enum)), (type, code) =>
     {
         code.StaticMembers = transpiler => string.Empty;
@@ -911,6 +908,14 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
                 return ($"\treturn static_cast<{transpiler.EscapeForStacked(types[0].MakeArrayType())}>({transpiler.Escape(method)}(&t__type_of<{transpiler.Escape(types[0])}>::v__instance));\n", 1);
             }
         );
+        code.ForGeneric(
+            type.GetMethod(nameof(Enum.IsDefined), 1, [Type.MakeGenericMethodParameter(0)]),
+            (transpiler, types) => ($@"{'\t'}auto type = &t__type_of<{transpiler.Escape(types[0])}>::v__instance;
+{'\t'}if (!type->v__fields) throw std::runtime_error(""no fields: "" + f__string(type->v__full_name));
+{'\t'}for (auto p = type->v__fields; *p; ++p) if (std::memcmp((*p)->f_address(nullptr), &a_0, sizeof(a_0)) == 0) return true;
+{'\t'}return false;
+", 0)
+        );
         // TODO
         foreach (var t in new[]
         {
@@ -924,7 +929,8 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             typeof(ulong)
         }) code.For(
             type.GetMethod(nameof(Enum.ToObject), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, [get(typeof(Type)), get(t)]),
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}auto type = static_cast<t__type*>(a_0);
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+{'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""must be enum"");
 {'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
 {'\t'}switch (type->v__size) {{
@@ -1394,7 +1400,8 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
     })
     .For(get(Type.GetType("System.ThrowHelper", true)!), (type, code) =>
     {
-        foreach (var name in new[] {
+        foreach (var name in new[]
+        {
             "ThrowForUnsupportedNumericsVectorBaseType",
             "ThrowForUnsupportedIntrinsicsVector64BaseType",
             "ThrowForUnsupportedIntrinsicsVector128BaseType",
@@ -1427,17 +1434,18 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             transpiler => ("\treturn false;\n", 1)
         );
     })
-    .For(get(Type.GetType("System.Globalization.GlobalizationMode", true)!), (type, code) =>
+    .For(get(Type.GetType("System.Globalization.GlobalizationMode+Settings", true)!), (type, code) =>
     {
+        // TODO
         code.For(
             type.GetProperty("Invariant", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
             transpiler => ("\treturn true;\n", 1)
         );
         code.For(
             type.GetProperty("PredefinedCulturesOnly", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
-            transpiler => ("\treturn true;\n", 1)
+            transpiler => ("\treturn false;\n", 1)
         );
-        var nls = type.GetProperty("UseNls", BindingFlags.Static | BindingFlags.NonPublic);
-        if (nls != null) code.For(nls.GetMethod, transpiler => ("\treturn false;\n", 1));
+        //var nls = type.GetProperty("UseNls", BindingFlags.Static | BindingFlags.NonPublic);
+        //if (nls != null) code.For(nls.GetMethod, transpiler => ("\treturn false;\n", 1));
     });
 }

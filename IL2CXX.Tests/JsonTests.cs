@@ -25,6 +25,11 @@ class JsonTests
         var json = JsonSerializer.Serialize(new Foo { ID = 1, Value = "foo" }, new JsonSerializerOptions { IncludeFields = true });
         return json == "{\"ID\":1,\"Value\":\"foo\"}" ? 0 : 1;
     }
+    static int DeserializeEnum()
+    {
+        var bar = JsonSerializer.Deserialize<Bar>("1");
+        return bar == Bar.Y ? 0 : 1;
+    }
     static int SerializeEnum()
     {
         var json = JsonSerializer.Serialize(Bar.Y);
@@ -35,6 +40,7 @@ class JsonTests
     {
         nameof(Deserialize) => Deserialize(),
         nameof(Serialize) => Serialize(),
+        nameof(DeserializeEnum) => DeserializeEnum(),
         nameof(SerializeEnum) => SerializeEnum(),
         _ => -1
     };
@@ -67,6 +73,7 @@ class JsonTests
         [Values(
             nameof(Deserialize),
             nameof(Serialize),
+            nameof(DeserializeEnum),
             nameof(SerializeEnum)
         )] string name,
         [Values] bool cooperative

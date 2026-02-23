@@ -209,8 +209,10 @@ public partial class Transpiler
     private readonly IReadOnlyDictionary<(string, string), Type> typeOfDiv_Un;
     private readonly IReadOnlyDictionary<(string, string), Type> typeOfShl;
     private readonly MethodInfo finalizeOfObject;
+    private readonly MethodInfo methodGetTypeCode;
     private readonly MethodInfo methodGetTypeFromHandle;
     private readonly MethodInfo methodIsPrimitiveGet;
+    private readonly MethodInfo methodIsSealedGet;
     private readonly MethodInfo methodIsValueTypeGet;
     private readonly MethodInfo methodTypeEquality;
     private readonly MethodInfo methodTypeInequality;
@@ -897,7 +899,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         Enqueue(m);
         return $"{Escape(m)}()";
     }
-    static readonly IReadOnlyDictionary<char, string> escapes = new Dictionary<char, string>
+    private static readonly IReadOnlyDictionary<char, string> escapes = new Dictionary<char, string>
     {
         ['\''] = "\\'",
         ['"'] = "\\\"",

@@ -190,9 +190,9 @@ partial class DefaultBuiltin
             type.GetMethod("CreateMutexCore", BindingFlags.Instance | BindingFlags.NonPublic, [get(typeof(bool))]),
             transpiler =>
             {
+                transpiler.Enqueue(swhc);
                 var set = type.GetProperty(nameof(WaitHandle.SafeWaitHandle))!.SetMethod!;
                 transpiler.Enqueue(set);
-                transpiler.Enqueue(swhc);
                 return ($@"{'\t'}auto RECYCLONE__SPILL p = f__new_zeroed<{transpiler.Escape(swh)}>();
 {'\t'}{transpiler.Escape(swhc)}(p, new t__mutex(a_1), true);
 {'\t'}{transpiler.Escape(set)}(a_0, p);

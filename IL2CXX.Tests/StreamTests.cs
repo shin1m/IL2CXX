@@ -112,10 +112,9 @@ class StreamTests
     public void TestWriteTextFile([Values] bool cooperative)
     {
         Utilities.Run(build, cooperative, nameof(WriteTextFile));
-        Assert.That(File.ReadLines(FilePath), Is.EqualTo(new[]
-        {
+        Assert.That(File.ReadLines(FilePath), Is.EqualTo([
             "Hello, World!",
             "Good bye."
-        }));
+        ]));
     }
 }

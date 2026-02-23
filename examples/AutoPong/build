@@ -1,8 +1,9 @@
 #!/bin/bash
-SOURCE=../../externals/MonoGame.Samples/AutoPong/AutoPong.DesktopGL
+BASE=$(cd $(dirname $0) && pwd)
+SOURCE=$BASE/../../externals/MonoGame.Samples/AutoPong/AutoPong.DesktopGL
 dotnet build $SOURCE -c Release || exit $?
 dotnet run --project ../../IL2CXX.Console --target Unix\
- --out out $SOURCE/bin/Release/net8.0/AutoPong.DesktopGL.dll\
+ --out out $SOURCE/bin/Release/net10.0/AutoPong.DesktopGL.dll\
  --reflection 'Program, AutoPong.DesktopGL'\
  || exit $?
 mkdir out/build || exit $?

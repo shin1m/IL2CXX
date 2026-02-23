@@ -172,6 +172,14 @@ partial class DefaultBuiltin
             transpiler => (string.Empty, 1)
         );
         code.For(
+            type.GetMethod("LogThreadPoolIOEnqueue", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
+            type.GetMethod("LogThreadPoolIODequeue", BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => (string.Empty, 1)
+        );
+        code.For(
             type.GetMethod("LogThreadPoolWorkingThreadCount", BindingFlags.Static | BindingFlags.NonPublic),
             transpiler => (string.Empty, 1)
         );

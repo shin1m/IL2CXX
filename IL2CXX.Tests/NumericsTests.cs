@@ -244,12 +244,50 @@ class NumericsTests
     static int VectorConvertToInt32()
     {
         var x = Vector.ConvertToInt32(new Vector<float>(-1f));
-        return x[0] == -1 ? 0 : 1;
+        if (x[0] != -1) return 1;
+        x = Vector.ConvertToInt32(new Vector<float>(float.MinValue));
+        if (x[0] != int.MinValue) return 2;
+        x = Vector.ConvertToInt32(new Vector<float>(float.MaxValue));
+        if (x[0] != int.MaxValue) return 3;
+        x = Vector.ConvertToInt32(new Vector<float>(float.NaN));
+        if (x[0] != 0) return 4;
+        return 0;
     }
     static int VectorConvertToInt64()
     {
         var x = Vector.ConvertToInt64(new Vector<double>(-1.0));
-        return x[0] == (long)-1 ? 0 : 1;
+        if (x[0] != -1L) return 1;
+        x = Vector.ConvertToInt64(new Vector<double>(double.MinValue));
+        if (x[0] != long.MinValue) return 2;
+        x = Vector.ConvertToInt64(new Vector<double>(double.MaxValue));
+        if (x[0] != long.MaxValue) return 3;
+        x = Vector.ConvertToInt64(new Vector<double>(double.NaN));
+        if (x[0] != 0L) return 4;
+        return 0;
+    }
+    static int VectorConvertToUInt32()
+    {
+        var x = Vector.ConvertToUInt32(new Vector<float>(1f));
+        if (x[0] != 1) return 1;
+        x = Vector.ConvertToUInt32(new Vector<float>(float.MinValue));
+        if (x[0] != uint.MinValue) return 2;
+        x = Vector.ConvertToUInt32(new Vector<float>(float.MaxValue));
+        if (x[0] != uint.MaxValue) return 3;
+        x = Vector.ConvertToUInt32(new Vector<float>(float.NaN));
+        if (x[0] != 0) return 4;
+        return 0;
+    }
+    static int VectorConvertToUInt64()
+    {
+        var x = Vector.ConvertToUInt64(new Vector<double>(1.0));
+        if (x[0] != 1L) return 1;
+        x = Vector.ConvertToUInt64(new Vector<double>(double.MinValue));
+        if (x[0] != ulong.MinValue) return 2;
+        x = Vector.ConvertToUInt64(new Vector<double>(double.MaxValue));
+        if (x[0] != ulong.MaxValue) return 3;
+        x = Vector.ConvertToUInt64(new Vector<double>(double.NaN));
+        if (x[0] != 0L) return 4;
+        return 0;
     }
     static int VectorShiftLeft()
     {
@@ -277,16 +315,63 @@ class NumericsTests
         }
         return 0;
     }
-    static int Vector3Max()
+    static int Check(Vector3 v, float x, float y, float z)
     {
-        var x = Vector3.Max(new Vector3(-1f), new Vector3(1f));
-        return x.X == 1f ? 0 : 1;
+        if (v.X != x) return 1;
+        if (v.Y != y) return 2;
+        if (v.Z != z) return 3;
+        return 0;
     }
-    static int Vector3Min()
+    static int Vector3NewX() => Check(new(1f), 1f, 1f, 1f);
+    static int Vector3NewZ() => Check(new(new(1f, 2f), 3f), 1f, 2f, 3f);
+    static int Vector3NewXYZ() => Check(new(1f, 2f, 3f), 1f, 2f, 3f);
+    static int Vector3One() => Check(Vector3.One, 1f, 1f, 1f);
+    static int Vector3UnitX() => Check(Vector3.UnitX, 1f, 0f, 0f);
+    static int Vector3UnitY() => Check(Vector3.UnitY, 0f, 1f, 0f);
+    static int Vector3UnitZ() => Check(Vector3.UnitZ, 0f, 0f, 1f);
+    static int Vector3Zero() => Check(Vector3.Zero, 0f, 0f, 0f);
+    static int Vector3UnaryNegation() => Check(-new Vector3(1f, 2f, 3f), -1f, -2f, -3f);
+    static int Vector3Multiply() => Check(new Vector3(1f, 2f, 3f) * new Vector3(4f, 5f, 6f), 4f, 10f, 18f);
+    static int Vector3Multiply0() => Check(new Vector3(1f, 2f, 3f) * 4f, 4f, 8f, 12f);
+    static int Vector3Multiply1() => Check(4f * new Vector3(1f, 2f, 3f), 4f, 8f, 12f);
+    static int Vector3Division() => Check(new Vector3(1f, 2f, 3f) / new Vector3(2f, 8f, 24f), 0.5f, 0.25f, 0.125f);
+    static int Vector3DivisionX() => Check(new Vector3(1f, 2f, 3f) / 2f, 0.5f, 1f, 1.5f);
+    static int Vector3Addition() => Check(new Vector3(1f, 2f, 3f) + new Vector3(4f, 5f, 6f), 5f, 7f, 9f);
+    static int Vector3Substraction() => Check(new Vector3(1f, 2f, 3f) - new Vector3(4f, 6f, 8f), -3f, -4f, -5f);
+    static int Vector3SubstractionMinMax() => Check(new Vector3(float.MinValue) - new Vector3(float.MaxValue), float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+    static int Vector3Abs() => Check(Vector3.Abs(new(-1f, -2f, -3f)), 1f, 2f, 3f);
+    static int Vector3Cross()
     {
-        var x = Vector3.Min(new Vector3(-1f), new Vector3(1f));
-        return x.X == -1f ? 0 : 1;
+        var x = new Vector3(1f, 2f, 3f);
+        var y = new Vector3(4f, 5f, 6f);
+        return Check(Vector3.Cross(x, y), x.Y * y.Z - x.Z * y.Y, x.Z * y.X - x.X * y.Z, x.X * y.Y - x.Y * y.X);
     }
+    static int Vector3Max() => Check(Vector3.Max(new(-1f, 2f, -3f), new(1f, -2f, 3f)), 1f, 2f, 3f);
+    static int Vector3MaxMinValue()
+    {
+        var x = Check(Vector3.Max(new(float.MinValue), new(0f)), 0f, 0f, 0f);
+        if (x != 0) return x;
+        x = Check(Vector3.Max(new(float.MinValue), new(float.MaxValue)), float.MaxValue, float.MaxValue, float.MaxValue);
+        if (x != 0) return x + 3;
+        return 0;
+    }
+    static int Vector3Min() => Check(Vector3.Min(new(-1f, 2f, -3f), new(1f, -2f, 3f)), -1f, -2f, -3f);
+    static int Vector3MinMaxValue()
+    {
+        var x = Check(Vector3.Min(new(float.MaxValue), new(0f)), 0f, 0f, 0f);
+        if (x != 0) return x;
+        x = Check(Vector3.Min(new(float.MaxValue), new(float.MinValue)), float.MinValue, float.MinValue, float.MinValue);
+        if (x != 0) return x + 3;
+        return 0;
+    }
+    static int Vector3Normalize()
+    {
+        var x = float.Sqrt(14f);
+        return Check(Vector3.Normalize(new(1f, 2f, 3f)), 1f / x, 2f / x, 3f / x);
+    }
+    static int Vector3SquareRoot() => Check(Vector3.SquareRoot(new(4f, 9f, 16f)), 2f, 3f, 4f);
+    static int Vector3Equals() => new Vector3(1f, 2f, 3f).Equals((object)new Vector3(1f, 2f, 3f)) ? 0 : 1;
+    static int Vector3Length() => new Vector3(1f, 2f, 3f).Length() == float.Sqrt(14f) ? 0 : 1;
 
     static int Run(string[] arguments) => arguments[0] switch
     {
@@ -329,11 +414,38 @@ class NumericsTests
         nameof(VectorConvertToDouble) => VectorConvertToDouble(),
         nameof(VectorConvertToInt32) => VectorConvertToInt32(),
         nameof(VectorConvertToInt64) => VectorConvertToInt64(),
+        nameof(VectorConvertToUInt32) => VectorConvertToUInt32(),
+        nameof(VectorConvertToUInt64) => VectorConvertToUInt64(),
         nameof(VectorShiftLeft) => VectorShiftLeft(),
         nameof(VectorShiftRightArithmetic) => VectorShiftRightArithmetic(),
         nameof(VectorShiftRightLogical) => VectorShiftRightLogical(),
+        nameof(Vector3NewX) => Vector3NewX(),
+        nameof(Vector3NewZ) => Vector3NewZ(),
+        nameof(Vector3NewXYZ) => Vector3NewXYZ(),
+        nameof(Vector3One) => Vector3One(),
+        nameof(Vector3UnitX) => Vector3UnitX(),
+        nameof(Vector3UnitY) => Vector3UnitY(),
+        nameof(Vector3UnitZ) => Vector3UnitZ(),
+        nameof(Vector3Zero) => Vector3Zero(),
+        nameof(Vector3UnaryNegation) => Vector3UnaryNegation(),
+        nameof(Vector3Multiply) => Vector3Multiply(),
+        nameof(Vector3Multiply0) => Vector3Multiply0(),
+        nameof(Vector3Multiply1) => Vector3Multiply1(),
+        nameof(Vector3Division) => Vector3Division(),
+        nameof(Vector3DivisionX) => Vector3DivisionX(),
+        nameof(Vector3Addition) => Vector3Addition(),
+        nameof(Vector3Substraction) => Vector3Substraction(),
+        nameof(Vector3SubstractionMinMax) => Vector3SubstractionMinMax(),
+        nameof(Vector3Abs) => Vector3Abs(),
+        nameof(Vector3Cross) => Vector3Cross(),
         nameof(Vector3Max) => Vector3Max(),
+        nameof(Vector3MaxMinValue) => Vector3MaxMinValue(),
         nameof(Vector3Min) => Vector3Min(),
+        nameof(Vector3MinMaxValue) => Vector3MinMaxValue(),
+        nameof(Vector3Normalize) => Vector3Normalize(),
+        nameof(Vector3SquareRoot) => Vector3SquareRoot(),
+        nameof(Vector3Equals) => Vector3Equals(),
+        nameof(Vector3Length) => Vector3Length(),
         _ => -1
     };
 
@@ -383,11 +495,38 @@ class NumericsTests
             nameof(VectorConvertToDouble),
             nameof(VectorConvertToInt32),
             nameof(VectorConvertToInt64),
+            nameof(VectorConvertToUInt32),
+            nameof(VectorConvertToUInt64),
             nameof(VectorShiftLeft),
             nameof(VectorShiftRightArithmetic),
             nameof(VectorShiftRightLogical),
+            nameof(Vector3NewX),
+            nameof(Vector3NewZ),
+            nameof(Vector3NewXYZ),
+            nameof(Vector3One),
+            nameof(Vector3UnitX),
+            nameof(Vector3UnitY),
+            nameof(Vector3UnitZ),
+            nameof(Vector3Zero),
+            nameof(Vector3UnaryNegation),
+            nameof(Vector3Multiply),
+            nameof(Vector3Multiply0),
+            nameof(Vector3Multiply1),
+            nameof(Vector3Division),
+            nameof(Vector3DivisionX),
+            nameof(Vector3Addition),
+            nameof(Vector3Substraction),
+            nameof(Vector3SubstractionMinMax),
+            nameof(Vector3Abs),
+            nameof(Vector3Cross),
             nameof(Vector3Max),
-            nameof(Vector3Min)
+            nameof(Vector3MaxMinValue),
+            nameof(Vector3Min),
+            nameof(Vector3MinMaxValue),
+            nameof(Vector3Normalize),
+            nameof(Vector3SquareRoot),
+            nameof(Vector3Equals),
+            nameof(Vector3Length)
         )] string name,
         [Values] bool cooperative
     ) => Utilities.Run(build, cooperative, name);

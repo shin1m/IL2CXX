@@ -12,6 +12,7 @@ partial class DefaultBuiltin
     private static void SetupIntrinsicsVector(Func<Type, Type> get, Type type, Builtin.Code code, Type typeofVectorOfT)
     {
         SetupVector(get, type, code, typeofVectorOfT, nameof(Vector64.Sqrt));
+        return;
         foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector64.Widen))) code.For(x, transpiler =>
         {
             var t = x.ReturnType.GenericTypeArguments[0];
@@ -510,6 +511,14 @@ partial class DefaultBuiltin
         code.For(
             type.GetMethod(nameof(AssemblyLoadContext.LoadFromStream), [get(typeof(Stream)), get(typeof(Stream))]),
             transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+        );
+    })
+    // TODO
+    .For(get(Type.GetType("System.Runtime.Serialization.SerializationGuard, System.Diagnostics.Process", true)!), (type, code) =>
+    {
+        code.For(
+            type.GetMethod("ThrowIfDeserializationInProgress"),
+            transpiler => (string.Empty, 1)
         );
     });
 }

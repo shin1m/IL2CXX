@@ -8,7 +8,6 @@ class RuntimeAssembly : Assembly
 {
     public override MethodInfo EntryPoint => throw new NotImplementedException();
     public override string FullName => throw new NotImplementedException();
-    public string Name => throw new NotImplementedException();
     public override object[] GetCustomAttributes(Type attributeType, bool inherit) => Array.Empty<Attribute>();
     public override Type[] GetExportedTypes() => throw new NotImplementedException();
     public override string[] GetManifestResourceNames() => throw new NotImplementedException();
@@ -28,7 +27,8 @@ abstract class RuntimeFieldInfo : FieldInfo
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
     public override Type ReflectedType => throw new NotImplementedException();
-    public override void SetValue(object? @this, object? value, BindingFlags bindingFlags, Binder? binder, CultureInfo? culture) => throw new NotImplementedException();
+    public new void SetValue(object? @this, object? value) => throw new NotImplementedException();
+    public override void SetValue(object? @this, object? value, BindingFlags invokeAttr, Binder? binder, CultureInfo? culture) => SetValue(@this, binder == null || binder == Type.DefaultBinder ? value : RuntimeType.ChangeType(binder, value, FieldType, culture));
 }
 abstract class RuntimeConstructorInfo : ConstructorInfo
 {
@@ -38,7 +38,12 @@ abstract class RuntimeConstructorInfo : ConstructorInfo
     public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
     public override IList<CustomAttributeData> GetCustomAttributesData() => throw new NotImplementedException();
     public override ParameterInfo[] GetParameters() => throw new NotImplementedException();
-    public override object Invoke(BindingFlags bindingFlags, Binder? binder, object?[]? parameters, CultureInfo? culture) => throw new NotImplementedException();
+    public new object Invoke(object?[]? parameters) => throw new NotImplementedException();
+    public override object Invoke(BindingFlags invokeAttr, Binder? binder, object?[]? parameters, CultureInfo? culture)
+    {
+        if (binder != null && parameters != null) RuntimeType.ChangeType(GetParameters(), binder, parameters, culture);
+        return Invoke(parameters?.Length > 0 ? parameters : null);
+    }
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
     public override Type ReflectedType => throw new NotImplementedException();
@@ -63,7 +68,12 @@ abstract class RuntimeMethodInfo : MethodInfo
     public override IList<CustomAttributeData> GetCustomAttributesData() => throw new NotImplementedException();
     public override ParameterInfo[] GetParameters() => throw new NotImplementedException();
     public RuntimeMethodInfo GetParentDefinition() => throw new NotImplementedException();
-    public override object Invoke(object? @this, BindingFlags bindingFlags, Binder? binder, object?[]? parameters, CultureInfo? culture) => throw new NotImplementedException();
+    public new object Invoke(object? @this, object?[]? parameters) => throw new NotImplementedException();
+    public override object Invoke(object? @this, BindingFlags invokeAttr, Binder? binder, object?[]? parameters, CultureInfo? culture)
+    {
+        if (binder != null && parameters != null) RuntimeType.ChangeType(GetParameters(), binder, parameters, culture);
+        return Invoke(@this, parameters);
+    }
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override MethodInfo MakeGenericMethod(params Type[] types) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
@@ -80,13 +90,27 @@ abstract class RuntimePropertyInfo : PropertyInfo
     public override ParameterInfo[] GetIndexParameters() => throw new NotImplementedException();
     public override MethodInfo GetMethod => throw new NotImplementedException();
     public PropertyInfo? GetParentDefinition(Type[] parameters) => ((RuntimeMethodInfo)(GetMethod ?? SetMethod)).GetParentDefinition()?.DeclaringType.GetProperty(Name, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, PropertyType, parameters, null);
-    public override object GetValue(object? @this, BindingFlags bindingFlags, Binder? binder, object?[]? index, CultureInfo? culture) => throw new NotImplementedException();
+    public new object GetValue(object? @this, object?[]? index) => throw new NotImplementedException();
+    public override object GetValue(object? @this, BindingFlags invokeAttr, Binder? binder, object?[]? index, CultureInfo? culture)
+    {
+        if (binder != null && index != null) RuntimeType.ChangeType(GetIndexParameters(), binder, index, culture);
+        return GetValue(@this, index);
+    }
     public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
     public override string Name => throw new NotImplementedException();
     public override Type PropertyType => throw new NotImplementedException();
     public override Type ReflectedType => throw new NotImplementedException();
     public override MethodInfo SetMethod => throw new NotImplementedException();
-    public override void SetValue(object? @this, object? value, BindingFlags bindingFlags, Binder? binder, object?[]? index, CultureInfo? culture) => throw new NotImplementedException();
+    public new void SetValue(object? @this, object? value, object?[]? index) => throw new NotImplementedException();
+    public override void SetValue(object? @this, object? value, BindingFlags invokeAttr, Binder? binder, object?[]? index, CultureInfo? culture)
+    {
+        if (binder != null)
+        {
+            value = RuntimeType.ChangeType(binder, value, PropertyType, culture);
+            if (index != null) RuntimeType.ChangeType(GetIndexParameters(), binder, index, culture);
+        }
+        SetValue(@this, value, index);
+    }
 }
 abstract class RuntimeType : Type
 {
@@ -139,6 +163,115 @@ abstract class RuntimeType : Type
     public static bool ValueEquals(RuntimeType type, nint x, object y) => throw new NotImplementedException();
     public static int ValueGetHashCode(RuntimeType type, nint x) => throw new NotImplementedException();
     public static string ValueToString(RuntimeType type, nint x) => throw new NotImplementedException();
+    public static object? ChangeType(Binder binder, object? value, Type type, CultureInfo? culture) => value == null ? null : binder.ChangeType(value, type, culture);
+    public static void ChangeType(ParameterInfo[] pis, Binder binder, object?[] parameters, CultureInfo? culture)
+    {
+        if (parameters.Length != pis.Length) throw new TargetParameterCountException();
+        for (var i = 0; i < pis.Length; ++i) parameters[i] = ChangeType(binder, parameters[i], pis[i].ParameterType, culture);
+    }
+    public static short ConvertInvokeParameterToInt16(object x) => x switch
+    {
+        sbyte y => y,
+        byte y => y,
+        _ => throw new ArgumentException()
+    };
+    public static ushort ConvertInvokeParameterToUInt16(object x) => x switch
+    {
+        byte y => y,
+        _ => throw new ArgumentException()
+    };
+    public static int ConvertInvokeParameterToInt32(object x) => x switch
+    {
+        sbyte y => y,
+        byte y => y,
+        short y => y,
+        ushort y => y,
+        _ => throw new ArgumentException()
+    };
+    public static uint ConvertInvokeParameterToUInt32(object x) => x switch
+    {
+        byte y => y,
+        ushort y => y,
+        _ => throw new ArgumentException()
+    };
+    public static long ConvertInvokeParameterToInt64(object x) => x switch
+    {
+        sbyte y => y,
+        byte y => y,
+        short y => y,
+        ushort y => y,
+        int y => y,
+        uint y => y,
+        nint y => y,
+        _ => throw new ArgumentException()
+    };
+    public static ulong ConvertInvokeParameterToUInt64(object x) => x switch
+    {
+        byte y => y,
+        ushort y => y,
+        uint y => y,
+        nuint y => y,
+        _ => throw new ArgumentException()
+    };
+    public static float ConvertInvokeParameterToSingle(object x) => x switch
+    {
+        sbyte y => y,
+        byte y => y,
+        short y => y,
+        ushort y => y,
+        int y => y,
+        uint y => y,
+        long y => y,
+        ulong y => y,
+        nint y => y,
+        nuint y => y,
+        _ => throw new ArgumentException()
+    };
+    public static double ConvertInvokeParameterToDouble(object x) => x switch
+    {
+        sbyte y => y,
+        byte y => y,
+        short y => y,
+        ushort y => y,
+        int y => y,
+        uint y => y,
+        long y => y,
+        ulong y => y,
+        float y => y,
+        nint y => y,
+        nuint y => y,
+        _ => throw new ArgumentException()
+    };
+    public static decimal ConvertInvokeParameterToDecimal(object x) => x switch
+    {
+        sbyte y => y,
+        byte y => y,
+        short y => y,
+        ushort y => y,
+        int y => y,
+        uint y => y,
+        long y => y,
+        ulong y => y,
+        nint y => y,
+        nuint y => y,
+        _ => throw new ArgumentException()
+    };
+    public static nint ConvertInvokeParameterToIntPtr(object x) => x switch
+    {
+        sbyte y => y,
+        byte y => y,
+        short y => y,
+        ushort y => y,
+        int y => y,
+        _ => throw new ArgumentException()
+    };
+    public static nuint ConvertInvokeParameterToUIntPtr(object x) => x switch
+    {
+        byte y => y,
+        ushort y => y,
+        uint y => y,
+        _ => throw new ArgumentException()
+    };
 }
 abstract class RuntimeGenericParameter : Type
 {
@@ -179,6 +312,36 @@ abstract class RuntimeGenericMethodParameter : RuntimeGenericParameter
 {
     public override bool IsGenericMethodParameter => true;
 }
+abstract class RuntimeGenericParameterPointer : Type
+{
+    public override Assembly Assembly => throw new NotSupportedException();
+    public override string? AssemblyQualifiedName => null;
+    public override Type BaseType => throw new NotImplementedException();
+    public override string FullName => throw new NotSupportedException();
+    protected override TypeAttributes GetAttributeFlagsImpl() => throw new NotImplementedException();
+    protected override ConstructorInfo? GetConstructorImpl(BindingFlags bindingFlags, Binder? binder, CallingConventions callingConventions, Type[] types, ParameterModifier[]? modifiers) => null;
+    public override ConstructorInfo[] GetConstructors(BindingFlags bindingFlags) => Array.Empty<ConstructorInfo>();
+    public override object[] GetCustomAttributes(bool inherit) => throw new NotImplementedException();
+    public override object[] GetCustomAttributes(Type type, bool inherit) => throw new NotImplementedException();
+    public override IList<CustomAttributeData> GetCustomAttributesData() => throw new NotImplementedException();
+    public override Type? GetElementType() => throw new NotImplementedException();
+    public override FieldInfo GetField(string name, BindingFlags bindingFlags) => throw new NotImplementedException();
+    public override FieldInfo[] GetFields(BindingFlags bindingFlags) => throw new NotImplementedException();
+    public override Type[] GetInterfaces() => throw new NotImplementedException();
+    protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingFlags, Binder? binder, CallingConventions callingConventions, Type[]? types, ParameterModifier[]? modifiers) => throw new NotImplementedException();
+    protected override MethodInfo GetMethodImpl(string name, int genericParameterCount, BindingFlags bindingFlags, Binder? binder, CallingConventions callingConventions, Type[]? types, ParameterModifier[]? modifiers) => throw new NotImplementedException();
+    public override MethodInfo[] GetMethods(BindingFlags bindingFlags) => throw new NotImplementedException();
+    public override PropertyInfo[] GetProperties(BindingFlags bindingFlags) => throw new NotImplementedException();
+    protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingFlags, Binder? binder, Type? @return, Type[]? types, ParameterModifier[]? modifiers) => throw new NotImplementedException();
+    protected override bool HasElementTypeImpl() => true;
+    protected override bool IsArrayImpl() => throw new NotImplementedException();
+    public override bool IsDefined(Type attributeType, bool inherit) => throw new NotImplementedException();
+    protected override bool IsPointerImpl() => throw new NotImplementedException();
+    public override string? Namespace => null;
+    public override string Name => throw new NotImplementedException();
+    public override string ToString() => Name;
+    public override Type UnderlyingSystemType => this;
+}
 class RuntimeCustomAttributeData : CustomAttributeData
 {
     public static IList<CustomAttributeData> Get(MemberInfo member) => throw new NotImplementedException();
@@ -208,26 +371,22 @@ class RuntimeCustomAttributeData : CustomAttributeData
                     break;
             }
         var cads = data.ToList();
-        object value(CustomAttributeTypedArgument x)
+        object? value(CustomAttributeTypedArgument x)
         {
-            if (x.Value == null) throw new Exception();
+            if (x.Value == null) return null;
             var type = x.ArgumentType;
             if (type.IsEnum) return Enum.ToObject(type, x.Value);
             if (!type.IsArray) return x.Value;
-            type = type.GetElementType() ?? throw new Exception();
             var xs = (ReadOnlyCollection<CustomAttributeTypedArgument>)x.Value;
-            var ys = Array.CreateInstance(type, xs.Count);
-            if (type.IsEnum)
-                for (var i = 0; i < ys.Length; ++i) ys.SetValue(Enum.ToObject(type, xs[i].Value ?? throw new Exception()), i);
-            else
-                for (var i = 0; i < ys.Length; ++i) ys.SetValue(xs[i].Value, i);
+            var ys = Array.CreateInstance(type.GetElementType() ?? throw new Exception(), xs.Count);
+            for (var i = 0; i < ys.Length; ++i) ys.SetValue(value(xs[i]), i);
             return ys;
         }
         var attributes = Array.CreateInstance(attributeType, cads.Count);
         for (var i = 0; i < cads.Count; ++i)
         {
             var cad = cads[i];
-            var cas = new object[cad.ConstructorArguments.Count];
+            var cas = new object?[cad.ConstructorArguments.Count];
             for (var j = 0; j < cas.Length; ++j) cas[j] = value(cad.ConstructorArguments[j]);
             var a = cad.Constructor.Invoke(cas);
             foreach (var x in cad.NamedArguments)

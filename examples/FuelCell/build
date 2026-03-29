@@ -1,0 +1,15 @@
+#!/bin/bash
+BASE=$(cd $(dirname $0) && pwd)
+SOURCE=$BASE/../../externals/MonoGame.Samples/FuelCell/FuelCell.DesktopGL
+dotnet build $SOURCE -c Release || exit $?
+dotnet run --project ../../IL2CXX.Console --target Unix\
+ --out out $SOURCE/bin/Release/net10.0/FuelCell.DesktopGL.dll\
+ --reflection\
+  'Microsoft.Xna.Framework.Content.ListReader`1[[System.Char, System.Private.CoreLib]], MonoGame.Framework'\
+  'Program, FuelCell.DesktopGL'\
+ || exit $?
+mkdir out/build || exit $?
+cd out/build || exit $?
+CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-Oz' .. || exit $?
+cmake --build . -j8 || exit $?
+cp -a $SOURCE/bin/Release/net10.0/Content . || exit $?

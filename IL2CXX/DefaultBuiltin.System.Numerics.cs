@@ -33,7 +33,7 @@ partial class DefaultBuiltin
             type.GetProperty(nameof(Vector.IsHardwareAccelerated))!.GetMethod,
             transpiler => ("\treturn false;\n", 1)
         );
-        return;
+        /*
         var typeofVectorOfT0 = typeofVectorOfT.MakeGenericType(Type.MakeGenericMethodParameter(0));
         void relation(string name, string @operator) => code.ForGeneric(
             type.GetMethod(name, 1, [typeofVectorOfT0, typeofVectorOfT0]),
@@ -142,10 +142,11 @@ partial class DefaultBuiltin
         shift(nameof(Vector.ShiftLeft), false, "<<");
         shift(nameof(Vector.ShiftRightArithmetic), false, ">>");
         shift(nameof(Vector.ShiftRightLogical), true, ">>");
+        */
     }
+    /*
     private static void SetupVectorOfT(Type type, Builtin.Code code)
     {
-        return;
         void additive(string name, string @operator) => code.ForGeneric(
             type.GetMethod(name),
             (transpiler, types) => VectorOfTBinary(type, transpiler, types, (value, x, y) => $"{value} = {x} {@operator} {y}")
@@ -199,6 +200,7 @@ partial class DefaultBuiltin
         equality(type.GetMethod("op_Equality"));
         equality(type.GetMethod(nameof(Equals), [type]));
     }
+    */
     private static Builtin SetupSystemNumerics(this Builtin @this, Func<Type, Type> get) => @this
     .For(get(typeof(BitOperations)), (type, code) =>
     {
@@ -225,7 +227,8 @@ partial class DefaultBuiltin
     .For(get(typeof(Vector)), (type, code) =>
     {
         SetupVector(get, type, code, get(typeof(Vector<>)), nameof(Vector.SquareRoot));
-        /*foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector.Widen))) code.For(x, transpiler =>
+        /*
+        foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector.Widen))) code.For(x, transpiler =>
         {
             var ps = x.GetParameters().Select(x => x.ParameterType).ToList();
             var e = transpiler.EscapeForStacked(ps[1].GetElementType()!.GenericTypeArguments[0]);
@@ -236,11 +239,13 @@ partial class DefaultBuiltin
 {'\t'}auto p2 = reinterpret_cast<{e}*>(a_2);
 {'\t'}for (size_t i = 0; i < n; ++i) p2[i] = p0[n + i];
 ", 1);
-        });*/
+        });
+        */
     })
+    /*
     .For(get(typeof(Vector<>)), (type, code) =>
     {
-        /*code.GenericMembers = (transpiler, types) => ($@"{'\t'}{'\t'}double _[{(transpiler.Is64Bit ? 4 : 2)}];
+        code.GenericMembers = (transpiler, types) => ($@"{'\t'}{'\t'}double _[{(transpiler.Is64Bit ? 4 : 2)}];
 {'\t'}{'\t'}void f_destruct()
 {'\t'}{'\t'}{{
 {'\t'}{'\t'}}}
@@ -257,7 +262,7 @@ partial class DefaultBuiltin
 {'\t'}for (size_t i = 0; i < sizeof(*a_0) / sizeof({e}); ++i) p[i] = a_1;
 ", 1);
             }
-        );*/
+        );
         SetupVectorOfT(type, code);
     })
     .For(get(typeof(Vector3)), (type, code) =>
@@ -273,5 +278,7 @@ partial class DefaultBuiltin
         );
         binary(nameof(Vector3.Max), "max");
         binary(nameof(Vector3.Min), "min");
-    });
+    })
+    */
+    ;
 }

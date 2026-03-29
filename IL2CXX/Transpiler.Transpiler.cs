@@ -47,6 +47,7 @@ partial class Transpiler
         typeofRuntimeType = get(typeof(RuntimeType));
         typeofRuntimeGenericTypeParameter = get(typeof(RuntimeGenericTypeParameter));
         typeofRuntimeGenericMethodParameter = get(typeof(RuntimeGenericMethodParameter));
+        typeofRuntimeGenericParameterPointer = get(typeof(RuntimeGenericParameterPointer));
         typeofBoolean = get(typeof(bool));
         typeofByte = get(typeof(byte));
         typeofSByte = get(typeof(sbyte));
@@ -104,6 +105,7 @@ partial class Transpiler
             [get(typeof(RuntimeGenericParameter))] = "t__generic_parameter",
             [typeofRuntimeGenericTypeParameter] = "t__generic_type_parameter",
             [typeofRuntimeGenericMethodParameter] = "t__generic_method_parameter",
+            [typeofRuntimeGenericParameterPointer] = "t__generic_parameter_pointer",
             [get(typeof(CriticalFinalizerObject))] = "t__critical_finalizer_object"
         };
         primitives = new Dictionary<Type, string>
@@ -368,7 +370,7 @@ partial class Transpiler
                 else if (float.IsNegativeInfinity(r))
                     writer.WriteLine("-std::numeric_limits<float>::infinity();");
                 else if (float.IsNaN(r))
-                    writer.WriteLine("std::numeric_limits<float>::quiet_NaN();");
+                    writer.WriteLine("-std::numeric_limits<float>::quiet_NaN();");
                 else
                     writer.WriteLine($"{literal};");
                 return index;
@@ -388,7 +390,7 @@ partial class Transpiler
                 else if (double.IsNegativeInfinity(r))
                     writer.WriteLine("-std::numeric_limits<double>::infinity();");
                 else if (double.IsNaN(r))
-                    writer.WriteLine("std::numeric_limits<double>::quiet_NaN();");
+                    writer.WriteLine("-std::numeric_limits<double>::quiet_NaN();");
                 else
                     writer.WriteLine($"{literal};");
                 return index;
@@ -750,8 +752,6 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
             (OpCode: OpCodes.Add, Operator: "+", Type: typeOfAdd),
             (OpCode: OpCodes.Sub, Operator: "-", Type: typeOfAdd),
             (OpCode: OpCodes.Mul, Operator: "*", Type: typeOfAdd),
-            (OpCode: OpCodes.Div_Un, Operator: "/", Type: typeOfDiv_Un),
-            (OpCode: OpCodes.Rem_Un, Operator: "%", Type: typeOfDiv_Un),
             (OpCode: OpCodes.Shr_Un, Operator: ">>", Type: typeOfShl)
         }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
         {
@@ -762,12 +762,44 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
                 return index;
             };
         }));
+        new[]
+        {
+            (OpCode: OpCodes.Div_Un, Operator: "/"),
+            (OpCode: OpCodes.Rem_Un, Operator: "%")
+        }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
+        {
+            x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfDiv_Un[(stack.Pop.VariableType, stack.VariableType)]));
+            x.Generate = (index, stack) =>
+            {
+                writer.Write($@"
+{'\t'}if ({stack.AsUnsigned} == 0) [[unlikely]] {GenerateThrow("DivideByZero")};
+{'\t'}{indexToStack[index].Assign($"{stack.Pop.AsUnsigned} {set.Operator} {stack.AsUnsigned}")};
+");
+                return index;
+            };
+        }));
         instructions1[OpCodes.Add.Value].Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfAdd[(stack.Pop.VariableType, stack.VariableType)], stack.Pop.OnStack ?? stack.OnStack));
         instructions1[OpCodes.Sub.Value].Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfAdd[(stack.Pop.VariableType, stack.VariableType)], stack.Type.IsValueType ? stack.Pop.OnStack : null));
         new[]
         {
-            (OpCode: OpCodes.Div, Operator: "/", Type: typeOfAdd),
-            (OpCode: OpCodes.Rem, Operator: "%", Type: typeOfAdd),
+            (OpCode: OpCodes.Div, Operator: "/"),
+            (OpCode: OpCodes.Rem, Operator: "%")
+        }.ForEach(set => instructions1[set.OpCode.Value].For(x =>
+        {
+            x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(typeOfAdd[(stack.Pop.VariableType, stack.VariableType)]));
+            x.Generate = (index, stack) =>
+            {
+                var after = indexToStack[index];
+                if (after.VariableType != "double") writer.Write($"\n\tif ({stack.AsSigned} == 0) [[unlikely]] {GenerateThrow("DivideByZero")};");
+                var result = set.OpCode == OpCodes.Rem && after.VariableType == "double"
+                    ? $"std::fmod({stack.Pop.Variable}, {stack.Variable})"
+                    : $"{stack.Pop.AsSigned} {set.Operator} {stack.AsSigned}";
+                writer.WriteLine($"\n\t{after.Assign(result)};");
+                return index;
+            };
+        }));
+        new[]
+        {
             (OpCode: OpCodes.And, Operator: "&", Type: typeOfDiv_Un),
             (OpCode: OpCodes.Or, Operator: "|", Type: typeOfDiv_Un),
             (OpCode: OpCodes.Xor, Operator: "^", Type: typeOfDiv_Un),
@@ -778,11 +810,7 @@ stack.Skip(1).Take(parameters.Length).Reverse(),
             x.Estimate = (index, stack) => (index, stack.Pop.Pop.Push(set.Type[(stack.Pop.VariableType, stack.VariableType)]));
             x.Generate = (index, stack) =>
             {
-                var after = indexToStack[index];
-                var result = set.OpCode == OpCodes.Rem && after.VariableType == "double"
-                    ? $"std::fmod({stack.Pop.Variable}, {stack.Variable})"
-                    : $"{stack.Pop.AsSigned} {set.Operator} {stack.AsSigned}";
-                writer.WriteLine($"\n\t{after.Assign(result)};");
+                writer.WriteLine($"\n\t{indexToStack[index].Assign($"{stack.Pop.AsSigned} {set.Operator} {stack.AsSigned}")};");
                 return index;
             };
         }));

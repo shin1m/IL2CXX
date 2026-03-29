@@ -146,17 +146,13 @@ partial class DefaultBuiltin
 ", 0);
             }
         );
-        code.For(
-            type.GetProperty(nameof(RuntimeAssembly.Name))!.GetMethod,
-            transpiler => (transpiler.GenerateCheckNull("a_0") + "\treturn f__new_string(a_0->v__name);\n", 1)
-        );
     })
     .For(get(typeof(RuntimeConstructorInfo)), (type, code) =>
     {
         SetupMethodBase(get, type, code);
         code.For(
-            type.GetMethod(nameof(MethodBase.Invoke), [get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
-            transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__create(a_0, a_1, a_2, a_3 && a_3->v__length > 0 ? a_3 : nullptr, a_4);\n", 0)
+            type.GetMethod(nameof(MethodBase.Invoke), [get(typeof(object[]))]),
+            transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__create(a_0, a_1);\n", 0)
         );
     })
     .For(get(typeof(RuntimeCustomAttributeData)), (type, code) =>
@@ -176,27 +172,26 @@ partial class DefaultBuiltin
                 var newCATAs = $"f__new_array<{transpiler.Escape(get(typeof(CustomAttributeTypedArgument[])))}, {transpiler.EscapeForMember(typeofCATA)}>";
                 var typeofCANA = get(typeof(CustomAttributeNamedArgument));
                 var typeofCAD = get(typeof(RuntimeCustomAttributeData));
-                return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto value = [](auto a) -> t__object*
+                return (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto build = [](auto self, auto type, auto value) -> t__object*
 {'\t'}{{
-{'\t'}{'\t'}if (a->v_type == &t__type_of<{transpiler.Escape(transpiler.typeofString)}>::v__instance) return a->v_value ? f__new_string(static_cast<const char16_t*>(a->v_value)) : nullptr;
-{'\t'}{'\t'}if (a->v_type == &t__type_of<{transpiler.Escape(transpiler.typeofType)}>::v__instance) return static_cast<t__type*>(a->v_value);
-{'\t'}{'\t'}if (!a->v_type->v__array) return a->v_type->f_box(a->v_value);
-{'\t'}{'\t'}auto e = a->v_type->v__element;
-{'\t'}{'\t'}auto [n, p] = *static_cast<std::pair<size_t, void*>*>(a->v_value);
-{'\t'}{'\t'}auto RECYCLONE__SPILL vs = {newCATAs}(n);
-{'\t'}{'\t'}if (e == &t__type_of<{transpiler.Escape(transpiler.typeofString)}>::v__instance) {{
-{'\t'}{'\t'}{'\t'}auto ss = static_cast<const char16_t**>(p);
-{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) {constructCATA}(&vs->f_data()[i], e, ss[i] ? f__new_string(ss[i]) : nullptr);
-{'\t'}{'\t'}}} else if (e == &t__type_of<{transpiler.Escape(transpiler.typeofType)}>::v__instance) {{
-{'\t'}{'\t'}{'\t'}auto ts = static_cast<t__type**>(p);
-{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) {constructCATA}(&vs->f_data()[i], e, ts[i]);
-{'\t'}{'\t'}}} else {{
-{'\t'}{'\t'}{'\t'}auto ps = static_cast<uint8_t*>(p);
-{'\t'}{'\t'}{'\t'}for (size_t i = 0; i < n; ++i, ps += e->v__size) {constructCATA}(&vs->f_data()[i], e, e->f_box(ps));
+{'\t'}{'\t'}if (type == &t__type_of<{transpiler.Escape(transpiler.typeofObject)}>::v__instance) {{
+{'\t'}{'\t'}{'\t'}auto [t, v] = *static_cast<std::pair<t__type*, void*>*>(value);
+{'\t'}{'\t'}{'\t'}return t ? self(self, t, v) : nullptr;
 {'\t'}{'\t'}}}
+{'\t'}{'\t'}if (type == &t__type_of<{transpiler.Escape(transpiler.typeofString)}>::v__instance) return value ? f__new_string(static_cast<const char16_t*>(value)) : nullptr;
+{'\t'}{'\t'}if (type == &t__type_of<{transpiler.Escape(transpiler.typeofType)}>::v__instance) return static_cast<t__type*>(value);
+{'\t'}{'\t'}if (!type->v__array) return type->f_box(value);
+{'\t'}{'\t'}auto e = type->v__element;
+{'\t'}{'\t'}auto [n, ps] = *static_cast<std::pair<size_t, void**>*>(value);
+{'\t'}{'\t'}auto RECYCLONE__SPILL vs = {newCATAs}(n);
+{'\t'}{'\t'}for (size_t i = 0; i < n; ++i) {constructCATA}(&vs->f_data()[i], e, self(self, e, ps[i]));
 {'\t'}{'\t'}auto RECYCLONE__SPILL roc = f__new_zeroed<{transpiler.Escape(typeofROC)}>();
 {'\t'}{'\t'}{escape(typeofROC.GetConstructors()[0])}(roc, vs);
 {'\t'}{'\t'}return roc;
+{'\t'}}};
+{'\t'}auto value = [&](auto a)
+{'\t'}{{
+{'\t'}{'\t'}return build(build, a->v_type, a->v_value);
 {'\t'}}};
 {'\t'}size_t n = 0;
 {'\t'}if (auto p = a_0->v__custom_attributes) for (; *p; ++p) ++n;
@@ -258,7 +253,7 @@ partial class DefaultBuiltin
 ", 0)
         );
         code.For(
-            type.GetMethod(nameof(FieldInfo.SetValue), [get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(CultureInfo))]),
+            type.GetMethod(nameof(FieldInfo.SetValue), [get(typeof(object)), get(typeof(object))]),
             transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (a_1 && !a_1->f_type()->f_is(a_0->v__declaring_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}if (a_2 && !a_2->f_type()->f_assignable_to(a_0->v__field_type)) [[unlikely]] {transpiler.GenerateThrow("Argument")};
 {'\t'}a_0->v__field_type->f_copy(a_0->v__field_type->f_unbox(const_cast<t__object*&>(a_2)), 1, a_0->f_address(a_0->v__declaring_type->f_unbox(const_cast<t__object*&>(a_1))));
@@ -302,8 +297,8 @@ partial class DefaultBuiltin
 ", 0)
         );
         code.For(
-            type.GetMethod(nameof(MethodBase.Invoke), [get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
-            transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__invoke(a_1, a_2, a_3, a_4, a_5);\n", 0)
+            type.GetMethod(nameof(MethodBase.Invoke), [get(typeof(object)), get(typeof(object[]))]),
+            transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__invoke(a_1, a_2);\n", 0)
         );
         code.For(
             type.GetMethod(nameof(MethodInfo.MakeGenericMethod)),
@@ -361,9 +356,9 @@ partial class DefaultBuiltin
             transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__get;\n", 0)
         );
         code.For(
-            type.GetMethod(nameof(PropertyInfo.GetValue), [get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
+            type.GetMethod(nameof(PropertyInfo.GetValue), [get(typeof(object)), get(typeof(object[]))]),
             transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__get) [[unlikely]] {transpiler.GenerateThrow("Argument")};
-{'\t'}return a_0->v__get->v__invoke(a_1, a_2, a_3, a_4, a_5);
+{'\t'}return a_0->v__get->v__invoke(a_1, a_2);
 ", 0)
         );
         code.For(
@@ -371,12 +366,12 @@ partial class DefaultBuiltin
             transpiler => (transpiler.GenerateCheckNull("a_0") + $"\treturn a_0->v__set;\n", 0)
         );
         code.For(
-            type.GetMethod(nameof(PropertyInfo.SetValue), [get(typeof(object)), get(typeof(object)), get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]),
+            type.GetMethod(nameof(PropertyInfo.SetValue), [get(typeof(object)), get(typeof(object)), get(typeof(object[]))]),
             transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}if (!a_0->v__set) [[unlikely]] {transpiler.GenerateThrow("Argument")};
-{'\t'}auto n = a_5 ? a_5->v__length : 0;
+{'\t'}auto n = a_3 ? a_3->v__length : 0;
 {'\t'}auto RECYCLONE__SPILL p = f__new_array<{transpiler.Escape(get(typeof(object[])))}, {transpiler.Escape(get(typeof(object)))}>(n + 1);
-{'\t'}*std::copy_n(a_5->f_data(), n, p->f_data()) = a_2;
-{'\t'}a_0->v__set->v__invoke(a_1, a_3, a_4, p, a_6);
+{'\t'}*std::copy_n(a_3->f_data(), n, p->f_data()) = a_2;
+{'\t'}a_0->v__set->v__invoke(a_1, p);
 ", 0)
         );
         code.For(

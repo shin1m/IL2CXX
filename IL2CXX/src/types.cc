@@ -148,10 +148,10 @@ bool t__thread::f_priority(HANDLE a_handle, int32_t a_priority)
 }
 #endif
 
-t__object* t__runtime_constructor_info::f_create(t__runtime_constructor_info* RECYCLONE__SPILL a_this, int32_t a_binding_flags, t__object* RECYCLONE__SPILL a_binder, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL a_culture)
+t__object* t__runtime_constructor_info::f_create(t__runtime_constructor_info* RECYCLONE__SPILL a_this, t__object* RECYCLONE__SPILL a_parameters)
 {
 	auto p = a_this->v__declaring_type->f_new_zeroed();
-	a_this->v__invoke(p, a_binding_flags, a_binder, a_parameters, a_culture);
+	a_this->v__invoke(p, a_parameters);
 	return p;
 }
 

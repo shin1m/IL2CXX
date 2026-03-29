@@ -161,9 +161,9 @@ struct t__runtime_parameter_info
 struct t__method_base : t__member_info
 {
 	t__runtime_parameter_info* const* v__parameters;
-	t__object*(*v__invoke)(t__object*, int32_t, t__object*, t__object*, t__object*);
+	t__object*(*v__invoke)(t__object*, t__object*);
 
-	t__method_base(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*)) : t__member_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes), v__parameters(a_parameters), v__invoke(a_invoke)
+	t__method_base(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, t__object*)) : t__member_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes), v__parameters(a_parameters), v__invoke(a_invoke)
 	{
 	}
 };
@@ -175,11 +175,11 @@ struct t__constructor_info : t__method_base
 
 struct t__runtime_constructor_info : t__constructor_info
 {
-	static t__object* f_create(t__runtime_constructor_info* RECYCLONE__SPILL a_this, int32_t a_binding_flags, t__object* RECYCLONE__SPILL a_binder, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL a_culture);
+	static t__object* f_create(t__runtime_constructor_info* RECYCLONE__SPILL a_this, t__object* RECYCLONE__SPILL a_parameters);
 
-	t__object*(*v__create)(t__runtime_constructor_info*, int32_t, t__object*, t__object*, t__object*);
+	t__object*(*v__create)(t__runtime_constructor_info*, t__object*);
 
-	t__runtime_constructor_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), t__object*(*a_create)(t__runtime_constructor_info*, int32_t, t__object*, t__object*, t__object*)) : t__constructor_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__create(a_create)
+	t__runtime_constructor_info(t__type* a_type, t__type* a_declaring_type, std::u16string_view a_name, int32_t a_attributes, t__custom_attribute* const* a_custom_attributes, t__runtime_parameter_info* const* a_parameters, t__object*(*a_invoke)(t__object*, t__object*), t__object*(*a_create)(t__runtime_constructor_info*, t__object*)) : t__constructor_info(a_type, a_declaring_type, a_name, a_attributes, a_custom_attributes, a_parameters, a_invoke), v__create(a_create)
 	{
 	}
 };
@@ -191,7 +191,7 @@ struct t__method_info : t__method_base
 
 struct t__runtime_method_info : t__method_info
 {
-	t__type* v__return_type;
+	t__abstract_type* v__return_type;
 	void* v__function;
 #ifdef __EMSCRIPTEN__
 	t__object*(*v__wasm_invoke)(t__object*, void**);
@@ -206,8 +206,8 @@ struct t__runtime_method_info : t__method_info
 		int32_t a_attributes,
 		t__custom_attribute* const* a_custom_attributes,
 		t__runtime_parameter_info* const* a_parameters,
-		t__type* a_return_type,
-		t__object*(*a_invoke)(t__object*, int32_t, t__object*, t__object*, t__object*), void* a_function,
+		t__abstract_type* a_return_type,
+		t__object*(*a_invoke)(t__object*, t__object*), void* a_function,
 #ifdef __EMSCRIPTEN__
 		t__object*(*a_wasm_invoke)(t__object*, void**),
 #endif
@@ -250,12 +250,11 @@ struct t__assembly : t__object
 struct t__runtime_assembly : t__assembly
 {
 	std::u16string_view v__full_name;
-	std::u16string_view v__name;
 	t__runtime_method_info* v__entry_point;
 	t__type* const* v__exported_types;
 	std::map<std::u16string_view, std::pair<uint8_t*, size_t>> v__resources;
 
-	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types, std::map<std::u16string_view, std::pair<uint8_t*, size_t>>&& a_resources);
+	t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types, std::map<std::u16string_view, std::pair<uint8_t*, size_t>>&& a_resources);
 };
 
 struct t__type : t__abstract_type
@@ -546,6 +545,15 @@ struct t__generic_method_parameter : t__generic_parameter
 	using t__generic_parameter::t__generic_parameter;
 };
 
+struct t__generic_parameter_pointer : t__abstract_type
+{
+	t__abstract_type* v__element;
+
+	t__generic_parameter_pointer(t__type* a_type, std::u16string_view a_name, int32_t a_attribute_flags, t__custom_attribute* const* a_custom_attributes, t__abstract_type* a_element) : t__abstract_type(a_type, nullptr, a_name, a_attribute_flags, a_custom_attributes), v__element(a_element)
+	{
+	}
+};
+
 struct t__custom_attribute
 {
 	struct t_typed
@@ -572,7 +580,7 @@ inline t__member_info::t__member_info(t__type* a_type, t__type* a_declaring_type
 	t__type::f_be(this, a_type);
 }
 
-inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, std::u16string_view a_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types, std::map<std::u16string_view, std::pair<uint8_t*, size_t>>&& a_resources) : t__assembly(-1), v__full_name(a_full_name), v__name(a_name), v__entry_point(a_entry_point), v__exported_types(a_exported_types), v__resources(std::move(a_resources))
+inline t__runtime_assembly::t__runtime_assembly(t__type* a_type, std::u16string_view a_full_name, t__runtime_method_info* a_entry_point, t__type* const* a_exported_types, std::map<std::u16string_view, std::pair<uint8_t*, size_t>>&& a_resources) : t__assembly(-1), v__full_name(a_full_name), v__entry_point(a_entry_point), v__exported_types(a_exported_types), v__resources(std::move(a_resources))
 {
 	t__type::f_be(this, a_type);
 }

@@ -164,7 +164,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
             reflection.UnionWith(types!);
             reflection.Add(get(typeof(System.Threading.Tasks.Task<>)));
         }
-        var transpiler = new Transpiler(get, builtin, /*Console.Error.WriteLine*/_ => { }, options.Target, options.Is64, false)
+        var transpiler = new Transpiler(get, builtin, /*Console.Error.WriteLine*/_ => { }, options.Target, options.Is64, options.CheckNull)
         {
             Bundle = bundleTypes,
             BundleMethods = bundleMethods,
@@ -272,9 +272,11 @@ class Options
 {
     [Option(Required = true)]
     public PlatformID Target { get; set; }
-    [Option(Group = "is32", Default = false)]
+    [Option]
     public bool Is32 { get; set; }
     public bool Is64 => !Is32;
+    [Option("check-null")]
+    public bool CheckNull { get; set; }
     [Option(Default = "out")]
     public string? Out { get; set; }
     [Value(0, Required = true)]

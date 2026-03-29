@@ -82,6 +82,13 @@ class TypeTests
     [Foo(Answer.Yes, ["foo"], typeof(IFoo), N0 = [Answer.No], N1 = "bar", N2 = [typeof(Bar)])]
     class Zot
     {
+        public static string DoObject(string x) => x;
+        public static DateTime DoValueType(DateTime x) => x;
+        public static double DoNumeric(double x) => x;
+        public static int? DoNullable(int? x) => x;
+        public static void DoObjectByRef(ref string x) => x = "foo";
+        public static void DoValueTypeByRef(ref double x) => x = x + 1.0;
+        public static void DoNullableByRef(ref int? x) => ++x;
         public static Zot Be(string x, string y) => new Zot($"{x}, {y}!");
 
         public string? X;
@@ -153,10 +160,73 @@ class TypeTests
     }
     static int GetMethods()
     {
-        if (typeof(Zot).GetMethods().Length != 8) return 1;
+        if (typeof(Zot).GetMethods().Length != 15) return 1;
         if (typeof(Zot).GetMethods(BindingFlags.Instance | BindingFlags.Public).Length != 7) return 2;
         if (typeof(Zot).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).Length != 0) return 3;
-        if (typeof(Zot).GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 1) return 4;
+        if (typeof(Zot).GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Length != 8) return 4;
+        return 0;
+    }
+    static int ParameterObject()
+    {
+        var m = typeof(Zot).GetMethod(nameof(Zot.DoObject));
+        if (m == null) return 1;
+        if (!(m.Invoke(null, [null]) is null)) return 2;
+        if (!(m.Invoke(null, ["foo"]) is string x && x == "foo")) return 3;
+        return 0;
+    }
+    static int ParameterValueType()
+    {
+        var m = typeof(Zot).GetMethod(nameof(Zot.DoValueType));
+        if (m == null) return 1;
+        if (!(m.Invoke(null, [null]) is DateTime x && x == default)) return 2;
+        if (!(m.Invoke(null, [new DateTime(1)]) is DateTime y && y == new DateTime(1))) return 3;
+        return 0;
+    }
+    static int ParameterNumeric()
+    {
+        var m = typeof(Zot).GetMethod(nameof(Zot.DoNumeric));
+        if (m == null) return 1;
+        if (!(m.Invoke(null, [null]) is double x && x == 0.0)) return 2;
+        if (!(m.Invoke(null, [1]) is double y && y == 1.0)) return 3;
+        return 0;
+    }
+    static int ParameterNullable()
+    {
+        var m = typeof(Zot).GetMethod(nameof(Zot.DoNullable));
+        if (m == null) return 0;
+        if (!(m.Invoke(null, [null]) is null)) return 1;
+        if (!(m.Invoke(null, [1]) is int x && x == 1)) return 2;
+        return 0;
+    }
+    static int ParameterObjectByRef()
+    {
+        var m = typeof(Zot).GetMethod(nameof(Zot.DoObjectByRef));
+        if (m == null) return 1;
+        object?[] xs = [null];
+        m.Invoke(null, xs);
+        return xs[0] is string x && x == "foo" ? 0 : 2;
+    }
+    static int ParameterValueTypeByRef()
+    {
+        var m = typeof(Zot).GetMethod(nameof(Zot.DoValueTypeByRef));
+        if (m == null) return 1;
+        object?[] xs = [null];
+        m.Invoke(null, xs);
+        if (!(xs[0] is double x && x == 1.0)) return 2;
+        m.Invoke(null, xs);
+        if (!(xs[0] is double y && y == 2.0)) return 3;
+        return 0;
+    }
+    static int ParameterNullableByRef()
+    {
+        var m = typeof(Zot).GetMethod(nameof(Zot.DoNullableByRef));
+        if (m == null) return 1;
+        object?[] xs = [null];
+        m.Invoke(null, xs);
+        if (!(xs[0] is null)) return 2;
+        xs[0] = 0;
+        m.Invoke(null, xs);
+        if (!(xs[0] is int x && x == 1)) return 3;
         return 0;
     }
     static int CreateDelegate()
@@ -298,6 +368,13 @@ class TypeTests
         nameof(GetConstructors) => GetConstructors(),
         nameof(GetMethod) => GetMethod(),
         nameof(GetMethods) => GetMethods(),
+        nameof(ParameterObject) => ParameterObject(),
+        nameof(ParameterValueType) => ParameterValueType(),
+        nameof(ParameterNumeric) => ParameterNumeric(),
+        nameof(ParameterNullable) => ParameterNullable(),
+        nameof(ParameterObjectByRef) => ParameterObjectByRef(),
+        nameof(ParameterValueTypeByRef) => ParameterValueTypeByRef(),
+        nameof(ParameterNullableByRef) => ParameterNullableByRef(),
         nameof(CreateDelegate) => CreateDelegate(),
         nameof(CreateDelegateWithNull) => CreateDelegateWithNull(),
         nameof(CreateDelegateWithTarget) => CreateDelegateWithTarget(),
@@ -349,6 +426,13 @@ class TypeTests
             nameof(GetConstructors),
             nameof(GetMethod),
             nameof(GetMethods),
+            nameof(ParameterObject),
+            nameof(ParameterValueType),
+            nameof(ParameterNumeric),
+            nameof(ParameterNullable),
+            nameof(ParameterObjectByRef),
+            nameof(ParameterValueTypeByRef),
+            nameof(ParameterNullableByRef),
             nameof(CreateDelegate),
             nameof(CreateDelegateWithNull),
             nameof(CreateDelegateWithTarget),

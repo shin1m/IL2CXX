@@ -12,7 +12,7 @@ partial class DefaultBuiltin
     private static void SetupIntrinsicsVector(Func<Type, Type> get, Type type, Builtin.Code code, Type typeofVectorOfT)
     {
         SetupVector(get, type, code, typeofVectorOfT, nameof(Vector64.Sqrt));
-        return;
+        /*
         foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector64.Widen))) code.For(x, transpiler =>
         {
             var t = x.ReturnType.GenericTypeArguments[0];
@@ -42,10 +42,11 @@ partial class DefaultBuiltin
 ", 1);
             }
         );
+        */
     }
     private static void SetupIntrinsicsVectorOfT(Type type, Builtin.Code code)
     {
-        SetupVectorOfT(type, code);
+        //SetupVectorOfT(type, code);
         // TODO
         code.ForGeneric(
             type.GetMethod(nameof(ToString)),
@@ -372,6 +373,7 @@ partial class DefaultBuiltin
             transpiler => (string.Empty, 1)
         );
     })
+    /*
     .For(get(Type.GetType("System.Runtime.Intrinsics.Scalar`1", true)!), (type, code) =>
     {
         code.ForGeneric(
@@ -390,14 +392,17 @@ partial class DefaultBuiltin
             (transpiler, types) => ("\treturn 1;\n", 1)
         );
     })
+    */
     .For(get(typeof(Vector64)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector64<>))))
     .For(get(typeof(Vector128)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector128<>))))
     .For(get(typeof(Vector256)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector256<>))))
     .For(get(typeof(Vector512)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector512<>))))
+    /*
     .For(get(typeof(Vector64<>)), SetupIntrinsicsVectorOfT)
     .For(get(typeof(Vector128<>)), SetupIntrinsicsVectorOfT)
     .For(get(typeof(Vector256<>)), SetupIntrinsicsVectorOfT)
     .For(get(typeof(Vector512<>)), SetupIntrinsicsVectorOfT)
+    */
     .ForIf(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch") is Type t ? get(t) : null, (type, code) =>
     {
         // TODO

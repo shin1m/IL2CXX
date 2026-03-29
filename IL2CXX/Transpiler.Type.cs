@@ -283,40 +283,47 @@ string.Join(", ", parameters.Select((x, i) => transpiler.CastValue(x, $"a_{i + 1
 
     private IEnumerable<MethodInfo> GetMethods(Type type) => type.GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Instance | (type.IsInterface ? BindingFlags.Default : BindingFlags.Static) | BindingFlags.Public | BindingFlags.NonPublic).Where(x => !invalids.Contains(x.ReturnType.FullName));
     private IEnumerable<PropertyInfo> GetProperties(Type type) => type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance | (type.IsInterface ? BindingFlags.Default : BindingFlags.Static) | BindingFlags.Public | BindingFlags.NonPublic).Where(x => !invalids.Contains(x.PropertyType.FullName));
-    private byte[] GetBytes(object value) => value switch
+    private static byte[] GetBytes(object value) => value switch
     {
         byte b => [b],
         sbyte b => [(byte)b],
-        _ => (byte[])(typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), [value.GetType()])!.Invoke(null, [value]) ?? throw new Exception())
+        _ => (byte[])(typeof(BitConverter).GetMethod(nameof(BitConverter.GetBytes), [value.GetType()])?.Invoke(null, [value]) ?? throw new Exception())
     };
+    private static string ToHexadecimals(object value) => string.Join(", ", GetBytes(value).Select(x => $"0x{x:x02}"));
     private string WriteAttributes(MemberInfo member, string name, TextWriter writer)
     {
         var attributes = member.GetCustomAttributesData();
         if (attributes.Count <= 0) return "t__custom_attribute::v_empty_attributes";
         string attributeName(int i) => $"v__attributes_{name}__a{i}";
-        string attributeData(CustomAttributeTypedArgument a, string name)
+        string attributeValue(Type type, object? value, string name)
         {
-            var type = a.ArgumentType;
-            if (type == typeofString) return $"const_cast<char16_t*>({ToLiteral((string?)a.Value)})";
-            if (type == typeofType) return $"&t__type_of<{Escape((Type)(a.Value ?? throw new Exception()))}>::v__instance";
+            if (type == typeofObject)
+            {
+                if (value == null)
+                {
+                    writer.WriteLine($"static std::pair<t__type*, void*> {name}_data{{nullptr, nullptr}};");
+                }
+                else
+                {
+                    var t = value is Type ? typeofType : getType(value.GetType());
+                    writer.WriteLine($"static std::pair<t__type*, void*> {name}_data{{&t__type_of<{Escape(t)}>::v__instance, {attributeValue(t, value, $"{name}_value")}}};");
+                }
+                return $"&{name}_data";
+            }
+            if (type == typeofString) return value == null ? "nullptr" : $"const_cast<char16_t*>({ToLiteral((string)value)})";
+            if (value == null) throw new Exception();
+            if (type == typeofType) return $"&t__type_of<{Escape((Type)(value))}>::v__instance";
             if (type.IsSZArray)
             {
-                var elements = (IReadOnlyCollection<CustomAttributeTypedArgument>)(a.Value ?? throw new Exception());
-                var e = type.GetElementType();
-                if (e == typeofString)
-                    writer.WriteLine($@"static const char16_t* {name}__elements[] = {{{string.Join(", ", elements.Select(x => ToLiteral((string?)x.Value)))}}};
-static std::pair<size_t, const char16_t**> {name}__data{{{elements.Count}, {name}__elements}};");
-                else if (e == typeofType)
-                    writer.WriteLine($@"static t__type* {name}__elements[] = {{{string.Join(", ", elements.Select(x => $"&t__type_of<{Escape((Type)(x.Value ?? throw new Exception()))}>::v__instance"))}}};
-static std::pair<size_t, t__type**> {name}__data{{{elements.Count}, {name}__elements}};");
-                else
-                    writer.WriteLine($@"static uint8_t {name}__elements[] = {{{string.Join(", ", elements.SelectMany(x => GetBytes(x.Value ?? throw new Exception())).Select(x => $"0x{x:x02}"))}}};
-static std::pair<size_t, uint8_t*> {name}__data{{{elements.Count}, {name}__elements}};");
-                return $"&{name}__data";
+                var values = (IReadOnlyCollection<CustomAttributeTypedArgument>)(value);
+                writer.WriteLine($@"static void* {name}_values[] = {{{string.Join(", ", values.Select((x, i) => attributeValue(type.GetElementType() ?? throw new Exception(), x.Value, $"{name}_value{i}")))}}};
+static std::pair<size_t, void**> {name}_data{{{values.Count}, {name}_values}};");
+                return $"&{name}_data";
             }
-            writer.WriteLine($"static uint8_t {name}__data[] = {{{string.Join(", ", GetBytes(a.Value ?? throw new Exception()).Select(x => $"0x{x:x02}"))}}};");
-            return $"{name}__data";
+            writer.WriteLine($"static uint8_t {name}_data[] = {{{ToHexadecimals(value)}}};");
+            return $"{name}_data";
         }
+        string attributeData(CustomAttributeTypedArgument a, string name) => attributeValue(a.ArgumentType, a.Value, name);
         foreach (var (x, i) in attributes.Select((x, i) => (x, i)))
         {
             Enqueue(x.AttributeType);
@@ -346,6 +353,16 @@ static std::pair<size_t, uint8_t*> {name}__data{{{elements.Count}, {name}__eleme
 }};");
         return $"v__attributes_{name}";
     }
+    private string ParameterTypePointer(Type type)
+    {
+        if (type.IsGenericParameter) return $"&v__generic_parameter_{Escape(type)}";
+        if (type.ContainsGenericParameters && GetElementTypeOrNull(type) is Type ge)
+        {
+            Enqueue(type);
+            return $"&v__generic_parameter_{Escape(ge)}{Escape(type.IsByRef ? "&" : type.IsPointer ? "*" : "[]")}";
+        }
+        return $"&t__type_of<{Escape(type)}>::v__instance";
+    }
     private string WriteParameters(ParameterInfo[] parameters, string name, TextWriter writer)
     {
         if (parameters.Length <= 0) return "t__runtime_parameter_info::v__empty_parameters";
@@ -361,7 +378,7 @@ static std::pair<size_t, uint8_t*> {name}__data{{{elements.Count}, {name}__eleme
                 writer.WriteLine($"static uint8_t {@default}[] = {{{string.Join(", ", GetDefaultValue(x).Select(y => $"0x{y:x02}"))}}};");
             }
             var pt = x.ParameterType;
-            writer.WriteLine($"static t__runtime_parameter_info {pname}{{{(int)x.Attributes}, {(pt.IsGenericParameter ? $"&v__generic_parameter_{Escape(pt)}" : $"&t__type_of<{Escape(pt)}>::v__instance")}, {@default}}};");
+            writer.WriteLine($"static t__runtime_parameter_info {pname}{{{(int)x.Attributes}, {ParameterTypePointer(pt)}, {@default}}};");
         }
         writer.WriteLine($@"static t__runtime_parameter_info* v__parameters_{name}[] = {{
 {string.Join(string.Empty, parameters.Select(x => $"\t&{parameterName(x)},\n"))}{'\t'}nullptr
@@ -385,6 +402,8 @@ static std::pair<size_t, uint8_t*> {name}__data{{{elements.Count}, {name}__eleme
             typeToRuntime.Add(type, definition);
             if (type.IsGenericParameter)
                 Enqueue(type.IsGenericTypeParameter ? typeofRuntimeGenericTypeParameter : typeofRuntimeGenericMethodParameter);
+            else if (GetElementTypeOrNull(type) != null)
+                Enqueue(typeofRuntimeGenericParameterPointer);
             else
                 typeDeclarations.WriteLine($@"// {type.AssemblyQualifiedName}
 struct {Escape(type)}
@@ -469,7 +488,7 @@ struct t__static_{identifier}
                     if (x.Attributes.HasFlag(FieldAttributes.Literal) && x.GetRawConstantValue() is object value && value.GetType().IsPrimitive)
                     {
                         fieldDeclarations.WriteLine($"extern uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[];");
-                        td.Definitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{string.Join(", ", GetBytes(value).Select(y => $"0x{y:x02}"))}}};");
+                        td.Definitions.WriteLine($"uint8_t v__field_{identifier}__{Escape(x.Name)}__literal[] = {{{ToHexadecimals(value)}}};");
                     }
                     else if (x.Attributes.HasFlag(FieldAttributes.HasFieldRVA))
                     {
@@ -879,7 +898,7 @@ static t__runtime_field_info* v__fields_{identifier}[] = {{
                 definition.HasMethods = true;
                 var name = Escape(x);
                 var function = "nullptr";
-                if (!x.ContainsGenericParameters)
+                if (!x.ContainsGenericParameters && !x.IsAbstract)
                 {
                     Enqueue(x);
                     function = $"reinterpret_cast<void*>({name})";
@@ -898,7 +917,7 @@ static t__runtime_field_info* v__fields_{identifier}[] = {{
 extern t__runtime_method_info* v__generic_methods_{name}[];");
                 }
                 fieldDeclarations.WriteLine($"extern t__runtime_method_info v__method_{name};");
-                definition.Definitions.WriteLine($@"t__runtime_method_info v__method_{name}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {WriteAttributes(x, name, definition.Definitions)}, {WriteParameters(x.GetParameters(), name, definition.Definitions)}, &t__type_of<{Escape(x.ReturnType)}>::v__instance, {GenerateInvokeFunction(x)}, {function},
+                definition.Definitions.WriteLine($@"t__runtime_method_info v__method_{name}{{&t__type_of<t__runtime_method_info>::v__instance, &t__type_of<{identifier}>::v__instance, u""{x.Name}""sv, {(int)x.Attributes}, {WriteAttributes(x, name, definition.Definitions)}, {WriteParameters(x.GetParameters(), name, definition.Definitions)}, {ParameterTypePointer(x.ReturnType)}, {GenerateInvokeFunction(x)}, {function},
 #ifdef __EMSCRIPTEN__
 {'\t'}{GenerateWASMInvokeFunction(x)},
 #endif
@@ -937,6 +956,14 @@ extern t__runtime_method_info* v__generic_methods_{name}[];");
             writerForDefinitions.WriteLine($"{t} v__generic_parameter_{identifier}{{&t__type_of<{t}>::v__instance, u\"{type.Name}\"sv, {(int)type.Attributes}, {definition.Attributes ?? "nullptr"}, {(int)type.GenericParameterAttributes}, {type.GenericParameterPosition}}};");
             return;
         }
+        if (type.ContainsGenericParameters && GetElementTypeOrNull(type) is Type ge)
+        {
+            var t = "t__generic_parameter_pointer";
+            var v = $"v__generic_parameter_{Escape(ge)}{Escape(type.IsByRef ? "&" : type.IsPointer ? "*" : "[]")}";
+            writerForDeclarations.WriteLine($"extern {t} {v};");
+            writerForDefinitions.WriteLine($"{t} {v}{{&t__type_of<{t}>::v__instance, u\"{type.Name}\"sv, {(int)type.Attributes}, {definition.Attributes ?? "nullptr"}, {ParameterTypePointer(ge)}}};");
+            return;
+        }
         var @base = definition is TypeDefinition && FinalizeOf(type) != null ? "t__type_finalizee" : "t__type";
         var interfaces = "v__empty_types";
         if (definition is TypeDefinition)
@@ -955,10 +982,7 @@ static t__type* v__interfaces_{identifier}[] = {{
         {
             writerForDefinitions.Write($@"
 static t__abstract_type* v__generic_arguments_{Escape(type)}[] = {{
-{string.Join(string.Empty, type.GetGenericArguments().Select(x => x.IsGenericParameter
-? $"\t&v__generic_parameter_{Escape(x)},\n"
-: $"\t&t__type_of<{Escape(x)}>::v__instance,\n"
-))}{'\t'}nullptr
+{string.Join(string.Empty, type.GetGenericArguments().Select(x => $"\t{ParameterTypePointer(x)},\n"))}{'\t'}nullptr
 }};");
             if (type.IsGenericTypeDefinition) writerForDefinitions.Write($@"
 static t__type* v__generic_types_{Escape(type)}[] = {{

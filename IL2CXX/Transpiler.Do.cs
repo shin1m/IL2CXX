@@ -349,7 +349,7 @@ static t__type* v__exported_{name}[] = {{
                         }
                     writer.Write("\";");
                 }
-                writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, u\"{name}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}, {(exportedTypes.Count > 0 ? $"v__exported_{name}" : "t__type::v__empty_types")}, {{{string.Join(",", names.Select(x => $"\n\t{{u\"{x}\"sv, {{v__resource_{name}__{Escape(x)}, sizeof(v__resource_{name}__{Escape(x)}) - 1}}}}"))}\n}}}};");
+                writer.WriteLine($"\nt__runtime_assembly v__assembly_{name}{{&t__type_of<t__runtime_assembly>::v__instance, u\"{assembly.FullName}\"sv, {(method != assembly.EntryPoint ? "nullptr" : ShouldGenerateReflection(method.DeclaringType) ? $"&v__method_{Escape(method)}" : "reinterpret_cast<t__runtime_method_info*>(-1)")}, {(exportedTypes.Count > 0 ? $"v__exported_{name}" : "t__type::v__empty_types")}, {{{string.Join(",", names.Select(x => $"\n\t{{u\"{x}\"sv, {{v__resource_{name}__{Escape(x)}, sizeof(v__resource_{name}__{Escape(x)}) - 1}}}}"))}\n}}}};");
             }
             WriteRuntimeDefinition(definition, $"v__assembly_{name}", genericTypeDefinitionToConstructeds, writerForDeclarations, writer);
         }
@@ -402,7 +402,7 @@ string.Join(string.Empty, assemblyToIdentifier.Values.OrderBy(x => x).Select(x =
 t__runtime_assembly* const v__entry_assembly = &v__assembly_{assemblyToIdentifier[method.DeclaringType.Assembly]};
 
 const std::map<std::string_view, t__type*> v__name_to_type{{{
-string.Join(",", runtimeDefinitions.Where(x => !x.Type.IsGenericParameter).Select(x => $"\n\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))
+string.Join(",", runtimeDefinitions.Where(x => !x.Type.ContainsGenericParameters || x.Type.IsGenericTypeDefinition).Select(x => $"\n\t{{\"{x.Type.AssemblyQualifiedName}\"sv, &t__type_of<{Escape(x.Type)}>::v__instance}}"))
 }
 }};
 

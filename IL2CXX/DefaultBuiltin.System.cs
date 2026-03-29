@@ -41,10 +41,21 @@ partial class DefaultBuiltin
 {'\t'}{'\t'}}}
 ", false, null);
     };
-    private static void ForFloatingPoint(Func<Type, Type> get, Type type, Builtin.Code code) => code.ForGeneric(
-        type.GetMethod(nameof(IFloatingPoint<>.ConvertToIntegerNative)),
-        (transpiler, types) => ("\treturn a_0;\n", 1)
-    );
+    private static void ForFloatingPoint(Func<Type, Type> get, Type type, Builtin.Code code)
+    {
+        code.For(
+            type.GetMethod(nameof(Equals), [get(typeof(object))]),
+            transpiler => default
+        );
+        code.ForGeneric(
+            type.GetMethod(nameof(IFloatingPoint<>.ConvertToIntegerNative)),
+            (transpiler, types) => ("\treturn a_0;\n", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(INumberBase<>.MultiplyAddEstimate)),
+            transpiler => ("\treturn a_0 * a_1 + a_2;\n", 1)
+        );
+    }
     private static Builtin SetupSystem(this Builtin @this, Func<Type, Type> get) => @this
     .For(get(typeof(object)), (type, code) =>
     {
@@ -93,15 +104,6 @@ partial class DefaultBuiltin
                 var m = get(typeof(RuntimeType)).GetMethod(nameof(RuntimeType.ValueToString)) ?? throw new Exception();
                 transpiler.Enqueue(m);
                 return (transpiler.GenerateCheckNull("a_0") + $"\treturn {transpiler.Escape(m)}(a_0->f_type(), a_0 + 1);\n", 0);
-            }
-        );
-        // TODO
-        code.ForTree(
-            type.GetMethod(nameof(Equals)),
-            (transpiler, actual) =>
-            {
-                var identifier = transpiler.Escape(actual);
-                return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && std::memcmp(a_0, &static_cast<{identifier}*>(a_1)->v__value, sizeof({transpiler.EscapeForValue(actual)})) == 0;\n", 1);
             }
         );
     })
@@ -260,6 +262,14 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}{'\t'}}}
 ", false, null);
         code.For(
+            type.GetMethod(nameof(Equals), [get(typeof(object))]),
+            transpiler =>
+            {
+                var identifier = transpiler.Escape(type);
+                return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && a_0->v__method == static_cast<{identifier}*>(a_1)->v__value.v__method;\n", 1);
+            }
+        );
+        code.For(
             type.GetMethod(nameof(GetHashCode)),
             transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0->v__method);\n", 1)
         );
@@ -297,6 +307,14 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}{'\t'}}}
 ", false, null);
         code.For(
+            type.GetMethod(nameof(Equals), [get(typeof(object))]),
+            transpiler =>
+            {
+                var identifier = transpiler.Escape(type);
+                return ($"\treturn a_1 && a_1->f_type() == &t__type_of<{identifier}>::v__instance && a_0->v__type == static_cast<{identifier}*>(a_1)->v__value.v__type;\n", 1);
+            }
+        );
+        code.For(
             type.GetMethod(nameof(GetHashCode)),
             transpiler => ("\treturn reinterpret_cast<intptr_t>(a_0->v__type);\n", 1)
         );
@@ -333,6 +351,20 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}element->f_clear(reinterpret_cast<char*>(a_0->f_bounds() + type->v__rank) + a_1 * element->v__size, a_2);
 ", 0)
         );
+        // TODO
+        code.For(
+            type.GetMethod(nameof(Array.ConstrainedCopy)),
+            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + transpiler.GenerateCheckArgumentNull("a_2") + $@"{'\t'}auto type = a_0->f_type();
+{'\t'}if (type == a_2->f_type()) {{
+{'\t'}{'\t'}auto rank = type->v__rank;
+{'\t'}{'\t'}auto element = type->v__element;
+{'\t'}{'\t'}auto n = element->v__size;
+{'\t'}{'\t'}element->f_copy(reinterpret_cast<char*>(a_0->f_bounds() + rank) + a_1 * n, a_4, reinterpret_cast<char*>(a_2->f_bounds() + rank) + a_3 * n);
+{'\t'}}} else {{
+{'\t'}{'\t'}throw std::runtime_error(""NotImplementedException "" + IL2CXX__AT());
+{'\t'}}}
+", 0)
+        );
         var copy = type.GetMethod(nameof(Array.Copy), [type, get(typeof(int)), type, get(typeof(int)), get(typeof(int))]) ?? throw new Exception();
         code.For(
             type.GetMethod(nameof(Array.Copy), [type, type, get(typeof(int))]),
@@ -367,6 +399,11 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}{'\t'}std::memset(a_p, 0, a_n);
 {'\t'}}});
 ", 0)
+        );
+        // TODO
+        code.For(
+            type.GetMethod(nameof(Array.CreateInstance), [get(typeof(Type)), get(typeof(int[]))]),
+            transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
         );
         code.For(
             type.GetMethod(nameof(Array.CreateInstanceFromArrayType), [get(typeof(Type)), get(typeof(int))]),
@@ -670,7 +707,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             type.GetMethod("DynamicInvokeImpl", declaredAndInstance),
             transpiler => (transpiler.GenerateCheckNull("a_0") + $@"{'\t'}auto p = a_0->f_type()->v__invoke_method;
 {'\t'}if (!p) throw std::runtime_error(""no invoke method: "" + f__string(a_0->f_type()->v__full_name));
-{'\t'}return p->v__invoke(a_0, 0, nullptr, a_1, nullptr);
+{'\t'}return p->v__invoke(a_0, a_1);
 ", 0)
         );
         // TODO
@@ -751,9 +788,11 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
                 return ($"\treturn {transpiler.Escape(create)}(a_0, a_1 ? {(int)(BindingFlags.Instance | BindingFlags.NonPublic)} : {(int)(BindingFlags.Instance | BindingFlags.Public)}, nullptr, nullptr, nullptr, nullptr);\n", 0);
             }
         );
-        code.For(
-            create,
-            transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
+        code.For(create, transpiler =>
+        {
+            var invoke = get(typeof(RuntimeConstructorInfo)).GetMethod(nameof(MethodBase.Invoke), [get(typeof(BindingFlags)), get(typeof(Binder)), get(typeof(object[])), get(typeof(CultureInfo))]) ?? throw new Exception();
+            transpiler.Enqueue(invoke);
+            return (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (type->v__generic_definition) for (auto p = type->v__generic_arguments; *p; ++p) if ((*p)->f_type() != &t__type_of<t__type>::v__instance) {transpiler.GenerateThrow("Argument")};
 {'\t'}auto n = a_3 ? a_3->v__length : 0;
@@ -772,11 +811,9 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
 {'\t'}{'\t'}return false;
 {'\t'}}});
 {'\t'}if (!constructor) throw std::runtime_error(""no matching constructor found: "" + f__string(type->v__full_name));
-{'\t'}auto p = type->f_new_zeroed();
-{'\t'}constructor->v__invoke(p, a_1, a_2, n > 0 ? a_3 : nullptr, a_4);
-{'\t'}return p;
-", 0)
-        );
+{'\t'}return {transpiler.Escape(invoke)}(constructor, a_1, a_2, n > 0 ? a_3 : nullptr, a_4);
+", 0);
+        });
     })
     .For(get(typeof(string)), (type, code) =>
     {
@@ -1225,8 +1262,18 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             transpiler => ("\treturn std::pow(a_0, a_1);\n", 1)
         );
         code.For(
+            type.GetMethod(nameof(Math.Round), [get(typeof(double))]),
+            transpiler => ("\treturn std::rint(a_0);\n", 1)
+        );
+        code.For(
             type.GetMethod(nameof(Math.Sin)),
             transpiler => ("\treturn std::sin(a_0);\n", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(Math.SinCos), BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ($@"{'\t'}*a_1 = std::sin(a_0);
+{'\t'}*a_2 = std::cos(a_0);
+", 1)
         );
         code.For(
             type.GetMethod(nameof(Math.Sinh)),
@@ -1328,8 +1375,18 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             transpiler => ("\treturn std::pow(a_0, a_1);\n", 1)
         );
         code.For(
+            type.GetMethod(nameof(MathF.Round), [get(typeof(float))]),
+            transpiler => ("\treturn std::rint(a_0);\n", 1)
+        );
+        code.For(
             type.GetMethod(nameof(MathF.Sin)),
             transpiler => ("\treturn std::sin(a_0);\n", 1)
+        );
+        code.For(
+            type.GetMethod(nameof(MathF.SinCos), BindingFlags.Static | BindingFlags.NonPublic),
+            transpiler => ($@"{'\t'}*a_1 = std::sin(a_0);
+{'\t'}*a_2 = std::cos(a_0);
+", 1)
         );
         code.For(
             type.GetMethod(nameof(MathF.Sinh)),
@@ -1398,19 +1455,6 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             transpiler => ("\treturn std::memcmp(a_0, a_1, a_2) == 0;\n", 1)
         );
     })
-    .For(get(Type.GetType("System.ThrowHelper", true)!), (type, code) =>
-    {
-        foreach (var name in new[]
-        {
-            "ThrowForUnsupportedNumericsVectorBaseType",
-            "ThrowForUnsupportedIntrinsicsVector64BaseType",
-            "ThrowForUnsupportedIntrinsicsVector128BaseType",
-            "ThrowForUnsupportedIntrinsicsVector256BaseType"
-        }) code.ForGeneric(
-            type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic),
-            (transpiler, types) => (string.Empty, 1)
-        );
-    })
     .For(get(typeof(FileLoadException)), (type, code) =>
     {
         code.For(
@@ -1445,7 +1489,5 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             type.GetProperty("PredefinedCulturesOnly", BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod,
             transpiler => ("\treturn false;\n", 1)
         );
-        //var nls = type.GetProperty("UseNls", BindingFlags.Static | BindingFlags.NonPublic);
-        //if (nls != null) code.For(nls.GetMethod, transpiler => ("\treturn false;\n", 1));
     });
 }

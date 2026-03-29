@@ -165,6 +165,7 @@ public partial class Transpiler
     public readonly Type typeofRuntimeType;
     public readonly Type typeofRuntimeGenericTypeParameter;
     public readonly Type typeofRuntimeGenericMethodParameter;
+    public readonly Type typeofRuntimeGenericParameterPointer;
     public readonly Type typeofBoolean;
     public readonly Type typeofByte;
     public readonly Type typeofSByte;
@@ -350,14 +351,36 @@ public partial class Transpiler
         switch (name)
         {
             case ".ctor":
-                return type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, parameters, null) ?? throw new Exception($"{type} .ctor({string.Join(", ", parameters.AsEnumerable())})");
+                {
+                    ConstructorInfo get(Type type) => type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, parameters, null) ?? throw new Exception($"{type} .ctor({string.Join(", ", parameters.AsEnumerable())})");
+                    try
+                    {
+                        return get(type);
+                    }
+                    catch (AmbiguousMatchException)
+                    {
+                        var gtd = type.GetGenericTypeDefinition() ?? throw new Exception();
+                        ConstructorInfo[] gets(Type type) => type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        return gets(type)[Array.IndexOf(gets(gtd), get(gtd))];
+                    }
+                }
             case "op_Implicit":
             case "op_Explicit":
                 return type.GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public).Single(x => x.Name == name && x.ReturnType == signature.ReturnType && x.GetParameters().Select(x => x.ParameterType).SequenceEqual(parameters));
             default:
                 {
                     var gpc = signature.GenericParameterCount;
-                    return type.GetMethod(name, gpc, BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, parameters, null) ?? throw new Exception($"{type} {name}`{gpc}({string.Join(", ", parameters.AsEnumerable())})");
+                    MethodInfo get(Type type) => type.GetMethod(name, gpc, BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, parameters, null) ?? throw new Exception($"{type} {name}`{gpc}({string.Join(", ", parameters.AsEnumerable())})");
+                    try
+                    {
+                        return get(type);
+                    }
+                    catch (AmbiguousMatchException)
+                    {
+                        var gtd = type.GetGenericTypeDefinition() ?? throw new Exception();
+                        MethodInfo[] gets(Type type) => type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        return gets(type)[Array.IndexOf(gets(gtd), get(gtd))];
+                    }
                 }
         }
     }
@@ -598,7 +621,7 @@ public partial class Transpiler
         }
         return EscapeType(type);
     }
-    private string Escape(Type type, string @object = "{0}*", string value = "{0}::t_value") =>
+    private string Escape(Type type, string @object, string value) =>
         type.IsByRef || type.IsPointer ? $"{EscapeForValue(GetElementType(type))}*" :
         type.IsInterface ? Escape(typeofObject, @object, value) :
         primitives.TryGetValue(type, out var x) ? x :
@@ -940,11 +963,19 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         WriteLiteral(writer, value);
         return writer.ToString();
     }
-    private void GenerateInvokeFunction(MethodBase method, IEnumerable<string> arguments, TextWriter writer)
+    private void GenerateInvokeFunction(MethodBase method, IEnumerable<string> arguments, string post, TextWriter writer)
     {
         var @return = GetReturnType(method);
         var @this = GetVirtualThisType(method.DeclaringType ?? throw new Exception());
-        string construct(string call) => @return == typeofVoid ? $"\t{call};\n\treturn nullptr;\n" : $"\treturn {(@return.IsValueType ? $"f__new_constructed<{Escape(@return)}>({call})" : call)};\n";
+        string construct(string call)
+        {
+            if (@return == typeofVoid) return $"\t{call};\n{post}\treturn nullptr;\n";
+            if (GetNullableUnderlyingType(@return) is Type t) return $@"{'\t'}auto x = {call};
+{post}{'\t'}return x.v_hasValue ? {$"f__new_constructed<{Escape(t)}>(x.v_value)"} : nullptr;
+";
+            var x = $"{(@return.IsValueType ? $"f__new_constructed<{Escape(@return)}>({call})" : call)}\n;";
+            return post.Length > 0 ? $"\tauto x = {x}{post}\treturn x;\n" : $"\treturn {x}";
+        }
         var isConcrete = !method.DeclaringType.IsInterface && (!method.IsVirtual || method.IsFinal);
         if (isConcrete)
         {
@@ -995,28 +1026,55 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
 {'\t'}{'\t'}{GenerateThrow(exception)};
 {'\t'}}}
 ";
-    private string GenerateParameter(MethodBase method, Type type, int i, TextWriter writer)
+    private string GenerateParameter(MethodBase method, Type type, int i, TextWriter pre, TextWriter post)
     {
-        writer.WriteLine($"\tauto& p{i} = parameters->f_data()[{i}];");
-        string f(Type type)
+        pre.WriteLine($"\tauto& p{i} = parameters->f_data()[{i}];");
+        var convert = typeofRuntimeType.GetMethod($"ConvertInvokeParameterTo{type.Name}");
+        if (convert?.ReturnType == type)
         {
-            if (type.IsValueType)
-            {
-                writer.Write(GenerateCheck(method, type, $"p{i}", $"!p{i} ||", "Argument"));
-                return $"static_cast<{Escape(type)}*>(p{i})->v__value";
-            }
-            else
-            {
-                writer.Write(GenerateCheck(method, type, $"p{i}", $"p{i} &&", "Argument"));
-                return $"p{i}";
-            }
+            Enqueue(convert);
+            pre.WriteLine($"\tauto q{i} = !p{i} ? {EscapeForStacked(type)}{{}} : p{i}->f_type() == &t__type_of<{Escape(type)}>::v__instance ? static_cast<{Escape(type)}*>(p{i})->v__value : {Escape(convert)}(p{i});");
+            return $"q{i}";
         }
-        return type.IsByRef ? $"&{f(GetElementType(type))}" : f(type);
+        void f(Func<Type, string> escape, Type type)
+        {
+            if (!type.IsValueType)
+            {
+                pre.Write(GenerateCheck(method, type, $"p{i}", $"p{i} &&", "Argument"));
+                pre.WriteLine($"{escape(typeofObject)} q{i} = p{i};");
+                return;
+            }
+            pre.Write($@"{'\t'}{escape(type)} q{i}{{}};
+{'\t'}if (p{i}) {{
+");
+            void g(Type type, string target) => pre.Write($@"{'\t'}{'\t'}if (p{i}->f_type() != &t__type_of<{Escape(type)}>::v__instance) {GenerateThrow("Argument")};
+{'\t'}{'\t'}{target} = static_cast<{Escape(type)}*>(p{i})->v__value;
+");
+            if (GetNullableUnderlyingType(type) is Type t)
+                g(t, $"q{i}.v_hasValue = true;\n\t\tq{i}.v_value");
+            else
+                g(type, $@"q{i}");
+            pre.WriteLine("\t}");
+        }
+        if (!type.IsByRef)
+        {
+            f(EscapeForStacked, type);
+            return $"q{i}";
+        }
+        var e = GetElementType(type);
+        f(EscapeForArgument, e);
+        if (!e.IsValueType)
+            post.WriteLine($"\tp{i} = q{i};");
+        else if (GetNullableUnderlyingType(e) is Type t)
+            post.WriteLine($"\tp{i} = q{i}.v_hasValue ? f__new_constructed<{Escape(t)}>(q{i}.v_value) : nullptr;");
+        else
+            post.WriteLine($"\tp{i} = f__new_constructed<{Escape(e)}>(q{i});");
+        return $"&q{i}";
     }
     private string GenerateInvokeFunction(MethodBase method)
     {
         using var writer = new StringWriter();
-        writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
+        writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, t__object* RECYCLONE__SPILL a_parameters) -> t__object*\n{");
         var @return = GetReturnType(method);
         var parameters = method.GetParameters();
         if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType!.IsByRefLike && !method.IsStatic || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike) || method.ContainsGenericParameters || method is ConstructorInfo && builtin.GetBody(this, ToKey(method)).body != null)
@@ -1032,8 +1090,9 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
             writer.Write(GenerateCheck(method, @this, "a_this", "!a_this ||", "Target"));
             arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
         }
-        arguments.AddRange(parameters.Select((x, i) => GenerateParameter(method, x.ParameterType, i, writer)));
-        GenerateInvokeFunction(method, arguments, writer);
+        using var post = new StringWriter();
+        arguments.AddRange(parameters.Select((x, i) => GenerateParameter(method, x.ParameterType, i, writer, post)));
+        GenerateInvokeFunction(method, arguments, post.ToString(), writer);
         writer.Write('}');
         return writer.ToString();
     }
@@ -1041,7 +1100,7 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
     {
         if (builtin.GetBody(this, ToKey(method)).body == null) return "t__runtime_constructor_info::f_create";
         using var writer = new StringWriter();
-        writer.WriteLine("[](t__runtime_constructor_info*, int32_t, t__object* RECYCLONE__SPILL, t__object* RECYCLONE__SPILL a_parameters, t__object* RECYCLONE__SPILL) -> t__object*\n{");
+        writer.WriteLine("[](t__runtime_constructor_info*, t__object* RECYCLONE__SPILL a_parameters) -> t__object*\n{");
         var type = method.DeclaringType ?? throw new Exception();
         var parameters = method.GetParameters();
         if (type.IsByRefLike || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike))
@@ -1051,10 +1110,13 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         }
         writer.Write(GenerateCheckParameterCount(method));
         Enqueue(method);
+        using var post = new StringWriter();
         var call = $@"{Escape(method)}({
-string.Join(",", parameters.Select((x, i) => $"\n\t\t{CastValue(x.ParameterType, GenerateParameter(method, x.ParameterType, i, writer))}"))
+string.Join(",", parameters.Select((x, i) => $"\n\t\t{CastValue(x.ParameterType, GenerateParameter(method, x.ParameterType, i, writer, post))}"))
 }{(parameters.Length > 0 ? "\n\t" : string.Empty)})";
-        writer.Write($"\treturn {(type.IsValueType ? $"f__new_constructed<{Escape(type)}>({call})" : call)};\n}}");
+        var x = $"{(type.IsValueType ? $"f__new_constructed<{Escape(type)}>({call})" : call)};\n";
+        var p = post.ToString();
+        writer.Write(p.Length > 0 ? $"\tauto x = {x}{p}return x;\n}}" : $"\treturn {x}}}");
         return writer.ToString();
     }
     private string GenerateWASMInvokeFunction(MethodBase method)
@@ -1076,7 +1138,7 @@ string.Join(",", parameters.Select((x, i) => $"\n\t\t{CastValue(x.ParameterType,
             arguments.Add(@this.IsValueType ? $"&static_cast<{Escape(@this)}*>(a_this)->v__value" : "a_this");
         }
         arguments.AddRange(parameters.Select((x, i) => x.ParameterType.IsValueType ? $"*static_cast<{EscapeForValue(x.ParameterType)}*>(a_parameters[{i}])" : $"a_parameters[{i}]"));
-        GenerateInvokeFunction(method, arguments, writer);
+        GenerateInvokeFunction(method, arguments, string.Empty, writer);
         writer.Write('}');
         return writer.ToString();
     }

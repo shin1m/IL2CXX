@@ -25,6 +25,8 @@ static class Utilities
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void ThrowArgumentOutOfRange() => throw new ArgumentOutOfRangeException();
     [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ThrowDivideByZero() => throw new DivideByZeroException();
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public static void ThrowIndexOutOfRange() => throw new IndexOutOfRangeException();
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void ThrowInvalidCast() => throw new InvalidCastException();

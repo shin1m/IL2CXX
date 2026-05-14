@@ -9,4 +9,5 @@ diff -r\
  -x *.h\
  -x *.in\
  -x jiterpreter*\
- $DOTNET_RUNTIME/src/mono/wasm/runtime runtime
+ -x *.txt\
+ $DOTNET_RUNTIME/src/mono/browser/runtime runtime

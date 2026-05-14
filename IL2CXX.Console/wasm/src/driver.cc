@@ -71,6 +71,37 @@ void f_module_cctor(void*, auto...)
 extern "C"
 {
 
+bool mono_bundled_resources_get_data_resource_values (const char *id, const uint8_t **data_out, uint32_t *size_out)
+{
+	return false;
+}
+
+EMSCRIPTEN_KEEPALIVE t__runtime_assembly*
+mono_wasm_assembly_load (const char *name)
+{
+	return v__entry_assembly;
+}
+
+EMSCRIPTEN_KEEPALIVE t__type*
+mono_wasm_assembly_find_class (t__runtime_assembly *assembly, const char *ns, const char *name)
+{
+	return f__find_type(v__name_to_type, f__u16string(*ns ? std::string(ns) + '.' + name : std::string_view(name)));
+}
+
+EMSCRIPTEN_KEEPALIVE t__runtime_method_info*
+mono_wasm_assembly_find_method (t__type *klass, const char *name, int arguments)
+{
+	assert (klass);
+	return arguments < 0 ? f_find_method(klass, f__u16string(name), [](auto)
+	{
+		return true;
+	}) : f_find_method(klass, f__u16string(name), [&](auto a_xs)
+	{
+		for (int i = 0; i < arguments; ++i, ++a_xs) if (!*a_xs) return false;
+		return !*a_xs;
+	});
+}
+
 EMSCRIPTEN_KEEPALIVE int
 mono_wasm_register_root (char *start, size_t size, const char *name)
 {
@@ -106,121 +137,34 @@ mono_wasm_getenv (const char *name)
 }
 
 EMSCRIPTEN_KEEPALIVE void
-mono_wasm_load_runtime (const char *unused, int debug_level)
+mono_wasm_load_runtime (int debug_level, int propertyCount, const char **propertyKeys, const char **propertyValues)
 {
 	f__startup(reinterpret_cast<void*>(emscripten_stack_get_base()));
+	f_t_IL2CXX_2eJSSynchronizationContext__Install();
 	t_thread<t__type>::f_current()->f_epoch_enter();
 }
 
-EMSCRIPTEN_KEEPALIVE t__runtime_assembly*
-mono_wasm_assembly_load (const char *name)
-{
-	return v__entry_assembly;
-}
-
-EMSCRIPTEN_KEEPALIVE t__runtime_assembly* 
-mono_wasm_get_corlib (void)
-{
-	return v__entry_assembly;
-}
-
-EMSCRIPTEN_KEEPALIVE t__type*
-mono_wasm_assembly_find_class (t__runtime_assembly *assembly, const char *ns, const char *name)
-{
-	return f__find_type(v__name_to_type, f__u16string(*ns ? std::string(ns) + '.' + name : std::string_view(name)));
-}
-
 EMSCRIPTEN_KEEPALIVE void
-mono_wasm_runtime_run_module_cctor (t__runtime_assembly *assembly)
-{
-	f_module_cctor(nullptr);
-}
-
-EMSCRIPTEN_KEEPALIVE t__runtime_method_info*
-mono_wasm_assembly_find_method (t__type *klass, const char *name, int arguments)
-{
-	assert (klass);
-	return arguments < 0 ? f_find_method(klass, f__u16string(name), [](auto)
-	{
-		return true;
-	}) : f_find_method(klass, f__u16string(name), [&](auto a_xs)
-	{
-		for (int i = 0; i < arguments; ++i, ++a_xs) if (!*a_xs) return false;
-		return !*a_xs;
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_invoke_method_ref (t__runtime_method_info *method, t__object **this_arg_in, void *params[], t__object **out_exc, t__object **out_result)
+mono_wasm_invoke_jsexport (t__runtime_method_info *method, void* args)
 {
 	f_epoch_noiger([&]
 	{
-		if (out_exc) f__store(*out_exc, nullptr);
 		try {
-			//std::printf("invoke method: %s, %p, %p, %p\n", f__string(method->v__name).c_str(), method->v__wasm_invoke, this_arg, params);
-			auto result = method->v__wasm_invoke(this_arg_in ? *this_arg_in : nullptr, params);
-			/*std::printf("\tgot: %p (%s)\n", result, result ? f__string(result->f_type()->v__full_name).c_str() : "");
-			std::printf("\tstring: %s\n", result ? f__string(f__to_string(result)).c_str() : nullptr);*/
-			if (out_result) f__store(*out_result, result);
+			try {
+				method->v__wasm_invoke(nullptr, &args);
+				return;
+			} catch (t__object* e) {
+				std::fprintf(stderr, "\tcaught object: %s\n", f__string(f__to_string(e)).c_str());
+			}
 		} catch (t__object* e) {
-			std::fprintf(stderr, "\tcaught object: %p\n", e);
-			if (out_exc) f__store(*out_exc, e);
-			//if (out_result) *out_result = f__to_string(e);
-			auto s = f__to_string(e);
-			std::fprintf(stderr, "\tstring: %s\n", f__string(s).c_str());
-			if (out_result) f__store(*out_result, s);
+			std::fprintf(stderr, "\tunexpected double fault: %p\n", e);
 		} catch (std::exception& e) {
 			std::fprintf(stderr, "\tcaught exception: %s\n", e.what());
-			auto s = f__new_string(e.what());
-			if (out_exc) f__store(*out_exc, s);
-			if (out_result) f__store(*out_result, s);
 		} catch (...) {
 			std::fprintf(stderr, "\tcaught unknown\n");
-			auto s = f__new_string(u"unknown exception"sv);
-			if (out_exc) f__store(*out_exc, s);
-			if (out_result) f__store(*out_result, s);
 		}
+		abort();
 	});
-}
-
-EMSCRIPTEN_KEEPALIVE int
-mono_wasm_invoke_method_bound (t__runtime_method_info *method, void* args /*JSMarshalerArguments*/, t_System_2eString **out_exc)
-{
-	return f_epoch_noiger([&]
-	{
-		try {
-			method->v__wasm_invoke(nullptr, &args);
-			return 0;
-		} catch (t__object* e) {
-			std::fprintf(stderr, "\tcaught object: %p\n", e);
-			if (out_exc) f__store(*out_exc, f__to_string(e));
-		} catch (std::exception& e) {
-			std::fprintf(stderr, "\tcaught exception: %s\n", e.what());
-			if (out_exc) f__store(*out_exc, f__new_string(e.what()));
-		} catch (...) {
-			std::fprintf(stderr, "\tcaught unknown\n");
-			if (out_exc) f__store(*out_exc, f__new_string(u"unknown exception"sv));
-		}
-		return 1;
-	});
-}
-
-EMSCRIPTEN_KEEPALIVE t__runtime_method_info*
-mono_wasm_assembly_get_entry_point (t__runtime_assembly *assembly, int auto_insert_breakpoint)
-{
-	auto method = assembly->v__entry_point;
-	if (!(method->v__attributes & 0x0800)) return method;
-	auto name = method->v__name;
-	if (name[0] != u'<' || name[name.size() - 1] != u'>') return method;
-	auto type = method->v__declaring_type;
-	auto match = [&](auto a_xs)
-	{
-		for (auto p = method->v__parameters; *p; ++p, ++a_xs) if ((*a_xs)->v__parameter_type != (*p)->v__parameter_type) return false;
-		return !*a_xs;
-	};
-	if (auto p = f_find_method(type, std::u16string(name) + u'$', match)) return p;
-	if (auto p = f_find_method(type, name.substr(1, name.size() - 2), match)) return p;;
-	return method;
 }
 
 EMSCRIPTEN_KEEPALIVE void
@@ -242,13 +186,10 @@ mono_wasm_exec_regression (int verbose_level, char *image)
 EMSCRIPTEN_KEEPALIVE int
 mono_wasm_exit (int exit_code)
 {
-	std::exit(exit_code);
-}
-
-EMSCRIPTEN_KEEPALIVE int
-mono_wasm_abort ()
-{
-	abort ();
+	//if (exit_code == 0) f__cleanup();
+	fflush (stdout);
+	fflush (stderr);
+	emscripten_force_exit (exit_code);
 }
 
 EMSCRIPTEN_KEEPALIVE void
@@ -264,11 +205,6 @@ mono_wasm_strdup (const char *s)
 
 EMSCRIPTEN_KEEPALIVE void
 mono_wasm_parse_runtime_options (int argc, char* argv[])
-{
-}
-
-EMSCRIPTEN_KEEPALIVE void
-mono_wasm_enable_on_demand_gc (int enable)
 {
 }
 
@@ -375,6 +311,10 @@ EMSCRIPTEN_KEEPALIVE const char * mono_wasm_method_get_name (t__runtime_method_i
 	return nullptr;
 }
 
+EMSCRIPTEN_KEEPALIVE char * mono_wasm_method_get_name_ex (t__runtime_method_info *method) {
+	return nullptr;
+}
+
 EMSCRIPTEN_KEEPALIVE float mono_wasm_get_f32_unaligned (const float *src) {
 	return *src;
 }
@@ -398,15 +338,71 @@ EMSCRIPTEN_KEEPALIVE int mono_wasm_is_zero_page_reserved () {
 	return (emscripten_stack_get_base() > 512) && (emscripten_stack_get_end() > 512);
 }
 
-EMSCRIPTEN_KEEPALIVE int32_t mono_wasm_load_icu_data(void* pData)
-{
-	return 1;
+// this will return bool value if the object is a bool, otherwise it will return -1 or error
+// we use it in Blazor's renderBatch as internal only
+EMSCRIPTEN_KEEPALIVE int
+mono_wasm_read_as_bool_or_null_unsafe (t__object* RECYCLONE__SPILL obj) {
+	return f_epoch_noiger([&]
+	{
+		if (obj->f_type() != &t__type_of<t_System_2eBoolean>::v__instance) return -1;
+		return static_cast<t_System_2eBoolean*>(obj)->v__value ? 1 : 0;
+	});
 }
 
-bool
-mono_bundled_resources_get_data_resource_values (const char *id, const uint8_t **data_out, uint32_t *size_out)
+EMSCRIPTEN_KEEPALIVE void il2cxx_js_synchronization_context_pump()
 {
-	return false;
+	f_epoch_noiger(f_t_IL2CXX_2eJSSynchronizationContext__Pump);
+}
+
+}
+
+namespace il2cxx
+{
+
+t__runtime_method_info*
+mono_wasm_assembly_get_entry_point (char *assembly_name, int auto_insert_breakpoint)
+{
+	free(assembly_name);
+	auto method = v__entry_assembly->v__entry_point;
+	if (!(method->v__attributes & 0x0800)) return method;
+	auto name = method->v__name;
+	if (name[0] != u'<' || name[name.size() - 1] != u'>') return method;
+	auto type = method->v__declaring_type;
+	auto match = [&](auto a_xs)
+	{
+		for (auto p = method->v__parameters; *p; ++p, ++a_xs) if ((*a_xs)->v__parameter_type != (*p)->v__parameter_type) return false;
+		return !*a_xs;
+	};
+	if (auto p = f_find_method(type, std::u16string(name) + u'$', match)) return p;
+	if (auto p = f_find_method(type, name.substr(1, name.size() - 2), match)) return p;;
+	return method;
+}
+
+void mono_wasm_bind_assembly_exports (char *assembly_name)
+{
+	free(assembly_name);
+	if (auto klass = mono_wasm_assembly_find_class(v__entry_assembly, "System.Runtime.InteropServices.JavaScript", "__GeneratedInitializer")) {
+		if (auto method = mono_wasm_assembly_find_method(klass, "__Register_", -1)) mono_wasm_invoke_jsexport(method, nullptr);
+	} else {
+		f_module_cctor(nullptr);
+	}
+}
+
+t__runtime_method_info* mono_wasm_get_assembly_export (char *assembly_name, char *ns, char *classname, char *methodname, int signature_hash)
+{
+	free(assembly_name);
+	auto klass = mono_wasm_assembly_find_class(v__entry_assembly, ns, classname);
+	free(ns);
+	free(classname);
+	assert (klass);
+
+	char real_method_name_buffer[4096];
+	snprintf(real_method_name_buffer, 4096, "__Wrapper_%s_%d", methodname, signature_hash);
+	free(methodname);
+
+	auto method = mono_wasm_assembly_find_method(klass, real_method_name_buffer, -1);
+	assert (method);
+	return method;
 }
 
 }

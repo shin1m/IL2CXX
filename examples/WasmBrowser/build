@@ -5,7 +5,7 @@ if [ "$1" == '' ]; then
 	rm -rf il2cxx || exit $?
 	dotnet publish -c Release || exit $?
 	mkdir -p il2cxx/source || exit $?
-	(cd bin/Release/net8.0 && cp\
+	(cd bin/Release/net10.0 && cp\
 	 System.Console.dll\
 	 System.Runtime.InteropServices.JavaScript.dll\
 	 WasmBrowser.dll\
@@ -15,14 +15,14 @@ if [ "$1" == '' ]; then
 	dotnet run --project $BASE/../../IL2CXX.Console --target Other --is32\
 	 --out out source/WasmBrowser.dll\
 	 --bundle\
-	  'MyClass, WasmBrowser'\
+	  'StopwatchSample, WasmBrowser'\
 	 --reflection\
-	  'MyClass, WasmBrowser'\
+	  'StopwatchSample, WasmBrowser'\
 	  'Program, WasmBrowser'\
 	 || exit $?
 	mkdir -p wwwroot/_framework || exit $?
 	cd wwwroot/_framework || exit $?
-	emcmake cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 ../../out || exit $?
+	emcmake cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=1 -DCMAKE_EXE_LINKER_FLAGS='-s INITIAL_MEMORY=64mb' ../../out || exit $?
 else
 	cd il2cxx/wwwroot/_framework || exit $?
 fi

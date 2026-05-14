@@ -5,10 +5,10 @@ if [ "$1" == '' ]; then
 	rm -rf build || exit $?
 	mkdir -p build || exit $?
 	cd build || exit $?
-	emcmake cmake -DCMAKE_BUILD_TYPE=Release $DOTNET_RUNTIME/src/native/libs || exit $?
+	emcmake cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS='-pthread' $DOTNET_RUNTIME/src/native/libs || exit $?
 else
 	cd build || exit $?
 fi
 cmake --build . -j8 || exit $?
+cp minipal/libminipal.a ../src || exit $?
 cp System.Native/libSystem.Native.a ../src || exit $?
-cp $DOTNET_RUNTIME/src/native/libs/System.Native/pal_random.lib.js ../src || exit $?

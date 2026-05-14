@@ -7,39 +7,45 @@
 // -- this javascript file is evaluated by emcc during compilation! --
 
 // because we can't pass custom define symbols to acorn optimizer, we use environment variables to pass other build options
-const DISABLE_LEGACY_JS_INTEROP = process.env.DISABLE_LEGACY_JS_INTEROP === "1";
 const WASM_ENABLE_SIMD = process.env.WASM_ENABLE_SIMD === "1";
+const WASM_ENABLE_EVENTPIPE = process.env.WASM_ENABLE_EVENTPIPE === "1";
 const WASM_ENABLE_EH = process.env.WASM_ENABLE_EH === "1";
-const ENABLE_BROWSER_PROFILER = process.env.ENABLE_BROWSER_PROFILER === "1";
+const ENABLE_DEVTOOLS_PROFILER = process.env.ENABLE_DEVTOOLS_PROFILER === "1";
 const ENABLE_AOT_PROFILER = process.env.ENABLE_AOT_PROFILER === "1";
+const ENABLE_LOG_PROFILER = process.env.ENABLE_LOG_PROFILER === "1";
+const RUN_AOT_COMPILATION = process.env.RUN_AOT_COMPILATION === "1";
 var methodIndexByName = undefined;
 var gitHash = undefined;
 
-function setup(linkerSetup, ready) {
-    const pthreadReplacements = {};
-    const dotnet_replacements = {
-        fetch: globalThis.fetch,
-        require,
-        updateMemoryViews,
-        pthreadReplacements,
-        scriptDirectory,
-        noExitRuntime
-    };
+function setup(emscriptenBuildOptions) {
     // USE_PTHREADS is emscripten's define symbol, which is passed to acorn optimizer, so we could use it here
     #if USE_PTHREADS
-    pthreadReplacements.loadWasmModuleToWorker = PThread.loadWasmModuleToWorker;
-    pthreadReplacements.threadInitTLS = PThread.threadInitTLS;
-    pthreadReplacements.allocateUnusedWorker = PThread.allocateUnusedWorker;
+    const modulePThread = PThread;
     #else
+    const modulePThread = {};
     const ENVIRONMENT_IS_PTHREAD = false;
     #endif
+    const dotnet_replacements = {
+        fetch: globalThis.fetch,
+        ENVIRONMENT_IS_WORKER,
+        require,
+        modulePThread,
+        scriptDirectory,
+    };
 
+    ENVIRONMENT_IS_WORKER = dotnet_replacements.ENVIRONMENT_IS_WORKER;
+    Module.__dotnet_runtime.initializeReplacements(dotnet_replacements);
+    noExitRuntime = dotnet_replacements.noExitRuntime;
+    fetch = dotnet_replacements.fetch;
+    require = dotnet_replacements.require;
+    _scriptName = __dirname = scriptDirectory = dotnet_replacements.scriptDirectory;
     Module.__dotnet_runtime.passEmscriptenInternals({
         isPThread: ENVIRONMENT_IS_PTHREAD,
         quit_, ExitStatus,
-        ...linkerSetup
-    });
-    Module.__dotnet_runtime.initializeReplacements(dotnet_replacements);
+        updateMemoryViews,
+        getMemory: () => { return wasmMemory; },
+        getWasmIndirectFunctionTable: () => { return wasmTable; },
+    }, emscriptenBuildOptions);
 
     #if USE_PTHREADS
     if (ENVIRONMENT_IS_PTHREAD) {
@@ -47,22 +53,10 @@ function setup(linkerSetup, ready) {
         Module.__dotnet_runtime.configureWorkerStartup(Module);
     } else {
         #endif
-        ready = Module.__dotnet_runtime.configureEmscriptenStartup(Module, ready);
+        Module.__dotnet_runtime.configureEmscriptenStartup(Module);
         #if USE_PTHREADS
     }
     #endif
-
-    updateMemoryViews = dotnet_replacements.updateMemoryViews;
-    noExitRuntime = dotnet_replacements.noExitRuntime;
-    fetch = dotnet_replacements.fetch;
-    require = dotnet_replacements.require;
-    _scriptName = __dirname = scriptDirectory = dotnet_replacements.scriptDirectory;
-    #if USE_PTHREADS
-    PThread.loadWasmModuleToWorker = pthreadReplacements.loadWasmModuleToWorker;
-    PThread.threadInitTLS = pthreadReplacements.threadInitTLS;
-    PThread.allocateUnusedWorker = pthreadReplacements.allocateUnusedWorker;
-    #endif
-    return ready;
 }
 
 const DotnetSupportLib = {
@@ -89,23 +83,22 @@ function injectDependencies() {
     createWasmImportStubsFrom(methodIndexByName.mono_wasm_threads_imports);
     #endif
 
-    if (!DISABLE_LEGACY_JS_INTEROP) {
-        createWasmImportStubsFrom(methodIndexByName.mono_wasm_legacy_interop_imports);
-    }
-
-    DotnetSupportLib["$DOTNET__postset"] = `const DOTNET_setup = ready => DOTNET.setup({ ` +
-        `linkerDisableLegacyJsInterop: ${DISABLE_LEGACY_JS_INTEROP ? "true" : "false"},` +
-        `linkerWasmEnableSIMD: ${WASM_ENABLE_SIMD ? "true" : "false"},` +
-        `linkerWasmEnableEH: ${WASM_ENABLE_EH ? "true" : "false"},` +
-        `linkerEnableAotProfiler: ${ENABLE_AOT_PROFILER ? "true" : "false"}, ` +
-        `linkerEnableBrowserProfiler: ${ENABLE_BROWSER_PROFILER ? "true" : "false"}, ` +
+    DotnetSupportLib["$DOTNET__postset"] = `const DOTNET_setup = () => DOTNET.setup({ ` +
+        `wasmEnableSIMD: ${WASM_ENABLE_SIMD},` +
+        `wasmEnableEH: ${WASM_ENABLE_EH},` +
+        `enableAotProfiler: ${ENABLE_AOT_PROFILER}, ` +
+        `enableDevToolsProfiler: ${ENABLE_DEVTOOLS_PROFILER}, ` +
+        `enableLogProfiler: ${ENABLE_LOG_PROFILER}, ` +
+        `enableEventPipe: ${WASM_ENABLE_EVENTPIPE}, ` +
+        `runAOTCompilation: ${RUN_AOT_COMPILATION}, ` +
+        `wasmEnableThreads: ${!!USE_PTHREADS}, ` +
         `gitHash: "${gitHash}", ` +
-        `}, ready);` +
-        `if (!ENVIRONMENT_IS_PTHREAD) readyPromise = DOTNET_setup(readyPromise);`;
+        `});` +
+        `if (!ENVIRONMENT_IS_PTHREAD) DOTNET_setup();`;
 
     autoAddDeps(DotnetSupportLib, "$DOTNET");
     mergeInto(LibraryManager.library, DotnetSupportLib);
 }
 
 
-// var methodIndexByName wil be appended below by the MSBuild in wasm.proj
+// var methodIndexByName wil be appended below by the MSBuild in browser.proj via exports-linker.ts

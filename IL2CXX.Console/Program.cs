@@ -18,15 +18,10 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
         var builtin = DefaultBuiltin.Create(get, options.Target);
         if (options.Target == PlatformID.Other)
         {
-            void forIf(Builtin.Code code, MethodBase? method, Func<Transpiler, (string body, int inline)> body)
-            {
-                if (method != null) code.For(method, body);
-            }
             builtin
             .For(get(typeof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument)), (type, code) =>
             {
-                void codeFor(MethodBase? method, Func<Transpiler, (string body, int inline)> body) => forIf(code, method, body);
-                codeFor(
+                code.For(
                     type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToManaged), [get(typeof(string).MakeByRefType())]),
                     transpiler => ($@"{'\t'}if (a_0->v_slot.v_Type.v) {{
 {'\t'}{'\t'}auto& p = reinterpret_cast<t_System_2eString*&>(a_0->v_slot.v_IntPtrValue.v);
@@ -37,7 +32,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}}
 ", 1)
                 );
-                codeFor(
+                code.For(
                     type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToJS), [get(typeof(string))]),
                     transpiler => ($@"{'\t'}if (a_1) {{
 {'\t'}{'\t'}a_0->v_slot.v_Type.v = 15;
@@ -50,8 +45,31 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
             })
             .For(context.LoadFromAssemblyName("System.Runtime.InteropServices.JavaScript").GetType("Interop+Runtime", true)!, (type, code) =>
             {
-                void codeFor(MethodBase? method, Func<Transpiler, (string body, int inline)> body) => forIf(code, method, body);
-                codeFor(
+                code.For(
+                    type.GetMethod("RegisterGCRoot"),
+                    transpiler => (string.Empty, 1)
+                );
+                code.For(
+                    type.GetMethod("DeregisterGCRoot"),
+                    transpiler => (string.Empty, 1)
+                );
+                code.For(
+                    type.GetMethod("BindJSImportST"),
+                    transpiler => ($@"{'\t'}return f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}return mono_wasm_bind_js_import_ST(a_0);
+{'\t'}}});
+", 0)
+                );
+                code.For(
+                    type.GetMethod("InvokeJSImportST"),
+                    transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}mono_wasm_invoke_jsimport_ST(a_0, a_1);
+{'\t'}}});
+", 0)
+                );
+                code.For(
                     type.GetMethod("ReleaseCSOwnedObject", BindingFlags.Static | BindingFlags.NonPublic),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -59,56 +77,64 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                codeFor(
-                    type.GetMethod("BindJSFunction"),
+                code.For(
+                    type.GetMethod("ResolveOrRejectPromise"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}int bound;
-{'\t'}{'\t'}*a_4 = 0;
-{'\t'}{'\t'}mono_wasm_bind_js_function(a_0, a_1, a_2, &bound, a_4, a_5);
-{'\t'}{'\t'}*a_3 = bound;
+{'\t'}{'\t'}mono_wasm_resolve_or_reject_promise(a_0);
 {'\t'}}});
 ", 0)
                 );
-                codeFor(
+                code.For(
                     type.GetMethod("InvokeJSFunction"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}mono_wasm_invoke_bound_function(a_0, a_1);
+{'\t'}{'\t'}mono_wasm_invoke_js_function(a_0, a_1);
 {'\t'}}});
 ", 0)
                 );
-                codeFor(
-                    type.GetMethod("InvokeImport"),
+                code.For(
+                    type.GetMethod("CancelPromise"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}mono_wasm_invoke_import(a_0, a_1);
+{'\t'}{'\t'}mono_wasm_cancel_promise(a_0);
 {'\t'}}});
 ", 0)
                 );
-                codeFor(
-                    type.GetMethod("BindCSFunction"),
+                code.For(
+                    type.GetMethod("AssemblyGetEntryPoint"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}mono_wasm_bind_cs_function(a_0, a_1, a_2, a_3, a_4);
+{'\t'}{'\t'}*a_2 = mono_wasm_assembly_get_entry_point(static_cast<char*>(static_cast<void*>(a_0)), a_1);
 {'\t'}}});
 ", 0)
                 );
-                codeFor(
-                    type.GetMethod("MarshalPromise"),
+                code.For(
+                    type.GetMethod("BindAssemblyExports"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
-{'\t'}{'\t'}mono_wasm_marshal_promise(a_0);
+{'\t'}{'\t'}mono_wasm_bind_assembly_exports(static_cast<char*>(static_cast<void*>(a_0)));
 {'\t'}}});
 ", 0)
                 );
-                codeFor(
-                    type.GetMethod("RegisterGCRoot"),
-                    transpiler => (string.Empty, 1)
+                code.For(
+                    type.GetMethod("GetAssemblyExport"),
+                    transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}*a_5 = mono_wasm_get_assembly_export(static_cast<char*>(static_cast<void*>(a_0)), static_cast<char*>(static_cast<void*>(a_1)), static_cast<char*>(static_cast<void*>(a_2)), static_cast<char*>(static_cast<void*>(a_3)), a_4);
+{'\t'}}});
+", 0)
                 );
-                codeFor(
-                    type.GetMethod("DeregisterGCRoot"),
-                    transpiler => (string.Empty, 1)
+            })
+            .For(context.LoadFromAssemblyName("System.Runtime.InteropServices.JavaScript").GetType("System.Runtime.InteropServices.JavaScript.JSHostImplementation", true)!, (type, code) =>
+            {
+                code.For(
+                    type.GetMethod("LoadLazyAssembly"),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
+                );
+                code.For(
+                    type.GetMethod("LoadSatelliteAssembly"),
+                    transpiler => ("\tthrow std::runtime_error(\"NotImplementedException \" + IL2CXX__AT());\n", 0)
                 );
             })
             .For(get(typeof(System.Runtime.InteropServices.RuntimeInformation)), (type, code) =>
@@ -118,18 +144,18 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
                     transpiler => ($"\treturn {(int)System.Runtime.InteropServices.Architecture.Wasm};\n", 1)
                 );
             })
-            .For(get(typeof(ThreadPool)), (type, code) => code.For(
-                type.GetMethod("InitializeConfig", BindingFlags.Static | BindingFlags.NonPublic),
-                transpiler =>
-                {
-                    var set = get(typeof(AppContext)).GetMethod(nameof(AppContext.SetData)) ?? throw new Exception();
-                    transpiler.Enqueue(set);
-                    return ($@"{'\t'}{transpiler.Escape(set)}(f__new_string(u""System.Threading.ThreadPool.MinThreads""sv), f__new_constructed<{transpiler.Escape(get(typeof(int)))}>(1));
-{'\t'}{transpiler.Escape(set)}(f__new_string(u""System.Threading.ThreadPool.MaxThreads""sv), f__new_constructed<{transpiler.Escape(get(typeof(int)))}>(1));
-{'\t'}return true;
-", 1);
-                }
-            ));
+            .For(get(typeof(JSSynchronizationContext)), (type, code) =>
+            {
+                code.For(
+                    type.GetMethod(nameof(JSSynchronizationContext.Notify)),
+                    transpiler => ($@"{'\t'}f_epoch_region([&]
+{'\t'}{{
+{'\t'}{'\t'}il2cxx_js_synchronization_context_notify();
+{'\t'}}});
+", 0)
+                );
+            });
+            // TODO configure ThreadPool.MinThreads/MaxThreads?
         }
         Type load(string x) => Type.GetType(x, context.LoadFromAssemblyName, (assembly, name, ignoreCase) => int.TryParse(name, out var x) ? Type.MakeGenericMethodParameter(x) : assembly?.GetType(name, false, ignoreCase), true)!;
         var bundleTypes = new List<Type>();
@@ -161,6 +187,11 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
                 assembly.GetType("System.Runtime.InteropServices.JavaScript.__GeneratedInitializer")
             }.Where(x => x != null);
             bundleTypes.AddRange(types!);
+            var jssc = get(typeof(JSSynchronizationContext));
+            bundleMethods.AddRange([
+                    jssc.GetMethod(nameof(JSSynchronizationContext.Install))!,
+                    jssc.GetMethod(nameof(JSSynchronizationContext.Pump))!
+            ]);
             reflection.UnionWith(types!);
             reflection.Add(get(typeof(System.Threading.Tasks.Task<>)));
         }
@@ -258,8 +289,9 @@ set_target_properties({name} PROPERTIES OUTPUT_NAME dotnet.native)
 target_sources({name} PRIVATE wasm/src/driver.cc wasm/src/pinvoke.cc)
 target_include_directories({name} PRIVATE wasm/src src .)
 target_link_libraries({name} recyclone dl
+{'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libminipal.a
 {'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libSystem.Native.a
-{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'UTF8ToString', 'UTF8ArrayToString', 'FS', 'runtimeKeepalivePush', 'runtimeKeepalivePop']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.lib.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/pal_random.lib.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.extpost.js;-Wl,-u,htonl""
+{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'lengthBytesUTF8', 'UTF8ToString', 'UTF8ArrayToString', 'stringToUTF8Array', 'FS', 'runtimeKeepalivePush', 'runtimeKeepalivePop', 'HEAP32', 'HEAPU8', 'HEAPU16', 'HEAPU32']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.lib.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.extpost.js""
 {'\t'})
 " : $@"
 target_include_directories({name} PRIVATE src .)

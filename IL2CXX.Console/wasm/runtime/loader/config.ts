@@ -2,17 +2,18 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 import BuildConfiguration from "consts:configuration";
-import type { DotnetModuleInternal, MonoConfigInternal } from "../types/internal";
-import type { DotnetModuleConfig, MonoConfig, ResourceGroups, ResourceList } from "../types";
-import { ENVIRONMENT_IS_WEB, exportedRuntimeAPI, loaderHelpers, runtimeHelpers } from "./globals";
+import WasmEnableThreads from "consts:wasmEnableThreads";
+
+import { type DotnetModuleInternal, type MonoConfigInternal, JSThreadBlockingMode } from "../types/internal";
+import type { AssemblyAsset, Assets, BootModule, DotnetModuleConfig, IcuAsset, JsAsset, MonoConfig, PdbAsset, SymbolsAsset, VfsAsset, WasmAsset } from "../types";
+import { exportedRuntimeAPI, loaderHelpers, runtimeHelpers } from "./globals";
 import { mono_log_error, mono_log_debug } from "./logging";
 import { importLibraryInitializers, invokeLibraryInitializers } from "./libraryInitializers";
 import { mono_exit } from "./exit";
 import { makeURLAbsoluteWithApplicationBase } from "./polyfills";
 import { appendUniqueQuery } from "./assets";
-import { mono_assert } from "./globals";
 
-export function deep_merge_config(target: MonoConfigInternal, source: MonoConfigInternal): MonoConfigInternal {
+export function deep_merge_config (target: MonoConfigInternal, source: MonoConfigInternal): MonoConfigInternal {
     // no need to merge the same object
     if (target === source) return target;
 
@@ -23,10 +24,10 @@ export function deep_merge_config(target: MonoConfigInternal, source: MonoConfig
     }
     if (providedConfig.resources !== undefined) {
         providedConfig.resources = deep_merge_resources(target.resources || {
-            assembly: {},
-            jsModuleNative: {},
-            jsModuleRuntime: {},
-            wasmNative: {}
+            assembly: [],
+            jsModuleNative: [],
+            jsModuleRuntime: [],
+            wasmNative: []
         }, providedConfig.resources);
     }
     if (providedConfig.environmentVariables !== undefined) {
@@ -38,7 +39,7 @@ export function deep_merge_config(target: MonoConfigInternal, source: MonoConfig
     return Object.assign(target, providedConfig);
 }
 
-export function deep_merge_module(target: DotnetModuleInternal, source: DotnetModuleConfig): DotnetModuleInternal {
+export function deep_merge_module (target: DotnetModuleInternal, source: DotnetModuleConfig): DotnetModuleInternal {
     // no need to merge the same object
     if (target === source) return target;
 
@@ -50,121 +51,130 @@ export function deep_merge_module(target: DotnetModuleInternal, source: DotnetMo
     return Object.assign(target, providedConfig);
 }
 
-function deep_merge_resources(target: ResourceGroups, source: ResourceGroups): ResourceGroups {
+function deep_merge_resources (target: Assets, source: Assets): Assets {
     // no need to merge the same object
     if (target === source) return target;
 
-    const providedResources: ResourceGroups = { ...source };
+    const providedResources: Assets = { ...source };
+    if (providedResources.coreAssembly !== undefined) {
+        providedResources.coreAssembly = [...(target.coreAssembly || []), ...(providedResources.coreAssembly || [])];
+    }
     if (providedResources.assembly !== undefined) {
-        providedResources.assembly = { ...(target.assembly || {}), ...(providedResources.assembly || {}) };
+        providedResources.assembly = [...(target.assembly || []), ...(providedResources.assembly || [])];
     }
     if (providedResources.lazyAssembly !== undefined) {
-        providedResources.lazyAssembly = { ...(target.lazyAssembly || {}), ...(providedResources.lazyAssembly || {}) };
+        providedResources.lazyAssembly = [...(target.lazyAssembly || []), ...(providedResources.lazyAssembly || [])];
+    }
+    if (providedResources.corePdb !== undefined) {
+        providedResources.corePdb = [...(target.corePdb || []), ...(providedResources.corePdb || [])];
     }
     if (providedResources.pdb !== undefined) {
-        providedResources.pdb = { ...(target.pdb || {}), ...(providedResources.pdb || {}) };
+        providedResources.pdb = [...(target.pdb || []), ...(providedResources.pdb || [])];
     }
     if (providedResources.jsModuleWorker !== undefined) {
-        providedResources.jsModuleWorker = { ...(target.jsModuleWorker || {}), ...(providedResources.jsModuleWorker || {}) };
+        providedResources.jsModuleWorker = [...(target.jsModuleWorker || []), ...(providedResources.jsModuleWorker || [])];
     }
     if (providedResources.jsModuleNative !== undefined) {
-        providedResources.jsModuleNative = { ...(target.jsModuleNative || {}), ...(providedResources.jsModuleNative || {}) };
+        providedResources.jsModuleNative = [...(target.jsModuleNative || []), ...(providedResources.jsModuleNative || [])];
+    }
+    if (providedResources.jsModuleDiagnostics !== undefined) {
+        providedResources.jsModuleDiagnostics = [...(target.jsModuleDiagnostics || []), ...(providedResources.jsModuleDiagnostics || [])];
     }
     if (providedResources.jsModuleRuntime !== undefined) {
-        providedResources.jsModuleRuntime = { ...(target.jsModuleRuntime || {}), ...(providedResources.jsModuleRuntime || {}) };
+        providedResources.jsModuleRuntime = [...(target.jsModuleRuntime || []), ...(providedResources.jsModuleRuntime || [])];
     }
     if (providedResources.wasmSymbols !== undefined) {
-        providedResources.wasmSymbols = { ...(target.wasmSymbols || {}), ...(providedResources.wasmSymbols || {}) };
+        providedResources.wasmSymbols = [...(target.wasmSymbols || []), ...(providedResources.wasmSymbols || [])];
     }
     if (providedResources.wasmNative !== undefined) {
-        providedResources.wasmNative = { ...(target.wasmNative || {}), ...(providedResources.wasmNative || {}) };
+        providedResources.wasmNative = [...(target.wasmNative || []), ...(providedResources.wasmNative || [])];
     }
     if (providedResources.icu !== undefined) {
-        providedResources.icu = { ...(target.icu || {}), ...(providedResources.icu || {}) };
+        providedResources.icu = [...(target.icu || []), ...(providedResources.icu || [])];
     }
     if (providedResources.satelliteResources !== undefined) {
-        providedResources.satelliteResources = deep_merge_dict(target.satelliteResources || {}, providedResources.satelliteResources || {});
+        providedResources.satelliteResources = deepMergeSatelliteResources(target.satelliteResources || {}, providedResources.satelliteResources || {});
     }
     if (providedResources.modulesAfterConfigLoaded !== undefined) {
-        providedResources.modulesAfterConfigLoaded = { ...(target.modulesAfterConfigLoaded || {}), ...(providedResources.modulesAfterConfigLoaded || {}) };
+        providedResources.modulesAfterConfigLoaded = [...(target.modulesAfterConfigLoaded || []), ...(providedResources.modulesAfterConfigLoaded || [])];
     }
     if (providedResources.modulesAfterRuntimeReady !== undefined) {
-        providedResources.modulesAfterRuntimeReady = { ...(target.modulesAfterRuntimeReady || {}), ...(providedResources.modulesAfterRuntimeReady || {}) };
+        providedResources.modulesAfterRuntimeReady = [...(target.modulesAfterRuntimeReady || []), ...(providedResources.modulesAfterRuntimeReady || [])];
     }
     if (providedResources.extensions !== undefined) {
         providedResources.extensions = { ...(target.extensions || {}), ...(providedResources.extensions || {}) };
     }
     if (providedResources.vfs !== undefined) {
-        providedResources.vfs = deep_merge_dict(target.vfs || {}, providedResources.vfs || {});
+        providedResources.vfs = [...(target.vfs || []), ...(providedResources.vfs || [])];
     }
     return Object.assign(target, providedResources);
 }
 
-function deep_merge_dict(target: { [key: string]: ResourceList }, source: { [key: string]: ResourceList }) {
+function deepMergeSatelliteResources (target: { [key: string]: AssemblyAsset[] }, source: { [key: string]: AssemblyAsset[] }) {
     // no need to merge the same object
     if (target === source) return target;
 
     for (const key in source) {
-        target[key] = { ...target[key], ...source[key] };
+        target[key] = [...target[key] || [], ...source[key] || []];
     }
     return target;
 }
 
 // NOTE: this is called before setRuntimeGlobals
-export function normalizeConfig() {
+export function normalizeConfig () {
     // normalize
     const config = loaderHelpers.config;
 
     config.environmentVariables = config.environmentVariables || {};
     config.runtimeOptions = config.runtimeOptions || [];
     config.resources = config.resources || {
-        assembly: {},
-        jsModuleNative: {},
-        jsModuleWorker: {},
-        jsModuleRuntime: {},
-        wasmNative: {},
-        vfs: {},
-        satelliteResources: {},
+        assembly: [],
+        jsModuleNative: [],
+        jsModuleWorker: [],
+        jsModuleRuntime: [],
+        wasmNative: [],
+        vfs: [],
+        satelliteResources: {}
     };
 
     if (config.assets) {
         mono_log_debug("config.assets is deprecated, use config.resources instead");
         for (const asset of config.assets) {
-            const resource = {} as ResourceList;
-            resource[asset.name] = asset.hash || "";
-            const toMerge = {} as ResourceGroups;
+            const toMerge = {} as Assets;
             switch (asset.behavior as string) {
                 case "assembly":
-                    toMerge.assembly = resource;
+                    toMerge.assembly = [asset as AssemblyAsset];
                     break;
                 case "pdb":
-                    toMerge.pdb = resource;
+                    toMerge.pdb = [asset as PdbAsset];
                     break;
                 case "resource":
                     toMerge.satelliteResources = {};
-                    toMerge.satelliteResources[asset.culture!] = resource;
+                    toMerge.satelliteResources[asset.culture!] = [asset as AssemblyAsset];
                     break;
                 case "icu":
-                    toMerge.icu = resource;
+                    toMerge.icu = [asset as IcuAsset];
                     break;
                 case "symbols":
-                    toMerge.wasmSymbols = resource;
+                    toMerge.wasmSymbols = [asset as SymbolsAsset];
                     break;
                 case "vfs":
-                    toMerge.vfs = {};
-                    toMerge.vfs[asset.virtualPath!] = resource;
+                    toMerge.vfs = [asset as VfsAsset];
                     break;
                 case "dotnetwasm":
-                    toMerge.wasmNative = resource;
+                    toMerge.wasmNative = [asset as WasmAsset];
                     break;
                 case "js-module-threads":
-                    toMerge.jsModuleWorker = resource;
+                    toMerge.jsModuleWorker = [asset as JsAsset];
                     break;
                 case "js-module-runtime":
-                    toMerge.jsModuleRuntime = resource;
+                    toMerge.jsModuleRuntime = [asset as JsAsset];
                     break;
                 case "js-module-native":
-                    toMerge.jsModuleNative = resource;
+                    toMerge.jsModuleNative = [asset as JsAsset];
+                    break;
+                case "js-module-diagnostics":
+                    toMerge.jsModuleDiagnostics = [asset as JsAsset];
                     break;
                 case "js-module-dotnet":
                     // don't merge loader
@@ -176,19 +186,37 @@ export function normalizeConfig() {
         }
     }
 
-    loaderHelpers.assertAfterExit = config.assertAfterExit = config.assertAfterExit || !ENVIRONMENT_IS_WEB;
-
     if (config.debugLevel === undefined && BuildConfiguration === "Debug") {
         config.debugLevel = -1;
     }
 
-    if (config.cachedResourcesPurgeDelay === undefined) {
-        config.cachedResourcesPurgeDelay = 10000;
+    if (!config.applicationEnvironment) {
+        config.applicationEnvironment = "Production";
     }
 
-    if (config.diagnosticTracing === undefined && BuildConfiguration === "Debug") {
+    // ActiveIssue https://github.com/dotnet/runtime/issues/75602
+    if (WasmEnableThreads) {
+
+        if (!Number.isInteger(config.pthreadPoolInitialSize)) {
+            config.pthreadPoolInitialSize = 5;
+        }
+        if (!Number.isInteger(config.pthreadPoolUnusedSize)) {
+            config.pthreadPoolUnusedSize = 1;
+        }
+        if (config.jsThreadBlockingMode == undefined) {
+            config.jsThreadBlockingMode = JSThreadBlockingMode.PreventSynchronousJSExport;
+        }
+    }
+
+    // this is how long the Mono GC will try to wait for all threads to be suspended before it gives up and aborts the process
+    if (WasmEnableThreads && config.environmentVariables["MONO_SLEEP_ABORT_LIMIT"] === undefined) {
+        config.environmentVariables["MONO_SLEEP_ABORT_LIMIT"] = "5000";
+    }
+
+    if (BuildConfiguration === "Debug" && config.diagnosticTracing === undefined) {
         config.diagnosticTracing = true;
     }
+
     if (config.applicationCulture) {
         // If a culture is specified via start options use that to initialize the Emscripten \  .NET culture.
         config.environmentVariables!["LANG"] = `${config.applicationCulture}.UTF-8`;
@@ -196,28 +224,26 @@ export function normalizeConfig() {
 
     runtimeHelpers.diagnosticTracing = loaderHelpers.diagnosticTracing = !!config.diagnosticTracing;
     runtimeHelpers.waitForDebugger = config.waitForDebugger;
-    config.startupMemoryCache = !!config.startupMemoryCache;
-    if (config.startupMemoryCache && runtimeHelpers.waitForDebugger) {
-        mono_log_debug("Disabling startupMemoryCache because waitForDebugger is set");
-        config.startupMemoryCache = false;
-    }
-
-    runtimeHelpers.enablePerfMeasure = !!config.browserProfilerOptions
-        && globalThis.performance
-        && typeof globalThis.performance.measure === "function";
 
     loaderHelpers.maxParallelDownloads = config.maxParallelDownloads || loaderHelpers.maxParallelDownloads;
     loaderHelpers.enableDownloadRetry = config.enableDownloadRetry !== undefined ? config.enableDownloadRetry : loaderHelpers.enableDownloadRetry;
 }
 
 let configLoaded = false;
-export async function mono_wasm_load_config(module: DotnetModuleInternal): Promise<void> {
-    const configFilePath = module.configSrc;
+export async function mono_wasm_load_config (module: DotnetModuleInternal): Promise<void> {
     if (configLoaded) {
         await loaderHelpers.afterConfigLoaded.promise;
         return;
     }
+    let configFilePath;
     try {
+        if (!module.configSrc && (!loaderHelpers.config || Object.keys(loaderHelpers.config).length === 0 || (!loaderHelpers.config.assets && !loaderHelpers.config.resources))) {
+            // if config file location nor assets are provided
+            module.configSrc = "dotnet.boot.js";
+        }
+
+        configFilePath = module.configSrc;
+
         configLoaded = true;
         if (configFilePath) {
             mono_log_debug("mono_wasm_load_config");
@@ -234,21 +260,14 @@ export async function mono_wasm_load_config(module: DotnetModuleInternal): Promi
             try {
                 await module.onConfigLoaded(loaderHelpers.config, exportedRuntimeAPI);
                 normalizeConfig();
-            }
-            catch (err: any) {
+            } catch (err: any) {
                 mono_log_error("onConfigLoaded() failed", err);
                 throw err;
             }
         }
 
         normalizeConfig();
-
-        mono_assert(!loaderHelpers.config.startupMemoryCache || !module.instantiateWasm, "startupMemoryCache is not supported with Module.instantiateWasm");
-
         loaderHelpers.afterConfigLoaded.promise_control.resolve(loaderHelpers.config);
-        if (!loaderHelpers.config.startupMemoryCache) {
-            loaderHelpers.memorySnapshotSkippedOrDone.promise_control.resolve();
-        }
     } catch (err) {
         const errMessage = `Failed to load config file ${configFilePath} ${err} ${(err as Error)?.stack}`;
         loaderHelpers.config = module.config = Object.assign(loaderHelpers.config, { message: errMessage, error: err, isError: true });
@@ -257,7 +276,7 @@ export async function mono_wasm_load_config(module: DotnetModuleInternal): Promi
     }
 }
 
-export function isDebuggingSupported(): boolean {
+export function isDebuggingSupported (): boolean {
     // Copied from blazor MonoDebugger.ts/attachDebuggerHotkey
     if (!globalThis.navigator) {
         return false;
@@ -266,27 +285,50 @@ export function isDebuggingSupported(): boolean {
     return loaderHelpers.isChromium || loaderHelpers.isFirefox;
 }
 
-async function loadBootConfig(module: DotnetModuleInternal): Promise<void> {
-    const defaultConfigSrc = loaderHelpers.locateFile(module.configSrc!);
+async function loadBootConfig (module: DotnetModuleInternal): Promise<void> {
+    const defaultConfigSrc = module.configSrc!;
+    const defaultConfigUrl = loaderHelpers.locateFile(defaultConfigSrc);
 
-    const loaderResponse = loaderHelpers.loadBootResource !== undefined ?
-        loaderHelpers.loadBootResource("manifest", "blazor.boot.json", defaultConfigSrc, "", "manifest") :
-        defaultLoadBootConfig(defaultConfigSrc);
-
-    let loadConfigResponse: Response;
-
-    if (!loaderResponse) {
-        loadConfigResponse = await defaultLoadBootConfig(appendUniqueQuery(defaultConfigSrc, "manifest"));
-    } else if (typeof loaderResponse === "string") {
-        loadConfigResponse = await defaultLoadBootConfig(makeURLAbsoluteWithApplicationBase(loaderResponse));
-    } else {
-        loadConfigResponse = await loaderResponse;
+    let loaderResponse = null;
+    if (loaderHelpers.loadBootResource !== undefined) {
+        loaderResponse = loaderHelpers.loadBootResource("manifest", defaultConfigSrc, defaultConfigUrl, "", "manifest");
     }
 
-    const loadedConfig: MonoConfig = await readBootConfigResponse(loadConfigResponse);
+    let loadedConfigResponse: Response | null = null;
+    let loadedConfig: MonoConfig;
+    if (!loaderResponse) {
+        if (defaultConfigUrl.includes(".json")) {
+            loadedConfigResponse = await fetchBootConfig(appendUniqueQuery(defaultConfigUrl, "manifest"));
+            loadedConfig = await readBootConfigResponse(loadedConfigResponse);
+        } else {
+            loadedConfig = (await import(appendUniqueQuery(defaultConfigUrl, "manifest"))).config;
+        }
+    } else if (typeof loaderResponse === "string") {
+        if (loaderResponse.includes(".json")) {
+            loadedConfigResponse = await fetchBootConfig(makeURLAbsoluteWithApplicationBase(loaderResponse));
+            loadedConfig = await readBootConfigResponse(loadedConfigResponse);
+        } else {
+            loadedConfig = (await import(makeURLAbsoluteWithApplicationBase(loaderResponse))).config;
+        }
+    } else {
+        const loadedResponse = await loaderResponse;
+        if (typeof (loadedResponse as Response).json == "function") {
+            loadedConfigResponse = loadedResponse as Response;
+            loadedConfig = await readBootConfigResponse(loadedConfigResponse);
+        } else {
+            // If the response doesn't contain .json(), consider it an imported module.
+            loadedConfig = (loadedResponse as BootModule).config;
+        }
+    }
+
+    // Prefer user-defined application environment
+    if (loaderHelpers.config.applicationEnvironment) {
+        loadedConfig.applicationEnvironment = loaderHelpers.config.applicationEnvironment;
+    }
+
     deep_merge_config(loaderHelpers.config, loadedConfig);
 
-    function defaultLoadBootConfig(url: string): Promise<Response> {
+    function fetchBootConfig (url: string): Promise<Response> {
         return loaderHelpers.fetch_like(url, {
             method: "GET",
             credentials: "include",
@@ -295,12 +337,12 @@ async function loadBootConfig(module: DotnetModuleInternal): Promise<void> {
     }
 }
 
-async function readBootConfigResponse(loadConfigResponse: Response): Promise<MonoConfig> {
+async function readBootConfigResponse (loadConfigResponse: Response): Promise<MonoConfig> {
     const config = loaderHelpers.config;
     const loadedConfig: MonoConfig = await loadConfigResponse.json();
 
-    if (!config.applicationEnvironment) {
-        loadedConfig.applicationEnvironment = loadConfigResponse.headers.get("Blazor-Environment") || loadConfigResponse.headers.get("DotNet-Environment") || "Production";
+    if (!config.applicationEnvironment && !loadedConfig.applicationEnvironment) {
+        loadedConfig.applicationEnvironment = loadConfigResponse.headers.get("Blazor-Environment") || loadConfigResponse.headers.get("DotNet-Environment") || undefined;
     }
 
     if (!loadedConfig.environmentVariables)

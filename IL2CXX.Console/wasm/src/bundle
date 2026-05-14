@@ -1,29 +1,37 @@
 #!/bin/bash
 BASE=$(cd $(dirname $0) && pwd)
 cp $BASE/../runtime/bin/* . || exit $?
-cat <<EOS >blazor.boot.json || exit $?
-{
+cat <<EOS >dotnet.boot.js || exit $?
+export const config = {
   "mainAssemblyName": "$1",
   "resources": {
-    "jsModuleNative": {
-      "dotnet.native.js": "sha256-$(cat dotnet.native.js | openssl dgst -sha256 -binary | openssl base64 -A)"
-    },
-    "jsModuleRuntime": {
-      "dotnet.runtime.js": "sha256-$(cat dotnet.runtime.js | openssl dgst -sha256 -binary | openssl base64 -A)"
-    },
-    "wasmNative": {
-      "dotnet.native.wasm": "sha256-$(cat dotnet.native.wasm | openssl dgst -sha256 -binary | openssl base64 -A)"
-    },
-    "wasmSymbols": {
-      "dotnet.native.js.symbols": "sha256-$(cat dotnet.native.js.symbols | openssl dgst -sha256 -binary | openssl base64 -A)"
-    }
+    "jsModuleNative": [
+      {
+        "name": "dotnet.native.js"
+      }
+    ],
+    "jsModuleRuntime": [
+      {
+        "name": "dotnet.runtime.js"
+      }
+    ],
+    "wasmNative": [
+      {
+        "name": "dotnet.native.wasm",
+        "integrity": "sha256-$(cat dotnet.native.wasm | openssl dgst -sha256 -binary | openssl base64 -A)",
+        "cache": "no-cache"
+      }
+    ]
   },
   "debugLevel": 0,
   "globalizationMode": "sharded"
-}
+};
 EOS
-shopt -s extglob
-if [ -d ../../../bin/Release/net8.0/publish/wwwroot ]; then
-	cp -a ../../../bin/Release/net8.0/publish/wwwroot/!(_framework) .. || exit $?
+if [ -d ../../../wwwroot ]; then
+	cp -a ../../../wwwroot/* .. || exit $?
+	sed -i \
+	 -e 's|<link rel="preload" id="webassembly" />|<link href="_framework/dotnet.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" />|' \
+	 -e "s|<script type='module' src=\"main#\\[\\.{fingerprint}\\]\\.js\"></script>|<script type='module' src=\"main.js\"></script>|" \
+	 ../index.html || exit $?
 	cp $BASE/serve.json .. || exit $?
 fi

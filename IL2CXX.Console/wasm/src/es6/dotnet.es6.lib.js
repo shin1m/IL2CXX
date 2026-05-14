@@ -7,39 +7,45 @@
 // -- this javascript file is evaluated by emcc during compilation! --
 
 // because we can't pass custom define symbols to acorn optimizer, we use environment variables to pass other build options
-const DISABLE_LEGACY_JS_INTEROP = process.env.DISABLE_LEGACY_JS_INTEROP === "1";
 const WASM_ENABLE_SIMD = process.env.WASM_ENABLE_SIMD === "1";
+const WASM_ENABLE_EVENTPIPE = process.env.WASM_ENABLE_EVENTPIPE === "1";
 const WASM_ENABLE_EH = process.env.WASM_ENABLE_EH === "1";
-const ENABLE_BROWSER_PROFILER = process.env.ENABLE_BROWSER_PROFILER === "1";
+const ENABLE_DEVTOOLS_PROFILER = process.env.ENABLE_DEVTOOLS_PROFILER === "1";
 const ENABLE_AOT_PROFILER = process.env.ENABLE_AOT_PROFILER === "1";
+const ENABLE_LOG_PROFILER = process.env.ENABLE_LOG_PROFILER === "1";
+const RUN_AOT_COMPILATION = process.env.RUN_AOT_COMPILATION === "1";
 var methodIndexByName = undefined;
 var gitHash = undefined;
 
-function setup(linkerSetup, ready) {
-    const pthreadReplacements = {};
-    const dotnet_replacements = {
-        fetch: globalThis.fetch,
-        require,
-        updateMemoryViews,
-        pthreadReplacements,
-        scriptDirectory,
-        noExitRuntime
-    };
+function setup(emscriptenBuildOptions) {
     // USE_PTHREADS is emscripten's define symbol, which is passed to acorn optimizer, so we could use it here
     #if USE_PTHREADS
-    pthreadReplacements.loadWasmModuleToWorker = PThread.loadWasmModuleToWorker;
-    pthreadReplacements.threadInitTLS = PThread.threadInitTLS;
-    pthreadReplacements.allocateUnusedWorker = PThread.allocateUnusedWorker;
+    const modulePThread = PThread;
     #else
+    const modulePThread = {};
     const ENVIRONMENT_IS_PTHREAD = false;
     #endif
+    const dotnet_replacements = {
+        fetch: globalThis.fetch,
+        ENVIRONMENT_IS_WORKER,
+        require,
+        modulePThread,
+        scriptDirectory,
+    };
 
+    ENVIRONMENT_IS_WORKER = dotnet_replacements.ENVIRONMENT_IS_WORKER;
+    Module.__dotnet_runtime.initializeReplacements(dotnet_replacements);
+    noExitRuntime = dotnet_replacements.noExitRuntime;
+    fetch = dotnet_replacements.fetch;
+    require = dotnet_replacements.require;
+    _scriptName = __dirname = scriptDirectory = dotnet_replacements.scriptDirectory;
     Module.__dotnet_runtime.passEmscriptenInternals({
         isPThread: ENVIRONMENT_IS_PTHREAD,
         quit_, ExitStatus,
-        ...linkerSetup
-    });
-    Module.__dotnet_runtime.initializeReplacements(dotnet_replacements);
+        updateMemoryViews,
+        getMemory: () => { return wasmMemory; },
+        getWasmIndirectFunctionTable: () => { return wasmTable; },
+    }, emscriptenBuildOptions);
 
     #if USE_PTHREADS
     if (ENVIRONMENT_IS_PTHREAD) {
@@ -47,22 +53,10 @@ function setup(linkerSetup, ready) {
         Module.__dotnet_runtime.configureWorkerStartup(Module);
     } else {
         #endif
-        ready = Module.__dotnet_runtime.configureEmscriptenStartup(Module, ready);
+        Module.__dotnet_runtime.configureEmscriptenStartup(Module);
         #if USE_PTHREADS
     }
     #endif
-
-    updateMemoryViews = dotnet_replacements.updateMemoryViews;
-    noExitRuntime = dotnet_replacements.noExitRuntime;
-    fetch = dotnet_replacements.fetch;
-    require = dotnet_replacements.require;
-    _scriptName = __dirname = scriptDirectory = dotnet_replacements.scriptDirectory;
-    #if USE_PTHREADS
-    PThread.loadWasmModuleToWorker = pthreadReplacements.loadWasmModuleToWorker;
-    PThread.threadInitTLS = pthreadReplacements.threadInitTLS;
-    PThread.allocateUnusedWorker = pthreadReplacements.allocateUnusedWorker;
-    #endif
-    return ready;
 }
 
 const DotnetSupportLib = {
@@ -89,28 +83,27 @@ function injectDependencies() {
     createWasmImportStubsFrom(methodIndexByName.mono_wasm_threads_imports);
     #endif
 
-    if (!DISABLE_LEGACY_JS_INTEROP) {
-        createWasmImportStubsFrom(methodIndexByName.mono_wasm_legacy_interop_imports);
-    }
-
-    DotnetSupportLib["$DOTNET__postset"] = `const DOTNET_setup = ready => DOTNET.setup({ ` +
-        `linkerDisableLegacyJsInterop: ${DISABLE_LEGACY_JS_INTEROP ? "true" : "false"},` +
-        `linkerWasmEnableSIMD: ${WASM_ENABLE_SIMD ? "true" : "false"},` +
-        `linkerWasmEnableEH: ${WASM_ENABLE_EH ? "true" : "false"},` +
-        `linkerEnableAotProfiler: ${ENABLE_AOT_PROFILER ? "true" : "false"}, ` +
-        `linkerEnableBrowserProfiler: ${ENABLE_BROWSER_PROFILER ? "true" : "false"}, ` +
+    DotnetSupportLib["$DOTNET__postset"] = `const DOTNET_setup = () => DOTNET.setup({ ` +
+        `wasmEnableSIMD: ${WASM_ENABLE_SIMD},` +
+        `wasmEnableEH: ${WASM_ENABLE_EH},` +
+        `enableAotProfiler: ${ENABLE_AOT_PROFILER}, ` +
+        `enableDevToolsProfiler: ${ENABLE_DEVTOOLS_PROFILER}, ` +
+        `enableLogProfiler: ${ENABLE_LOG_PROFILER}, ` +
+        `enableEventPipe: ${WASM_ENABLE_EVENTPIPE}, ` +
+        `runAOTCompilation: ${RUN_AOT_COMPILATION}, ` +
+        `wasmEnableThreads: ${!!USE_PTHREADS}, ` +
         `gitHash: "${gitHash}", ` +
-        `}, ready);` +
-        `if (!ENVIRONMENT_IS_PTHREAD) readyPromise = DOTNET_setup(readyPromise);`;
+        `});` +
+        `if (!ENVIRONMENT_IS_PTHREAD) DOTNET_setup();`;
 
     autoAddDeps(DotnetSupportLib, "$DOTNET");
     mergeInto(LibraryManager.library, DotnetSupportLib);
 }
 
 
-// var methodIndexByName wil be appended below by the MSBuild in wasm.proj
+// var methodIndexByName wil be appended below by the MSBuild in browser.proj via exports-linker.ts
 
-    var gitHash = "5c06b86e60635179f4ebc67712cd63c0ff07ac1b";
+    var gitHash = "ef63b206b25e0988f087be7b2739086798288463";
     var methodIndexByName = {
   "mono_wasm_imports": {
     "mono_wasm_schedule_timer": 0,
@@ -120,30 +113,28 @@ function injectDependencies() {
     "mono_wasm_fire_debugger_agent_message_with_data": 4,
     "mono_wasm_fire_debugger_agent_message_with_data_to_pause": 5,
     "schedule_background_exec": 6,
-    "mono_wasm_profiler_enter": 7,
-    "mono_wasm_profiler_leave": 8,
+    "mono_wasm_profiler_now": 7,
+    "mono_wasm_profiler_record": 8,
     "mono_wasm_trace_logger": 9,
     "mono_wasm_set_entrypoint_breakpoint": 10,
-    "mono_wasm_event_pipe_early_startup_callback": 11,
-    "mono_wasm_release_cs_owned_object": 12,
-    "mono_wasm_bind_js_function": 13,
-    "mono_wasm_invoke_bound_function": 14,
-    "mono_wasm_invoke_import": 15,
-    "mono_wasm_bind_cs_function": 16,
-    "mono_wasm_marshal_promise": 17,
-    "mono_wasm_change_case_invariant": 18,
-    "mono_wasm_change_case": 19,
-    "mono_wasm_compare_string": 20,
-    "mono_wasm_starts_with": 21,
-    "mono_wasm_ends_with": 22,
-    "mono_wasm_index_of": 23,
-    "mono_wasm_get_calendar_info": 24,
-    "mono_wasm_get_culture_info": 25,
-    "mono_wasm_get_first_day_of_week": 26,
-    "mono_wasm_get_first_week_of_year": 27
+    "mono_wasm_browser_entropy": 11,
+    "mono_wasm_process_current_pid": 12,
+    "mono_wasm_console_clear": 13,
+    "mono_wasm_release_cs_owned_object": 14,
+    "mono_wasm_bind_js_import_ST": 15,
+    "mono_wasm_invoke_js_function": 16,
+    "mono_wasm_invoke_jsimport_ST": 17,
+    "mono_wasm_resolve_or_reject_promise": 18,
+    "mono_wasm_cancel_promise": 19,
+    "mono_wasm_get_locale_info": 20,
+    "il2cxx_js_synchronization_context_notify": 21,
+    "ds_rt_websocket_create": 22,
+    "ds_rt_websocket_send": 23,
+    "ds_rt_websocket_poll": 24,
+    "ds_rt_websocket_recv": 25,
+    "ds_rt_websocket_close": 26
   },
-  "mono_wasm_threads_imports": {},
-  "mono_wasm_legacy_interop_imports": {}
+  "mono_wasm_threads_imports": {}
 };
     injectDependencies();
     

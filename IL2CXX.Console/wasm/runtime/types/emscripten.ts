@@ -27,30 +27,12 @@ declare interface FileSystem {
 }
 
 export declare interface EmscriptenModule {
-    /** @deprecated Please use growableHeapI8() instead.*/
-    HEAP8: Int8Array,
-    /** @deprecated Please use growableHeapI16() instead.*/
-    HEAP16: Int16Array;
-    /** @deprecated Please use growableHeapI32() instead. */
-    HEAP32: Int32Array;
-    /** @deprecated Please use growableHeapI64() instead. */
-    HEAP64: BigInt64Array;
-    /** @deprecated Please use growableHeapU8() instead. */
-    HEAPU8: Uint8Array;
-    /** @deprecated Please use growableHeapU16() instead. */
-    HEAPU16: Uint16Array;
-    /** @deprecated Please use growableHeapU32() instead */
-    HEAPU32: Uint32Array;
-    /** @deprecated Please use growableHeapF32() instead */
-    HEAPF32: Float32Array;
-    /** @deprecated Please use growableHeapF64() instead. */
-    HEAPF64: Float64Array;
-
     FS: FileSystem;
 
     // this should match emcc -s EXPORTED_FUNCTIONS
     _malloc(size: number): VoidPtr;
     _free(ptr: VoidPtr): void;
+    _sbrk(size: number): VoidPtr;
 
     // this should match emcc -s EXPORTED_RUNTIME_METHODS
     out(message: string): void;
@@ -64,6 +46,7 @@ export declare interface EmscriptenModule {
     UTF8ToString(ptr: CharPtr, maxBytesToRead?: number): string;
     UTF8ArrayToString(u8Array: Uint8Array, idx?: number, maxBytesToRead?: number): string;
     stringToUTF8Array(str: string, heap: Uint8Array, outIdx: number, maxBytesToWrite: number): void;
+    lengthBytesUTF8(str: string): number;
     addFunction(fn: Function, signature: string): number;
     stackSave(): VoidPtr;
     stackRestore(stack: VoidPtr): void;

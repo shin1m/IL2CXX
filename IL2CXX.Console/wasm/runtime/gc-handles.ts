@@ -4,7 +4,7 @@
 import WasmEnableThreads from "consts:wasmEnableThreads";
 import BuildConfiguration from "consts:configuration";
 
-import { loaderHelpers, mono_assert } from "./globals";
+import { loaderHelpers, mono_assert, ENVIRONMENT_IS_WORKER } from "./globals";
 import { assert_js_interop, js_import_wrapper_by_fn_handle } from "./invoke-js";
 import { mono_log_info, mono_log_warn } from "./logging";
 import { bound_cs_function_symbol, imported_js_function_symbol, proxy_debug_symbol } from "./marshal";
@@ -106,6 +106,10 @@ export function register_with_jsv_handle (js_obj: any, jsv_handle: JSHandle) {
 
 // note: in MT, this is called from locked JSProxyContext. Don't call anything that would need locking.
 export function mono_wasm_release_cs_owned_object (js_handle: JSHandle): void {
+    if (ENVIRONMENT_IS_WORKER) {
+        self.postMessage({il2cxx: "release_cs_owned_object", jsHandle: js_handle});
+        return;
+    }
     let obj: any;
     if (is_js_handle(js_handle)) {
         obj = _cs_owned_objects_by_js_handle[<any>js_handle];

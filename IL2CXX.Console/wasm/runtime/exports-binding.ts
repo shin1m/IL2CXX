@@ -30,6 +30,9 @@ import { mono_wasm_get_locale_info } from "./globalization-locale";
 import { mono_wasm_profiler_record, mono_wasm_profiler_now } from "./profiler";
 import { ds_rt_websocket_create, ds_rt_websocket_send, ds_rt_websocket_poll, ds_rt_websocket_recv, ds_rt_websocket_close } from "./diagnostics";
 
+import { ENVIRONMENT_IS_WORKER } from "./globals";
+import cwraps from "./cwraps";
+
 // the JS methods would be visible to EMCC linker and become imports of the WASM module
 
 export const mono_wasm_threads_imports = !WasmEnableThreads ? [] : [
@@ -100,7 +103,10 @@ export const mono_wasm_imports = [
     mono_wasm_cancel_promise,
     mono_wasm_get_locale_info,
     function il2cxx_js_synchronization_context_notify() {
-        self.postMessage({il2cxx: "js_synchronization_context_notify"});
+        if (ENVIRONMENT_IS_WORKER)
+            self.postMessage({il2cxx: "js_synchronization_context_pump"});
+        else
+            queueMicrotask(cwraps.il2cxx_js_synchronization_context_pump);
     },
 
     //event pipe

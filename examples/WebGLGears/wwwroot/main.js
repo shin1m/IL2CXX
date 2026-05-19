@@ -1,8 +1,7 @@
 import { dotnet } from './_framework/dotnet.js'
 import { webgl } from './thinjs.webgl.js';
 
-const { setModuleImports } = await dotnet
-    .withDiagnosticTracing(false)
+const { setModuleImports, runMain } = await dotnet
     .withApplicationArgumentsFromQuery()
     .create();
 
@@ -20,4 +19,4 @@ setModuleImports('main.js', {
     onMouseMove: (element, f) => element.addEventListener('mousemove', e => f(e.x, e.y))
 });
 
-await dotnet.run();
+await runMain();

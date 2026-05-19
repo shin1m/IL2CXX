@@ -10,6 +10,7 @@ import { Module, ENVIRONMENT_IS_WORKER, createPromiseController, loaderHelpers, 
 import { PThreadLibrary, MainToWorkerMessageType, MonoThreadMessage, PThreadInfo, PThreadPtr, PThreadPtrNull, PThreadWorker, PromiseController, Thread, WorkerToMainMessageType, monoMessageSymbol } from "../types/internal";
 import { mono_log_info, mono_log_debug, mono_log_warn } from "../logging";
 import cwraps from "../cwraps";
+import { mono_wasm_release_cs_owned_object } from "../gc-handles";
 
 const threadPromises: Map<PThreadPtr, PromiseController<Thread>[]> = new Map();
 
@@ -56,9 +57,13 @@ export function resolveThreadPromises (pthreadPtr: PThreadPtr, thread?: Thread):
 // handler that runs in the main thread when a message is received from a pthread worker
 function monoWorkerMessageHandler (worker: PThreadWorker, ev: MessageEvent<any>): void {
     //if (!WasmEnableThreads) return;
-    if (ev.data.il2cxx === "js_synchronization_context_notify") {
-        cwraps.il2cxx_js_synchronization_context_pump();
-        return;
+    switch (ev.data.il2cxx) {
+        case "release_cs_owned_object":
+            mono_wasm_release_cs_owned_object(ev.data.jsHandle);
+            return;
+        case "js_synchronization_context_pump":
+            cwraps.il2cxx_js_synchronization_context_pump();
+            return;
     }
     let pthreadId: PThreadPtr;
     // this is emscripten message

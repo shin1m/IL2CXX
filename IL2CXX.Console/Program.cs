@@ -291,7 +291,7 @@ target_include_directories({name} PRIVATE wasm/src src .)
 target_link_libraries({name} recyclone dl
 {'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libminipal.a
 {'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libSystem.Native.a
-{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'lengthBytesUTF8', 'UTF8ToString', 'UTF8ArrayToString', 'stringToUTF8Array', 'FS', 'runtimeKeepalivePush', 'runtimeKeepalivePop', 'HEAP32', 'HEAPU8', 'HEAPU16', 'HEAPU32']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.lib.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.extpost.js""
+{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'lengthBytesUTF8', 'UTF8ToString', 'UTF8ArrayToString', 'stringToUTF8Array', 'FS', 'runtimeKeepalivePush', 'runtimeKeepalivePop', 'HEAP8', 'HEAP16', 'HEAP32', 'HEAP64', 'HEAPU8', 'HEAPU16', 'HEAPU32', 'HEAPU64', 'HEAPF32', 'HEAPF64']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.lib.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.extpost.js""
 {'\t'})
 " : $@"
 target_include_directories({name} PRIVATE src .)

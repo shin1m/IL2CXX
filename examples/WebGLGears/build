@@ -5,7 +5,7 @@ if [ "$1" == '' ]; then
 	rm -rf il2cxx || exit $?
 	dotnet publish -c Release || exit $?
 	mkdir -p il2cxx/source || exit $?
-	(cd bin/Release/net8.0 && cp\
+	(cd bin/Release/net10.0 && cp\
 	 System.Runtime.InteropServices.JavaScript.dll\
 	 ThinJS.WebGL.dll\
 	 WebGLGears.dll\

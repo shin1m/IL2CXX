@@ -65,27 +65,27 @@ class NumericsTests
         var x = Vector.ConditionalSelect(new Vector<int>(Enumerable.Range(0, Vector<int>.Count).Select(x => x % 2 == 0 ? ~0 : 0).ToArray()), new Vector<float>(1f), new Vector<float>(2f));
         return x == new Vector<float>(Enumerable.Range(0, Vector<float>.Count).Select(x => x % 2 == 0 ? 1f : 2f).ToArray()) ? 0 : 1;
     }
-    static int VectorAdd()
+    static int VectorOfTAdd()
     {
         var x = new Vector<float>(1f) + new Vector<float>(2f);
         return x[0] == 3f ? 0 : 1;
     }
-    static int VectorSubtract()
+    static int VectorOfTSubtract()
     {
         var x = new Vector<float>(1f) - new Vector<float>(2f);
         return x[0] == -1f ? 0 : 1;
     }
-    static int VectorMultiply()
+    static int VectorOfTMultiply()
     {
         var x = new Vector<float>(2f) * new Vector<float>(3f);
         return x[0] == 6f ? 0 : 1;
     }
-    static int VectorMultiplyValue()
+    static int VectorOfTMultiplyValue()
     {
         var x = new Vector<float>(2f) * 3f;
         return x[0] == 6f ? 0 : 1;
     }
-    static int VectorDivide()
+    static int VectorOfTDivide()
     {
         var x = new Vector<float>(3f) / new Vector<float>(2f);
         return x[0] == 1.5f ? 0 : 1;
@@ -110,12 +110,8 @@ class NumericsTests
         var x = Vector.OnesComplement(new Vector<int>(0));
         return x[0] == ~0 ? 0 : 1;
     }
-    static int VectorEquality()
-    {
-        var x = new Vector<float>(1f);
-        var y = new Vector<float>(1f);
-        return x == y ? 0 : 1;
-    }
+    static int VectorOfTEquality() => new Vector<float>(1f) == new Vector<float>(1f) ? 0 : 1;
+    static int VectorOfTEquals() => new Vector<float>(1f).Equals((object)new Vector<float>(1f)) ? 0 : 1;
     static int VectorEquals()
     {
         var x = Vector.Equals<float>(new Vector<float>(1f), new Vector<float>(1f));
@@ -141,7 +137,7 @@ class NumericsTests
         var x = Vector.GreaterThanOrEqual<float>(new Vector<float>(1f), new Vector<float>(1f));
         return float.IsNaN(x[0]) ? 0 : 1;
     }
-    static int VectorComplement()
+    static int VectorOfTComplement()
     {
         var x = ~new Vector<uint>(0);
         return x[0] == uint.MaxValue ? 0 : 1;
@@ -384,22 +380,23 @@ class NumericsTests
         nameof(BitRotateLeft) => BitRotateLeft(),
         nameof(BitRotateRight) => BitRotateRight(),
         nameof(VectorConditionalSelect) => VectorConditionalSelect(),
-        nameof(VectorAdd) => VectorAdd(),
-        nameof(VectorSubtract) => VectorSubtract(),
-        nameof(VectorMultiply) => VectorMultiply(),
-        nameof(VectorMultiplyValue) => VectorMultiplyValue(),
-        nameof(VectorDivide) => VectorDivide(),
+        nameof(VectorOfTAdd) => VectorOfTAdd(),
+        nameof(VectorOfTSubtract) => VectorOfTSubtract(),
+        nameof(VectorOfTMultiply) => VectorOfTMultiply(),
+        nameof(VectorOfTMultiplyValue) => VectorOfTMultiplyValue(),
+        nameof(VectorOfTDivide) => VectorOfTDivide(),
         nameof(VectorBitwiseAnd) => VectorBitwiseAnd(),
         nameof(VectorBitwiseOr) => VectorBitwiseOr(),
         nameof(VectorXor) => VectorXor(),
         nameof(VectorOnesComplement) => VectorOnesComplement(),
-        nameof(VectorEquality) => VectorEquality(),
+        nameof(VectorOfTEquality) => VectorOfTEquality(),
+        nameof(VectorOfTEquals) => VectorOfTEquals(),
         nameof(VectorEquals) => VectorEquals(),
         nameof(VectorLessThan) => VectorLessThan(),
         nameof(VectorLessThanOrEqual) => VectorLessThanOrEqual(),
         nameof(VectorGreaterThan) => VectorGreaterThan(),
         nameof(VectorGreaterThanOrEqual) => VectorGreaterThanOrEqual(),
-        nameof(VectorComplement) => VectorComplement(),
+        nameof(VectorOfTComplement) => VectorOfTComplement(),
         nameof(VectorAbs) => VectorAbs(),
         nameof(VectorMin) => VectorMin(),
         nameof(VectorMax) => VectorMax(),
@@ -465,22 +462,23 @@ class NumericsTests
             nameof(BitRotateLeft),
             nameof(BitRotateRight),
             nameof(VectorConditionalSelect),
-            nameof(VectorAdd),
-            nameof(VectorSubtract),
-            nameof(VectorMultiply),
-            nameof(VectorMultiplyValue),
-            nameof(VectorDivide),
+            nameof(VectorOfTAdd),
+            nameof(VectorOfTSubtract),
+            nameof(VectorOfTMultiply),
+            nameof(VectorOfTMultiplyValue),
+            nameof(VectorOfTDivide),
             nameof(VectorBitwiseAnd),
             nameof(VectorBitwiseOr),
             nameof(VectorXor),
             nameof(VectorOnesComplement),
-            nameof(VectorEquality),
+            nameof(VectorOfTEquality),
+            nameof(VectorOfTEquals),
             nameof(VectorEquals),
             nameof(VectorLessThan),
             nameof(VectorLessThanOrEqual),
             nameof(VectorGreaterThan),
             nameof(VectorGreaterThanOrEqual),
-            nameof(VectorComplement),
+            nameof(VectorOfTComplement),
             nameof(VectorAbs),
             nameof(VectorMin),
             nameof(VectorMax),

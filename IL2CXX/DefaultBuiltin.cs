@@ -19,7 +19,13 @@ public static partial class DefaultBuiltin
         },
         MethodNameToBody =
         {
-            ["System.Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType?.Namespace == "System.Runtime.Intrinsics.X86" ? ("\treturn false;\n", 1) : default
+            ["System.Boolean get_IsSupported()"] = (transpiler, method) => method.DeclaringType?.Namespace switch
+            {
+                "System.Runtime.Intrinsics.Arm" or
+                "System.Runtime.Intrinsics.X86" or
+                "System.Runtime.Intrinsics.Wasm" => ("\treturn false;\n", 1),
+                _ => default
+            }
         }
     }
     .SetupInterop(get, target)

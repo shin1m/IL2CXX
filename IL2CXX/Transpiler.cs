@@ -1077,14 +1077,20 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         writer.WriteLine("[](t__object* RECYCLONE__SPILL a_this, t__object* RECYCLONE__SPILL a_parameters) -> t__object*\n{");
         var @return = GetReturnType(method);
         var parameters = method.GetParameters();
-        if (@return.IsByRef || @return.IsPointer || @return.IsByRefLike || method.DeclaringType!.IsByRefLike && !method.IsStatic || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike) || method.ContainsGenericParameters || method is ConstructorInfo && builtin.GetBody(this, ToKey(method)).body != null)
+        var @this = GetVirtualThisType(method.DeclaringType ?? throw new Exception());
+        if (
+            @return.IsByRef || @return.IsPointer || @return.IsByRefLike ||
+            @this.IsByRefLike && !method.IsStatic ||
+            parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike) ||
+            method.ContainsGenericParameters ||
+            method is ConstructorInfo && !@this.IsValueType && builtin.GetBody(this, ToKey(method)).body != null
+        )
         {
             writer.Write($"\t{GenerateThrow("NotSupported")};\n}}");
             return writer.ToString();
         }
         writer.Write(GenerateCheckParameterCount(method));
         var arguments = new List<string>();
-        var @this = GetVirtualThisType(method.DeclaringType);
         if (!method.IsStatic)
         {
             writer.Write(GenerateCheck(method, @this, "a_this", "!a_this ||", "Target"));
@@ -1098,10 +1104,10 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
     }
     private string GenerateCreateFunction(ConstructorInfo method)
     {
-        if (builtin.GetBody(this, ToKey(method)).body == null) return "t__runtime_constructor_info::f_create";
+        var type = method.DeclaringType ?? throw new Exception();
+        if (type.IsValueType || builtin.GetBody(this, ToKey(method)).body == null) return "t__runtime_constructor_info::f_create";
         using var writer = new StringWriter();
         writer.WriteLine("[](t__runtime_constructor_info*, t__object* RECYCLONE__SPILL a_parameters) -> t__object*\n{");
-        var type = method.DeclaringType ?? throw new Exception();
         var parameters = method.GetParameters();
         if (type.IsByRefLike || parameters.Select(x => x.ParameterType).Any(x => x.IsPointer || x.IsByRefLike))
         {
@@ -1113,10 +1119,10 @@ string.Join(",", UnmanagedSignature(parameters.Select(x => x.Parameter), charSet
         using var post = new StringWriter();
         var call = $@"{Escape(method)}({
 string.Join(",", parameters.Select((x, i) => $"\n\t\t{CastValue(x.ParameterType, GenerateParameter(method, x.ParameterType, i, writer, post))}"))
-}{(parameters.Length > 0 ? "\n\t" : string.Empty)})";
-        var x = $"{(type.IsValueType ? $"f__new_constructed<{Escape(type)}>({call})" : call)};\n";
+}{(parameters.Length > 0 ? "\n\t" : string.Empty)});
+";
         var p = post.ToString();
-        writer.Write(p.Length > 0 ? $"\tauto x = {x}{p}return x;\n}}" : $"\treturn {x}}}");
+        writer.Write(p.Length > 0 ? $"\tauto x = {call}{p}return x;\n}}" : $"\treturn {call}}}");
         return writer.ToString();
     }
     private string GenerateWASMInvokeFunction(MethodBase method)

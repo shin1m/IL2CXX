@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <DefineConstants>IL2CXX_OVERRIDE_NUMERICS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

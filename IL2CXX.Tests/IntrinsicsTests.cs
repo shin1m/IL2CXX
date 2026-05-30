@@ -55,12 +55,8 @@ class IntrinsicsTests
         var x = Vector256.OnesComplement(Vector256.Create(0));
         return x[0] == ~0 ? 0 : 1;
     }
-    static int VectorEquality()
-    {
-        var x = Vector256.Create(1f);
-        var y = Vector256.Create(1f);
-        return x == y ? 0 : 1;
-    }
+    static int VectorEquality() => Vector256.Create(1f) == Vector256.Create(1f) ? 0 : 1;
+    static int VectorObjectEquals() => Vector256.Create(1f).Equals((object)Vector256.Create(1f)) ? 0 : 1;
     static int VectorEquals()
     {
         var x = Vector256.Equals<float>(Vector256.Create(1f), Vector256.Create(1f));
@@ -200,6 +196,7 @@ class IntrinsicsTests
         nameof(VectorXor) => VectorXor(),
         nameof(VectorOnesComplement) => VectorOnesComplement(),
         nameof(VectorEquality) => VectorEquality(),
+        nameof(VectorObjectEquals) => VectorObjectEquals(),
         nameof(VectorEquals) => VectorEquals(),
         nameof(VectorLessThan) => VectorLessThan(),
         nameof(VectorLessThanOrEqual) => VectorLessThanOrEqual(),
@@ -246,6 +243,7 @@ class IntrinsicsTests
             nameof(VectorXor),
             nameof(VectorOnesComplement),
             nameof(VectorEquality),
+            nameof(VectorObjectEquals),
             nameof(VectorEquals),
             nameof(VectorLessThan),
             nameof(VectorLessThanOrEqual),

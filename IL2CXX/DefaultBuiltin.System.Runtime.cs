@@ -12,46 +12,36 @@ partial class DefaultBuiltin
     private static void SetupIntrinsicsVector(Func<Type, Type> get, Type type, Builtin.Code code, Type typeofVectorOfT)
     {
         SetupVector(get, type, code, typeofVectorOfT, nameof(Vector64.Sqrt));
-        /*
-        foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector64.Widen))) code.For(x, transpiler =>
-        {
-            var t = x.ReturnType.GenericTypeArguments[0];
-            var v = transpiler.EscapeForStacked(t);
-            var e = transpiler.EscapeForStacked(t.GenericTypeArguments[0]);
-            return ($@"{'\t'}auto p0 = reinterpret_cast<{transpiler.EscapeForStacked(x.GetParameters()[0].ParameterType.GenericTypeArguments[0])}*>(&a_0);
-{'\t'}auto n = sizeof({v}) / sizeof({e});
-{'\t'}{v} x;
-{'\t'}auto p1 = reinterpret_cast<{e}*>(&x);
-{'\t'}for (size_t i = 0; i < n; ++i) p1[i] = p0[i];
-{'\t'}{v} y;
-{'\t'}auto p2 = reinterpret_cast<{e}*>(&y);
-{'\t'}for (size_t i = 0; i < n; ++i) p2[i] = p0[n + i];
-{'\t'}return {{x, y}};
-", 1);
-        });
+#if IL2CXX_OVERRIDE_NUMERICS
         code.ForGeneric(
             type.GetMethod(nameof(Vector64.ExtractMostSignificantBits)),
-            (transpiler, types) =>
+            (transpiler, types) => VectorOfTIfSupported(transpiler, types, () =>
             {
                 var t = types[0];
-                var e = transpiler.EscapeForStacked(t);
+                var e = VectorOfTNative(transpiler, t);
                 return ($@"{'\t'}uint32_t value{{}};
 {'\t'}auto p0 = reinterpret_cast<{(t == get(typeof(float)) ? "uint32_t" : t == get(typeof(double)) ? "uint64_t" : $"std::make_unsigned_t<{e}>")}*>(&a_0);
 {'\t'}for (size_t i = 0; i < sizeof(a_0) / sizeof({e}); ++i) value |= p0[i] >> (sizeof({e}) * 8 - 1) << i;
 {'\t'}return value;
 ", 1);
-            }
+            })
         );
-        */
-    }
-    private static void SetupIntrinsicsVectorOfT(Type type, Builtin.Code code)
-    {
-        //SetupVectorOfT(type, code);
-        // TODO
-        code.ForGeneric(
-            type.GetMethod(nameof(ToString)),
-            (transpiler, types) => ($"\treturn f__new_string(u\"{type.MakeGenericType(types)}\"sv);\n", 0)
-        );
+        foreach (var x in type.GetMethods().Where(x => x.Name == nameof(Vector64.Shuffle))) code.For(x, transpiler =>
+        {
+            var e = transpiler.EscapeForStacked(x.ReturnType.GenericTypeArguments[0]);
+            return ($@"{'\t'}{transpiler.EscapeForStacked(x.ReturnType)} value;
+{'\t'}auto p = reinterpret_cast<{e}*>(&value);
+{'\t'}auto p0 = reinterpret_cast<{e}*>(&a_0);
+{'\t'}auto p1 = reinterpret_cast<{transpiler.EscapeForStacked(x.GetParameters()[1].ParameterType.GenericTypeArguments[0])}*>(&a_1);
+{'\t'}auto n = sizeof(value) / sizeof({e});
+{'\t'}for (size_t i = 0; i < n; ++i) {{
+{'\t'}{'\t'}auto j = p1[i];
+{'\t'}{'\t'}p[i] = j < n ? p0[j] : 0;
+{'\t'}}}
+{'\t'}return value;
+", 1);
+        });
+#endif
     }
     private static Builtin ForIf(this Builtin @this, Type? type, Action<Type, Builtin.Code> action) => type == null ? @this : @this.For(type, action);
     private static Builtin SetupSystemRuntime(this Builtin @this, Func<Type, Type> get) => @this
@@ -373,7 +363,7 @@ partial class DefaultBuiltin
             transpiler => (string.Empty, 1)
         );
     })
-    /*
+#if IL2CXX_OVERRIDE_NUMERICS
     .For(get(Type.GetType("System.Runtime.Intrinsics.Scalar`1", true)!), (type, code) =>
     {
         code.ForGeneric(
@@ -389,20 +379,20 @@ partial class DefaultBuiltin
         );
         code.ForGeneric(
             type.GetProperty("One")!.GetMethod,
-            (transpiler, types) => ("\treturn 1;\n", 1)
+            (transpiler, types) => VectorOfTIfSupported(transpiler, types, () => ("\treturn 1;\n", 1))
         );
     })
-    */
+#endif
     .For(get(typeof(Vector64)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector64<>))))
     .For(get(typeof(Vector128)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector128<>))))
     .For(get(typeof(Vector256)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector256<>))))
     .For(get(typeof(Vector512)), (type, code) => SetupIntrinsicsVector(get, type, code, get(typeof(Vector512<>))))
-    /*
-    .For(get(typeof(Vector64<>)), SetupIntrinsicsVectorOfT)
-    .For(get(typeof(Vector128<>)), SetupIntrinsicsVectorOfT)
-    .For(get(typeof(Vector256<>)), SetupIntrinsicsVectorOfT)
-    .For(get(typeof(Vector512<>)), SetupIntrinsicsVectorOfT)
-    */
+#if IL2CXX_OVERRIDE_NUMERICS
+    .For(get(typeof(Vector64<>)), SetupVectorOfT)
+    .For(get(typeof(Vector128<>)), SetupVectorOfT)
+    .For(get(typeof(Vector256<>)), SetupVectorOfT)
+    .For(get(typeof(Vector512<>)), SetupVectorOfT)
+#endif
     .ForIf(Type.GetType("System.Runtime.Versioning.CompatibilitySwitch") is Type t ? get(t) : null, (type, code) =>
     {
         // TODO

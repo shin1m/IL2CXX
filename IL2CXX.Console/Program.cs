@@ -18,10 +18,15 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
         var builtin = DefaultBuiltin.Create(get, options.Target);
         if (options.Target == PlatformID.Other)
         {
+            void forIf(Builtin.Code code, MethodBase? method, Func<Transpiler, (string body, int inline)> body)
+            {
+                if (method != null) code.For(method, body);
+            }
             builtin
             .For(get(typeof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument)), (type, code) =>
             {
-                code.For(
+                void codeFor(MethodBase? method, Func<Transpiler, (string body, int inline)> body) => forIf(code, method, body);
+                codeFor(
                     type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToManaged), [get(typeof(string).MakeByRefType())]),
                     transpiler => ($@"{'\t'}if (a_0->v_slot.v_Type.v) {{
 {'\t'}{'\t'}auto& p = reinterpret_cast<t_System_2eString*&>(a_0->v_slot.v_IntPtrValue.v);
@@ -32,7 +37,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}}
 ", 1)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod(nameof(System.Runtime.InteropServices.JavaScript.JSMarshalerArgument.ToJS), [get(typeof(string))]),
                     transpiler => ($@"{'\t'}if (a_1) {{
 {'\t'}{'\t'}a_0->v_slot.v_Type.v = 15;
@@ -45,15 +50,16 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
             })
             .For(context.LoadFromAssemblyName("System.Runtime.InteropServices.JavaScript").GetType("Interop+Runtime", true)!, (type, code) =>
             {
-                code.For(
+                void codeFor(MethodBase? method, Func<Transpiler, (string body, int inline)> body) => forIf(code, method, body);
+                codeFor(
                     type.GetMethod("RegisterGCRoot"),
                     transpiler => (string.Empty, 1)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("DeregisterGCRoot"),
                     transpiler => (string.Empty, 1)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("BindJSImportST"),
                     transpiler => ($@"{'\t'}return f_epoch_region([&]
 {'\t'}{{
@@ -61,7 +67,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("InvokeJSImportST"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -69,7 +75,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("ReleaseCSOwnedObject", BindingFlags.Static | BindingFlags.NonPublic),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -77,7 +83,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("ResolveOrRejectPromise"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -85,7 +91,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("InvokeJSFunction"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -93,7 +99,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("CancelPromise"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -101,7 +107,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("AssemblyGetEntryPoint"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -109,7 +115,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("BindAssemblyExports"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -117,7 +123,7 @@ Parser.Default.ParseArguments<Options>(args).MapResult(options =>
 {'\t'}}});
 ", 0)
                 );
-                code.For(
+                codeFor(
                     type.GetMethod("GetAssemblyExport"),
                     transpiler => ($@"{'\t'}f_epoch_region([&]
 {'\t'}{{
@@ -291,7 +297,7 @@ target_include_directories({name} PRIVATE wasm/src src .)
 target_link_libraries({name} recyclone dl
 {'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libminipal.a
 {'\t'}${{PROJECT_SOURCE_DIR}}/wasm/src/libSystem.Native.a
-{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['cwrap', 'setValue', 'lengthBytesUTF8', 'UTF8ToString', 'UTF8ArrayToString', 'stringToUTF8Array', 'FS', 'runtimeKeepalivePush', 'runtimeKeepalivePop', 'HEAP8', 'HEAP16', 'HEAP32', 'HEAP64', 'HEAPU8', 'HEAPU16', 'HEAPU32', 'HEAPU64', 'HEAPF32', 'HEAPF64']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackSave', 'stackRestore', 'stackAlloc']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.lib.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.extpost.js""
+{'\t'}""-s FORCE_FILESYSTEM;-s EXPORTED_RUNTIME_METHODS=\""['FS', 'cwrap', 'setValue', 'UTF8ToString', 'UTF8ArrayToString', 'lengthBytesUTF8', 'stringToUTF8Array', 'runtimeKeepalivePush', 'runtimeKeepalivePop', 'abort', 'wasmExports', 'HEAP8', 'HEAP16', 'HEAP32', 'HEAP64', 'HEAPU8', 'HEAPU16', 'HEAPU32', 'HEAPU64', 'HEAPF32', 'HEAPF64']\"";-s EXPORTED_FUNCTIONS=\""['_free', '_malloc', 'stackAlloc', 'stackRestore', 'stackSave']\"";-s EXPORT_NAME=\""'createDotnetRuntime'\"";-s MODULARIZE;-s EXPORT_ES6;--emit-symbol-map;--pre-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.pre.js;--js-library ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.lib.js;--extern-post-js ${{PROJECT_SOURCE_DIR}}/wasm/src/es6/dotnet.es6.extpost.js""
 {'\t'})
 " : $@"
 target_include_directories({name} PRIVATE src .)

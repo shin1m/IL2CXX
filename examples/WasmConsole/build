@@ -5,7 +5,7 @@ if [ "$1" == '' ]; then
 	rm -rf il2cxx || exit $?
 	dotnet publish -c Release || exit $?
 	mkdir -p il2cxx/source || exit $?
-	(cd bin/Release/net8.0/browser-wasm/publish && cp\
+	(cd bin/Release/net10.0/browser-wasm/publish && cp\
 	 System.Console.dll\
 	 System.Runtime.InteropServices.JavaScript.dll\
 	 WasmConsole.dll\
@@ -28,7 +28,7 @@ else
 fi
 cmake --build . -j8 || exit $?
 ../../out/wasm/src/bundle WasmConsole || exit $?
-(cd $BASE/bin/Release/net8.0/browser-wasm/AppBundle && cp\
+(cd $BASE/bin/Release/net10.0/browser-wasm/AppBundle && cp\
  main.mjs\
  package.json\
  $BASE/il2cxx/build\

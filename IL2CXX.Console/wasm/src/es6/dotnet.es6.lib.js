@@ -103,7 +103,7 @@ function injectDependencies() {
 
 // var methodIndexByName wil be appended below by the MSBuild in browser.proj via exports-linker.ts
 
-    var gitHash = "de82c11901a7a027913cf92be67034575bd1ce1e";
+    var gitHash = "95817c64fb2ec3318d64e4461a5b8dbd294fd027";
     var methodIndexByName = {
   "mono_wasm_imports": {
     "mono_wasm_schedule_timer": 0,

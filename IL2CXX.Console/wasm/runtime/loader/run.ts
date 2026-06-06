@@ -485,12 +485,13 @@ async function initializeModules (es6Modules: [RuntimeModuleExportsInternal, Nat
 
     let readyResolve: ((value: unknown) => void) | undefined;
     let readyReject;
+    const ready = new Promise((resolve, reject) => {
+	readyResolve = resolve;
+	readyReject = reject;
+    });
     const result = emscriptenFactory(() => {
         Object.assign(emscriptenModule, {
-            ready: new Promise((resolve, reject) => {
-                readyResolve = resolve;
-                readyReject = reject;
-            }),
+            ready: ready,
             __dotnet_runtime: {
                 initializeReplacements, configureEmscriptenStartup, configureWorkerStartup, passEmscriptenInternals
             }

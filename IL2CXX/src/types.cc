@@ -330,7 +330,7 @@ bool t__type::f_assignable_to(t__type* a_type) const
 
 t__object* t__type::f_new_zeroed()
 {
-	auto RECYCLONE__SPILL p = f_engine()->f_allocate(v__managed_size);
+	auto RECYCLONE__SPILL p = f_allocate(v__managed_size);
 	std::memset(p + 1, 0, v__managed_size - sizeof(t__object));
 	f_register_finalize(p);
 	p->f_be(this);

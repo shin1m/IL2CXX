@@ -159,7 +159,7 @@ t_System_2eArray* f__new_array(t__type* a_type, uint32_t a_length, auto a_do)
 {
 	auto a = sizeof(t_System_2eArray) + sizeof(t_System_2eArray::t__bound);
 	auto n = a_type->v__element->v__size * a_length;
-	auto p = static_cast<t_System_2eArray*>(f_engine()->f_allocate(a + n));
+	auto p = static_cast<t_System_2eArray*>(f_allocate(a + n));
 	p->v__length = a_length;
 	p->f_bounds()[0] = {a_length, 0};
 	a_do(reinterpret_cast<char*>(p) + a, n);

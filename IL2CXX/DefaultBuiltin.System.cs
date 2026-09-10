@@ -171,7 +171,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
         );
         code.For(
             type.GetMethod(nameof(Type.MakeGenericMethodParameter)),
-            transpiler => ($@"{'\t'}auto p = f_engine()->f_allocate(sizeof(t__generic_method_parameter));
+            transpiler => ($@"{'\t'}auto p = f_allocate(sizeof(t__generic_method_parameter));
 {'\t'}std::memset(p + 1, 0, sizeof(t__generic_method_parameter) - sizeof(t__object));
 {'\t'}auto q = static_cast<t__generic_method_parameter*>(p);
 {'\t'}q->v__position = a_0;
@@ -969,7 +969,7 @@ transpiler.GenerateVirtualCall(get(typeof(Type)).GetMethod("GetAttributeFlagsImp
             transpiler => (transpiler.GenerateCheckArgumentNull("a_0") + $@"{'\t'}if (a_0->f_type() != &t__type_of<t__type>::v__instance) throw std::runtime_error(""must be t__type"");
 {'\t'}auto type = static_cast<t__type*>(a_0);
 {'\t'}if (!type->v__enum) throw std::runtime_error(""must be enum"");
-{'\t'}auto p = f_engine()->f_allocate(type->v__managed_size);
+{'\t'}auto p = f_allocate(type->v__managed_size);
 {'\t'}switch (type->v__size) {{
 {'\t'}case 1:
 {'\t'}{'\t'}*reinterpret_cast<uint8_t*>(p + 1) = a_1;

@@ -24,10 +24,6 @@ struct t_engine : recyclone::t_engine<t__type>
 	static RECYCLONE__THREAD t__thread* v_current_thread;
 
 	using recyclone::t_engine<t__type>::t_engine;
-	RECYCLONE__ALWAYS_INLINE constexpr t__object* f_allocate(size_t a_size)
-	{
-		return static_cast<t__object*>(recyclone::t_engine<t__type>::f_allocate(a_size));
-	}
 	void f_start(t__thread* RECYCLONE__SPILL a_thread, auto a_main);
 	void f_background__(t__thread* RECYCLONE__SPILL a_thread, bool a_value);
 	void f_priority__(t__thread* RECYCLONE__SPILL a_thread, int32_t a_value);
@@ -53,12 +49,17 @@ inline t_engine* f_engine()
 	return static_cast<t_engine*>(recyclone::f_engine<t__type>());
 }
 
+inline RECYCLONE__ALWAYS_INLINE t__object* f_allocate(size_t a_size)
+{
+	return static_cast<t__object*>(recyclone::f_allocate<t__type>(a_size));
+}
+
 template<typename T>
 struct t__new
 {
 	T* v_p;
 
-	RECYCLONE__ALWAYS_INLINE constexpr t__new(size_t a_extra) : v_p(static_cast<T*>(f_engine()->f_allocate(sizeof(T) + a_extra)))
+	RECYCLONE__ALWAYS_INLINE constexpr t__new(size_t a_extra) : v_p(static_cast<T*>(f_allocate(sizeof(T) + a_extra)))
 	{
 	}
 	RECYCLONE__ALWAYS_INLINE ~t__new()
